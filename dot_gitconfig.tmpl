@@ -3,7 +3,7 @@
 [user]
 	name = "{{ $username }}"
 	email = "{{ $username }}@outlook.com"
-	signingkey = "{{ onepasswordRead (list "op://personal/" $username "/public key" | join "") "my.1password.com" }}"
+	signingkey = "{{ onepasswordRead (list "op://personal/" $username "/public key" | join "") "my" }}"
 [gpg]
 	format = ssh
 [gpg "ssh"]
@@ -35,23 +35,23 @@
 	rollback = reset --soft HEAD~1
 
 	# gpg signing
-    {{ range (onepassword "Active GPGs" "personal" "my.1password.com").fields -}}
+    {{ range (onepassword "Active GPGs" "personal" "my").fields -}}
 	{{      if (eq .type "REFERENCE") -}}
-	{{          $gpgAlias := onepasswordRead (list "op://Private/" .value "/gpg alias" | join "") "my.1password.com" }}
-	{{          $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my.1password.com" }}
-	{{          $gpgEmail := onepasswordRead (list "op://Private/" .value "/gpg email" | join "") "my.1password.com" }}
-	{{          $gpgFingerprint := onepasswordRead (list "op://Private/" .value "/fingerprint" | join "") "my.1password.com" }}
+	{{          $gpgAlias := onepasswordRead (list "op://Private/" .value "/gpg alias" | join "") "my" }}
+	{{          $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my" }}
+	{{          $gpgEmail := onepasswordRead (list "op://Private/" .value "/gpg email" | join "") "my" }}
+	{{          $gpgFingerprint := onepasswordRead (list "op://Private/" .value "/fingerprint" | join "") "my" }}
 	gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' &&git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
 	{{      end -}}
 	{{ end }}
 
 	# ssh signing
-	{{ range (onepassword "Active SSHs" "personal" "my.1password.com").fields -}}
+	{{ range (onepassword "Active SSHs" "personal" "my").fields -}}
 	{{      if (eq .type "REFERENCE") -}}
-	{{          $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my.1password.com" }}
-	{{          $sshUsername := onepasswordRead (list "op://Private/" .value "/ssh username" | join "") "my.1password.com" }}
-	{{          $sshEmail := onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my.1password.com" }}
-	{{          $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my.1password.com" }}
+	{{          $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my" }}
+	{{          $sshUsername := onepasswordRead (list "op://Private/" .value "/ssh username" | join "") "my" }}
+	{{          $sshEmail := onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" }}
+	{{          $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" }}
 	ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
 	{{      end -}}
 	{{ end }}

@@ -88,7 +88,6 @@ fi
 export SPEEDTEST="$TOOLS_DIR/Speedtest" && export PATH="$SPEEDTEST:$PATH"
 export CYCLONEDX="$TOOLS_DIR/Cyclonedx" && export PATH="$CYCLONEDX:$PATH"
 
-alias op="op.exe"
 alias ssh="ssh.exe"
 alias ssh-add="ssh-add.exe"
 alias video2mp4="video2mp4(){ ffmpeg -i $1 ${1%.*}.mp4 }; video2mp4"
@@ -113,8 +112,8 @@ alias play="PYTHONPATH=$HOME/Documents/Tools/asciinema python3 -m asciinema play
 
 ###### Engineering ######################################################################################################
 ###### Cloud #######################################################################
-alias awsprof="awsset(){ export AWS_PROFILE=$1 }; awsset"
-alias azsubs=""
+alias awsprof="awsprof(){ export AWS_PROFILE=$1 }; awsprof"
+alias azsubs="azsubs(){ az account set --subscription $1 }; azsubs"
 
 ###### Docker ######################################################################
 zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
@@ -153,8 +152,8 @@ CUSTOM_PATH="$HOME/$CUSTOM_FOLDER"
 FILES=("toolset-folders.sh" "engineering-k8s.sh" "credentials.sh")
 if [[ ! -d "$CUSTOM_PATH" ]]; then
   mkdir -p $CUSTOM_PATH
-  GITHUB_USERNAME=$(op read --account "my.1password.com" "op://personal/GitHub API/username")
-  GITHUB_PASSWORD=$(op read --account "my.1password.com" "op://personal/GitHub API/credential")
+  GITHUB_USERNAME=$(op read --account "my" "op://personal/GitHub API/username")
+  GITHUB_PASSWORD=$(op read --account "my" "op://personal/GitHub API/credential")
   for file in "${FILES[@]}"; do
     curl -sL -XGET -u $GITHUB_USERNAME:$GITHUB_PASSWORD -o "$CUSTOM_PATH/${file}.tpl" https://raw.githubusercontent.com/$GITHUB_USERNAME/dotfiles-private/main/wsl/$CUSTOM_FOLDER/$file
 	op inject -i "$CUSTOM_PATH/${file}.tpl" -o $CUSTOM_PATH/$file

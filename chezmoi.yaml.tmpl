@@ -2,7 +2,7 @@
 {{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 encryption: "age"
 age:
-  identity: "{{ onepasswordRead (list "op://personal/" $username "/public key" | join "") "my.1password.com" }}"
+  identity: "{{ onepasswordRead (list "op://personal/" $username "/public key" | join "") "my" }}"
   symmetric: true
 
 git:
