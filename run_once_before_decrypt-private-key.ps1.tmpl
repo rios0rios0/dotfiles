@@ -1,4 +1,4 @@
-{{- if eq .chezmoi.os "windows" }}
+{{ if eq .chezmoi.os "windows" }}
 $chezmoiConfigDir = "$HOME\.config\chezmoi"
 if (-Not (Test-Path "$chezmoiConfigDir\key.txt")) {
     New-Item -ItemType Directory -Force -Path $chezmoiConfigDir
@@ -6,4 +6,4 @@ if (-Not (Test-Path "$chezmoiConfigDir\key.txt")) {
     chezmoi age decrypt --passphrase "$chezmoiConfigDir\key.txt.age" --output "$chezmoiConfigDir\key.txt"
     Set-ItemProperty -Path "$chezmoiConfigDir\key.txt" -Name IsReadOnly -Value $false
 }
-{{- end }}
+{{ end }}

@@ -1,5 +1,6 @@
+{{ if eq .chezmoi.os "linux" }}
 #!/bin/sh
-{{ if ne .chezmoi.os "windows" }}
+
 chezmoiConfigDir="${HOME}/.config/chezmoi"
 if [ ! -f "${chezmoiConfigDir}/key.txt" ]; then
     mkdir -p $chezmoiConfigDir

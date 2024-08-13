@@ -3,7 +3,17 @@ LICENSE
 README.md
 
 # Windows
-{{- if eq .chezmoi.os "windows" }}
+{{ if ne .chezmoi.os "windows" }}
+  .aws
+  .azure
+  .ssh
+  .oh-my-posh.json
+  .wakatime.cfg
+  run_once_before_decrypt-private-key.ps1
+{{ end }}
+
+# Linux
+{{ if ne .chezmoi.os "linux" }}
   .docker
   .kube
   .freterc
@@ -11,13 +21,5 @@ README.md
   .zshrc
   # TODO: do I really need this file?
   pyvenv.cfg
-{{- end }}
-
-# Linux
-{{- if ne .chezmoi.os "windows" }}
-  .aws
-  .azure
-  .ssh
-  .oh-my-posh.json
-  .wakatime.cfg
-{{- end }}
+  run_once_before_decrypt-private-key.sh
+{{ end }}
