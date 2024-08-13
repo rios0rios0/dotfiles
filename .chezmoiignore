@@ -1,5 +1,6 @@
 # Common
 LICENSE
+README.md
 
 # Windows
 {{- if eq .chezmoi.os "windows" }}
