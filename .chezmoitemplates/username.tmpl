@@ -1,0 +1,1 @@
+{{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}

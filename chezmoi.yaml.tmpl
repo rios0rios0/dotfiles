@@ -1,0 +1,11 @@
+# TODO: how to avoid repetition with templates?
+{{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
+encryption: "age"
+age:
+  identity: "{{ onepasswordRead (list "op://personal/" $username "/public key" | join "") "my.1password.com" }}"
+  symmetric: true
+
+git:
+  autoAdd: true
+  autoCommit: true
+  #autoPush: true

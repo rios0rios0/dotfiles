@@ -8,11 +8,15 @@ LICENSE
   .freterc
   .p10k.zsh
   .zshrc
-  pyenv.cfg # TODO: do I really need this file?
+  # TODO: do I really need this file?
+  pyvenv.cfg
 {{- end }}
 
 # Linux
 {{- if ne .chezmoi.os "windows" }}
+  .aws
+  .azure
   .ssh
   .oh-my-posh.json
+  .wakatime.cfg
 {{- end }}

@@ -1,0 +1,16 @@
+{
+  "auths": {
+    {{ $items := (onepassword "Active Docker Registries" "personal" "my.1password.com").fields -}}
+    {{ $lastIndex := sub (len $items) 1 }}
+    {{ range $index, $item := $items }}
+    {{      if (eq $item.type "REFERENCE") -}}
+	{{          $registryUsername := onepasswordRead (list "op://Private/" $item.value "/username" | join "") "my.1password.com" }}
+    {{          $registryCredential := onepasswordRead (list "op://Private/" $item.value "/credential" | join "") "my.1password.com" }}
+	{{          $registryName := onepasswordRead (list "op://Private/" $item.value "/registry name" | join "") "my.1password.com" }}
+	"{{ $registryName }}": {
+      "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
+    }{{ if lt $index $lastIndex }},{{ end }}
+	{{      end -}}
+    {{ end -}}
+  }
+}

@@ -1,0 +1,72 @@
+# TODO: how to avoid repetition with templates?
+{{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
+[user]
+	name = "{{ $username }}"
+	email = "{{ $username }}@outlook.com"
+	signingkey = "{{ onepasswordRead (list "op://personal/" $username "/public key" | join "") "my.1password.com" }}"
+[gpg]
+	format = ssh
+[gpg "ssh"]
+	{{- if eq .chezmoi.os "windows" }}
+	program = "C:/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
+	allowedSignersFile = "C:/Users/{{ $username }}/.ssh/allowed_signers"
+	{{ else }}
+	program = "/mnt/c/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign-wsl"
+	allowedSignersFile = "/home/{{ $username }}/.ssh/allowed_signers"
+	{{ end }}
+[commit]
+	gpgsign = true
+[tag]
+	forceSignAnnotated = true
+[alias]
+	pom = push origin main -u
+	cim = "!f() { git commit -m \"$*\"; }; f"
+	ci = commit
+	co = checkout
+	cm = checkout main
+	cb = checkout -b
+	st = status -sb
+	sf = show --name-only
+	lg = log --pretty=format:'%Cred%h%Creset %C(bold)%cr%Creset %Cgreen<%an>%Creset %s' --max-count=30
+	incoming = !(git fetch --quiet && git log --pretty=format:'%C(yellow)%h %C(white)- %C(red)%an %C(white)- %C(cyan)%d%Creset %s %C(white)- %ar%Creset' ..@{u})
+	outgoing = !(git fetch --quiet && git log --pretty=format:'%C(yellow)%h %C(white)- %C(red)%an %C(white)- %C(cyan)%d%Creset %s %C(white)- %ar%Creset' @{u}..)
+	unstage = reset HEAD --
+	undo = checkout --
+	rollback = reset --soft HEAD~1
+
+	# gpg signing
+    {{ range (onepassword "Active GPGs" "personal" "my.1password.com").fields -}}
+	{{      if (eq .type "REFERENCE") -}}
+	{{          $gpgAlias := onepasswordRead (list "op://Private/" .value "/gpg alias" | join "") "my.1password.com" }}
+	{{          $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my.1password.com" }}
+	{{          $gpgEmail := onepasswordRead (list "op://Private/" .value "/gpg email" | join "") "my.1password.com" }}
+	{{          $gpgFingerprint := onepasswordRead (list "op://Private/" .value "/fingerprint" | join "") "my.1password.com" }}
+	gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' &&git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
+	{{      end -}}
+	{{ end }}
+
+	# ssh signing
+	{{ range (onepassword "Active SSHs" "personal" "my.1password.com").fields -}}
+	{{      if (eq .type "REFERENCE") -}}
+	{{          $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my.1password.com" }}
+	{{          $sshUsername := onepasswordRead (list "op://Private/" .value "/ssh username" | join "") "my.1password.com" }}
+	{{          $sshEmail := onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my.1password.com" }}
+	{{          $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my.1password.com" }}
+	ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
+	{{      end -}}
+	{{ end }}
+[core]
+	autocrlf = input
+	editor = vim
+	{{- if eq .chezmoi.os "windows" }}
+	excludesfile = "C:/Users/{{ $username }}/.gitignore"
+	sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe"
+	{{ else }}
+	excludesfile = "/home/{{ $username }}/.gitignore"
+	sshCommand = ssh.exe
+	{{ end }}
+[merge]
+	commit = yes
+	ff = yes
+#[includeIf 'gitdir:~/work/acme/'] # every repository under ~/work/acme will use this configuration
+#  path = ~/work/acme/.gitconfig
