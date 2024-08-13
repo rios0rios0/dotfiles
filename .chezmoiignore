@@ -1,0 +1,18 @@
+# Common
+LICENSE
+
+# Windows
+{{- if eq .chezmoi.os "windows" }}
+  .docker
+  .kube
+  .freterc
+  .p10k.zsh
+  .zshrc
+  pyenv.cfg # TODO: do I really need this file?
+{{- end }}
+
+# Linux
+{{- if ne .chezmoi.os "windows" }}
+  .ssh
+  .oh-my-posh.json
+{{- end }}
