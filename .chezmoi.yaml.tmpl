@@ -2,10 +2,10 @@
 {{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 encryption: "age"
 age:
-  identity: "~/.config/chezmoi/key.txt"
-  recipient: "{{ onepasswordRead "op://personal/Chezmoi Age Key/public key" "my" }}"
+  identity: "{{ dir .chezmoi.configFile }}/{{ $username }}"
+  recipient: "{{ onepasswordRead (list "op://personal/" $username "/public key" | join "") "my" }}"
 
 git:
   autoAdd: true
-  autoCommit: true
+  #autoCommit: true
   #autoPush: true

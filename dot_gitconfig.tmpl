@@ -41,7 +41,7 @@
 	{{          $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my" }}
 	{{          $gpgEmail := onepasswordRead (list "op://Private/" .value "/gpg email" | join "") "my" }}
 	{{          $gpgFingerprint := onepasswordRead (list "op://Private/" .value "/fingerprint" | join "") "my" }}
-	gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' &&git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
+	gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
 	{{      end -}}
 	{{ end }}
 

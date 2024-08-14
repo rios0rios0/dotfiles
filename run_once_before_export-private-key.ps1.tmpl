@@ -1,0 +1,8 @@
+# TODO: how to avoid repetition with templates?
+{{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
+$chezmoiConfigDir = "{{ dir .chezmoi.configFile }}"
+if (-Not (Test-Path "$chezmoiConfigDir\{{ $username }}")) {
+    Write-Host "# Creating $chezmoiConfigDir\{{ $username }}"
+    New-Item -ItemType Directory -Force -Path $chezmoiConfigDir
+    op read "op://personal/{{ $username }}/private key" | Set-Content "$chezmoiConfigDir\{{ $username }}"
+}

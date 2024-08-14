@@ -6,20 +6,25 @@ README.md
 {{ if ne .chezmoi.os "windows" }}
   .aws
   .azure
-  .ssh
+  .ssh # TODO: it's missing a lot of files
   .oh-my-posh.json
   .wakatime.cfg
-  run_once_before_decrypt-private-key.ps1
+  export-private-key.ps1
 {{ end }}
 
 # Linux
 {{ if ne .chezmoi.os "linux" }}
   .docker
   .kube
+  .autobump.yaml
+  .npmrc
+  .npmrc.2
   .freterc
   .p10k.zsh
   .zshrc
   # TODO: do I really need this file?
   pyvenv.cfg
-  run_once_before_decrypt-private-key.sh
+  export-private-key.sh
+  extract-kube-config-files.sh
+  watch-kube-config-files.sh
 {{ end }}
