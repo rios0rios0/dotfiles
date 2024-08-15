@@ -88,6 +88,12 @@ fi
 export SPEEDTEST="$TOOLS_DIR/Speedtest" && export PATH="$SPEEDTEST:$PATH"
 export CYCLONEDX="$TOOLS_DIR/Cyclonedx" && export PATH="$CYCLONEDX:$PATH"
 
+winOp=$(find /mnt/c/Users/$USER/AppData/Local/Microsoft/WinGet/Packages -type d | grep -m 1 "AgileBits.1Password.CLI_Microsoft.Winget.Source_")
+wslOp="/usr/bin/op"
+if [[ ! -e "$wslOp" ]]; then
+	echo "Creating 1Password symbolic link from Windows to WSL..."
+	sudo ln -sf "$winOp/op.exe" "$wslOp"
+fi
 alias ssh="ssh.exe"
 alias ssh-add="ssh-add.exe"
 alias video2mp4="video2mp4(){ ffmpeg -i $1 ${1%.*}.mp4 }; video2mp4"

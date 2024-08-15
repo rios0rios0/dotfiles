@@ -8,12 +8,12 @@ README.md
   .azure
   .ssh
   AppData
+  .chezmoiscripts/windows-copy-app-data-files.ps1
+  .chezmoiscripts/windows-create-ssh-known-hosts.ps1
+  .chezmoiscripts/windows-create-ssh-public-keys.ps1
+  .chezmoiscripts/windows-export-private-key.ps1
   .oh-my-posh.json
   .wakatime.cfg
-  windows-copy-app-data-files.ps1
-  windows-create-ssh-known-hosts.ps1
-  windows-create-ssh-public-keys.ps1
-  windows-export-private-key.ps1
 {{- end }}
 
 # Linux
@@ -21,13 +21,13 @@ README.md
   .docker
   .kube
   .autobump.yaml
+  .chezmoiscripts/linux-export-private-key.sh
+  .chezmoiscripts/linux-extract-kube-config-files.sh
   .freterc
   .npmrc
   .npmrc.2
   .p10k.zsh
   .zshrc
-  linux-export-private-key.sh
-  linux-extract-kube-config-files.sh
   linux-toolset-watch-kube-config-files.sh
   pyvenv.cfg # TODO: do I really need this file?
 {{- end }}

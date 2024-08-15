@@ -5,7 +5,6 @@ chezmoiConfigDir="{{ dir .chezmoi.configFile }}"
 if [ ! -f "$chezmoiConfigDir/{{ $username }}" ]; then
     echo "Creating $chezmoiConfigDir/{{ $username }}"
     mkdir -p $chezmoiConfigDir
-    eval $(op signin)
     op read "op://personal/{{ $username }}/private key" > "$chezmoiConfigDir/{{ $username }}"
     chmod 600 "$chezmoiConfigDir/{{ $username }}"
 fi

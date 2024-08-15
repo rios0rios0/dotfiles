@@ -10,7 +10,7 @@
 	{{- if eq .chezmoi.os "windows" }}
 	program = "C:/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
 	allowedSignersFile = "C:/Users/{{ $username }}/.ssh/allowed_signers"
-	{{- else -}}
+	{{ else }}
 	program = "/mnt/c/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign-wsl"
 	allowedSignersFile = "/home/{{ $username }}/.ssh/allowed_signers"
 	{{- end }}
@@ -61,7 +61,7 @@
 	{{- if eq .chezmoi.os "windows" }}
 	excludesfile = "C:/Users/{{ $username }}/.gitignore"
 	sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe"
-	{{- else -}}
+	{{ else }}
 	excludesfile = "/home/{{ $username }}/.gitignore"
 	sshCommand = ssh.exe
 	{{- end }}
