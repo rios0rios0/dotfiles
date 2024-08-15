@@ -1,0 +1,35 @@
+# Define the root path for chezmoi
+$chezmoiRoot = "{{ .chezmoi.sourceDir }}\AppData"
+
+# Get all directories with a "+" in the name
+$directories = Get-ChildItem -Path $chezmoiRoot -Recurse -Directory | Where-Object { $_.Name -like "*+*" }
+
+foreach ($dir in $directories) {
+    # Extract the relevant part of the path and replace "+" with "*"
+    $relativePath = $dir.FullName.Substring($chezmoiRoot.Length + 1)
+    $pattern = $relativePath -replace "\+", "*"
+
+    # Find the real directory
+    $realDir = Get-ChildItem -Path "$HOME\AppData" -Filter $pattern -Directory | Where-Object { $_.Name -notlike "*_+*" } | Select-Object -First 1
+
+    if ($realDir) {
+        # Get all files in the directory
+        $files = Get-ChildItem -Path $dir.FullName -Recurse -File
+
+        foreach ($file in $files) {
+            # Construct the destination path
+            $relativePath = $file.FullName.Substring($dir.FullName.Length + 1)
+            $destinationPath = Join-Path -Path $realDir.FullName -ChildPath $relativePath
+
+            # Create the destination directory if it doesn't exist
+            $destinationDir = Split-Path -Path $destinationPath -Parent
+            if (-not (Test-Path -Path $destinationDir)) {
+                New-Item -ItemType Directory -Path $destinationDir
+            }
+
+            # Copy the file
+            Write-Host "Copying `"$($file.FullName.Substring($chezmoiRoot.Length + 1))`" to `"$destinationPath`"..."
+            Copy-Item -Path $file.FullName -Destination $destinationPath -Force
+        }
+    }
+}

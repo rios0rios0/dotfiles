@@ -9,7 +9,9 @@ README.md
   .ssh # TODO: it's missing a lot of files
   .oh-my-posh.json
   .wakatime.cfg
+  AppData
   export-private-key.ps1
+  copy-app-data-files.ps1
 {{ end }}
 
 # Linux

@@ -3,7 +3,7 @@
 {{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 chezmoiConfigDir="{{ dir .chezmoi.configFile }}"
 if [ ! -f "$chezmoiConfigDir/{{ $username }}" ]; then
-    echo "# Creating $chezmoiConfigDir/{{ $username }}"
+    echo "Creating $chezmoiConfigDir/{{ $username }}"
     mkdir -p $chezmoiConfigDir
     eval $(op signin)
     op read "op://personal/{{ $username }}/private key" > "$chezmoiConfigDir/{{ $username }}"
