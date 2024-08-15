@@ -1,6 +1,6 @@
 #!/bin/sh
 # TODO: how to avoid repetition with templates?
-{{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
+{{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 chezmoiConfigDir="{{ dir .chezmoi.configFile }}"
 if [ ! -f "$chezmoiConfigDir/{{ $username }}" ]; then
     echo "Creating $chezmoiConfigDir/{{ $username }}"

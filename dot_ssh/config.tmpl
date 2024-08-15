@@ -1,0 +1,45 @@
+###### VCS #######################################################################
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{-      if (eq .type "REFERENCE") -}}
+{{-          $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" -}}
+{{-          $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my" }}
+
+Host github.com-{{ $sshAlias }}
+  HostName github.com
+  IdentityFile ~/.ssh/{{ $sshName }}.pub
+  IdentitiesOnly yes
+
+Host gitlab.com-{{ $sshAlias }}
+  HostName gitlab.com
+  IdentityFile ~/.ssh/{{ $sshName }}.pub
+  IdentitiesOnly yes
+
+Host dev.azure.com-{{ $sshAlias }}
+  HostName ssh.dev.azure.com
+  IdentityFile ~/.ssh/{{ $sshName }}.pub
+  IdentitiesOnly yes
+
+Host bitbucket.org-{{ $sshAlias }}
+  HostName bitbucket.org
+  IdentityFile ~/.ssh/{{ $sshName }}.pub
+  IdentitiesOnly yes
+
+{{-      end -}}
+{{- end }}
+
+###### PEM #######################################################################
+{{- range (onepassword "Active PEMs" "personal" "my").fields -}}
+{{-      if (eq .type "REFERENCE") -}}
+{{-          $pemName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" -}}
+{{-          $pemHostAlias := onepasswordRead (list "op://Private/" .value "/pem host alias" | join "") "my" -}}
+{{-          $pemHost := onepasswordRead (list "op://Private/" .value "/pem host" | join "") "my" -}}
+{{-          $pemUser := onepasswordRead (list "op://Private/" .value "/pem user" | join "") "my" }}
+
+Host {{ $pemHostAlias }}
+  Hostname {{ $pemHost }}
+  User {{ $pemUser }}
+  IdentityFile ~/.ssh/{{ $pemName }}.pem
+  IdentitiesOnly yes
+
+{{-      end -}}
+{{- end }}

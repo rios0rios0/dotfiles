@@ -1,16 +1,16 @@
 {
   "auths": {
-    {{ $items := (onepassword "Active Docker Registries" "personal" "my").fields -}}
-    {{ $lastIndex := sub (len $items) 1 }}
-    {{ range $index, $item := $items }}
-    {{      if (eq $item.type "REFERENCE") -}}
-	{{          $registryUsername := onepasswordRead (list "op://Private/" $item.value "/username" | join "") "my" }}
-    {{          $registryCredential := onepasswordRead (list "op://Private/" $item.value "/credential" | join "") "my" }}
-	{{          $registryName := onepasswordRead (list "op://Private/" $item.value "/registry name" | join "") "my" }}
+    {{- $items := (onepassword "Active Docker Registries" "personal" "my").fields -}}
+    {{- $lastIndex := sub (len $items) 1 -}}
+    {{- range $index, $item := $items -}}
+    {{-      if (eq $item.type "REFERENCE") -}}
+	{{-          $registryUsername := onepasswordRead (list "op://Private/" $item.value "/username" | join "") "my" -}}
+    {{-          $registryCredential := onepasswordRead (list "op://Private/" $item.value "/credential" | join "") "my" -}}
+	{{-          $registryName := onepasswordRead (list "op://Private/" $item.value "/registry name" | join "") "my" -}}
 	"{{ $registryName }}": {
       "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
-    }{{ if lt $index $lastIndex }},{{ end }}
-	{{      end -}}
-    {{ end -}}
+    }{{- if lt $index $lastIndex -}},{{- end -}}
+	{{-      end -}}
+    {{- end -}}
   }
 }

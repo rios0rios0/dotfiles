@@ -1,5 +1,6 @@
-# TODO: how to avoid repetition with templates?
-{{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
-{{ range gitHubKeys $username -}}
-{{   .Key }}
-{{ end -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{-      if (eq .type "REFERENCE") -}}
+{{-          $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" }}
+{{           $sshPublicKey }}
+{{-      end -}}
+{{- end }}

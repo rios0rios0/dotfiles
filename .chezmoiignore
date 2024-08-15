@@ -3,20 +3,21 @@ LICENSE
 README.md
 
 # Windows
-{{ if ne .chezmoi.os "windows" }}
+{{- if ne .chezmoi.os "windows" }}
   .aws
   .azure
-  .ssh # TODO: it's missing a lot of files
+  .ssh
   AppData
   .oh-my-posh.json
   .wakatime.cfg
-  copy-app-data-files.ps1
-  create-ssh-public-keys.ps1
-  export-private-key.ps1
-{{ end }}
+  windows-copy-app-data-files.ps1
+  windows-create-ssh-known-hosts.ps1
+  windows-create-ssh-public-keys.ps1
+  windows-export-private-key.ps1
+{{- end }}
 
 # Linux
-{{ if ne .chezmoi.os "linux" }}
+{{- if ne .chezmoi.os "linux" }}
   .docker
   .kube
   .autobump.yaml
@@ -25,8 +26,8 @@ README.md
   .npmrc.2
   .p10k.zsh
   .zshrc
-  export-private-key.sh
-  extract-kube-config-files.sh
+  linux-export-private-key.sh
+  linux-extract-kube-config-files.sh
+  linux-toolset-watch-kube-config-files.sh
   pyvenv.cfg # TODO: do I really need this file?
-  watch-kube-config-files.sh
-{{ end }}
+{{- end }}

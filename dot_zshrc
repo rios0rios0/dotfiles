@@ -98,7 +98,7 @@ alias speed="python3 $SPEEDTEST/speedtest-cli --bytes"
 # TODO: sudo find /var/log -name "*.log" -type f -mtime +60 -exec rm -f {} \;
 
 ###### Files #######################################################################
-./watch-kube-config-files.sh &
+./linux-toolset-watch-kube-config-files.sh &
 
 ###### EXA #########################################################################
 alias ls="exa -1 --classify --group-directories-first"
