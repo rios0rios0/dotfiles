@@ -7,11 +7,12 @@ README.md
   .aws
   .azure
   .ssh # TODO: it's missing a lot of files
+  AppData
   .oh-my-posh.json
   .wakatime.cfg
-  AppData
-  export-private-key.ps1
   copy-app-data-files.ps1
+  create-ssh-public-keys.ps1
+  export-private-key.ps1
 {{ end }}
 
 # Linux
@@ -19,14 +20,13 @@ README.md
   .docker
   .kube
   .autobump.yaml
+  .freterc
   .npmrc
   .npmrc.2
-  .freterc
   .p10k.zsh
   .zshrc
-  # TODO: do I really need this file?
-  pyvenv.cfg
   export-private-key.sh
   extract-kube-config-files.sh
+  pyvenv.cfg # TODO: do I really need this file?
   watch-kube-config-files.sh
 {{ end }}

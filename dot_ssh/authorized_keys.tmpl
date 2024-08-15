@@ -1,3 +1,5 @@
-{{ range gitHubKeys "rios0rios0" -}} # TODO: missing the template here
+# TODO: how to avoid repetition with templates?
+{{ $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
+{{ range gitHubKeys $username -}}
 {{   .Key }}
 {{ end -}}
