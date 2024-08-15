@@ -42,35 +42,36 @@ export LESS_TERMCAP_ue=$'\e[0m'
 export LESS_TERMCAP_us=$'\e[1;4;31m'
 
 ###### ZINIT Plugins ###############################################################
+######################################################
 zinit light larkery/zsh-histdb
-##
 ln -sf $HOME/.local/share/zinit/plugins/larkery---zsh-histdb $HOME/.oh-my-zsh/custom/plugins/zsh-histdb
 source $HOME/.oh-my-zsh/custom/plugins/zsh-histdb/sqlite-history.zsh
 autoload -Uz add-zsh-hook
 source $HOME/.oh-my-zsh/custom/plugins/zsh-histdb/histdb-interactive.zsh
 bindkey '^r' _histdb-isearch
-bindkey '^[[A' _histdb-isearch # TODO: not working
-bindkey '^[[B' _histdb-isearch # TODO: not working
+#bindkey '^[[A' _histdb-isearch # TODO: it didn't work
+#bindkey '^[[B' _histdb-isearch # TODO: it didn't work
 
 _zsh_autosuggest_strategy_histdb_top() {
     local query="
-        select commands.argv from history
-        left join commands on history.command_id = commands.rowid
-        left join places on history.place_id = places.rowid
-        where commands.argv LIKE '$(sql_escape $1)%'
-        group by commands.argv, places.dir
-        order by places.dir != '$(sql_escape $PWD)', count(*) desc
-        limit 1
+        SELECT commands.argv FROM history
+        LEFT JOIN commands ON history.command_id = commands.rowid
+        LEFT JOIN places ON history.place_id = places.rowid
+        WHERE commands.argv LIKE '$(sql_escape $1)%'
+        GROUP BY commands.argv, places.dir
+        ORDER BY places.dir != '$(sql_escape $PWD)', COUNT(*) DESC
+        LIMIT 1
     "
     suggestion=$(_histdb_query "$query")
 }
 
 ZSH_AUTOSUGGEST_STRATEGY=histdb_top
-##
-
+######################################################
+######################################################
 zinit light zsh-users/zsh-completions
 zinit light zsh-users/zsh-autosuggestions
 zinit light zdharma-continuum/fast-syntax-highlighting
+######################################################
 
 
 ###### P10k CONFIGURATION ###############################################################################################
@@ -83,11 +84,12 @@ if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]
 fi
 
 
-###### Toolset ##########################################################################################################
-###### Linux #######################################################################
+###### Toolbox ##########################################################################################################
+###### General #####################################################################
 export SPEEDTEST="$TOOLS_DIR/Speedtest" && export PATH="$SPEEDTEST:$PATH"
 export CYCLONEDX="$TOOLS_DIR/Cyclonedx" && export PATH="$CYCLONEDX:$PATH"
 
+alias tools="cd $TOOLS_DIR"
 winOp=$(find /mnt/c/Users/$USER/AppData/Local/Microsoft/WinGet/Packages -type d | grep -m 1 "AgileBits.1Password.CLI_Microsoft.Winget.Source_")
 wslOp="/usr/bin/op"
 if [[ ! -e "$wslOp" ]]; then
@@ -97,14 +99,14 @@ fi
 alias ssh="ssh.exe"
 alias ssh-add="ssh-add.exe"
 alias video2mp4="video2mp4(){ ffmpeg -i $1 ${1%.*}.mp4 }; video2mp4"
-alias pdf2one="pdf2one(){ pdftk $1 $2 cat output output.pdf }; pdf2one"
+alias pdfJoin="pdfJoin(){ pdftk $1 $2 cat output result.pdf }; pdfJoin"
 alias pdf2jpg="pdf2jpg(){ convert -density 300 -quality 100 $1 ${1%.*}.jpg }; pdf2jpg"
 alias speed="python3 $SPEEDTEST/speedtest-cli --bytes"
-# TODO: sudo du -hs * | sort -rh | head -5
-# TODO: sudo find /var/log -name "*.log" -type f -mtime +60 -exec rm -f {} \;
+alias top5size='sudo du -hs * | sort -rh | head -5'
+alias rmLogs='rmLogs(){ sudo find /var/log -name "*.log" -type f -mtime +$1 -exec rm -f {} \; }; rmLogs'
 
 ###### Files #######################################################################
-./linux-toolset-watch-kube-config-files.sh &
+$HOME/linux-toolbox-watch-kube-config-files.sh &
 
 ###### EXA #########################################################################
 alias ls="exa -1 --classify --group-directories-first"
@@ -124,17 +126,20 @@ alias play="PYTHONPATH=$HOME/Documents/Tools/asciinema python3 -m asciinema play
 alias awsprof="awsprof(){ export AWS_PROFILE=$1 }; awsprof"
 alias azsubs="azsubs(){ az account set --subscription $1 }; azsubs"
 
+###### K8s #########################################################################
+export KREW_BIN="${KREW_ROOT:-$HOME/.krew}/bin" && export PATH=$KREW_BIN:$PATH
+
+source "$HOME/linux-engineering-detect-kube-config-files.sh"
+
 ###### Docker ######################################################################
 zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
 
-alias dip='dip(){ docker inspect --format="{{ .Name }}: {{range .NetworkSettings.Networks}}{{.IPAddress}}{{end}}" $(docker ps -q); unset -f dip; }; dip'
-alias dip='dip(){ docker inspect --format="{{ .Name }}: {{range .NetworkSettings.Networks}}{{.IPAddress}} - {{end}}" $(docker ps -q); unset -f dip; }; dip'
-alias dreset='docker container stop $(docker container ls -aq) && docker container prune --force && docker volume prune --force && docker network prune --force && docker builder prune -f'
+source "$HOME/linux-engineering-docker-aliases.sh"
 
 ###### GoLang ######################################################################
 export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 
-[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm" # TODO: ERROR: Invalid or corrupt Go version
 
 ###### Java ########################################################################
 export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
@@ -154,20 +159,5 @@ export PYENV_ROOT="$HOME/.pyenv"
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 
-
-###### Private Code #####################################################################################################
-CUSTOM_FOLDER=".custom"
-CUSTOM_PATH="$HOME/$CUSTOM_FOLDER"
-FILES=("toolset-folders.sh" "engineering-k8s.sh" "credentials.sh")
-if [[ ! -d "$CUSTOM_PATH" ]]; then
-  mkdir -p $CUSTOM_PATH
-  GITHUB_USERNAME=$(op read --account "my" "op://personal/GitHub API/username")
-  GITHUB_PASSWORD=$(op read --account "my" "op://personal/GitHub API/credential")
-  for file in "${FILES[@]}"; do
-    curl -sL -XGET -u $GITHUB_USERNAME:$GITHUB_PASSWORD -o "$CUSTOM_PATH/${file}.tpl" https://raw.githubusercontent.com/$GITHUB_USERNAME/dotfiles-private/main/wsl/$CUSTOM_FOLDER/$file
-	op inject -i "$CUSTOM_PATH/${file}.tpl" -o $CUSTOM_PATH/$file
-  done
-fi
-for file in "${FILES[@]}"; do
-  source $CUSTOM_PATH/$file
-done
+###### Workspace Information #######################################################
+source "$HOME/linux-engineering-workspace-information.sh"

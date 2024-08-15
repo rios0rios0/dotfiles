@@ -1,8 +1,8 @@
-# Define the path to the .ssh folder
+# define the path to the .ssh folder
 $sshFolderPath = "$HOME\.ssh"
 $knownHostsPath = "$sshFolderPath\known_hosts"
 
-# Ensure the .ssh folder exists
+# ensure the .ssh folder exists
 if (-Not (Test-Path -Path $sshFolderPath)) {
     New-Item -ItemType Directory -Path $sshFolderPath
 }
