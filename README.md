@@ -9,4 +9,5 @@
 - https://github.com/patrick-5546/dotfiles
 - https://github.com/budimanjojo/dotfiles
 - https://www.chezmoi.io/user-guide/command-overview/
+- https://www.chezmoi.io/reference/templates/variables/
 - https://masterminds.github.io/sprig/
