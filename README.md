@@ -1,6 +1,4 @@
 ### TODO:
-- `know_hosts` are with binary content when executed via Chezmoi
-- manage the script files imported in the `.zshrc` inside another custom folder
 - export all active GPGs to the `.gpg` folder + import them in the keyring
 - check how to avoid 1Password duplicated calls
 - check how to use variables from a included template
@@ -10,4 +8,5 @@
 - https://github.com/budimanjojo/dotfiles
 - https://www.chezmoi.io/user-guide/command-overview/
 - https://www.chezmoi.io/reference/templates/variables/
+- https://www.chezmoi.io/reference/special-files-and-directories/chezmoiscripts/
 - https://masterminds.github.io/sprig/

@@ -106,7 +106,7 @@ alias top5size='sudo du -hs * | sort -rh | head -5'
 alias rmLogs='rmLogs(){ sudo find /var/log -name "*.log" -type f -mtime +$1 -exec rm -f {} \; }; rmLogs'
 
 ###### Files #######################################################################
-$HOME/linux-toolbox-watch-kube-config-files.sh &
+$HOME/.scripts/linux-toolbox-watch-kube-config-files.sh &
 
 ###### EXA #########################################################################
 alias ls="exa -1 --classify --group-directories-first"
@@ -129,12 +129,12 @@ alias azsubs="azsubs(){ az account set --subscription $1 }; azsubs"
 ###### K8s #########################################################################
 export KREW_BIN="${KREW_ROOT:-$HOME/.krew}/bin" && export PATH=$KREW_BIN:$PATH
 
-source "$HOME/linux-engineering-detect-kube-config-files.sh"
+source "$HOME/.scripts/linux-engineering-detect-kube-config-files.sh"
 
 ###### Docker ######################################################################
 zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
 
-source "$HOME/linux-engineering-docker-aliases.sh"
+source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
 
 ###### GoLang ######################################################################
 export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
@@ -160,4 +160,4 @@ export PYENV_ROOT="$HOME/.pyenv"
 eval "$(pyenv init -)"
 
 ###### Workspace Information #######################################################
-source "$HOME/linux-engineering-workspace-information.sh"
+source "$HOME/.scripts/linux-engineering-workspace-information.sh"

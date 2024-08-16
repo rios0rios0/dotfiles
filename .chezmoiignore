@@ -22,6 +22,7 @@ README.md
 {{- if ne .chezmoi.os "linux" }}
   .docker
   .kube
+  .scripts
   .autobump.yaml
   .chezmoiscripts/linux-execute-chezmoi-templates.sh
   .chezmoiscripts/linux-export-private-key.sh
@@ -31,9 +32,5 @@ README.md
   .npmrc.2
   .p10k.zsh
   .zshrc
-  linux-engineering-detect-kube-config-files.sh
-  linux-engineering-docker-aliases.sh
-  linux-engineering-workspace-information-template.sh
-  linux-toolbox-watch-kube-config-files.sh
   pyvenv.cfg # TODO: do I really need this file?
 {{- end }}
