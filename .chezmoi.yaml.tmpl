@@ -1,9 +1,7 @@
-# TODO: how to avoid repetition with templates?
-{{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 encryption: "age"
 age:
-  identity: "{{ dir .chezmoi.configFile }}/{{ $username }}"
-  recipient: "{{ onepasswordRead (list "op://personal/" $username "/public key" | join "") "my" }}"
+  identity: "{{ .chezmoi.homeDir }}/.ssh/chezmoi"
+  recipient: "{{ onepasswordRead (list "op://personal/Chezmoi Key/public key" | join "") "my" }}"
 
 git:
   autoAdd: true

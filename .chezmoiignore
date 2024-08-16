@@ -11,6 +11,7 @@ README.md
   AppData
   .chezmoiscripts/windows-copy-app-data-files.ps1
   .chezmoiscripts/windows-create-ssh-known-hosts.ps1
+  .chezmoiscripts/windows-create-ssh-pems.ps1
   .chezmoiscripts/windows-create-ssh-public-keys.ps1
   .chezmoiscripts/windows-export-private-key.ps1
   .oh-my-posh.json
