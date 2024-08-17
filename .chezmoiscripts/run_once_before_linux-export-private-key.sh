@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# define the path to the .ssh folder
+# define the path to the ".ssh" folder
 sshFolderPath="$HOME/.ssh"
 
 # ensure the ".ssh" folder exists
