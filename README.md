@@ -38,7 +38,7 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 1. Install PowerShell 7 from the Microsoft Store.
 
-2. Install git and gsudo using winget in PowerShell:
+2. Install `git` and `gsudo` using winget in PowerShell:
     ```powershell
     winget install --exact --id Git.Git --interactive
     winget install --exact --id gerardog.gsudo --interactive
