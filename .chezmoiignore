@@ -1,4 +1,5 @@
 # Common
+CHANGELOG.md
 LICENSE
 README.md
 .editorconfig
@@ -22,7 +23,6 @@ README.md
 {{- if ne .chezmoi.os "linux" }}
   .docker
   .kube
-  .scripts
   .autobump.yaml
   .chezmoiscripts/linux-execute-chezmoi-templates.sh
   .chezmoiscripts/linux-export-private-key.sh
@@ -31,7 +31,18 @@ README.md
   .freterc
   .npmrc
   .npmrc.2
-  .p10k.zsh
-  .zshrc
   pyvenv.cfg # TODO: do I really need this file?
+
+  # Android (go)
+  {{- if ne .chezmoi.os "android" }}
+    .scripts
+    .p10k.zsh
+    .zshrc
+  {{- end }}
+  
+{{- end }}
+
+# Android (don't go)
+{{- if eq .chezmoi.os "android" }}
+  .gitconfig
 {{- end }}

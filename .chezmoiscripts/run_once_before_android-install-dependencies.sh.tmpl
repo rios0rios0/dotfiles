@@ -1,0 +1,133 @@
+#!{{ lookPath "bash" }}
+
+# function to check and install dependencies using the native package manager
+native_package_manager() {
+    DEPENDENCIES=(
+        which
+        git
+        age
+        chezmoi
+        zsh
+        docker
+        rust # needed for azure-cli and exa
+        bison # needed for exa
+        sqlite
+        binutils-is-llvm # for azure-cli
+    )
+
+    check_and_install() {
+        PACKAGE=$1
+        COMMAND=$2
+        if ! command -v $COMMAND &> /dev/null; then
+            echo "$PACKAGE not found. Installing..."
+            apt install -y $PACKAGE
+        else
+            echo "$PACKAGE is already installed."
+        fi
+    }
+
+    for DEP in "${DEPENDENCIES[@]}"; do
+        case $DEP in
+            golang)
+                check_and_install "golang" "go"
+                ;;
+            python3)
+                check_and_install "python3" "python"
+                ;;
+            *)
+                check_and_install $DEP $DEP
+                ;;
+        esac
+    done
+}
+
+# function to install gvm
+# https://github.com/moovweb/gvm?tab=readme-ov-file
+install_gvm() {
+    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+}
+
+# function to install sdkman and related packages
+# https://sdkman.io/install/
+install_sdkman() {
+    curl -s "https://get.sdkman.io" | bash
+    source "$HOME/.sdkman/bin/sdkman-init.sh"
+    sdk install java
+    sdk install gradle
+}
+
+# function to install nvm
+# https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
+install_nvm() {
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    # npm, yarn
+}
+
+# function to install pyenv
+# https://github.com/pyenv/pyenv
+install_pyenv() {
+    curl https://pyenv.run | bash
+}
+
+# function to install azure-cli
+# https://pypi.org/project/azure-cli/
+install_azure_cli() {
+    pip install azure-cli
+}
+
+# function to install oh-my-zsh
+# https://ohmyz.sh/#install
+install_oh_my_zsh() {
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+}
+
+# function to install exa
+# https://www.cyberciti.biz/open-source/command-line-hacks/exa-a-modern-replacement-for-ls-written-in-rust-for-linuxunix/
+install_exa() {
+    cargo install exa
+}
+
+# function to install 1Password CLI for arm64 architecture
+# https://1password.com/downloads/command-line/
+install_1password_cli() {
+    ARCH="arm64"
+    wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.30.3/op_linux_${ARCH}_v2.30.3.zip" -O op.zip
+    unzip -d op op.zip
+    mv op/op /data/data/com.termux/files/usr/bin/
+    rm -rf op.zip op
+    groupadd -f onepassword-cli
+    chgrp onepassword-cli /data/data/com.termux/files/usr/bin/op
+    chmod g+s /data/data/com.termux/files/usr/bin/op
+}
+
+# main packages
+native_package_manager
+
+# secondary packages as a map of commands and their respective installation functions
+declare -A INSTALL_CMDS
+INSTALL_CMDS=(
+    ["gvm"]="install_gvm"
+    ["sdk"]="install_sdkman"
+    ["nvm"]="install_nvm"
+    ["pyenv"]="install_pyenv"
+    ["az"]="install_azure_cli"
+    ["exa"]="install_exa"
+    ["op"]="install_1password_cli"
+)
+
+# loop through the map and check if the command exists, if not, call the installation function
+for CMD in "${!INSTALL_CMDS[@]}"; do
+    if ! command -v $CMD &> /dev/null; then
+        echo "$CMD not found. Installing..."
+        ${INSTALL_CMDS[$CMD]}
+    else
+        echo "$CMD is already installed."
+    fi
+done
+
+# install oh-my-zsh if desired
+# if [ ! -d "$HOME/.oh-my-zsh" ]; then
+#     install_oh_my_zsh
+# fi
+
+echo "All dependencies have been checked and installed if necessary."
