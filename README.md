@@ -15,10 +15,12 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 - **Kali Linux in WSL**:
     - [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
     - [age](https://github.com/FiloSottile/age)
+    - [1Password CLI](https://developer.1password.com/docs/cli/get-started)
 
 - **Windows 11**:
     - PowerShell 7
     - [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+    - [1Password CLI](https://developer.1password.com/docs/cli/get-started)
 
 ### Installation Steps
 
