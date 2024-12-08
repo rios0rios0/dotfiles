@@ -40,10 +40,10 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 1. Install PowerShell 7 from the Microsoft Store.
 
-2. Install `git` and `gsudo` using winget in PowerShell:
+2. Install some dependencies using `winget` in PowerShell:
     ```powershell
     winget install --exact --id Git.Git --interactive
-    winget install --exact --id gerardog.gsudo --interactive
+    winget install 1password-cli
     ```
 
 3. Clone this repository and apply the dotfiles:
