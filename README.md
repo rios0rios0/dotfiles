@@ -8,6 +8,10 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 - **Shells**: Zsh and PowerShell.
 - **Terminal**: Windows Terminal.
 
+![WSL with Kali](.docs/wsl-with-kali.png)
+![Windows with PowerShell 7](.docs/windows-with-powershell-7.png)
+![Android with Termux](.docs/android-with-termux.png)
+
 ## Installation
 
 ### Prerequisites
@@ -18,7 +22,7 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
     - [1Password CLI](https://developer.1password.com/docs/cli/get-started)
 
 - **Windows 11**:
-    - PowerShell 7
+    - [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.4)
     - [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
     - [1Password CLI](https://developer.1password.com/docs/cli/get-started)
 
@@ -38,11 +42,14 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 #### PowerShell 7 on Windows 11
 
-1. Install PowerShell 7 from the Microsoft Store.
+1. Install PowerShell 7:
+    ```powershell
+    winget install --exact --id Microsoft.PowerShell
+    ```
 
 2. Install some dependencies using `winget` in PowerShell:
     ```powershell
-    winget install --exact --id Git.Git --interactive
+    winget install --exact --id Git.Git
     winget install 1password-cli
     ```
 
@@ -53,7 +60,7 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 ## Configuration
 
-## Encryption
+### Encryption
 
 - Sensitive files are encrypted using [age](https://github.com/FiloSottile/age).
 - Unix-specific decryption script: `run_before_decrypt-private-key-unix.sh.tmpl`

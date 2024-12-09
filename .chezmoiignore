@@ -1,8 +1,9 @@
 # Common
+.docs
+.editorconfig
 CHANGELOG.md
 LICENSE
 README.md
-.editorconfig
 
 # Windows
 {{- if ne .chezmoi.os "windows" }}
