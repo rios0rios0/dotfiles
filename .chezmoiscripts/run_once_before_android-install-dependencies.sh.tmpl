@@ -3,6 +3,8 @@
 # function to check and install dependencies using the native package manager
 native_package_manager() {
     DEPENDENCIES=(
+        vim
+        neovim
         which
         git
         age
@@ -98,6 +100,14 @@ install_1password_cli() {
     groupadd -f onepassword-cli
     chgrp onepassword-cli /data/data/com.termux/files/usr/bin/op
     chmod g+s /data/data/com.termux/files/usr/bin/op
+}
+
+# function to configure "neovim"
+# https://docs.astronvim.com/
+configure_neovim() {
+    git clone --depth 1 https://github.com/AstroNvim/template ~/.config/nvim
+    rm -rf ~/.config/nvim/.git
+    nvim
 }
 
 # main packages
