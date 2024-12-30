@@ -1,10 +1,9 @@
 # dotfiles
-
 My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/) and 1Password for sensitive information.
 
 ## Highlights
 
-- **Cross-platform**: Configurations for Kali Linux in WSL and Windows 11.
+- **Cross-platform**: Configurations for Kali Linux in WSL, Windows 11 and Termux (Android).
 - **Shells**: Zsh and PowerShell.
 - **Terminal**: Windows Terminal.
 
@@ -15,8 +14,13 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 ## Installation
 
 ### Prerequisites
+Notice that using `chezmoi age` you are not able to decrypt using SSH keys.
+That's why it's a prerequisite to install `age` to force `chezmoi` to use it for decryption. If you don't it, you could have errors like this:
+```bash
+chezmoi: error at line 1: malformed secret key: separator
+```
 
-- **Kali Linux in WSL**:
+- **Linux (WSL or Android)**:
     - [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
     - [age](https://github.com/FiloSottile/age)
     - [1Password CLI](https://developer.1password.com/docs/cli/get-started)
@@ -24,6 +28,7 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 - **Windows 11**:
     - [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.4)
     - [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+    - [age](https://github.com/FiloSottile/age)
     - [1Password CLI](https://developer.1password.com/docs/cli/get-started)
 
 ### Installation Steps
@@ -35,7 +40,7 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
     sudo apt install git age
     ```
 
-2. Install chezmoi and apply the dotfiles:
+2. Install `chezmoi` and apply the `dotfiles`:
     ```sh
     sh -c "$(curl -fsLS get.chezmoi.io/lb)" -- init --apply rios0rios0
     ```
@@ -44,34 +49,43 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 1. Install PowerShell 7:
     ```powershell
-    winget install --exact --id Microsoft.PowerShell
+    winget install Microsoft.PowerShell
     ```
 
 2. Install some dependencies using `winget` in PowerShell:
     ```powershell
-    winget install --exact --id Git.Git
+    winget install Git.Git
+    winget install FiloSottile.age # add the age executable to the PATH manually
     winget install 1password-cli
     ```
 
 3. Clone this repository and apply the dotfiles:
     ```powershell
+    Set-ExecutionPolicy RemoteSigned -Scope Process
     chezmoi init --apply rios0rios0
     ```
 
 ## Configuration
 
 ### Encryption
-
 - Sensitive files are encrypted using [age](https://github.com/FiloSottile/age).
 - Unix-specific decryption script: `run_before_decrypt-private-key-unix.sh.tmpl`
 - Windows-specific decryption script: `run_before_decrypt-private-key-windows.ps1.tmpl`
 
-## Additional Information
+### Known Issues
+1. Zsh is using `ssh.exe` from Windows via alias.
+2. Git is using `ssh.exe` from Windows via configuration file.
 
+- Due to 1 and 2: `git` commands could be stuck when the `known_hosts` file is not created.
+
+### Debugging ideas
+- Check the `chezmoi doctor` command to check the status of the installation.
+- Run `git` commands with `GIT_TRACE=1` to see what's happening.
+
+## Additional Information
 - Documentation for the setup can be found on my [notes website](https://rios0rios0.github.io/notes/setup/).
 
 ## References:
-
 - https://github.com/patrick-5546/dotfiles
 - https://github.com/budimanjojo/dotfiles
 - https://www.chezmoi.io/user-guide/command-overview/

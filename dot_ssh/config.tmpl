@@ -14,11 +14,18 @@ Host gitlab.com-{{ $sshAlias }}
   IdentityFile ~/.ssh/{{ $sshName }}.pub
   IdentitiesOnly yes
 
+# Azure DevOps
 Host dev.azure.com-{{ $sshAlias }}
   HostName ssh.dev.azure.com
   IdentityFile ~/.ssh/{{ $sshName }}.pub
   IdentitiesOnly yes
 
+Host visualstudio.com-{{ $sshAlias }}
+    HostName vs-ssh.visualstudio.com
+    IdentityFile ~/.ssh/{{ $sshName }}.pub
+    IdentitiesOnly yes
+
+# Atlassian
 Host bitbucket.org-{{ $sshAlias }}
   HostName bitbucket.org
   IdentityFile ~/.ssh/{{ $sshName }}.pub

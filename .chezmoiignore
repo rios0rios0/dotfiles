@@ -7,29 +7,31 @@ README.md
 
 # Windows
 {{- if ne .chezmoi.os "windows" }}
-  .aws
-  .azure
-  .ssh
-  AppData
   .chezmoiscripts/windows-copy-app-data-files.ps1
   .chezmoiscripts/windows-create-ssh-known-hosts.ps1
   .chezmoiscripts/windows-create-ssh-pems.ps1
   .chezmoiscripts/windows-create-ssh-public-keys.ps1
   .chezmoiscripts/windows-export-private-key.ps1
   .chezmoiscripts/windows-install-dependencies.ps1
+
+  .aws
+  .azure
+  .ssh
+  AppData
   .oh-my-posh.json
   .wakatime.cfg
 {{- end }}
 
 # Linux
 {{- if ne .chezmoi.os "linux" }}
-  .docker
-  .kube
-  .autobump.yaml
   .chezmoiscripts/linux-execute-chezmoi-templates.sh
   .chezmoiscripts/linux-export-private-key.sh
   .chezmoiscripts/linux-extract-kube-config-files.sh
   .chezmoiscripts/linux-import-gpg-keys.sh
+
+  .docker
+  .kube
+  .autobump.yaml
   .freterc
   .npmrc
   .npmrc.2
@@ -38,6 +40,7 @@ README.md
   # Android (go)
   {{- if ne .chezmoi.os "android" }}
     .chezmoiscripts/android-install-dependencies.sh
+
     .scripts
     .p10k.zsh
     .zshrc
