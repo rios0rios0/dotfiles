@@ -16,6 +16,7 @@ README.md
   .chezmoiscripts/windows-create-ssh-pems.ps1
   .chezmoiscripts/windows-create-ssh-public-keys.ps1
   .chezmoiscripts/windows-export-private-key.ps1
+  .chezmoiscripts/windows-install-dependencies.ps1
   .oh-my-posh.json
   .wakatime.cfg
 {{- end }}
@@ -36,6 +37,7 @@ README.md
 
   # Android (go)
   {{- if ne .chezmoi.os "android" }}
+    .chezmoiscripts/android-install-dependencies.sh
     .scripts
     .p10k.zsh
     .zshrc
