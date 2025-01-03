@@ -26,7 +26,7 @@ README.md
 {{- if ne .chezmoi.os "linux" }}
   .chezmoiscripts/linux-execute-chezmoi-templates.sh
   .chezmoiscripts/linux-export-private-key.sh
-  .chezmoiscripts/linux-extract-kube-config-files.sh
+  .chezmoiscripts/linux-extract-compressed-folders.sh
   .chezmoiscripts/linux-import-gpg-keys.sh
 
   .docker
