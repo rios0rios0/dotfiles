@@ -135,7 +135,7 @@ alias rmLogs='rmLogs(){ sudo find /var/log -name "*.log" -type f -mtime +$1 -exe
 
 ###### Files #######################################################################
 {{- if ne .chezmoi.os "android" }}
-$HOME/.scripts/linux-toolbox-watch-kube-config-files.sh &
+$HOME/.scripts/linux-toolbox-watch-compress-folders.sh &
 {{- end }}
 
 ###### EXA #########################################################################
