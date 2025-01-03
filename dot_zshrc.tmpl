@@ -133,7 +133,7 @@ ssh-add() {
 
 ###### Files #######################################################################
 {{- if ne .chezmoi.os "android" }}
-$HOME/.scripts/linux-toolbox-watch-kube-config-files.sh &
+$HOME/.scripts/linux-toolbox-watch-compress-folders.sh &
 {{- end }}
 
 alias top5size='sudo du -hs * | sort -rh | head -5'

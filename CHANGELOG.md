@@ -22,4 +22,5 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - added Windows feature to copy configuration inside `AppData` folder
 - added feature to handle SSH, PEM and GPG keys seamlessly with 1Password
 - added Linux WSL features to handle Git and SSH configuration with 1Password 
-- added ShellScript features to handle watching multiple files (and compressing them) for Kubernetes secrets
+- added Shell Script features to handle watching multiple files (and compressing them) for Kubernetes secrets
+- added a new feature to compress and watch many folders instead of just one folder
