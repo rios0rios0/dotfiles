@@ -14,11 +14,6 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 ## Installation
 
 ### Prerequisites
-Notice that using `chezmoi age` you are not able to decrypt using SSH keys.
-That's why it's a prerequisite to install `age` to force `chezmoi` to use it for decryption. If you don't it, you could have errors like this:
-```bash
-chezmoi: error at line 1: malformed secret key: separator
-```
 
 - **Linux (WSL or Android)**:
     - [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
@@ -81,6 +76,21 @@ chezmoi: error at line 1: malformed secret key: separator
 ### Debugging ideas
 - Check the `chezmoi doctor` command to check the status of the installation.
 - Run `git` commands with `GIT_TRACE=1` to see what's happening.
+
+### Known Issues
+1. Notice that using `chezmoi age` you are not able to decrypt using SSH keys.
+   That's why it's a prerequisite to install `age` to force `chezmoi` to use it for decryption.
+   If you don't it, you could have errors like this:
+   ```bash
+   chezmoi: error at line 1: malformed secret key: separator
+   ```
+
+2. Notice that Windows has `path` size limitations (256 characters).
+   If you are using WSL interoperability (calling `.exe` files inside WSL), you could have errors like this:
+   ```bash
+   /mnt/c/WINDOWS/system32/notepad.exe: Invalid argument
+   ```
+   That means, you exceeded the `path` size limitation on the current `path` you are running the command.
 
 ## Additional Information
 - Documentation for the setup can be found on my [notes website](https://rios0rios0.github.io/notes/setup/).
