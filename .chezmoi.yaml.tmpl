@@ -1,11 +1,3 @@
 encryption: "age"
 age:
   identity: "{{ .chezmoi.homeDir }}/.ssh/chezmoi"
-{{- if ne .chezmoi.os "android" }}
-  recipient: "{{ onepasswordRead (list "op://personal/Chezmoi Key/public key" | join "") "my" }}"
-{{- end }}
-
-git:
-  autoAdd: true
-  #autoCommit: true
-  #autoPush: true

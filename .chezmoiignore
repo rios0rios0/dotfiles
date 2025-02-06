@@ -7,12 +7,12 @@ README.md
 
 # Windows
 {{- if ne .chezmoi.os "windows" }}
-  .chezmoiscripts/windows-copy-app-data-files.ps1
-  .chezmoiscripts/windows-create-ssh-known-hosts.ps1
-  .chezmoiscripts/windows-create-ssh-pems.ps1
-  .chezmoiscripts/windows-create-ssh-public-keys.ps1
-  .chezmoiscripts/windows-export-private-key.ps1
-  .chezmoiscripts/windows-install-dependencies.ps1
+  .chezmoiscripts/windows-001-create-ssh-known-hosts.ps1
+  .chezmoiscripts/windows-001-create-ssh-public-keys.ps1
+  .chezmoiscripts/windows-001-install-dependencies.ps1
+  .chezmoiscripts/windows-002-create-ssh-pems.ps1
+  .chezmoiscripts/windows-002-export-private-key.ps1
+  .chezmoiscripts/windows-003-copy-app-data-files.ps1
 
   .aws
   .azure
@@ -24,10 +24,11 @@ README.md
 
 # Linux
 {{- if ne .chezmoi.os "linux" }}
-  .chezmoiscripts/linux-execute-chezmoi-templates.sh
-  .chezmoiscripts/linux-export-private-key.sh
-  .chezmoiscripts/linux-extract-kube-config-files.sh
-  .chezmoiscripts/linux-import-gpg-keys.sh
+  .chezmoiscripts/linux-001-install-dependencies.sh
+  .chezmoiscripts/linux-001-execute-chezmoi-templates.sh
+  .chezmoiscripts/linux-002-export-private-key.sh
+  .chezmoiscripts/linux-002-extract-kube-config-files.sh
+  .chezmoiscripts/linux-003-import-gpg-keys.sh
 
   .docker
   .kube
@@ -39,7 +40,8 @@ README.md
 
   # Android (go)
   {{- if ne .chezmoi.os "android" }}
-    .chezmoiscripts/android-install-dependencies.sh
+    .chezmoiscripts/android-001-install-dependencies.sh
+    .chezmoiscripts/android-002-export-private-key.sh
 
     .scripts
     .p10k.zsh

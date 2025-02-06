@@ -67,33 +67,29 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 - Unix-specific decryption script: `run_before_decrypt-private-key-unix.sh.tmpl`
 - Windows-specific decryption script: `run_before_decrypt-private-key-windows.ps1.tmpl`
 
-### Known Issues
-1. Zsh is using `ssh.exe` from Windows via alias.
-2. Git is using `ssh.exe` from Windows via configuration file.
-
-- Due to 1 and 2: `git` commands could be stuck when the `known_hosts` file is not created.
-
-### Debugging ideas
+### Debugging Ideas
 - Check the `chezmoi doctor` command to check the status of the installation.
 - Run `git` commands with `GIT_TRACE=1` to see what's happening.
 
 ### Known Issues
-1. Notice that using `chezmoi age` you are not able to decrypt using SSH keys.
+1. Git stuck while cloning with SSH.
+   1. Zsh is using `ssh.exe` from Windows via alias. 
+   2. Git is using `ssh.exe` from Windows via configuration file.
+   3. Due to "i" and "ii": `git` commands could be stuck when the `known_hosts` file is not created.
+
+2. Notice that using `chezmoi age` you are not able to decrypt using SSH keys.
    That's why it's a prerequisite to install `age` to force `chezmoi` to use it for decryption.
    If you don't it, you could have errors like this:
    ```bash
    chezmoi: error at line 1: malformed secret key: separator
    ```
 
-2. Notice that Windows has `path` size limitations (256 characters).
+3. Notice that Windows has `path` size limitations (256 characters).
    If you are using WSL interoperability (calling `.exe` files inside WSL), you could have errors like this:
    ```bash
    /mnt/c/WINDOWS/system32/notepad.exe: Invalid argument
    ```
    That means, you exceeded the `path` size limitation on the current `path` you are running the command.
-
-## Additional Information
-- Documentation for the setup can be found on my [notes website](https://rios0rios0.github.io/notes/setup/).
 
 ## References:
 - https://github.com/patrick-5546/dotfiles
