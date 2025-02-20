@@ -34,6 +34,7 @@ $requirements = @(
     "AgileBits.1Password",
     "AgileBits.1Password.CLI",
     "FiloSottile.age",              # Age for encryption
+    "Git.Git",                      # TODO: it's needed to install manually to avoid OpenSSH of installing and check ASLR issues options
     "JanDeDobbeleer.OhMyPosh",      # Oh My Posh
     "Microsoft.PowerShell"
     "Microsoft.WSL",                # Windows Subsystem for Linux
@@ -44,7 +45,7 @@ Install-Package-List $requirements
 # =========================================================================================================
 # Hardware
 $hardware = @(
-    "Asus.ArmouryCrate",
+    "Asus.ArmouryCrate",            # TODO: it's never found. Always asking to install
     "Brother.FullDriver",
     "CPUID.CPU-Z.ROG",
     "FinalWire.AIDA64.Extreme",
@@ -71,7 +72,7 @@ $utilities = @(
     "Piriform.CCleaner",
     "Piriform.Recuva",
     "RevoUninstaller.RevoUninstallerPro",
-    "Spotify.Spotify"
+    "Spotify.Spotify"               # TODO: error when installing (code 29)
 )
 Install-Package-List $utilities
 # Utilities for Desktop
@@ -92,7 +93,6 @@ Install-Package-List $communication
 $development = @(
     "Docker.DockerDesktop",
     "ExpressVPN.ExpressVPN",
-    "Git.Git",
     "GoLang.Go",
     "JetBrains.Toolbox",
     "Microsoft.AzureStorageExplorer",
@@ -106,14 +106,20 @@ Install-Package-List $development
 # =========================================================================================================
 # Gaming
 $gaming = @(
-    "Blizzard.BattleNet",
+    "Blizzard.BattleNet",               # TODO: asking for a path and never installs
     "ElectronicArts.EADesktop",
     "EpicGames.EpicGamesLauncher",
     "GOG.Galaxy",
-    "Ubisoft.Connect"
+    "Ubisoft.Connect"                   # TODO: the hash is not matching, Windows prevents the installation
     "Valve.Steam"
 )
 Install-Package-List $gaming
 # =========================================================================================================
 # Refresh the PATH environment variable
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+
+
+# Install the font
+# wsl --install kali-linux
+# wsl --set-default kali-linux
+# PerformanceTest
