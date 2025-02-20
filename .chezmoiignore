@@ -10,6 +10,8 @@ README.md
   .chezmoiscripts/windows-001-create-ssh-known-hosts.ps1
   .chezmoiscripts/windows-001-create-ssh-public-keys.ps1
   .chezmoiscripts/windows-001-install-dependencies.ps1
+  .chezmoiscripts/windows-001-install-fonts.ps1
+  .chezmoiscripts/windows-002-configure-dependencies.ps1
   .chezmoiscripts/windows-002-create-ssh-pems.ps1
   .chezmoiscripts/windows-002-export-private-key.ps1
   .chezmoiscripts/windows-003-copy-app-data-files.ps1
@@ -33,7 +35,10 @@ README.md
   .docker
   .kube
   .scripts
+  .autobump.yaml
   .freterc
+  .npmrc
+  .npmrc.2
   .p10k.zsh
   .zshrc
   pyvenv.cfg # TODO: do I really need this file?
