@@ -32,25 +32,24 @@ README.md
 
   .docker
   .kube
-  .autobump.yaml
+  .scripts
   .freterc
-  .npmrc
-  .npmrc.2
+  .p10k.zsh
+  .zshrc
   pyvenv.cfg # TODO: do I really need this file?
-
-  # Android (go)
-  {{- if ne .chezmoi.os "android" }}
-    .chezmoiscripts/android-001-install-dependencies.sh
-    .chezmoiscripts/android-002-export-private-key.sh
-
-    .scripts
-    .p10k.zsh
-    .zshrc
-  {{- end }}
-  
 {{- end }}
 
-# Android (don't go)
+# Android (include)
+{{- if ne .chezmoi.os "android" }}
+  .chezmoiscripts/android-001-install-dependencies.sh
+  .chezmoiscripts/android-002-export-private-key.sh
+
+  .scripts
+  .p10k.zsh
+  .zshrc
+{{- end }}
+
+# Android (exclude)
 {{- if eq .chezmoi.os "android" }}
   .gitconfig
 {{- end }}
