@@ -45,7 +45,7 @@ Install-Package-List $requirements
 # =========================================================================================================
 # Hardware
 $hardware = @(
-    "Asus.ArmouryCrate",            # TODO: it's never found. Always asking to install
+    #"Asus.ArmouryCrate",            # TODO: it's never found. Always asking to install
     "Brother.FullDriver",
     "CPUID.CPU-Z.ROG",
     "FinalWire.AIDA64.Extreme",
@@ -72,8 +72,8 @@ $utilities = @(
     "PDFLabs.PDFtk.Free"
     "Piriform.CCleaner",
     "Piriform.Recuva",
-    "RevoUninstaller.RevoUninstallerPro",
-    "Spotify.Spotify"               # TODO: error when installing (code 29)
+    "RevoUninstaller.RevoUninstallerPro"
+    #"Spotify.Spotify"               # TODO: error when installing (code 29)
 )
 Install-Package-List $utilities
 # Utilities for Desktop
@@ -107,11 +107,11 @@ Install-Package-List $development
 # =========================================================================================================
 # Gaming
 $gaming = @(
-    "Blizzard.BattleNet",               # TODO: asking for a path and never installs
+    #"Blizzard.BattleNet",               # TODO: asking for a path and never installs
     "ElectronicArts.EADesktop",
     "EpicGames.EpicGamesLauncher",
     "GOG.Galaxy",
-    "Ubisoft.Connect"                   # TODO: the hash is not matching, Windows prevents the installation
+    #"Ubisoft.Connect"                   # TODO: the hash is not matching, Windows prevents the installation
     "Valve.Steam"
 )
 Install-Package-List $gaming

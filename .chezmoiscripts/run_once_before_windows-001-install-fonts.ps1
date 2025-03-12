@@ -46,7 +46,7 @@ Write-Host "Installing fonts..."
 Start-Sleep -Seconds 2
 $Shell = New-Object -ComObject Shell.Application
 $FontFolder = $Shell.Namespace(0x14)  # Windows Fonts folder
-Get-ChildItem -Path $fontDir -Filter "*.ttf","*.otf" | ForEach-Object {
+Get-ChildItem -Path $fontDir -Include *.ttf,*.otf -Recurse | ForEach-Object {
     $FontFolder.CopyHere($_.FullName)
 }
 
