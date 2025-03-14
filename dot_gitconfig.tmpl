@@ -1,4 +1,5 @@
 # TODO: how to avoid repetition with templates?
+# TODO: when the Windows username is different than WSL username, the 1Password path is different breaking the commit signing
 {{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 {{- $defaultUsername := "" -}}
 {{- $defaultUserEmail := "" -}}

@@ -28,17 +28,12 @@ export LESS_TERMCAP_ue=$'\e[0m'
 export LESS_TERMCAP_us=$'\e[1;4;31m'
 
 ###### ZINIT Plugins ###############################################################
-######################################################
 # TODO: this should be in another file before configuration, installing those dependencies
-
-#mkdir -p $HOME/.oh-my-zsh/custom/plugins/
-
-#git clone https://github.com/larkery/zsh-histdb $HOME/.oh-my-zsh/custom/plugins/zsh-histdb
-
-#git clone --depth=1 https://github.com/romkatv/powerlevel10k.git ${ZSH_CUSTOM:-$HOME/.oh-my-zsh/custom}/themes/powerlevel10k
-# TODO: finishing block here. It should be tested with zinit before doing raw git clone
-
+######################################################
 zinit light romkatv/powerlevel10k
+ln -sf $HOME/.local/share/zinit/plugins/romkatv---powerlevel10k $HOME/.oh-my-zsh/custom/themes/powerlevel10k
+######################################################
+######################################################
 zinit light larkery/zsh-histdb
 ln -sf $HOME/.local/share/zinit/plugins/larkery---zsh-histdb $HOME/.oh-my-zsh/custom/plugins/zsh-histdb
 source $HOME/.oh-my-zsh/custom/plugins/zsh-histdb/sqlite-history.zsh
@@ -65,7 +60,11 @@ ZSH_AUTOSUGGEST_STRATEGY=histdb_top
 ######################################################
 ######################################################
 zinit light zsh-users/zsh-completions
+######################################################
+######################################################
 zinit light zsh-users/zsh-autosuggestions
+######################################################
+######################################################
 zinit light zdharma-continuum/fast-syntax-highlighting
 ######################################################
 
@@ -167,7 +166,9 @@ source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
 ###### GoLang ######################################################################
 export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 
-[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm" # TODO: ERROR: Invalid or corrupt Go version
+# TODO: ERROR: Invalid or corrupt Go version
+# TODO: ERROR: GVM couldn't find hexdump
+[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
 ###### Java ########################################################################
 export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
@@ -187,7 +188,7 @@ export PYENV_ROOT="$HOME/.pyenv"
 [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
 eval "$(pyenv init -)"
 
-###### Rust ######################################################################
+###### Rust ########################################################################
 export CARGO_ROOT="$HOME/.cargo"
 [[ -d $CARGO_ROOT/bin ]] && export PATH="$CARGO_ROOT/bin:$PATH"
 
