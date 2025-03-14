@@ -20,7 +20,10 @@ AppData
 {{- if ne .chezmoi.os "linux" }}
 .chezmoiscripts/linux-*.sh
 .docker
+.histdb
+.john
 .kube
+.sqlmap
 .autobump.yaml
 .freterc
 .npmrc
