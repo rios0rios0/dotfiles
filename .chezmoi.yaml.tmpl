@@ -1,3 +1,7 @@
+{{- if eq .chezmoi.os "linux" }}
+onePassword:
+  command: op.exe
+{{- end }}
 encryption: "age"
 age:
   identity: "{{ .chezmoi.homeDir }}/.ssh/chezmoi"

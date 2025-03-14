@@ -1,60 +1,47 @@
-# Common
+# Common files (ignored on all systems)
 .docs
 .editorconfig
 CHANGELOG.md
 LICENSE
 README.md
 
-# Windows
+{{- /* Windows-specific files – these are only useful on Windows. When not on Windows, ignore them. */ -}}
 {{- if ne .chezmoi.os "windows" }}
-  .chezmoiscripts/windows-001-create-ssh-known-hosts.ps1
-  .chezmoiscripts/windows-001-create-ssh-public-keys.ps1
-  .chezmoiscripts/windows-001-install-dependencies.ps1
-  .chezmoiscripts/windows-001-install-fonts.ps1
-  .chezmoiscripts/windows-002-configure-dependencies.ps1
-  .chezmoiscripts/windows-002-create-ssh-pems.ps1
-  .chezmoiscripts/windows-002-export-private-key.ps1
-  .chezmoiscripts/windows-003-copy-app-data-files.ps1
-
-  .aws
-  .azure
-  .ssh
-  AppData
-  .oh-my-posh.json
-  .wakatime.cfg
+.chezmoiscripts/windows-*.ps1
+.aws
+.azure
+.ssh
+AppData
+.oh-my-posh.json
+.wakatime.cfg
 {{- end }}
 
-# Linux
+{{- /* Linux‑exclusive files – only for Linux. When not running Linux, ignore them. */ -}}
 {{- if ne .chezmoi.os "linux" }}
-  .chezmoiscripts/linux-001-install-dependencies.sh
-  .chezmoiscripts/linux-001-execute-chezmoi-templates.sh
-  .chezmoiscripts/linux-002-export-private-key.sh
-  .chezmoiscripts/linux-002-extract-kube-config-files.sh
-  .chezmoiscripts/linux-003-import-gpg-keys.sh
-
-  .docker
-  .kube
-  .scripts
-  .autobump.yaml
-  .freterc
-  .npmrc
-  .npmrc.2
-  .p10k.zsh
-  .zshrc
-  pyvenv.cfg # TODO: do I really need this file?
+.chezmoiscripts/linux-*.sh
+.docker
+.kube
+.autobump.yaml
+.freterc
+.npmrc
+.npmrc.2
+pyvenv.cfg
 {{- end }}
 
-# Android (include)
+{{- /* Files shared between Linux and Android.
+     They are only needed on these systems, so ignore them on all others (i.e. on Windows). */ -}}
+{{- if not (or (eq .chezmoi.os "linux") (eq .chezmoi.os "android")) }}
+.scripts
+.p10k.zsh
+.zshrc
+{{- end }}
+
+{{- /* Android‑exclusive files – only for Android. When not running Android, ignore them. */ -}}
 {{- if ne .chezmoi.os "android" }}
-  .chezmoiscripts/android-001-install-dependencies.sh
-  .chezmoiscripts/android-002-export-private-key.sh
-
-  .scripts
-  .p10k.zsh
-  .zshrc
+.chezmoiscripts/android-*.sh
 {{- end }}
 
-# Android (exclude)
+{{- /* Additional Android exclusions: For example, ignore .gitconfig on Android even if it’s normally managed elsewhere. */ -}}
 {{- if eq .chezmoi.os "android" }}
-  .gitconfig
+.gitconfig
 {{- end }}

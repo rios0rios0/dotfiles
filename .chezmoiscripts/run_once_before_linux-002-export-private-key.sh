@@ -1,10 +1,15 @@
 #!/bin/bash
 
+# TODO: workaround since "op" isn't installed on WSL
+op() {
+  op.exe "$@"
+}
+
 # define the path to the ".ssh" folder
 sshFolderPath="$HOME/.ssh"
 
-# ensure the ".ssh" folder exists
-mkdir -p $sshFolderPath
+# clean and recreate the ".ssh" folder
+rm -rf "$sshFolderPath" && mkdir -p "$sshFolderPath"
 
 if [[ ! -f "$sshFolderPath/chezmoi" ]]; then
     echo "Creating Chezmoi encryption key at: \"$sshFolderPath/chezmoi\"..."

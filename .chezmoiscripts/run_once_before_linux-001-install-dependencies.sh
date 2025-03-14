@@ -3,58 +3,42 @@
 # update the package list
 sudo apt update
 
-# get the list of installed packages
-installedPackages=$(apt list --installed 2>/dev/null)
-
-# function to check if a package is installed
-is_package_installed() {
-    local packageName=$1
-    echo "$installedPackages" | grep -q "$packageName"
-}
-
-# function to install a list of packages
-install_package_list() {
-    local packageList=("$@")
-    for package in "${packageList[@]}"; do
-        if ! is_package_installed "$package"; then
-            sudo apt install -y "$package"
-            echo "$package installed successfully..."
-        else
-            echo "$package is already installed..."
-        fi
-    done
-}
-
 # =========================================================================================================
 # Requirements for this repository to work properly
 requirements=(
     "git"
     "curl"
-    "unzip" # required for SDK Man
+    "zip"     # required for SDKMan
+    "unzip"   # required for SDKMan
+    "age"     # required for Chezmoi (decrypt files with SSH)
+    "gpg"     # required for Chezmoi (import and export GPGs)
+    "eza"     # it's for "ls" highlighting (https://github.com/eza-community/eza)
+    "sqlite3" # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
 )
-sudo apt install zip # required for SDK Man TODO: the function to check if a package is installed is not working properly
-install_package_list "${requirements[@]}"
+sudo apt install --no-install-recommends --yes "${requirements[@]}"
+# =========================================================================================================
+# Hardware
+hardware=(
+    "htop" # it's for monitoring system resources
+)
+sudo apt install --no-install-recommends --yes "${hardware[@]}"
+# =========================================================================================================
+# Utilities
+utilities=(
+    "jq"                # it's for parsing JSON
+    "bat"               # it's for cat with syntax highlighting (https://github.com/sharkdp/bat)
+    "silversearcher-ag" # it's for searching files (https://github.com/ggreer/the_silver_searcher)
+    "inotify-tools"     # it's for watching file changes ("inotifywait")
+)
+sudo apt install --no-install-recommends --yes "${utilities[@]}"
+# =========================================================================================================
+# =========================================================================================================
 # function to install oh-my-zsh
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 }
-install_oh_my_zsh
-# =========================================================================================================
-# Hardware
-hardware=(
-    "htop"
-)
-install_package_list "${hardware[@]}"
-# =========================================================================================================
-# Utilities
-utilities=(
-    "jq"
-    "bat"
-    "silversearcher-ag"
-)
-install_package_list "${utilities[@]}"
-# =========================================================================================================
+
 # function to install gvm
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
@@ -91,6 +75,7 @@ install_azure_cli() {
     pip install azure-cli
 }
 
+install_oh_my_zsh
 install_gvm
 install_sdkman
 install_nvm

@@ -117,12 +117,10 @@ export CYCLONEDX="$TOOLS_DIR/Cyclonedx" && export PATH="$CYCLONEDX:$PATH"
 
 alias tools="cd $TOOLS_DIR"
 {{- if ne .chezmoi.os "android" }}
-winOp=$(find /mnt/c/Users/$USER/AppData/Local/Microsoft/WinGet/Packages -type d | grep -m 1 "AgileBits.1Password.CLI_Microsoft.Winget.Source_")
-wslOp="/usr/bin/op"
-if [[ ! -e "$wslOp" ]]; then
-	echo "Creating 1Password symbolic link from Windows to WSL..."
-	sudo ln -sf "$winOp/op.exe" "$wslOp"
-fi
+# TODO: workaround since "op" isn't installed on WSL
+op() {
+  op.exe "$@"
+}
 alias ssh="ssh.exe"
 alias ssh-add="ssh-add.exe"
 {{- end }}
