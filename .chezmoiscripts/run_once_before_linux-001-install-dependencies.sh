@@ -39,20 +39,17 @@ utilities=(
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
 # =========================================================================================================
-# function to install oh-my-zsh
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 }
 
-# function to install gvm
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    sudo rm -rf /home/rios0rios0/.gvm
+    sudo rm -rf /home/$USER/.gvm
     bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
 }
 
-# function to install sdkman and related packages
 # https://sdkman.io/install/
 install_sdkman() {
     curl -s "https://get.sdkman.io" | bash
@@ -61,21 +58,20 @@ install_sdkman() {
     sdk install gradle
 }
 
-# function to install nvm
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-    # npm, yarn
+    nvm install --lts
+    npm install -g yarn
+    # TODO: install core pack
 }
 
-# function to install pyenv
 # https://github.com/pyenv/pyenv
 install_pyenv() {
     sudo rm -rf /home/rios0rios0/.pyenv
     curl https://pyenv.run | bash
 }
 
-# function to install azure-cli
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
     pip install azure-cli
