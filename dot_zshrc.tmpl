@@ -120,8 +120,12 @@ alias tools="cd $TOOLS_DIR"
 op() {
   op.exe "$@"
 }
-alias ssh="ssh.exe"
-alias ssh-add="ssh-add.exe"
+ssh() {
+  ssh.exe "$@"
+}
+ssh-add() {
+  ssh-add.exe "$@"
+}
 {{- end }}
 alias video2mp4="video2mp4(){ ffmpeg -i $1 ${1%.*}.mp4 }; video2mp4"
 alias pdfJoin="pdfJoin(){ pdftk $1 $2 cat output result.pdf }; pdfJoin"
@@ -166,8 +170,6 @@ source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
 ###### GoLang ######################################################################
 export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 
-# TODO: ERROR: Invalid or corrupt Go version
-# TODO: ERROR: GVM couldn't find hexdump
 [[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
 
 ###### Java ########################################################################

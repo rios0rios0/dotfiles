@@ -79,6 +79,8 @@
 	{{- end }}
 [merge]
 	commit = yes
-	ff = yes
+    ff = yes
+[push]
+    autoSetupRemote = true
 #[includeIf 'gitdir:~/work/acme/'] # every repository under ~/work/acme will use this configuration
 #  path = ~/work/acme/.gitconfig

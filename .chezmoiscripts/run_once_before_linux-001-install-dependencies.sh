@@ -8,12 +8,18 @@ sudo apt update
 requirements=(
     "git"
     "curl"
-    "zip"     # required for SDKMan
-    "unzip"   # required for SDKMan
-    "age"     # required for Chezmoi (decrypt files with SSH)
-    "gpg"     # required for Chezmoi (import and export GPGs)
-    "eza"     # it's for "ls" highlighting (https://github.com/eza-community/eza)
-    "sqlite3" # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
+    "zip"           # required for SDKMan
+    "unzip"         # required for SDKMan
+    "age"           # required for Chezmoi (decrypt files with SSH)
+    "gpg"           # required for import and export GPGs
+    "gpg-agent"     # required for import and export GPGs
+    "eza"           # it's for "ls" highlighting (https://github.com/eza-community/eza)
+    "sqlite3"       # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
+    "bsdmainutils"  # hexdump is an utility for displaying file contents in hexadecimal required by GVM (Go Version Manager)
+    "binutils"      # required by GVM (Go Version Manager)
+    "bison"         # required by GVM (Go Version Manager)
+    "gcc"           # required for many things and GVM
+    "make"          # required for many things and GVM
 )
 sudo apt install --no-install-recommends --yes "${requirements[@]}"
 # =========================================================================================================
