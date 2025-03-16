@@ -139,6 +139,15 @@ alias rmLogs='rmLogs(){ sudo find /var/log -name "*.log" -type f -mtime +$1 -exe
 $HOME/.scripts/linux-toolbox-watch-kube-config-files.sh &
 {{- end }}
 
+clear-h() {
+  rm -rf ~/.bash_history
+  rm -rf ~/.bashrc.original
+  rm -rf ~/.shell.pre-oh-my-zsh
+  rm -rf ~/.sudo_as_admin_successful
+  rm -rf ~/.zcompdump*
+  rm -rf ~/.zshrc.pre-oh-my-zsh
+}
+
 ###### EXA #########################################################################
 alias ls="exa -1 --classify --group-directories-first"
 alias ll="exa --long --header --classify --icons --group-directories-first --no-permissions"

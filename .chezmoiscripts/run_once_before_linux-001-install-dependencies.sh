@@ -26,6 +26,7 @@ sudo apt install --no-install-recommends --yes "${requirements[@]}"
 # Hardware
 hardware=(
     "htop" # it's for monitoring system resources
+    "screenfetch" # it's for displaying system information
 )
 sudo apt install --no-install-recommends --yes "${hardware[@]}"
 # =========================================================================================================
@@ -54,16 +55,16 @@ install_gvm() {
 install_sdkman() {
     curl -s "https://get.sdkman.io" | bash
     source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk install java
-    sdk install gradle
+    sdk install java 23.0.2-amzn
+    sdk install gradle 8.13
 }
 
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
     nvm install --lts
-    npm install -g yarn
-    # TODO: install core pack
+    npm install -g corepack
+    corepack enable
 }
 
 # https://github.com/pyenv/pyenv
