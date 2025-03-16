@@ -102,3 +102,5 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 ## TODO:
 - check how to avoid 1Password duplicated calls
 - check how to use variables from an included template
+- when getting from scratch and changing bashes, it stuck on the new one
+- when getting from scratch and having more than 1Password account, it get the wrong account order

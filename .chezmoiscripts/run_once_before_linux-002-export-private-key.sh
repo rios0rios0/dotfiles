@@ -5,6 +5,9 @@ op() {
   op.exe "$@"
 }
 
+# TODO: workaround to always use the same account first
+eval $(op signin --account my)
+
 # define the path to the ".ssh" folder
 sshFolderPath="$HOME/.ssh"
 

@@ -1,47 +1,20 @@
-$distro = "kali-linux"
+$distroList = & wsl.exe -l -q
+$kaliFound = $false
 
-# Get the list of WSL distributions with detailed info.
-try {
-    $wslList = wsl --list --verbose 2>&1
-} catch {
-    Write-Error "Error retrieving WSL distributions. Ensure that WSL is installed and configured."
-    exit
-}
-
-$installed = $false
-$defaultDistro = $null
-
-foreach ($line in $wslList) {
-    $trimmed = $line.Trim()
-    if ([string]::IsNullOrWhiteSpace($trimmed)) { continue }
-    # Skip header lines (e.g., "NAME  STATE  VERSION")
-    if ($trimmed -match "NAME\s+STATE\s+VERSION") { continue }
-
-    # Check for default distro (lines starting with '*')
-    if ($trimmed.StartsWith('*')) {
-        $parts = $trimmed.Substring(1).Trim().Split()
-        if ($parts.Count -gt 0) {
-            $defaultDistro = $parts[0]
-        }
-    }
-
-    # Get distro name (remove any asterisk that marks it as default)
-    $name = $trimmed.TrimStart('*').Trim().Split()[0]
-    if ($name -eq $distro) {
-        $installed = $true
+foreach ($distro in $distroList) {
+    if ($distro.Trim().ToLower() -eq "kali-linux") {
+        $kaliFound = $true
+        break
     }
 }
 
-if (-not $installed) {
-    Write-Host "$distro is not installed. Installing..."
-    wsl --install $distro
+if ($kaliFound) {
+    Write-Host "Kali Linux is installed. Updating WSL..."
+    wsl.exe --update
 } else {
-    Write-Host "$distro is already installed."
-}
+    Write-Host "Kali Linux is NOT installed. Installing Kali Linux distro..."
+    wsl.exe --install -d kali-linux
 
-if ($defaultDistro -ne $distro) {
-    Write-Host "$distro is not the default distro. Setting it as default..."
-    wsl --set-default $distro
-} else {
-    Write-Host "$distro is already the default distro."
+    Write-Host "Setting Kali Linux as the default distro..."
+    wsl.exe --setdefault kali-linux
 }
