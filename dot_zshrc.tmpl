@@ -2,13 +2,11 @@
 export LOCAL_ROOT="$HOME/.local"
 [[ -d $LOCAL_ROOT/bin ]] && export PATH="$LOCAL_ROOT/bin:$PATH"
 
-export TOOLS_DIR="$HOME/Development/Tools"
-
 # it solves the java options problem in many places
 unset _JAVA_OPTIONS
 
-# nvm is not compatible with the "PREFIX" environment variable. This is generated because of ZSH plugins
 {{- if eq .chezmoi.os "android" }}
+# TODO: nvm is not compatible with the "PREFIX" environment variable. This is generated because of ZSH plugins
 unset PREFIX
 {{- end }}
 
@@ -111,13 +109,17 @@ source $ZSH/oh-my-zsh.sh
 
 ###### Toolbox ##########################################################################################################
 ###### General #####################################################################
+export TOOLS_DIR="$HOME/Development/Tools"
 export SPEEDTEST="$TOOLS_DIR/Speedtest" && export PATH="$SPEEDTEST:$PATH"
 export CYCLONEDX="$TOOLS_DIR/Cyclonedx" && export PATH="$CYCLONEDX:$PATH"
 
 alias tools="cd $TOOLS_DIR"
+alias speed1="speedtest"
+alias speed2="python $SPEEDTEST/speedtest-cli --bytes"
+
 {{- if ne .chezmoi.os "android" }}
-# TODO: workaround since "op" isn't installed on WSL
 op() {
+  # TODO: workaround since "op" isn't installed on WSL
   op.exe "$@"
 }
 ssh() {
@@ -127,18 +129,13 @@ ssh-add() {
   ssh-add.exe "$@"
 }
 {{- end }}
-alias video2mp4="video2mp4(){ ffmpeg -i $1 ${1%.*}.mp4 }; video2mp4"
-alias pdfJoin="pdfJoin(){ pdftk $1 $2 cat output result.pdf }; pdfJoin"
-alias pdf2jpg="pdf2jpg(){ convert -density 300 -quality 100 $1 ${1%.*}.jpg }; pdf2jpg"
-alias speed="python3 $SPEEDTEST/speedtest-cli --bytes"
-alias top5size='sudo du -hs * | sort -rh | head -5'
-alias rmLogs='rmLogs(){ sudo find /var/log -name "*.log" -type f -mtime +$1 -exec rm -f {} \; }; rmLogs'
 
 ###### Files #######################################################################
 {{- if ne .chezmoi.os "android" }}
 $HOME/.scripts/linux-toolbox-watch-kube-config-files.sh &
 {{- end }}
 
+alias top5size='sudo du -hs * | sort -rh | head -5'
 clear-h() {
   rm -rf ~/.bash_history
   rm -rf ~/.bashrc.original
@@ -146,6 +143,18 @@ clear-h() {
   rm -rf ~/.sudo_as_admin_successful
   rm -rf ~/.zcompdump*
   rm -rf ~/.zshrc.pre-oh-my-zsh
+}
+clear-logs() {
+  sudo find /var/log -name "*.log" -type f -mtime +$1 -exec rm -f {} \;
+}
+pdf-join() {
+  pdftk $1 $2 cat output result.pdf
+}
+pdf-to-jpg() {
+  convert -density 300 -quality 100 $1 ${1%.*}.jpg
+}
+video-to-mp4() {
+  ffmpeg -i $1 ${1%.*}.mp4
 }
 
 ###### EXA #########################################################################
@@ -157,14 +166,18 @@ alias lt="exa --tree --long --header --classify --icons --group-directories-firs
 alias t="exa --tree --header --classify --icons --group-directories-first"
 
 ###### ASCIINema ###################################################################
-alias record="PYTHONPATH=$HOME/Documents/Tools/asciinema python3 -m asciinema rec"
-alias play="PYTHONPATH=$HOME/Documents/Tools/asciinema python3 -m asciinema play"
+alias record="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema rec"
+alias play="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema play"
 
 
 ###### Engineering ######################################################################################################
 ###### Cloud #######################################################################
-alias awsprof="awsprof(){ export AWS_PROFILE=$1 }; awsprof"
-alias azsubs="azsubs(){ az account set --subscription $1 }; azsubs"
+aws-prof() {
+  export AWS_PROFILE=$1
+}
+az-subs() {
+  az account set --subscription $1
+}
 
 ###### K8s #########################################################################
 export KREW_BIN="${KREW_ROOT:-$HOME/.krew}/bin" && export PATH=$KREW_BIN:$PATH

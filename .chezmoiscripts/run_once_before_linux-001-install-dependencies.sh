@@ -25,13 +25,14 @@ sudo apt install --no-install-recommends --yes "${requirements[@]}"
 # =========================================================================================================
 # Hardware
 hardware=(
-    "htop" # it's for monitoring system resources
-    "screenfetch" # it's for displaying system information
+    "htop"          # it's for monitoring system resources
+    "screenfetch"   # it's for displaying system information
 )
 sudo apt install --no-install-recommends --yes "${hardware[@]}"
 # =========================================================================================================
 # Utilities
 utilities=(
+    #"imagemagick"       # it's for image manipulation (convert, identify, etc.) TODO: better to use on Windows?
     "jq"                # it's for parsing JSON
     "bat"               # it's for cat with syntax highlighting (https://github.com/sharkdp/bat)
     "silversearcher-ag" # it's for searching files (https://github.com/ggreer/the_silver_searcher)
@@ -49,6 +50,33 @@ install_oh_my_zsh() {
 install_gvm() {
     sudo rm -rf /home/$USER/.gvm
     bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+}
+
+# https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
+install_kubectl() {
+    sudo mkdir -p -m 755 /etc/apt/keyrings
+    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+
+    echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+    sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list
+
+    sudo apt update && sudo apt install --no-install-recommends --yes kubectl
+}
+
+install_krew() {
+    (
+      set -x; cd "$(mktemp -d)" &&
+      OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+      ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
+      KREW="krew-${OS}_${ARCH}" &&
+      curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
+      tar zxvf "${KREW}.tar.gz" &&
+      ./"${KREW}" install krew
+    )
+
+    k krew install ctx
+    k krew install ns
 }
 
 # https://sdkman.io/install/
@@ -69,19 +97,30 @@ install_nvm() {
 
 # https://github.com/pyenv/pyenv
 install_pyenv() {
-    sudo rm -rf /home/rios0rios0/.pyenv
+    sudo rm -rf /home/$USER/.pyenv
     curl https://pyenv.run | bash
+
+    # https://github.com/pyenv/pyenv/wiki#suggested-build-environment
+    sudo apt install --no-install-recommends --yes build-essential libssl-dev zlib1g-dev \
+      libbz2-dev libreadline-dev libsqlite3-dev curl git \
+      libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
+
+    pyenv install 3.13.2
+    pyenv global 3.13.2
 }
 
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
+    pip install --upgrade pip
     pip install azure-cli
 }
 
 install_oh_my_zsh
 install_gvm
+install_kubectl
+install_krew
 install_sdkman
 install_nvm
 install_pyenv
-#install_azure_cli
+install_azure_cli
 # =========================================================================================================

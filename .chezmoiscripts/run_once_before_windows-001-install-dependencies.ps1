@@ -1,28 +1,27 @@
-$installedPackages = winget list --source winget
+# Retrieve installed packages in JSON format and extract their IDs.
+$installedPackageData = winget list --source winget --output json | ConvertFrom-Json
+$installedPackageIds  = $installedPackageData | ForEach-Object { $_.Id }
 
-function Is-PackageInstalled
-{
+function Is-PackageInstalled {
     param (
-        [string]$packageName
+        [string]$packageId
     )
-    return $installedPackages -like "*$packageName*"
+    # Check if the array of installed package IDs contains the specific package ID.
+    return $installedPackageIds -contains $packageId
 }
 
-function Install-Package-List
-{
+function Install-PackageList {
     param (
         [string[]]$packageList
     )
 
-    foreach ($package in $packageList)
-    {
-        if (-not (Is-PackageInstalled $package))
-        {
-            winget install $package
+    foreach ($package in $packageList) {
+        if (-not (Is-PackageInstalled -packageId $package)) {
+            # Install the package using its exact ID.
+            winget install --id $package --source winget --accept-package-agreements --accept-source-agreements
             Write-Host "$package installed successfully..."
         }
-        else
-        {
+        else {
             Write-Host "$package is already installed..."
         }
     }
@@ -38,10 +37,9 @@ $requirements = @(
     "JanDeDobbeleer.OhMyPosh",      # Oh My Posh
     "Microsoft.PowerShell"
     "Microsoft.WSL",                # Windows Subsystem for Linux
-    "Microsoft.WindowsTerminal",    # My default terminal
-    "OffSec.KaliLinux"              # Kali Linux (my default WSL distro)
+    "Microsoft.WindowsTerminal"     # My default terminal
 )
-Install-Package-List $requirements
+Install-PackageList $requirements
 # =========================================================================================================
 # Hardware
 $hardware = @(
@@ -52,12 +50,12 @@ $hardware = @(
     "Logitech.GHUB",
     "PerformanceTest"
 )
-Install-Package-List $hardware
+Install-PackageList $hardware
 # Hardware for Desktop
 #$hardwareDesktop = @(
 #    "Asus.GPUTweak"               # (just for RTX 4090)
 #)
-#Install-Package-List $hardwareDesktop
+#Install-PackageList $hardwareDesktop
 # =========================================================================================================
 # Utilities
 $utilities = @(
@@ -75,12 +73,12 @@ $utilities = @(
     "RevoUninstaller.RevoUninstallerPro"
     #"Spotify.Spotify"               # TODO: error when installing (code 29)
 )
-Install-Package-List $utilities
+Install-PackageList $utilities
 # Utilities for Desktop
 #$utilitiesDesktop = @(
 #    "CyberPowerSystems.PowerPanel.Personal" # (just for Desktop)
 #)
-#Install-Package-List $utilitiesDesktop
+#Install-PackageList $utilitiesDesktop
 # =========================================================================================================
 # Communication
 $communication = @(
@@ -88,10 +86,11 @@ $communication = @(
     "Discord.Discord",
     "Zoom.Zoom.EXE"
 )
-Install-Package-List $communication
+Install-PackageList $communication
 # =========================================================================================================
 # Development
 $development = @(
+    "CoreyButler.NVMforWindows",
     "Docker.DockerDesktop",
     "ExpressVPN.ExpressVPN",
     "GoLang.Go",
@@ -101,9 +100,10 @@ $development = @(
     "Mirantis.Lens",
     "OpenVPNTechnologies.OpenVPNConnect",
     "Postman.Postman",
-    "jqlang.jq"
+    "jqlang.jq",
+    "sharkdp.bat"
 )
-Install-Package-List $development
+Install-PackageList $development
 # =========================================================================================================
 # Gaming
 $gaming = @(
@@ -114,7 +114,7 @@ $gaming = @(
     #"Ubisoft.Connect"                   # TODO: the hash is not matching, Windows prevents the installation
     "Valve.Steam"
 )
-Install-Package-List $gaming
+Install-PackageList $gaming
 # =========================================================================================================
 # Refresh the PATH environment variable
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
