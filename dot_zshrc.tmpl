@@ -110,12 +110,13 @@ source $ZSH/oh-my-zsh.sh
 ###### Toolbox ##########################################################################################################
 ###### General #####################################################################
 export TOOLS_DIR="$HOME/Development/Tools"
-export SPEEDTEST="$TOOLS_DIR/Speedtest" && export PATH="$SPEEDTEST:$PATH"
-export CYCLONEDX="$TOOLS_DIR/Cyclonedx" && export PATH="$CYCLONEDX:$PATH"
+export SPEEDTEST="$TOOLS_DIR/Speedtest"
+export CYCLONEDX="$TOOLS_DIR/Cyclonedx"
 
 alias tools="cd $TOOLS_DIR"
-alias speed1="speedtest"
+alias speed1="$SPEEDTEST/speedtest"
 alias speed2="python $SPEEDTEST/speedtest-cli --bytes"
+alias cydx="$CYCLONEDX/cyclonedx-cli"
 
 {{- if ne .chezmoi.os "android" }}
 op() {
@@ -139,13 +140,15 @@ alias top5size='sudo du -hs * | sort -rh | head -5'
 clear-h() {
   rm -rf ~/.bash_history
   rm -rf ~/.bashrc.original
+  rm -rf ~/.lesshst
+  rm -rf ~/.python_history
   rm -rf ~/.shell.pre-oh-my-zsh
   rm -rf ~/.sudo_as_admin_successful
   rm -rf ~/.zcompdump*
   rm -rf ~/.zshrc.pre-oh-my-zsh
 }
 clear-logs() {
-  sudo find /var/log -name "*.log" -type f -mtime +$1 -exec rm -f {} \;
+  sudo find /var/log -name "*.log" -type f -mtime +5 -exec rm -f {} \;
 }
 pdf-join() {
   pdftk $1 $2 cat output result.pdf
