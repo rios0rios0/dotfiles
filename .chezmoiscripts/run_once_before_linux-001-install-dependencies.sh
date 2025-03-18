@@ -48,7 +48,7 @@ install_oh_my_zsh() {
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    sudo rm -rf /home/$USER/.gvm
+    sudo rm -rf "/home/$USER/.gvm"
     bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
 }
 
@@ -64,6 +64,7 @@ install_kubectl() {
     sudo apt update && sudo apt install --no-install-recommends --yes kubectl
 }
 
+# https://krew.sigs.k8s.io/docs/user-guide/setup/install/
 install_krew() {
     (
       set -x; cd "$(mktemp -d)" &&
@@ -75,8 +76,8 @@ install_krew() {
       ./"${KREW}" install krew
     )
 
-    k krew install ctx
-    k krew install ns
+    kubectl krew install ctx
+    kubectl krew install ns
 }
 
 # https://sdkman.io/install/
@@ -90,6 +91,7 @@ install_sdkman() {
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+    # TODO: at this point NVM is not available in the current shell, so we need to source it
     nvm install --lts
     npm install -g corepack
     corepack enable
