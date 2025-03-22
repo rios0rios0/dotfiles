@@ -72,10 +72,12 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 - Run `git` commands with `GIT_TRACE=1` to see what's happening.
 
 ### Known Issues
-1. Git stuck while cloning with SSH.
-   1. Zsh is using `ssh.exe` from Windows via alias. 
+1. Git stuck while doing any command with SSH.
+   1. Zsh is using `ssh.exe` from Windows via alias/function. 
    2. Git is using `ssh.exe` from Windows via configuration file.
    3. Due to "i" and "ii": `git` commands could be stuck when the `known_hosts` file is not created.
+   4. Workaround: run `ssh git@<YOUR_HOST>` to add the host to the `known_hosts` file via WSL using `ssh.exe` from Windows.
+   5. See TODO section for more information.
 
 2. Notice that using `chezmoi age` you are not able to decrypt using SSH keys.
    That's why it's a prerequisite to install `age` to force `chezmoi` to use it for decryption.
@@ -104,3 +106,5 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 - check how to use variables from an included template
 - when getting from scratch and changing bashes, it stuck on the new one
 - when getting from scratch and having more than 1Password account, it get the wrong account order
+- the script `run_once_after_windows-001-create-ssh-known-hosts.ps1` is not working properly, because when calling
+  `ssh.exe` via `git` commands in WSL, the command just freezes. So, the workaround is to do `ssh git@dev.azure.com` to each entry you want.

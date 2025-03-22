@@ -50,6 +50,8 @@ install_oh_my_zsh() {
 install_gvm() {
     sudo rm -rf /home/$USER/.gvm
     bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    gvm install go1.24.1 -B
+    go use go1.24.1
 }
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
@@ -64,6 +66,7 @@ install_kubectl() {
     sudo apt update && sudo apt install --no-install-recommends --yes kubectl
 }
 
+# https://krew.sigs.k8s.io/docs/user-guide/setup/install/
 install_krew() {
     (
       set -x; cd "$(mktemp -d)" &&
@@ -77,6 +80,20 @@ install_krew() {
 
     k krew install ctx
     k krew install ns
+}
+
+# https://developer.hashicorp.com/terraform/install
+install_terraform() {
+    wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com bullseye main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+    sudo apt update && sudo apt install terraform
+}
+
+# https://terragrunt.gruntwork.io/docs/getting-started/install/
+install_terragrunt() {
+    curl -LO https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64
+    sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+    sudo chmod +x /usr/local/bin/terragrunt
 }
 
 # https://sdkman.io/install/
@@ -119,6 +136,8 @@ install_oh_my_zsh
 install_gvm
 install_kubectl
 install_krew
+install_terraform
+install_terragrunt
 install_sdkman
 install_nvm
 install_pyenv
