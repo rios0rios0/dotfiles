@@ -18,3 +18,5 @@ if ($kaliFound) {
     Write-Host "Setting Kali Linux as the default distro..."
     wsl.exe --setdefault kali-linux
 }
+# =========================================================================================================
+nvm install --lts
