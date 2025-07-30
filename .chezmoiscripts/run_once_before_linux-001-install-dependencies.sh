@@ -39,6 +39,7 @@ utilities=(
     "inotify-tools"     # it's for watching file changes ("inotifywait")
     "dos2unix"          # it's for converting text files between Unix and DOS formats
     "expect"            # it's for automating interactive applications (used in some scripts)
+    "aria2c"            # cURL alternative with many features
 )
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================

@@ -85,11 +85,11 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 ### Known Issues
 1. Git stuck while doing any command with SSH.
-   1. Zsh is using `ssh.exe` from Windows via alias/function. 
-   2. Git is using `ssh.exe` from Windows via configuration file.
-   3. Due to "i" and "ii": `git` commands could be stuck when the `known_hosts` file is not created.
-   4. Workaround: run `ssh git@<YOUR_HOST>` to add the host to the `known_hosts` file via WSL using `ssh.exe` from Windows.
-   5. See TODO section for more information.
+   i. Zsh is using `ssh.exe` from Windows via alias/function. 
+   ii. Git is using `ssh.exe` from Windows via configuration file.
+   a) Due to "i" and "ii": `git` commands could be stuck when the `known_hosts` file is not created.
+   b) Workaround: run `ssh git@<YOUR_HOST>` to add the host to the `known_hosts` file via WSL using `ssh.exe` from Windows.
+   c) See TODO section for more information.
 
 2. Notice that using `chezmoi age` you are not able to decrypt using SSH keys.
    That's why it's a prerequisite to install `age` to force `chezmoi` to use it for decryption.
