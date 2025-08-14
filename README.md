@@ -7,9 +7,9 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 - **Shells**: Zsh and PowerShell.
 - **Terminal**: Windows Terminal.
 
-![WSL with Kali](.docs/wsl-with-kali.png)
-![Windows with PowerShell 7](.docs/windows-with-powershell-7.png)
-![Android with Termux](.docs/android-with-termux.png)
+![Kali Linux on WSL](.docs/wsl-with-kali.png)
+![PowerShell 7 on Windows](.docs/windows-with-powershell-7.png)
+![Termux on Android](.docs/android-with-termux.png)
 
 ## Installation
 
@@ -28,7 +28,7 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 ### Installation Steps
 
-#### Zsh on Kali Linux in WSL
+#### Kali Linux on WSL
 
 1. Install prerequisites:
     ```sh
@@ -40,7 +40,7 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
     sh -c "$(curl -fsLS get.chezmoi.io/lb)" -- init --apply rios0rios0
     ```
 
-#### PowerShell 7 on Windows 11
+#### PowerShell 7 on Windows
 
 1. Install PowerShell 7:
     ```powershell
@@ -57,6 +57,18 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 3. Clone this repository and apply the dotfiles:
     ```powershell
     Set-ExecutionPolicy RemoteSigned -Scope Process
+    chezmoi init --apply rios0rios0
+    ```
+
+#### Termux on Android
+
+1. Install prerequisites and `chezmoi`:
+    ```sh
+    apt install git chezmoi
+    ```
+
+2. Apply the `dotfiles`:
+    ```sh
     chezmoi init --apply rios0rios0
     ```
 
@@ -105,6 +117,6 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 - check how to avoid 1Password duplicated calls
 - check how to use variables from an included template
 - when getting from scratch and changing bashes, it stuck on the new one
-- when getting from scratch and having more than 1Password account, it get the wrong account order
+- when getting from scratch and having more than 1Password account, it gets the wrong account order
 - the script `run_once_after_windows-001-create-ssh-known-hosts.ps1` is not working properly, because when calling
   `ssh.exe` via `git` commands in WSL, the command just freezes. So, the workaround is to do `ssh git@dev.azure.com` to each entry you want.

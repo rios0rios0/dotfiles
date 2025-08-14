@@ -156,6 +156,9 @@ pdf-join() {
 pdf-to-jpg() {
   convert -density 300 -quality 100 $1 ${1%.*}.jpg
 }
+jpg-to-pdf() {
+  convert *.jpg -auto-orient pictures.pdf
+}
 video-to-mp4() {
   ffmpeg -i $1 ${1%.*}.mp4
 }
@@ -195,29 +198,45 @@ source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
 ###### GoLang ######################################################################
 export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 
-[[ -s "$HOME/.gvm/scripts/gvm" ]] && source "$HOME/.gvm/scripts/gvm"
+gvmRoot="$HOME/.gvm"
+if [ -d "$gvmRoot" ]; then
+    [[ -s "$gvmRoot/scripts/gvm" ]] && source "$gvmRoot/scripts/gvm"
+    gvm use go1.24.5
+fi
 
 ###### Java ########################################################################
 export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
 export PATH="$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/platform-tools/adb:$PATH"
 
-export SDKMAN_DIR="$HOME/.sdkman"
-[[ -s "$HOME/.sdkman/bin/sdkman-init.sh" ]] && source "$HOME/.sdkman/bin/sdkman-init.sh"
+sdkmanRoot="$HOME/.sdkman"
+if [ -d "$sdkmanRoot" ]; then
+    export SDKMAN_DIR="$sdkmanRoot"
+    [[ -s "$sdkmanRoot/bin/sdkman-init.sh" ]] && source "$sdkmanRoot/bin/sdkman-init.sh"
+fi
 
 ###### Node ########################################################################
-export NVM_HOME="$HOME/.nvm"
-[ -s "$NVM_HOME/nvm.sh" ] && \. "$NVM_HOME/nvm.sh"
-[ -s "$NVM_HOME/bash_completion" ] && \. "$NVM_HOME/bash_completion"
-[ -f "$(pwd)/.nvmrc" ] && nvm use
+nvmRoot="$HOME/.nvm"
+if [ -d "$nvmRoot" ]; then
+    export NVM_HOME="$nvmRoot"
+    [ -s "$NVM_HOME/nvm.sh" ] && \. "$NVM_HOME/nvm.sh"
+    [ -s "$NVM_HOME/bash_completion" ] && \. "$NVM_HOME/bash_completion"
+    [ -f "$(pwd)/.nvmrc" ] && nvm use
+fi
 
 ###### Python ######################################################################
-export PYENV_ROOT="$HOME/.pyenv"
-[[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-eval "$(pyenv init -)"
+pyenvRoot="$HOME/.pyenv"
+if [ -d "$pyenvRoot" ]; then
+    export PYENV_ROOT="$pyenvRoot"
+    [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init -)"
+fi
 
 ###### Rust ########################################################################
-export CARGO_ROOT="$HOME/.cargo"
-[[ -d $CARGO_ROOT/bin ]] && export PATH="$CARGO_ROOT/bin:$PATH"
+cargoRoot="$HOME/.cargo"
+if [ -d "$cargoRoot" ]; then
+    export CARGO_ROOT="$cargoRoot"
+    [[ -d $CARGO_ROOT/bin ]] && export PATH="$CARGO_ROOT/bin:$PATH"
+fi
 
 ###### Workspace Information #######################################################
 {{- if ne .chezmoi.os "android" }}

@@ -37,6 +37,8 @@ utilities=(
     "bat"               # it's for cat with syntax highlighting (https://github.com/sharkdp/bat)
     "silversearcher-ag" # it's for searching files (https://github.com/ggreer/the_silver_searcher)
     "inotify-tools"     # it's for watching file changes ("inotifywait")
+    "dos2unix"          # it's for converting text files between Unix and DOS formats
+    "expect"            # it's for automating interactive applications (used in some scripts)
 )
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
