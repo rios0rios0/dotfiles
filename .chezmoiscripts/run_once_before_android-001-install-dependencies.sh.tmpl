@@ -67,6 +67,8 @@ install_oh_my_zsh() {
 
     if [ ! -d "$omzPath" ]; then
         sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    else
+        echo "Oh My ZSH is already installed."
     fi
 }
 
@@ -80,6 +82,8 @@ install_gvm() {
         source "$gvmPath/scripts/gvm"
         gvm install go1.24.4
         gvm use go1.24.4
+    else
+        echo "GVM is already installed."
     fi
 }
 
@@ -91,6 +95,8 @@ install_terragrunt() {
         curl -LO "https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64"
         mv terragrunt_linux_amd64 "$terragruntBin"
         chmod +x "$terragruntBin"
+    else
+        echo "Terragrunt is already installed."
     fi
 }
 
@@ -104,6 +110,8 @@ install_sdkman() {
         source "$sdkPath/bin/sdkman-init.sh"
         sdk install java
         sdk install gradle
+    else
+        echo "SDKMan is already installed."
     fi
 }
 
@@ -119,6 +127,8 @@ install_nvm() {
         nvm install --lts
         npm install -g corepack
         corepack enable
+    else
+        echo "NVM is already installed."
     fi
 }
 
