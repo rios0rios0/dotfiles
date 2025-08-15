@@ -59,51 +59,67 @@ languages=(
 apt install --no-install-recommends --yes "${languages[@]}"
 # =========================================================================================================
 # =========================================================================================================
+binPath="/data/data/com.termux/files/usr/bin"
+
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    omzPath="$HOME/.omz"
+
+    if [ ! -d "$omzPath" ]; then
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    fi
 }
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    gvmRoot="$HOME/.gvm"
+    gvmPath="$HOME/.gvm"
 
-    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    if [ ! -d "$gvmPath" ]; then
+        bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
 
-    source "$gvmRoot/scripts/gvm"
-    gvm install go1.24.4
-    gvm use go1.24.4
+        source "$gvmPath/scripts/gvm"
+        gvm install go1.24.4
+        gvm use go1.24.4
+    fi
 }
 
 # https://terragrunt.gruntwork.io/docs/getting-started/install/
 install_terragrunt() {
-    binPath=/data/data/com.termux/files/usr/bin
+    terragruntBin="$binPath/terragrunt"
 
-    curl -LO https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64
-    mv terragrunt_linux_amd64 $binPath/terragrunt
-    chmod +x $binPath/terragrunt
+    if [ ! -f "$terragruntBin" ]; then
+        curl -LO "https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64"
+        mv terragrunt_linux_amd64 "$terragruntBin"
+        chmod +x "$terragruntBin"
+    fi
 }
 
 # https://sdkman.io/install/
 install_sdkman() {
-    curl -s "https://get.sdkman.io" | bash
+    sdkPath="$HOME/.sdkman"
 
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk install java
-    sdk install gradle
+    if [ ! -d "$sdkPath" ]; then
+        curl -s "https://get.sdkman.io" | bash
+
+        source "$sdkPath/bin/sdkman-init.sh"
+        sdk install java
+        sdk install gradle
+    fi
 }
 
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
-    nvmRoot="$HOME/.nvm"
+    nvmPath="$HOME/.nvm"
 
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+    if [ ! -d "$nvmPath" ]; then
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
 
-    unset PREFIX
-    source "$nvmRoot/nvm.sh"
-    nvm install --lts
-    npm install -g corepack
-    corepack enable
+        unset PREFIX
+        source "$nvmPath/nvm.sh"
+        nvm install --lts
+        npm install -g corepack
+        corepack enable
+    fi
 }
 
 # https://pypi.org/project/azure-cli/
@@ -114,15 +130,15 @@ install_azure_cli() {
 
 # https://1password.com/downloads/command-line/
 install_1password_cli() {
-    binPath=/data/data/com.termux/files/usr/bin
+    opBin="$binPath/op"
 
-    if [ ! -f "$binPath/op" ]; then
+    if [ ! -f "$opPath" ]; then
         ARCH="arm64"
         wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.30.3/op_linux_${ARCH}_v2.30.3.zip" -O op.zip
         unzip -d op op.zip
         mv op/op "$binPath"
         rm -rf op.zip op
-        chmod +x "$binPath/op"
+        chmod +x "$opPath"
     else
         echo "1Password CLI is already installed."
     fi
@@ -139,11 +155,11 @@ install_1password_cli
 # =========================================================================================================
 # https://docs.astronvim.com/
 configure_neovim() {
-    set -e
+    nvimPath="$HOME/.config/nvim"
 
-    if [ ! -d "$HOME/.config/nvim" ]; then
-        git clone --depth 1 https://github.com/AstroNvim/template ~/.config/nvim
-        rm -rf ~/.config/nvim/.git
+    if [ ! -d "$nvimPath" ]; then
+        git clone --depth 1 https://github.com/AstroNvim/template "$nvimPath"
+        rm -rf "$nvimPath/.git"
         nvim
     else
         echo "'nvim' is already configured."
