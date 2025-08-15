@@ -163,13 +163,13 @@ video-to-mp4() {
   ffmpeg -i $1 ${1%.*}.mp4
 }
 
-###### EXA #########################################################################
-alias ls="exa -1 --classify --group-directories-first"
-alias ll="exa --long --header --classify --icons --group-directories-first --no-permissions"
-alias lp="exa --long --header --classify --icons --group-directories-first"
-alias la="exa -a --long --header --classify --icons --group-directories-first"
-alias lt="exa --tree --long --header --classify --icons --group-directories-first"
-alias t="exa --tree --header --classify --icons --group-directories-first"
+###### EZA #########################################################################
+alias ls="eza -1 --classify --group-directories-first"
+alias ll="eza --long --header --classify --icons --group-directories-first --no-permissions"
+alias lp="eza --long --header --classify --icons --group-directories-first"
+alias la="eza -a --long --header --classify --icons --group-directories-first"
+alias lt="eza --tree --long --header --classify --icons --group-directories-first"
+alias t="eza --tree --header --classify --icons --group-directories-first"
 
 ###### ASCIINema ###################################################################
 alias record="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema rec"
