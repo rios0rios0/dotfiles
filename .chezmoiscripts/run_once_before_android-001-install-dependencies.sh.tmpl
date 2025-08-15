@@ -65,11 +65,15 @@ install_oh_my_zsh() {
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    rm -rf "$HOME/.gvm"
+    gvmRoot="$HOME/.gvm"
+    rm -rf "$gvmRoot"
     bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
 
-    gvm install go1.24.4
-    go use go1.24.4
+    if [ -d "$gvmRoot" ]; then
+        [[ -s "$gvmRoot/scripts/gvm" ]] && source "$gvmRoot/scripts/gvm"
+        gvm install go1.24.4
+        gvm use go1.24.4
+    fi
 }
 
 # https://terragrunt.gruntwork.io/docs/getting-started/install/
