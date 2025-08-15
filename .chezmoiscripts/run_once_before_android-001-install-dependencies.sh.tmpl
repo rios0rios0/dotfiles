@@ -38,15 +38,15 @@ utilities=(
     "inotify-tools"     # it's for watching file changes ("inotifywait")
     "dos2unix"          # it's for converting text files between Unix and DOS formats
     "expect"            # it's for automating interactive applications (used in some scripts)
+    "aria2c"            # cURL alternative with many features
     "which"             # it performs command lookups
     "mlocate"           # it performs file searches (locate and updatedb)
-    "aria2c"            # cURL alternative with many features
 )
 apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
 # Languages
 languages=(
-    "golang"        # not working/broken via GVM, just native package manager
+    "golang"        # needed for GVM to compile other GoLang versions
     "rust"          # needed to compile Azure CLI and exa
     "python"        # needed for Azure CLI (not working/broken via Pyenv, just native package manager)
     "python-pip"    # needed for Azure CLI (not working/broken via Pyenv, just native package manager)
@@ -59,6 +59,21 @@ install_oh_my_zsh() {
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 }
 
+# https://github.com/moovweb/gvm?tab=readme-ov-file
+install_gvm() {
+    sudo rm -rf /home/$USER/.gvm
+    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    gvm install go1.24.1 -B
+    go use go1.24.1
+}
+
+# https://terragrunt.gruntwork.io/docs/getting-started/install/
+install_terragrunt() {
+    curl -LO https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64
+    sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
+    sudo chmod +x /usr/local/bin/terragrunt
+}
+
 # https://sdkman.io/install/
 install_sdkman() {
     curl -s "https://get.sdkman.io" | bash
@@ -69,7 +84,7 @@ install_sdkman() {
 
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
+    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
     # npm, yarn
 }
 
@@ -84,6 +99,7 @@ install_exa() {
 
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
+    pip install --upgrade pip
     pip install azure-cli
 }
 
@@ -102,6 +118,8 @@ install_1password_cli() {
 }
 
 install_oh_my_zsh
+install_gvm
+install_terragrunt
 install_sdkman
 install_nvm
 install_exa

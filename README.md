@@ -62,6 +62,9 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 #### Termux on Android
 
+!! IMPORTANT: You should avoid using Termux from the Play Store, as it may not be up-to-date. Instead, use the official Termux app from [F-Droid](https://f-droid.org/en/packages/com.termux/).
+Supporting article: https://www.reddit.com/r/termux/comments/zu8ets/do_not_install_termux_from_play_store/
+
 1. Install prerequisites and `chezmoi`:
     ```sh
     apt install git chezmoi
@@ -85,11 +88,11 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 ### Known Issues
 1. Git stuck while doing any command with SSH.
-   i. Zsh is using `ssh.exe` from Windows via alias/function. 
-   ii. Git is using `ssh.exe` from Windows via configuration file.
-   a) Due to "i" and "ii": `git` commands could be stuck when the `known_hosts` file is not created.
-   b) Workaround: run `ssh git@<YOUR_HOST>` to add the host to the `known_hosts` file via WSL using `ssh.exe` from Windows.
-   c) See TODO section for more information.
+   1. Zsh is using `ssh.exe` from Windows via alias/function. 
+   2. Git is using `ssh.exe` from Windows via configuration file.
+      * Due to "i" and "ii": `git` commands could be stuck when the `known_hosts` file is not created.
+      * Workaround: run `ssh git@<YOUR_HOST>` to add the host to the `known_hosts` file via WSL using `ssh.exe` from Windows.
+      * See TODO section for more information.
 
 2. Notice that using `chezmoi age` you are not able to decrypt using SSH keys.
    That's why it's a prerequisite to install `age` to force `chezmoi` to use it for decryption.
