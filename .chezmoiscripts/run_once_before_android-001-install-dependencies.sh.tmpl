@@ -1,5 +1,8 @@
 #!{{ lookPath "bash" }}
 
+# init storage capabilities
+termux-setup-storage
+
 # update the package list
 apt update
 
@@ -70,9 +73,10 @@ install_gvm() {
 
 # https://terragrunt.gruntwork.io/docs/getting-started/install/
 install_terragrunt() {
+    binPath=/data/data/com.termux/files/usr/bin
     curl -LO https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64
-    sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
-    sudo chmod +x /usr/local/bin/terragrunt
+    mv terragrunt_linux_amd64 $binPath/terragrunt
+    chmod +x $binPath/terragrunt
 }
 
 # https://sdkman.io/install/
@@ -86,6 +90,9 @@ install_sdkman() {
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+    export NVM_DIR="$HOME/.nvm"
+    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
+    [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
     # npm, yarn
 }
 
@@ -106,13 +113,15 @@ install_azure_cli() {
 
 # https://1password.com/downloads/command-line/
 install_1password_cli() {
-    if [ ! -f /data/data/com.termux/files/usr/bin/op ]; then
+    binPath=/data/data/com.termux/files/usr/bin
+
+    if [ ! -f "$binPath/op" ]; then
         ARCH="arm64"
         wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.30.3/op_linux_${ARCH}_v2.30.3.zip" -O op.zip
         unzip -d op op.zip
-        mv op/op /data/data/com.termux/files/usr/bin/
+        mv op/op "$binPath"
         rm -rf op.zip op
-        chmod +x /data/data/com.termux/files/usr/bin/op
+        chmod +x "$binPath/op"
     else
         echo "1Password CLI is already installed."
     fi
