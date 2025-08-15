@@ -132,6 +132,15 @@ install_nvm() {
     fi
 }
 
+install_pyenv() {
+    pyenvPath="$HOME/.pyenv"
+
+    if [ ! -d "$pyenvPath" ]; then
+        curl -fsSL https://pyenv.run | bash
+        
+    fi
+}
+
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
     pip install --upgrade pip
