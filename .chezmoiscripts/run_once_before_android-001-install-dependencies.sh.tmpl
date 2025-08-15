@@ -98,7 +98,9 @@ install_nvm() {
 
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
 
-    # npm, yarn
+    nvm install --lts
+    npm install -g corepack
+    corepack enable
 }
 
 # https://www.cyberciti.biz/open-source/command-line-hacks/exa-a-modern-replacement-for-ls-written-in-rust-for-linuxunix/
