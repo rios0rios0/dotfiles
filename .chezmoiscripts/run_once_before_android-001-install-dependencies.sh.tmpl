@@ -65,15 +65,17 @@ install_oh_my_zsh() {
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    sudo rm -rf /home/$USER/.gvm
+    rm -rf "$HOME/.gvm"
     bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-    gvm install go1.24.1 -B
-    go use go1.24.1
+
+    gvm install go1.24.4
+    go use go1.24.4
 }
 
 # https://terragrunt.gruntwork.io/docs/getting-started/install/
 install_terragrunt() {
     binPath=/data/data/com.termux/files/usr/bin
+
     curl -LO https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64
     mv terragrunt_linux_amd64 $binPath/terragrunt
     chmod +x $binPath/terragrunt
@@ -83,6 +85,7 @@ install_terragrunt() {
 install_sdkman() {
     curl -s "https://get.sdkman.io" | bash
     source "$HOME/.sdkman/bin/sdkman-init.sh"
+
     sdk install java
     sdk install gradle
 }
@@ -93,6 +96,7 @@ install_nvm() {
     export NVM_DIR="$HOME/.nvm"
     [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"  # This loads nvm
     [ -s "$NVM_DIR/bash_completion" ] && \. "$NVM_DIR/bash_completion"  # This loads nvm bash_completion
+
     # npm, yarn
 }
 
