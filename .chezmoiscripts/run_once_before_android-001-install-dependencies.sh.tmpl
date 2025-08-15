@@ -132,6 +132,7 @@ install_nvm() {
     fi
 }
 
+# https://github.com/pyenv/pyenv
 install_pyenv() {
     pyenvPath="$HOME/.pyenv"
 
@@ -139,6 +140,7 @@ install_pyenv() {
         curl -fsSL https://pyenv.run | bash
         pyenv install 3.13:latest
         pyenv global 3.13:latest
+        pip install --upgrade pip
     else
         echo "Pyenv is already installed."
     fi
@@ -146,7 +148,6 @@ install_pyenv() {
 
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
-    pip install --upgrade pip
     pip install azure-cli
 }
 
