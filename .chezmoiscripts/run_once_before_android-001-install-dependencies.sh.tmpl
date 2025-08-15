@@ -80,8 +80,8 @@ install_gvm() {
         bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
 
         source "$gvmPath/scripts/gvm"
-        gvm install go1.24.4
-        gvm use go1.24.4
+        gvm install go1.24.5
+        gvm use go1.24.5
     else
         echo "GVM is already installed."
     fi
