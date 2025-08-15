@@ -98,6 +98,7 @@ install_nvm() {
 
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
 
+    source "$nvmRoot/nvm.sh"
     nvm install --lts
     npm install -g corepack
     corepack enable
