@@ -142,7 +142,7 @@ install_azure_cli() {
 install_1password_cli() {
     opBin="$binPath/op"
 
-    if [ ! -f "$opPath" ]; then
+    if [ ! -f "$opBin" ]; then
         ARCH="arm64"
         wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.30.3/op_linux_${ARCH}_v2.30.3.zip" -O op.zip
         unzip -d op op.zip
