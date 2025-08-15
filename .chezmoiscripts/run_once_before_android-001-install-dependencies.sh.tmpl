@@ -137,7 +137,10 @@ install_pyenv() {
 
     if [ ! -d "$pyenvPath" ]; then
         curl -fsSL https://pyenv.run | bash
-        
+        pyenv install 3.13:latest
+        pyenv global 3.13:latest
+    else
+        echo "Pyenv is already installed."
     fi
 }
 
@@ -168,6 +171,7 @@ install_gvm
 install_terragrunt
 install_sdkman
 install_nvm
+install_pyenv
 install_azure_cli
 install_1password_cli
 
