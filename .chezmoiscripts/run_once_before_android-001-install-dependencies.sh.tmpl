@@ -18,7 +18,7 @@ requirements=(
     "vim"               # needed for some operations
     "neovim"            # preferred editor
     "binutils-is-llvm"  # required by Azure CLI
-    "bison"             # needed for exa (replacement for 'ls')
+    "bison"             # needed for GVM
     "make"              # required for many things and GVM
     "wget"              # required by 1Password CLI
     "zsh"               # preferred shell
@@ -51,7 +51,7 @@ apt install --no-install-recommends --yes "${utilities[@]}"
 # Languages
 languages=(
     "golang"        # needed for GVM to compile other GoLang versions
-    "rust"          # needed to compile Azure CLI and exa
+    "rust"          # needed to compile Azure CLI
     #"python"        # needed for Azure CLI (not working/broken via Pyenv, just native package manager)
     #"python-pip"    # needed for Azure CLI (not working/broken via Pyenv, just native package manager)
 )
