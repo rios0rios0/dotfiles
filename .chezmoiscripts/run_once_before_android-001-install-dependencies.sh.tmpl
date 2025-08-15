@@ -14,6 +14,7 @@ requirements=(
     "zip"               # required for SDKMan
     "unzip"             # required for SDKMan
     "age"               # required for Chezmoi (decrypt files with SSH)
+    "eza"               # it's for "ls" highlighting (https://github.com/eza-community/eza)
     "sqlite"            # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
     "vim"               # needed for some operations
     "neovim"            # preferred editor
@@ -105,15 +106,6 @@ install_nvm() {
     corepack enable
 }
 
-# https://www.cyberciti.biz/open-source/command-line-hacks/exa-a-modern-replacement-for-ls-written-in-rust-for-linuxunix/
-install_exa() {
-    if ! command -v exa &> /dev/null; then
-        cargo install exa
-    else
-        echo "'exa' is already installed."
-    fi
-}
-
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
     pip install --upgrade pip
@@ -141,7 +133,6 @@ install_gvm
 install_terragrunt
 install_sdkman
 install_nvm
-install_exa
 install_azure_cli
 install_1password_cli
 
