@@ -1,0 +1,14 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# all installed binaries inside host, are available inside proot
+# so, there's no need to install them inside proot again
+
+export PROOTNOCALL_VERIFY=1
+export PROOT_LINK2SYMLINK=1
+export PROOT_VERBOSE=0
+
+workspace="/root/workspace"
+proot-distro login alpine \
+    --bind $HOME/.azure:/root/.azure \
+    --bind $(pwd):$workspace \
+    --work-dir $workspace -- "$@"

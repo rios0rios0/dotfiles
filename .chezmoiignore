@@ -10,10 +10,15 @@ README.md
 .chezmoiscripts/windows-*.ps1
 .aws
 .azure
-.ssh
 AppData
 .oh-my-posh.json
 .wakatime.cfg
+{{- end }}
+
+{{- /* Files shared between Windows and Android.
+     They are only needed on these systems, so ignore them on all others (i.e. on Linux). */ -}}
+{{- if not (or (eq .chezmoi.os "windows") (eq .chezmoi.os "android")) }}
+.ssh
 {{- end }}
 
 {{- /* Linux‑exclusive files – only for Linux. When not running Linux, ignore them. */ -}}
@@ -42,6 +47,7 @@ pyvenv.cfg
 {{- /* Android‑exclusive files – only for Android. When not running Android, ignore them. */ -}}
 {{- if ne .chezmoi.os "android" }}
 .chezmoiscripts/android-*.sh
+.local
 {{- end }}
 
 {{- /* Additional Android exclusions: For example, ignore .gitconfig on Android even if it’s normally managed elsewhere. */ -}}

@@ -1,7 +1,22 @@
+{{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
+
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-{{-      if (eq .type "REFERENCE") -}}
-{{-          $sshEmail := onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" -}}
-{{-          $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" }}
-{{           $sshEmail }} {{ $sshPublicKey }}
-{{-       end -}}
+  {{- if (eq .type "REFERENCE") -}}
+
+    {{- /* Read full “device@account” title */ -}}
+    {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
+
+    {{- /* Split into [device, account] */ -}}
+    {{- $parts := split "@" $sshName -}}
+    {{- $device := index $parts "_0" -}}
+
+    {{- /* Only emit hosts for the current device */ -}}
+    {{- if eq $device $deviceName -}}
+
+      {{- $sshEmail := onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" -}}
+      {{- $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" -}}
+      {{ $sshEmail }} {{ $sshPublicKey }}
+
+    {{- end -}}
+  {{- end -}}
 {{- end }}

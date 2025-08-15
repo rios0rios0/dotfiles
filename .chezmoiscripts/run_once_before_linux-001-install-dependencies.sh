@@ -103,8 +103,8 @@ install_terragrunt() {
 install_sdkman() {
     curl -s "https://get.sdkman.io" | bash
     source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk install java 23.0.2-amzn
-    sdk install gradle 8.13
+    sdk install java
+    sdk install gradle
 }
 
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script

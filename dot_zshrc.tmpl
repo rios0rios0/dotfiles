@@ -1,15 +1,20 @@
 ###### Environment ######################################################################################################
 export LOCAL_ROOT="$HOME/.local"
-[[ -d $LOCAL_ROOT/bin ]] && export PATH="$LOCAL_ROOT/bin:$PATH"
+binPath="$LOCAL_ROOT/bin"
+if [ -d "$binPath" ]; then
+    export BIN_PATH="$binPath"
+    export PATH="$BIN_PATH:$PATH"
+fi
 
 # it solves the java options problem in many places
 unset _JAVA_OPTIONS
 
 {{- if eq .chezmoi.os "android" }}
+export CHEZMOI_DEVICE="$(getprop ro.product.model)"
+
 # TODO: nvm is not compatible with the "PREFIX" environment variable. This is generated because of ZSH plugins
 unset PREFIX
 {{- end }}
-
 
 ###### ZINIT CONFIGURATION ##############################################################################################
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
@@ -89,9 +94,7 @@ DISABLE_MAGIC_FUNCTIONS="true"
 plugins=(
   common-aliases zsh-histdb # history history-substring-search (history managed by "histdb")
   colorize colored-man-pages command-not-found vim-interaction
-  {{- if ne .chezmoi.os "android" }}
   1password
-  {{- end }}
   nmap ssh
   aws azure heroku terraform helm
   docker docker-compose kubectl kubectx
@@ -163,13 +166,13 @@ video-to-mp4() {
   ffmpeg -i $1 ${1%.*}.mp4
 }
 
-###### EXA #########################################################################
-alias ls="exa -1 --classify --group-directories-first"
-alias ll="exa --long --header --classify --icons --group-directories-first --no-permissions"
-alias lp="exa --long --header --classify --icons --group-directories-first"
-alias la="exa -a --long --header --classify --icons --group-directories-first"
-alias lt="exa --tree --long --header --classify --icons --group-directories-first"
-alias t="exa --tree --header --classify --icons --group-directories-first"
+###### EZA #########################################################################
+alias ls="eza -1 --classify --group-directories-first"
+alias ll="eza --long --header --classify --icons --group-directories-first --no-permissions"
+alias lp="eza --long --header --classify --icons --group-directories-first"
+alias la="eza -a --long --header --classify --icons --group-directories-first"
+alias lt="eza --tree --long --header --classify --icons --group-directories-first"
+alias t="eza --tree --header --classify --icons --group-directories-first"
 
 ###### ASCIINema ###################################################################
 alias record="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema rec"

@@ -1,5 +1,8 @@
 #!{{ lookPath "bash" }}
 
+# init storage capabilities
+termux-setup-storage
+
 # update the package list
 apt update
 
@@ -11,14 +14,19 @@ requirements=(
     "zip"               # required for SDKMan
     "unzip"             # required for SDKMan
     "age"               # required for Chezmoi (decrypt files with SSH)
+    "eza"               # it's for "ls" highlighting (https://github.com/eza-community/eza)
     "sqlite"            # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
     "vim"               # needed for some operations
     "neovim"            # preferred editor
     "binutils-is-llvm"  # required by Azure CLI
-    "bison"             # needed for exa (replacement for 'ls')
+    "bison"             # needed for GVM
     "make"              # required for many things and GVM
     "wget"              # required by 1Password CLI
     "zsh"               # preferred shell
+    "ncurses-utils"     # needed for many packages (like GVM)
+    "proot"             # needed to run binaries with Termux DNS
+    "proot-distro"      # neede to controll proot capabilities selecting a distro
+    "file"              # providds functions to analyze file types
 )
 apt install --no-install-recommends --yes "${requirements[@]}"
 # =========================================================================================================
@@ -38,89 +46,265 @@ utilities=(
     "inotify-tools"     # it's for watching file changes ("inotifywait")
     "dos2unix"          # it's for converting text files between Unix and DOS formats
     "expect"            # it's for automating interactive applications (used in some scripts)
+    #"aria2c"            # cURL alternative with many features (TODO: not found on Termux default repositories)
     "which"             # it performs command lookups
     "mlocate"           # it performs file searches (locate and updatedb)
-    "aria2c"            # cURL alternative with many features
+    "openssh"           # used to clone Git repositories and also authentication
 )
 apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
 # Languages
 languages=(
-    "golang"        # not working/broken via GVM, just native package manager
-    "rust"          # needed to compile Azure CLI and exa
-    "python"        # needed for Azure CLI (not working/broken via Pyenv, just native package manager)
-    "python-pip"    # needed for Azure CLI (not working/broken via Pyenv, just native package manager)
+    "golang"        # issue described on line 261
+    "rust"          # needed to compile Azure CLI
+    "nodejs"        # issue described on line 261
+    "python"        # issue described on line 261
+    "python-pip"    # issue described on line 261
 )
 apt install --no-install-recommends --yes "${languages[@]}"
 # =========================================================================================================
 # =========================================================================================================
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    omzPath="$HOME/.oh-my-zsh"
+
+    if [ ! -d "$omzPath" ]; then
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    else
+        echo "Oh My ZSH is already installed."
+    fi
+}
+
+# https://github.com/moovweb/gvm?tab=readme-ov-file
+install_gvm() {
+    if command_exists go; then
+        echo "GoLang detected, means it was previously installed or native package installed..."
+
+        return;
+    fi
+
+    gvmPath="$HOME/.gvm"
+
+    if [ ! -d "$gvmPath" ]; then
+        bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+
+        source "$gvmPath/scripts/gvm"
+        gvm install go1.24.5
+        gvm use go1.24.5
+    else
+        echo "GVM is already installed."
+    fi
+}
+
+install_wrapper() {
+  proot-distro install alpine
+}
+
+# github.com/rios0rios0/terra
+install_terra() {
+    # TODO: can't avoid repetition?
+    binPath="/usr/bin"
+    terraBin="$binPath/terra"
+
+    if proot-distro login alpine -- bash -c "[ ! -f "$terraBin" ]"; then
+        sourcePath="$HOME/Development/github.com/rios0rios0/terra"
+        if [ ! -d "$sourcePath" ]; then
+            git clone https://github.com/rios0rios0/terra.git $sourcePath
+        fi
+        cd $sourcePath
+        # make sure correct environment before installing shell
+        export PATH="$PATH:$HOME/go/bin"
+        make build
+        proot-distro copy bin/terra alpine:/usr/bin
+    else
+        echo "Terra is already installed."
+    fi
+}
+
+# https://terragrunt.gruntwork.io/docs/getting-started/install/
+install_terragrunt() {
+    proot-distro login alpine -- bash <<-'EOF'
+        binPath="/usr/bin"
+        terragruntBin="$binPath/terragrunt"
+
+        if [ ! -f "$terragruntBin" ]; then
+            curl -LO "https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_arm64"
+            mv terragrunt_linux_arm64 "$terragruntBin"
+            chmod +x "$terragruntBin"
+        else
+            echo "Terragrunt is already installed."
+        fi
+EOF
+}
+
+# https://developer.hashicorp.com/terraform/install
+install_terraform() {
+    proot-distro login alpine -- bash <<-'EOF'
+        binPath="/usr/bin"
+        terraformBin="$binPath/terraform"
+    
+        if [ ! -f "$terraformBin" ]; then
+            wget https://releases.hashicorp.com/terraform/1.12.2/terraform_1.12.2_linux_arm64.zip
+            unzip terraform_1.12.2_linux_arm64.zip -d "$binPath"
+            mv "$binPath/terraform" "$terraformBin"
+            rm terraform_1.12.2_linux_arm64.zip
+            rm "$binPath/LICENSE.txt"
+            chmod +x "$terraformBin"
+        else
+            echo "Terraform is already installed."
+        fi
+EOF
 }
 
 # https://sdkman.io/install/
 install_sdkman() {
-    curl -s "https://get.sdkman.io" | bash
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk install java
-    sdk install gradle
+    sdkPath="$HOME/.sdkman"
+
+    if [ ! -d "$sdkPath" ]; then
+        curl -s "https://get.sdkman.io" | bash
+
+        source "$sdkPath/bin/sdkman-init.sh"
+        sdk install java
+        sdk install gradle
+    else
+        echo "SDKMan is already installed."
+    fi
 }
 
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.1/install.sh | bash
-    # npm, yarn
+    if command_exists npm; then
+        echo "Node detected, means it was previously installed or native package installed..."
+
+        npm install -g corepack
+        corepack enable
+        return;
+    fi
+
+    nvmPath="$HOME/.nvm"
+
+    if [ ! -d "$nvmPath" ]; then
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+
+        unset PREFIX
+        source "$nvmPath/nvm.sh"
+        nvm install --lts
+
+        npm install -g npm@latest
+        npm install -g corepack
+        corepack enable
+    else
+        echo "NVM is already installed."
+    fi
 }
 
-# https://www.cyberciti.biz/open-source/command-line-hacks/exa-a-modern-replacement-for-ls-written-in-rust-for-linuxunix/
-install_exa() {
-    if ! command -v exa &> /dev/null; then
-        cargo install exa
+# https://github.com/pyenv/pyenv
+install_pyenv() {
+    if command_exists pip; then
+        echo "Python detected, means it was previously installed or native package installed..."
+
+        return;
+    fi
+
+    pyenvPath="$HOME/.pyenv"
+
+    if [ ! -d "$pyenvPath" ]; then
+        curl -fsSL https://pyenv.run | bash
+
+        export PATH="$PATH:$pyenvPath"
+        pyenv install 3.13:latest
+        pyenv global 3.13:latest
+
+        pip install --upgrade pip
     else
-        echo "'exa' is already installed."
+        echo "Pyenv is already installed."
     fi
 }
 
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
-    pip install azure-cli
+    if ! command_exists pip; then
+        echo "Install 'pip' first, it seems to be NOT installed..."
+
+        return;
+    fi
+
+    azPath="$HOME/.azure"
+
+    if [ ! -d "$azPath" ]; then
+        # TODO: when installed via Pyenv it should be loaded first on the current shell
+        pip install azure-cli
+    else
+        echo "AZ is already installed."
+    fi
 }
 
 # https://1password.com/downloads/command-line/
 install_1password_cli() {
-    if [ ! -f /data/data/com.termux/files/usr/bin/op ]; then
-        ARCH="arm64"
-        wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.30.3/op_linux_${ARCH}_v2.30.3.zip" -O op.zip
-        unzip -d op op.zip
-        mv op/op /data/data/com.termux/files/usr/bin/
-        rm -rf op.zip op
-        chmod +x /data/data/com.termux/files/usr/bin/op
-    else
-        echo "1Password CLI is already installed."
-    fi
+    proot-distro login alpine -- bash <<-'EOF'
+        binPath="/usr/bin"
+        opBin="$binPath/op"
+
+        if [ ! -f "$opBin" ]; then
+            ARCH="arm64"
+            wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.31.1/op_linux_${ARCH}_v2.31.1.zip" -O op.zip
+            unzip -d op op.zip
+            mv op/op "$binPath"
+            rm -rf op.zip op
+            chmod +x "$opBin"
+        else
+            echo "1Password CLI is already installed."
+        fi
+EOF
 }
 
 install_oh_my_zsh
+
+# TODO: building Go versions on Termux are breaking, since they don't recognize system critial path (like /etc/resolv.conf) leading to DNS errors
+install_gvm
+
+install_wrapper
+install_terra
+install_terragrunt
+install_terraform
 install_sdkman
+
+# TODO: same of the line 261
 install_nvm
-install_exa
+
+# TODO: same of the line 261
+install_pyenv
+
 install_azure_cli
 install_1password_cli
 
 # =========================================================================================================
+# resolv.config
+configure_dns() {
+    rcfile="/data/data/com.termux/files/usr/etc/resolv.conf"
+
+    echo "nameserver 8.8.8.8" > "$rcfile"
+    echo "nameserver 8.8.4.4" >> "$rcfile"
+    echo "nameserver 1.1.1.1" >> "$rcfile"
+}
+
 # https://docs.astronvim.com/
 configure_neovim() {
-    set -e
+    nvimPath="$HOME/.config/nvim"
 
-    if [ ! -d "$HOME/.config/nvim" ]; then
-        git clone --depth 1 https://github.com/AstroNvim/template ~/.config/nvim
-        rm -rf ~/.config/nvim/.git
+    if [ ! -d "$nvimPath" ]; then
+        git clone --depth 1 https://github.com/AstroNvim/template "$nvimPath"
+        rm -rf "$nvimPath/.git"
         nvim
     else
-        echo "'nvim' is already configured."
+        echo "NeoVIM with AstroVIM is already configured."
     fi
 }
 
+configure_dns
 configure_neovim
 # =========================================================================================================
