@@ -6,12 +6,9 @@ export LOCAL_ROOT="$HOME/.local"
 unset _JAVA_OPTIONS
 
 {{- if eq .chezmoi.os "android" }}
-BIN_PATH=
-
 # TODO: nvm is not compatible with the "PREFIX" environment variable. This is generated because of ZSH plugins
 unset PREFIX
 {{- end }}
-
 
 ###### ZINIT CONFIGURATION ##############################################################################################
 ZINIT_HOME="${XDG_DATA_HOME:-${HOME}/.local/share}/zinit/zinit.git"
