@@ -47,6 +47,7 @@ utilities=(
     #"aria2c"            # cURL alternative with many features (TODO: not found on Termux default repositories)
     "which"             # it performs command lookups
     "mlocate"           # it performs file searches (locate and updatedb)
+    "openssh"           # used to clone Git repositories and also authentication
 )
 apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
