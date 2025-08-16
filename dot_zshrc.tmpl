@@ -1,6 +1,6 @@
 ###### Environment ######################################################################################################
 export LOCAL_ROOT="$HOME/.local"
-# usually android doesn't have that created
+# usually Android on Termux doesn't have that created
 mkdir -p "$LOCAL_ROOT/bin"
 [[ -d $LOCAL_ROOT/bin ]] && export PATH="$LOCAL_ROOT/bin:$PATH"
 
@@ -202,7 +202,10 @@ export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 gvmRoot="$HOME/.gvm"
 if [ -d "$gvmRoot" ]; then
     [[ -s "$gvmRoot/scripts/gvm" ]] && source "$gvmRoot/scripts/gvm"
+    {{- if ne .chezmoi.os "android" }}
+    # Go versions built with GVM on Android are failing to build other binaries
     gvm use go1.24.5
+    {{- end }}
 fi
 
 ###### Java ########################################################################
