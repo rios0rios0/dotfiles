@@ -193,6 +193,11 @@ function run_with_dns() {
     --link2symlink \
     -- "$@"
 }
+
+# Terraform via PRoot DNS
+function terraform() {
+  run_with_dns "$BIN_PATH/terraform" "$@"
+}
 {{- end }}
 
 ###### Cloud #######################################################################
