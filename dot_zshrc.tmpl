@@ -1,5 +1,7 @@
 ###### Environment ######################################################################################################
 export LOCAL_ROOT="$HOME/.local"
+# usually android doesn't have that created
+mkdir -p "$LOCAL_ROOT/bin"
 [[ -d $LOCAL_ROOT/bin ]] && export PATH="$LOCAL_ROOT/bin:$PATH"
 
 # it solves the java options problem in many places
