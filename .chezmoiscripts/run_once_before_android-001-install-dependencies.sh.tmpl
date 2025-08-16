@@ -216,11 +216,11 @@ install_1password_cli
 configure_dns() {
     rcfile="/data/data/com.termux/files/usr/etc/resolv.conf"
 
-    cat <<-EOF >"$rcfile"
+    cat <<-EOT >"$rcfile"
     nameserver 8.8.8.8
     nameserver 8.8.4.4
     nameserver 1.1.1.1
-    EOF
+    EOT
 }
 
 # https://docs.astronvim.com/
