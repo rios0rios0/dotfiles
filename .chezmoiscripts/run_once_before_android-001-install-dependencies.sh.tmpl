@@ -217,8 +217,8 @@ configure_dns() {
     rcfile="/data/data/com.termux/files/usr/etc/resolv.conf"
 
     echo "nameserver 8.8.8.8" > "$rcfile"
-    echo "nameserver 8.8.4.4" > "$rcfile"
-    echo "nameserver 1.1.1.1" > "$rcfile"
+    echo "nameserver 8.8.4.4" >> "$rcfile"
+    echo "nameserver 1.1.1.1" >> "$rcfile"
 }
 
 # https://docs.astronvim.com/
