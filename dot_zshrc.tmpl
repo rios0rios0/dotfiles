@@ -181,6 +181,8 @@ alias play="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema play"
 
 ###### Engineering ######################################################################################################
 {{- if eq .chezmoi.os "android" }}
+
+
 # usually pre-built binaries won't work with Termux DNS. Use PRoot as workaround for that
 function run_with_dns() {
   if ! command -v proot >/dev/null; then
@@ -189,7 +191,7 @@ function run_with_dns() {
   fi
 
   proot \
-    --bind="$PREFIX/etc/resolv.conf":/etc/resolv.conf \
+    --bind="/data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf" \
     --link2symlink \
     -- "$@"
 }
