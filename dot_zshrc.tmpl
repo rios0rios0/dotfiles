@@ -180,6 +180,21 @@ alias play="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema play"
 
 
 ###### Engineering ######################################################################################################
+{{- if eq .chezmoi.os "android" }}
+# usually pre-built binaries won't work with Termux DNS. Use PRoot as workaround for that
+function run_with_dns() {
+  if ! command -v proot >/dev/null; then
+    echo "Error: proot not installed." >&2
+    return 1
+  fi
+
+  proot \
+    --bind="$PREFIX/etc/resolv.conf":/etc/resolv.conf \
+    --link2symlink \
+    -- "$@"
+}
+{{- end }}
+
 ###### Cloud #######################################################################
 aws-prof() {
   export AWS_PROFILE=$1
