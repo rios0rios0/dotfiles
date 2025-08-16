@@ -181,24 +181,19 @@ alias play="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema play"
 
 ###### Engineering ######################################################################################################
 {{- if eq .chezmoi.os "android" }}
-
-
 # usually pre-built binaries won't work with Termux DNS. Use PRoot as workaround for that
 function run_with_dns() {
-  if ! command -v proot >/dev/null; then
-    echo "Error: proot not installed." >&2
-    return 1
-  fi
+    rcfile="/data/data/com.termux/files/usr/etc/resolv.conf"
 
-  proot \
-    --bind="/data/data/com.termux/files/usr/etc/resolv.conf:/etc/resolv.conf" \
-    --link2symlink \
-    -- "$@"
+    proot \
+        --bind="$rcfile:/etc/resolv.conf" \
+        --link2symlink \
+        -- "$@"
 }
 
-# Terraform via PRoot DNS
+# it runs Terraform via PRoot DNS
 function terraform() {
-  run_with_dns "$BIN_PATH/terraform" "$@"
+    run_with_dns "$BIN_PATH/terraform" "$@"
 }
 {{- end }}
 
