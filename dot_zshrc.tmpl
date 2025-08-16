@@ -191,9 +191,12 @@ function run_with_dns() {
         "$@"
 }
 
-# it runs Terraform via PRoot DNS
+# it runs via PRoot DNS
 function terraform() {
     run_with_dns "$BIN_PATH/terraform" "$@"
+}
+function terragrunt() {
+    run_with_dns "$BIN_PATH/terragrunt" "$@"
 }
 {{- end }}
 
