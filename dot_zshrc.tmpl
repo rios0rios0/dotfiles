@@ -1,8 +1,9 @@
 ###### Environment ######################################################################################################
 export LOCAL_ROOT="$HOME/.local"
+export BIN_PATH="$LOCAL_ROOT/bin"
 # usually Android on Termux doesn't have that created
-mkdir -p "$LOCAL_ROOT/bin"
-[[ -d $LOCAL_ROOT/bin ]] && export PATH="$LOCAL_ROOT/bin:$PATH"
+mkdir -p "$BIN_PATH"
+[[ -d "$BIN_PATH" ]] && export PATH="$BIN_PATH:$PATH"
 
 # it solves the java options problem in many places
 unset _JAVA_OPTIONS
