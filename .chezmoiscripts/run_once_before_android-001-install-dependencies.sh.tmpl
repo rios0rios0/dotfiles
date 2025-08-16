@@ -111,7 +111,7 @@ install_terragrunt() {
     terragruntBin="$binPath/terragrunt"
 
     if [ ! -f "$terragruntBin" ]; then
-        curl -LO "https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64"
+        curl -LO "https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_arm64"
         mv terragrunt_linux_amd64 "$terragruntBin"
         chmod +x "$terragruntBin"
     else
