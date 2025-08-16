@@ -101,6 +101,7 @@ install_terraform() {
         unzip terraform_1.12.2_linux_arm64.zip -d "$binPath"
         chmod +x "$terraformBin"
         rm terraform_1.12.2_linux_arm64.zip
+        rm "$binPath/LICENSE.txt"
     else
         echo "Terragrunt is already installed."
     fi
