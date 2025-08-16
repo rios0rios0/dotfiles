@@ -97,7 +97,10 @@ install_terraform() {
     terraformBin="$binPath/terraform"
     
     if [ ! -f "$terraformBin" ]; then
-    
+        wget https://releases.hashicorp.com/terraform/1.12.2/terraform_1.12.2_linux_arm64.zip
+        unzip terraform_1.12.2_linux_arm64.zip -d "$binPath"
+        chmod +x "$terraformBin"
+        rm terraform_1.12.2_linux_arm64.zip
     else
         echo "Terragrunt is already installed."
     fi
