@@ -212,6 +212,17 @@ install_azure_cli
 install_1password_cli
 
 # =========================================================================================================
+# resolv.config
+configure_dns() {
+    rcfile="/data/data/com.termux/files/usr/etc/resolv.conf"
+
+    cat <<-EOF >"$rcfile"
+    nameserver 8.8.8.8
+    nameserver 8.8.4.4
+    nameserver 1.1.1.1
+    EOF
+}
+
 # https://docs.astronvim.com/
 configure_neovim() {
     nvimPath="$HOME/.config/nvim"
@@ -225,5 +236,6 @@ configure_neovim() {
     fi
 }
 
+configure_dns
 configure_neovim
 # =========================================================================================================
