@@ -24,6 +24,7 @@ requirements=(
     "wget"              # required by 1Password CLI
     "zsh"               # preferred shell
     "ncurses-utils"     # needed for many packages (like GVM)
+    "proot"             # needed to run binaries with Termux DNS
 )
 apt install --no-install-recommends --yes "${requirements[@]}"
 # =========================================================================================================
