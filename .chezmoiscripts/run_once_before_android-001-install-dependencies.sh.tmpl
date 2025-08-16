@@ -60,6 +60,10 @@ languages=(
 apt install --no-install-recommends --yes "${languages[@]}"
 # =========================================================================================================
 # =========================================================================================================
+command_exists() {
+  command -v "$1" >/dev/null 2>&1
+}
+
 binPath="/data/data/com.termux/files/usr/bin"
 
 # https://ohmyz.sh/#install
@@ -149,6 +153,12 @@ install_pyenv() {
 
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
+    if command_exists pip; then
+        echo "Install 'pip' first, it seems to be NOT installed..."
+        return;
+    fi
+
+
     azPath="$HOME/.azure"
 
     if [ ! -d "$azPath" ]; then
