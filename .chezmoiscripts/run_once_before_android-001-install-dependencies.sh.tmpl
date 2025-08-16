@@ -194,7 +194,7 @@ install_1password_cli() {
         unzip -d op op.zip
         mv op/op "$binPath"
         rm -rf op.zip op
-        chmod +x "$opPath"
+        chmod +x "$opBin"
     else
         echo "1Password CLI is already installed."
     fi
