@@ -64,7 +64,8 @@ command_exists() {
   command -v "$1" >/dev/null 2>&1
 }
 
-binPath="/data/data/com.termux/files/usr/bin"
+binPath="$HOME/.local/bin"
+mkdir -p $binPath
 
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
