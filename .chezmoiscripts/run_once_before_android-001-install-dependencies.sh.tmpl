@@ -92,6 +92,17 @@ install_gvm() {
     fi
 }
 
+# https://developer.hashicorp.com/terraform/install
+install_terraform() {
+    terraformBin="$binPath/terraform"
+    
+    if [ ! -f "$terraformBin" ]; then
+    
+    else
+        echo "Terragrunt is already installed."
+    fi
+}
+
 # https://terragrunt.gruntwork.io/docs/getting-started/install/
 install_terragrunt() {
     terragruntBin="$binPath/terragrunt"
@@ -186,6 +197,7 @@ install_1password_cli() {
 
 install_oh_my_zsh
 install_gvm
+install_terraform
 install_terragrunt
 install_sdkman
 install_nvm           # TODO: it breaks when trying to install any Node version
