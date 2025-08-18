@@ -1,17 +1,35 @@
 # TODO: how to avoid repetition with templates?
 # TODO: when the Windows username is different than WSL username, the 1Password path is different breaking the commit signing
+
+{{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
 {{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
+
 {{- $defaultUsername := "" -}}
 {{- $defaultUserEmail := "" -}}
 {{- $defaultUserSigningkey := "" -}}
+
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-{{-     if (eq .type "REFERENCE") -}}
-{{-         $defaultUsername = onepasswordRead (list "op://Private/" .value "/ssh username" | join "") "my" -}}
-{{-         $defaultUserEmail = onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" -}}
-{{-         $defaultUserSigningkey = onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" -}}
-{{-         break -}}
-{{-      end -}}
+  {{- if (eq .type "REFERENCE") -}}
+
+    {{- /* Read full “device@account” title */ -}}
+    {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
+
+    {{- /* Split into [device, account] */ -}}
+    {{- $parts := split "@" $sshName -}}
+    {{- $device := index $parts "_0" -}}
+
+    {{- /* Only emit hosts for the current device */ -}}
+    {{- if eq $device $deviceName -}}
+
+      {{- $defaultUsername = onepasswordRead (list "op://Private/" .value "/ssh username" | join "") "my" -}}
+      {{- $defaultUserEmail = onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" -}}
+      {{- $defaultUserSigningkey = onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" -}}
+      {{- break -}}
+
+    {{- end -}}
+  {{- end -}}
 {{- end }}
+
 [user]
 	name = "{{ $defaultUsername }}"
 	email = "{{ $defaultUserEmail }}"
@@ -19,13 +37,15 @@
 [gpg]
 	format = ssh
 [gpg "ssh"]
-	{{- if eq .chezmoi.os "windows" }}
+
+{{- if eq .chezmoi.os "windows" }}
 	program = "C:/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
 	allowedSignersFile = "C:/Users/{{ $username }}/.ssh/allowed_signers"
-	{{- else }}
+{{- else }}
 	program = "/mnt/c/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign-wsl"
 	allowedSignersFile = "/home/{{ $username }}/.ssh/allowed_signers"
-	{{- end }}
+{{- end }}
+
 [commit]
 	gpgsign = true
 [tag]
@@ -47,40 +67,60 @@
 	rollback = reset --soft HEAD~1
 
 	# gpg signing
-    {{- range (onepassword "Active GPGs" "personal" "my").fields -}}
-	{{-      if (eq .type "REFERENCE") -}}
-	{{-          $gpgAlias := onepasswordRead (list "op://Private/" .value "/gpg alias" | join "") "my" -}}
-	{{-          $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my" -}}
-	{{-          $gpgEmail := onepasswordRead (list "op://Private/" .value "/gpg email" | join "") "my" -}}
-	{{-          $gpgFingerprint := onepasswordRead (list "op://Private/" .value "/fingerprint" | join "") "my" }}
+{{- range (onepassword "Active GPGs" "personal" "my").fields -}}
+  {{- if (eq .type "REFERENCE") -}}
+    {{- $gpgAlias := onepasswordRead (list "op://Private/" .value "/gpg alias" | join "") "my" -}}
+    {{- $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my" -}}
+    {{- $gpgEmail := onepasswordRead (list "op://Private/" .value "/gpg email" | join "") "my" -}}
+    {{- $gpgFingerprint := onepasswordRead (list "op://Private/" .value "/fingerprint" | join "") "my" }}
+
 	gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
-	{{-      end -}}
-	{{- end }}
+
+  {{- end -}}
+{{- end }}
 
 	# ssh signing
-	{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-	{{-      if (eq .type "REFERENCE") -}}
-	{{-          $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my" -}}
-	{{-          $sshUsername := onepasswordRead (list "op://Private/" .value "/ssh username" | join "") "my" -}}
-	{{-          $sshEmail := onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" -}}
-	{{-          $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" }}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if (eq .type "REFERENCE") -}}
+
+    {{- /* Read full “device@account” title */ -}}
+    {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
+
+    {{- /* Split into [device, account] */ -}}
+    {{- $parts := split "@" $sshName -}}
+    {{- $device := index $parts "_0" -}}
+
+    {{- /* Only emit hosts for the current device */ -}}
+    {{- if eq $device $deviceName -}}
+
+      {{- $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my" -}}
+      {{- $sshUsername := onepasswordRead (list "op://Private/" .value "/ssh username" | join "") "my" -}}
+      {{- $sshEmail := onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" -}}
+      {{- $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" }}
+
 	ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
-	{{-      end -}}
-	{{- end }}
+
+    {{- end -}}
+  {{- end -}}
+{{- end }}
+
 [core]
 	autocrlf = input
 	editor = vim
-	{{- if eq .chezmoi.os "windows" }}
+
+{{- if eq .chezmoi.os "windows" }}
 	excludesfile = "C:/Users/{{ $username }}/.gitignore"
 	sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe"
-	{{- else }}
+{{- else }}
 	excludesfile = "/home/{{ $username }}/.gitignore"
 	sshCommand = ssh.exe
-	{{- end }}
+{{- end }}
+
 [merge]
-	commit = yes
+    commit = yes
     ff = yes
 [push]
     autoSetupRemote = true
+
 #[includeIf 'gitdir:~/work/acme/'] # every repository under ~/work/acme will use this configuration
 #  path = ~/work/acme/.gitconfig
