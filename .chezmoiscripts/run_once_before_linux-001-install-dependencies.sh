@@ -40,6 +40,7 @@ utilities=(
     "dos2unix"          # it's for converting text files between Unix and DOS formats
     "expect"            # it's for automating interactive applications (used in some scripts)
     "aria2c"            # cURL alternative with many features
+    "file"              # it's for determining file types
 )
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================

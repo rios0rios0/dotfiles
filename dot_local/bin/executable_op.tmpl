@@ -1,0 +1,15 @@
+{{- if eq .chezmoi.os "android" -}}
+
+#!/data/data/com.termux/files/usr/bin/bash
+wrapper op "$@"
+
+{{- else -}}
+
+#!/bin/bash
+# this variable transports the environment variables to the op executable on Windows
+# see more details on how to use it at: https://devblogs.microsoft.com/commandline/share-environment-vars-between-wsl-and-windows/
+# see also at: https://github.com/1Password/terraform-provider-onepassword/blob/main/internal/onepassword/cli/op.go#L249
+export WSLENV=OP_FORMAT:OP_INTEGRATION_NAME:OP_INTEGRATION_ID:OP_INTEGRATION_BUILDNUMBER
+op.exe "$@"
+
+{{- end -}}

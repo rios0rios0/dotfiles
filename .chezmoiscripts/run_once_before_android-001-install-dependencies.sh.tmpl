@@ -25,8 +25,8 @@ requirements=(
     "zsh"               # preferred shell
     "ncurses-utils"     # needed for many packages (like GVM)
     "proot"             # needed to run binaries with Termux DNS
-    "proot-distro"      # neede to controll proot capabilities selecting a distro
-    "file"              # providds functions to analyze file types
+    "proot-distro"      # needed to control proot capabilities selecting a distro
+    "file"              # it's for determining file types
 )
 apt install --no-install-recommends --yes "${requirements[@]}"
 # =========================================================================================================
@@ -264,7 +264,7 @@ EOF
 
 install_oh_my_zsh
 
-# TODO: building Go versions on Termux are breaking, since they don't recognize system critial path (like /etc/resolv.conf) leading to DNS errors
+# TODO: building Go versions on Termux are breaking, since they don't recognize system critical path (like /etc/resolv.conf) leading to DNS errors
 install_gvm
 
 install_wrapper

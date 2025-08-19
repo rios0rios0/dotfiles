@@ -28,6 +28,8 @@ AppData
 .histdb
 .john
 .kube
+.local/ssh
+.local/ssh-add
 .sqlmap
 .autobump.yaml
 .freterc
@@ -39,6 +41,7 @@ pyvenv.cfg
 {{- /* Files shared between Linux and Android.
      They are only needed on these systems, so ignore them on all others (i.e. on Windows). */ -}}
 {{- if not (or (eq .chezmoi.os "linux") (eq .chezmoi.os "android")) }}
+.local/op
 .scripts
 .p10k.zsh
 .zshrc
@@ -47,7 +50,9 @@ pyvenv.cfg
 {{- /* Android‑exclusive files – only for Android. When not running Android, ignore them. */ -}}
 {{- if ne .chezmoi.os "android" }}
 .chezmoiscripts/android-*.sh
-.local
+.local/terraform
+.local/terragrunt
+.local/wrapper
 {{- end }}
 
 {{- /* Additional Android exclusions: For example, ignore .gitconfig on Android even if it’s normally managed elsewhere. */ -}}

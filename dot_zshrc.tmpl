@@ -1,9 +1,9 @@
 ###### Environment ######################################################################################################
 export LOCAL_ROOT="$HOME/.local"
-binPath="$LOCAL_ROOT/bin"
-if [ -d "$binPath" ]; then
-    export BIN_PATH="$binPath"
-    export PATH="$BIN_PATH:$PATH"
+localBinPath="$LOCAL_ROOT/bin"
+if [ -d "$localBinPath" ]; then
+    export LOCAL_BIN_PATH="$localBinPath"
+    export PATH="$LOCAL_BIN_PATH:$PATH"
 fi
 
 # it solves the java options problem in many places
@@ -122,10 +122,6 @@ alias speed2="python $SPEEDTEST/speedtest-cli --bytes"
 alias cydx="$CYCLONEDX/cyclonedx-cli"
 
 {{- if ne .chezmoi.os "android" }}
-op() {
-  # TODO: workaround since "op" isn't installed on WSL
-  op.exe "$@"
-}
 ssh() {
   ssh.exe "$@"
 }
