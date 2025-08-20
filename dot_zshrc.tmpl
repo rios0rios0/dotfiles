@@ -69,8 +69,28 @@ zinit light zsh-users/zsh-autosuggestions
 ######################################################
 ######################################################
 zinit light zdharma-continuum/fast-syntax-highlighting
+{{- if eq .chezmoi.os "android" }}
 ######################################################
+######################################################
+# generate slug from CHEZMOI_DEVICE
+slug=$(printf '%s' "$CHEZMOI_DEVICE" \
+  | sed -e 's/^[[:space:]]*//' \
+        -e 's/[[:space:]]*$//' \
+        -e 's/[[:space:]]\+/-/g' \
+  | tr '[:upper:]' '[:lower:]')
 
+# collect only non-.pub identities
+typeset -a sshIdentities
+for key in "$HOME/.ssh/$slug"*(.N); do
+  if [[ $key != *.pub ]]; then
+    sshIdentities+=${key:t}
+  fi
+done
+
+# feed them to the OMZ ssh-agent plugin
+zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
+######################################################
+{{- end }}
 
 ###### P10k CONFIGURATION ###############################################################################################
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
@@ -96,6 +116,9 @@ plugins=(
   colorize colored-man-pages command-not-found vim-interaction
   1password
   nmap ssh
+  {{- if eq .chezmoi.os "android" }}
+  ssh-agent
+  {{- end }}
   aws azure heroku terraform helm
   docker docker-compose kubectl kubectx
   git github git-flow git-flow-avh git-hubflow
@@ -120,15 +143,6 @@ alias tools="cd $TOOLS_DIR"
 alias speed1="$SPEEDTEST/speedtest"
 alias speed2="python $SPEEDTEST/speedtest-cli --bytes"
 alias cydx="$CYCLONEDX/cyclonedx-cli"
-
-{{- if ne .chezmoi.os "android" }}
-ssh() {
-  ssh.exe "$@"
-}
-ssh-add() {
-  ssh-add.exe "$@"
-}
-{{- end }}
 
 ###### Files #######################################################################
 {{- if ne .chezmoi.os "android" }}

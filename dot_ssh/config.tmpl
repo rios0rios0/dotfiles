@@ -1,46 +1,50 @@
+{{- /* 
+TODO: The IdentityFile logic is inverted on Android (uses private key), all other OSes use public key.
+This is because on Android (Termux) only private keys are usable, while other platforms require public keys for SSH config.
+*/ -}}
 {{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
+{{- $isAndroid := eq .chezmoi.os "android" -}}
 
 ###### VCS #######################################################################
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if (eq .type "REFERENCE") -}}
-
-    {{- /* Read full “device@account” title */ -}}
+  {{- if eq .type "REFERENCE" -}}
     {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
-
-    {{- /* Split into [device, account] */ -}}
     {{- $parts := split "@" $sshName -}}
     {{- $device := index $parts "_0" -}}
-
-    {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
-
-      {{- $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my" | trim }}
+      {{- $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my" | trim -}}
+      {{- $identityFile := "" -}}
+      {{- if $isAndroid -}}
+        {{- $identityFile = (print "~/.ssh/" $sshName) -}}
+      {{- else -}}
+        {{- $identityFile = (print "~/.ssh/" $sshName ".pub") -}}
+      {{- end }}
 
 Host github.com-{{ $sshAlias }}
   HostName github.com
-  IdentityFile ~/.ssh/{{ $sshName }}.pub
+  IdentityFile {{ $identityFile }}
   IdentitiesOnly yes
 
 Host gitlab.com-{{ $sshAlias }}
   HostName gitlab.com
-  IdentityFile ~/.ssh/{{ $sshName }}.pub
+  IdentityFile {{ $identityFile }}
   IdentitiesOnly yes
 
 # Azure DevOps
 Host dev.azure.com-{{ $sshAlias }}
   HostName ssh.dev.azure.com
-  IdentityFile ~/.ssh/{{ $sshName }}.pub
+  IdentityFile {{ $identityFile }}
   IdentitiesOnly yes
 
 Host visualstudio.com-{{ $sshAlias }}
   HostName vs-ssh.visualstudio.com
-  IdentityFile ~/.ssh/{{ $sshName }}.pub
+  IdentityFile {{ $identityFile }}
   IdentitiesOnly yes
 
 # Atlassian
 Host bitbucket.org-{{ $sshAlias }}
   HostName bitbucket.org
-  IdentityFile ~/.ssh/{{ $sshName }}.pub
+  IdentityFile {{ $identityFile }}
   IdentitiesOnly yes
 
     {{- end -}}
@@ -49,26 +53,20 @@ Host bitbucket.org-{{ $sshAlias }}
 
 ###### PEM #######################################################################
 {{- range (onepassword "Active PEMs" "personal" "my").fields -}}
-  {{- if (eq .type "REFERENCE") -}}
-
-    {{- /* Read full “device@account” title */ -}}
+  {{- if eq .type "REFERENCE" -}}
     {{- $pemName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
-
-    {{- /* Split into [device, account] */ -}}
     {{- $parts := split "@" $pemName -}}
     {{- $device := index $parts "_0" -}}
-
-    {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
-
       {{- $alias := onepasswordRead (list "op://Private/" .value "/pem host alias" | join "") "my" | trim -}}
       {{- $host := onepasswordRead (list "op://Private/" .value "/pem host" | join "") "my" | trim -}}
-      {{- $user := onepasswordRead (list "op://Private/" .value "/pem user" | join "") "my" | trim }}
+      {{- $user := onepasswordRead (list "op://Private/" .value "/pem user" | join "") "my" | trim -}}
+      {{- $pemIdentityFile := (print "~/.ssh/" $pemName ".pem") -}}
 
 Host {{ $alias }}
   HostName {{ $host }}
   User {{ $user }}
-  IdentityFile ~/.ssh/{{ $pemName }}.pem
+  IdentityFile {{ $pemIdentityFile }}
   IdentitiesOnly yes
 
     {{- end -}}
