@@ -1,0 +1,6 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# even though it could be run outside wrapper,
+# it's better to use the wrapper, bacause it avoids 
+# instantiation of many commands needed by this command
+wrapper terra "$@"
