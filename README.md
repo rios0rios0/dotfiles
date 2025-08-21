@@ -77,6 +77,27 @@ Supporting article: https://www.reddit.com/r/termux/comments/zu8ets/do_not_insta
 
 ## Configuration
 
+### 1Password Account Selection
+
+If you have multiple 1Password accounts configured, you can specify which account to use:
+
+```bash
+# Set via environment variable
+export ONEPASSWORD_ACCOUNT="company"
+
+# Or specify by subdomain
+export ONEPASSWORD_ACCOUNT="company.1password.com"
+
+# Or specify by email
+export ONEPASSWORD_ACCOUNT="user@company.com"
+```
+
+The bootstrap process will automatically:
+1. Use the exact shorthand if it exists
+2. Find account by URL containing the specified value
+3. Find account by email containing the specified value
+4. Fall back to the first available account if none match
+
 ### Encryption
 - Sensitive files are encrypted using [age](https://github.com/FiloSottile/age).
 - Unix-specific decryption script: `run_before_decrypt-private-key-unix.sh.tmpl`
@@ -120,6 +141,6 @@ Supporting article: https://www.reddit.com/r/termux/comments/zu8ets/do_not_insta
 - check how to avoid 1Password duplicated calls
 - check how to use variables from an included template
 - when getting from scratch and changing bashes, it stuck on the new one
-- when getting from scratch and having more than 1Password account, it gets the wrong account order
+- ~~when getting from scratch and having more than 1Password account, it gets the wrong account order~~ (FIXED: Now supports configurable account selection)
 - the script `run_once_after_windows-001-create-ssh-known-hosts.ps1` is not working properly, because when calling
   `ssh.exe` via `git` commands in WSL, the command just freezes. So, the workaround is to do `ssh git@dev.azure.com` to each entry you want.
