@@ -6,7 +6,9 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
     New-Item -ItemType Directory -Path $sshFolderPath
 }
 
-{{- range (onepassword "Active PEMs" "personal" "my").fields }}
+{{- $opCache := include "onepassword-cache.tmpl" . | fromJson -}}
+
+{{- range $opCache.activePEMs.fields }}
 {{-      if (eq .type "REFERENCE") }}
 
 # read the PEM name and private key from 1Password

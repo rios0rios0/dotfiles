@@ -1,7 +1,8 @@
+{{- $opCache := include "onepassword-cache.tmpl" . | fromJson -}}
 {{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
 
 ###### VCS #######################################################################
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- range $opCache.activeSSHs.fields -}}
   {{- if (eq .type "REFERENCE") -}}
 
     {{- /* Read full “device@account” title */ -}}
@@ -48,7 +49,7 @@ Host bitbucket.org-{{ $sshAlias }}
 {{- end }}
 
 ###### PEM #######################################################################
-{{- range (onepassword "Active PEMs" "personal" "my").fields -}}
+{{- range $opCache.activePEMs.fields -}}
   {{- if (eq .type "REFERENCE") -}}
 
     {{- /* Read full “device@account” title */ -}}

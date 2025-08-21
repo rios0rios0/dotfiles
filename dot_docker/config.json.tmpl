@@ -1,6 +1,7 @@
 {
   "auths": {
-    {{- $items := (onepassword "Active Docker Registries" "personal" "my").fields }}
+    {{- $opCache := include "onepassword-cache.tmpl" . | fromJson -}}
+    {{- $items := $opCache.activeDockerRegistries.fields }}
     {{- $lastIndex := sub (len $items) 1 }}
     {{- range $index, $item := $items }}
     {{-      if (eq $item.type "REFERENCE") }}

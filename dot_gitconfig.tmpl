@@ -1,6 +1,6 @@
-# TODO: how to avoid repetition with templates?
 # TODO: when the Windows username is different than WSL username, the 1Password path is different breaking the commit signing
 
+{{- $opCache := include "onepassword-cache.tmpl" . | fromJson -}}
 {{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
 {{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 
@@ -8,7 +8,7 @@
 {{- $defaultUserEmail := "" -}}
 {{- $defaultUserSigningkey := "" -}}
 
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- range $opCache.activeSSHs.fields -}}
   {{- if (eq .type "REFERENCE") -}}
 
     {{- /* Read full “device@account” title */ -}}
@@ -67,7 +67,7 @@
 	rollback = reset --soft HEAD~1
 
 	# gpg signing
-{{- range (onepassword "Active GPGs" "personal" "my").fields -}}
+{{- range $opCache.activeGPGs.fields -}}
   {{- if (eq .type "REFERENCE") -}}
     {{- $gpgAlias := onepasswordRead (list "op://Private/" .value "/gpg alias" | join "") "my" -}}
     {{- $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my" -}}
@@ -80,7 +80,7 @@
 {{- end }}
 
 	# ssh signing
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- range $opCache.activeSSHs.fields -}}
   {{- if (eq .type "REFERENCE") -}}
 
     {{- /* Read full “device@account” title */ -}}

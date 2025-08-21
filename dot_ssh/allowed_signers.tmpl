@@ -1,6 +1,7 @@
+{{- $opCache := include "onepassword-cache.tmpl" . | fromJson -}}
 {{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
 
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- range $opCache.activeSSHs.fields -}}
   {{- if (eq .type "REFERENCE") -}}
 
     {{- /* Read full “device@account” title */ -}}
