@@ -1,3 +1,14 @@
+{{- template "helpers.tmpl" . -}}
+
+{{- define "ssh-entry-handler" -}}
+{{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .sshEntry.value) "my" | trim }}
+echo "Creating public key file: $sshFolder/{{ .sshName }}.pub …"
+cat << 'EOF' > "$sshFolder/{{ .sshName }}.pub"
+{{ $sshPublicKey }}
+EOF
+chmod 600 "$sshFolder/{{ .sshName }}.pub"
+{{- end -}}
+
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 
@@ -6,27 +17,4 @@ sshFolder="$HOME/.ssh"
 mkdir -p "$sshFolder"
 chmod 700 "$sshFolder"
 
-{{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
-
-{{- range (onepassword "Active SSHs" "personal" "my").fields }}
-  {{- if (eq .type "REFERENCE") }}
-
-    {{- /* Read full “device@account” title */ -}}
-    {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
-
-    {{- /* Split into [device, account] */ -}}
-    {{- $parts := split "@" $sshName -}}
-    {{- $device := index $parts "_0" -}}
-
-    {{- /* Only emit hosts for the current device */ -}}
-    {{- if eq $device $deviceName -}}
-
-      {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" | trim }}
-      echo "Creating public key file: $sshFolder/{{ $sshName }}.pub …"
-      cat << 'EOF' > "$sshFolder/{{ $sshName }}.pub"
-      {{ $sshPublicKey }}
-EOF
-      chmod 600 "$sshFolder/{{ $sshName }}.pub"
-    {{- end -}}
-  {{- end -}}
-{{- end }}
+{{- template "helpers.sshEntries" . }}

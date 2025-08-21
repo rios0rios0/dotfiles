@@ -1,18 +1,11 @@
-#!/bin/bash
+{{- template "helpers.tmpl" . -}}
 
-# define the path to the ".gpg" folder
-gpgFolderPath="$HOME/.gpg"
-
-# ensure the ".gpg" folder exists
-mkdir -p $gpgFolderPath
-
-{{- range (onepassword "Active GPGs" "personal" "my").fields }}
-{{-      if (eq .type "REFERENCE") }}
+{{- define "gpg-entry-handler" -}}
 
 # read the GPG name and private key from 1Password
-gpgName="{{ onepasswordRead (list "op://Private/" .value "/title" | join "") "my" }}"
-gpgPassword="{{ trimAll "`" (onepasswordRead (list "op://Private/" .value "/password" | join "") "my") }}"
-gpgPrivateKey="{{ trimAll "`" (onepasswordRead (list "op://Private/" .value "/private.key" | join "") "my") }}"
+gpgName="{{ onepasswordRead (list "op://Private/" .gpgEntry.value "/title" | join "") "my" }}"
+gpgPassword="{{ trimAll "`" (onepasswordRead (list "op://Private/" .gpgEntry.value "/password" | join "") "my") }}"
+gpgPrivateKey="{{ trimAll "`" (onepasswordRead (list "op://Private/" .gpgEntry.value "/private.key" | join "") "my") }}"
 
 # create the private key file
 privateKeyFilePath="$gpgFolderPath/$gpgName"
@@ -24,8 +17,17 @@ gpg --batch --passphrase "$gpgPassword" --import "$privateKeyFilePath"
 
 echo "Private key file has been created successfully."
 
-{{-      end -}}
-{{- end }}
+{{- end -}}
+
+#!/bin/bash
+
+# define the path to the ".gpg" folder
+gpgFolderPath="$HOME/.gpg"
+
+# ensure the ".gpg" folder exists
+mkdir -p $gpgFolderPath
+
+{{- template "helpers.gpgEntries" . }}
 
 # cleanup the ".gpg" folder
 rm -rf $gpgFolderPath
