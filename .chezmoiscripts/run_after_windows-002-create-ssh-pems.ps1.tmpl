@@ -1,3 +1,18 @@
+{{ template "helpers" . }}
+
+{{- define "pem-entry-handler" -}}
+
+# read the PEM name and private key from 1Password
+$pemName = "{{ .pemName }}"
+$pemPrivateKey = "{{ trimAll "`" (onepasswordRead (list "op://Private/" .pemEntry.value "/notes" | join "") "my") }}"
+
+# create the private key file
+$privateKeyFilePath = "$sshFolderPath\$pemName"
+Write-Output "Creating private key file: `"$privateKeyFilePath`"..."
+Set-Content -Path $privateKeyFilePath -Value $pemPrivateKey -Force
+
+{{- end -}}
+
 # define the path to the .ssh folder
 $sshFolderPath = "$HOME\.ssh"
 
@@ -6,17 +21,4 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
     New-Item -ItemType Directory -Path $sshFolderPath
 }
 
-{{- range (onepassword "Active PEMs" "personal" "my").fields }}
-{{-      if (eq .type "REFERENCE") }}
-
-# read the PEM name and private key from 1Password
-$pemName = "{{ onepasswordRead (list "op://Private/" .value "/title" | join "") "my" }}"
-$pemPrivateKey = "{{ trimAll "`" (onepasswordRead (list "op://Private/" .value "/notes" | join "") "my") }}"
-
-# create the private key file
-$privateKeyFilePath = "$sshFolderPath\$pemName"
-Write-Output "Creating private key file: `"$privateKeyFilePath`"..."
-Set-Content -Path $privateKeyFilePath -Value $pemPrivateKey -Force
-
-{{-      end -}}
-{{- end }}
+{{- template "helpers.allPemEntries" . }}

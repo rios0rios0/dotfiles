@@ -75,6 +75,23 @@
 {{- end -}}
 
 {{- /* 
+  Iterate over ALL PEM entries (no device filtering).
+  The template calling this should define what to do with each entry.
+  Context variables available in the calling template:
+  - $pemName: the full PEM name (device@account)
+  - $pemEntry: the 1Password entry reference
+*/ -}}
+{{- define "helpers.allPemEntries" -}}
+{{- range (onepassword "Active PEMs" "personal" "my").fields -}}
+  {{- if (eq .type "REFERENCE") -}}
+    {{- $pemName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
+    {{- $pemEntry := . -}}
+    {{- template "pem-entry-handler" (dict "pemName" $pemName "pemEntry" $pemEntry "context" $) -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- /* 
   Iterate over GPG entries.
   The template calling this should define what to do with each entry.
   Context variables available in the calling template:

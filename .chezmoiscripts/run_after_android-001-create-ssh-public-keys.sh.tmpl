@@ -1,4 +1,4 @@
-{{- template "helpers.tmpl" . -}}
+{{ template "helpers" . }}
 
 {{- define "ssh-entry-handler" -}}
 {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .sshEntry.value) "my" | trim }}

@@ -1,4 +1,4 @@
-{{- template "helpers.tmpl" . -}}
+{{ template "helpers" . }}
 
 {{- define "ssh-entry-handler" -}}
 {{- $sshAlias := onepasswordRead (list "op://Private/" .sshEntry.value "/ssh alias" | join "") "my" | trim }}
