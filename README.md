@@ -117,7 +117,7 @@ Supporting article: https://www.reddit.com/r/termux/comments/zu8ets/do_not_insta
 - https://masterminds.github.io/sprig/
 
 ## TODO:
-- check how to avoid 1Password duplicated calls
+- ~~check how to avoid 1Password duplicated calls~~ ✅ COMPLETED: Implemented centralized 1Password caching via `.chezmoitemplates/onepassword-cache.tmpl`
 - check how to use variables from an included template
 - when getting from scratch and changing bashes, it stuck on the new one
 - when getting from scratch and having more than 1Password account, it gets the wrong account order

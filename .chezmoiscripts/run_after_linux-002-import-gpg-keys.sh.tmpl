@@ -1,12 +1,14 @@
 #!/bin/bash
 
+{{- $opCache := include "onepassword-cache.tmpl" . | fromJson -}}
+
 # define the path to the ".gpg" folder
 gpgFolderPath="$HOME/.gpg"
 
 # ensure the ".gpg" folder exists
 mkdir -p $gpgFolderPath
 
-{{- range (onepassword "Active GPGs" "personal" "my").fields }}
+{{- range $opCache.activeGPGs.fields }}
 {{-      if (eq .type "REFERENCE") }}
 
 # read the GPG name and private key from 1Password

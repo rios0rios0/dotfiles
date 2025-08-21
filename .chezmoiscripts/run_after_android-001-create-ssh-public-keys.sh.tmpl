@@ -1,6 +1,8 @@
 #!/data/data/com.termux/files/usr/bin/bash
 set -euo pipefail
 
+{{- $opCache := include "onepassword-cache.tmpl" . | fromJson -}}
+
 # define and prepare the .ssh folder
 sshFolder="$HOME/.ssh"
 mkdir -p "$sshFolder"
@@ -8,7 +10,7 @@ chmod 700 "$sshFolder"
 
 {{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
 
-{{- range (onepassword "Active SSHs" "personal" "my").fields }}
+{{- range $opCache.activeSSHs.fields }}
   {{- if (eq .type "REFERENCE") }}
 
     {{- /* Read full “device@account” title */ -}}
