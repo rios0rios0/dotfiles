@@ -1,3 +1,7 @@
+{{- /* 
+TODO: The IdentityFile logic is inverted on Android (uses private key), all other OSes use public key.
+This is because on Android (Termux) only private keys are usable, while other platforms require public keys for SSH config.
+*/ -}}
 {{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
 {{- $isAndroid := eq .chezmoi.os "android" -}}
 
