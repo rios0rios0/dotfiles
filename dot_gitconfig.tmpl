@@ -38,12 +38,19 @@
 	format = ssh
 [gpg "ssh"]
 
+
 {{- if eq .chezmoi.os "windows" }}
-	program = "C:/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
-	allowedSignersFile = "C:/Users/{{ $username }}/.ssh/allowed_signers"
+    program = "C:/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
+    allowedSignersFile = "C:/Users/{{ $username }}/.ssh/allowed_signers"
+{{- else if and (eq .chezmoi.os "linux") (contains .chezmoi.kernel "microsoft") }}
+    program = "/mnt/c/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign-wsl"
+    allowedSignersFile = "{{ .chezmoi.homeDir }}/.ssh/allowed_signers"
+{{- else if eq .chezmoi.os "android" }}
+    program = "op-ssh-sign"
+    allowedSignersFile = "{{ .chezmoi.homeDir }}/.ssh/allowed_signers"
 {{- else }}
-	program = "/mnt/c/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign-wsl"
-	allowedSignersFile = "/home/{{ $username }}/.ssh/allowed_signers"
+    program = "op-ssh-sign"
+    allowedSignersFile = "{{ .chezmoi.homeDir }}/.ssh/allowed_signers"
 {{- end }}
 
 [commit]
