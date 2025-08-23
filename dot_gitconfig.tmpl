@@ -1,124 +1,114 @@
-# TODO: how to avoid repetition with templates?
-# TODO: when the Windows username is different than WSL username, the 1Password path is different breaking the commit signing
+{{- /* TODO: how to avoid repetition with templates? */ -}}
+{{- /* TODO: when the Windows username is different than WSL username, the 1Password path is different breaking the commit signing */ -}}
 
-{{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
+{{- /* Helper: Get 1Password device fields for current device */ -}}
+{{- $deviceName := (default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower) -}}
 {{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 
+{{- /* OS-dependent paths and executables */ -}}
+{{- $windowsHome := printf "C:/Users/%s" $username -}}
+{{- $defaultHome := .chezmoi.homeDir -}}
+
+{{- $program := "op-ssh-sign" -}}
+{{- $allowedSignersFile := printf "%s/.ssh/allowed_signers" $defaultHome -}}
+{{- $excludesfile := printf "%s/.gitignore" $defaultHome -}}
+{{- $sshCommand := "ssh" -}}
+
+{{- if eq .chezmoi.os "windows" -}}
+    {{- $program = printf "%s/AppData/Local/1Password/app/8/op-ssh-sign.exe" $windowsHome -}}
+    {{- $allowedSignersFile = printf "%s/.ssh/allowed_signers" $windowsHome -}}
+    {{- $excludesfile = printf "%s/.gitignore" $windowsHome -}}
+    {{- $sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe" -}}
+{{- else if and (eq .chezmoi.os "linux") (contains .chezmoi.kernel "microsoft") -}}
+    {{- $program = printf "/mnt/c/Users/%s/AppData/Local/1Password/app/8/op-ssh-sign-wsl" $username -}}
+    {{- $sshCommand = "ssh.exe" -}}
+{{- else if eq .chezmoi.os "android" -}}
+    {{- $program = "op-ssh-sign" -}}
+    {{- $sshCommand = "ssh" -}}
+{{- end }}
+
+{{- /* Helper function for fetching OnePassword fields for a device */ -}}
+{{- $getOpField := (lambda "item" "field" "account" (onepasswordRead (printf "op://Private/%s/%s" .item .field) .account)) -}}
+
+{{- /* Default user fields from 1Password Active SSHs */ -}}
 {{- $defaultUsername := "" -}}
 {{- $defaultUserEmail := "" -}}
 {{- $defaultUserSigningkey := "" -}}
-
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if (eq .type "REFERENCE") -}}
-
-    {{- /* Read full “device@account” title */ -}}
-    {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
-
-    {{- /* Split into [device, account] */ -}}
+  {{- if eq .type "REFERENCE" -}}
+    {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
     {{- $parts := split "@" $sshName -}}
     {{- $device := index $parts "_0" -}}
-
-    {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
-
-      {{- $defaultUsername = onepasswordRead (list "op://Private/" .value "/ssh username" | join "") "my" -}}
-      {{- $defaultUserEmail = onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" -}}
-      {{- $defaultUserSigningkey = onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" -}}
+      {{- $defaultUsername = onepasswordRead (printf "op://Private/%s/ssh username" .value) "my" -}}
+      {{- $defaultUserEmail = onepasswordRead (printf "op://Private/%s/ssh email" .value) "my" -}}
+      {{- $defaultUserSigningkey = onepasswordRead (printf "op://Private/%s/public key" .value) "my" -}}
       {{- break -}}
-
     {{- end -}}
   {{- end -}}
 {{- end }}
 
 [user]
-	name = "{{ $defaultUsername }}"
-	email = "{{ $defaultUserEmail }}"
-	signingkey = "{{ $defaultUserSigningkey }}"
+    name = "{{ $defaultUsername }}"
+    email = "{{ $defaultUserEmail }}"
+    signingkey = "{{ $defaultUserSigningkey }}"
+
 [gpg]
-	format = ssh
+    format = ssh
+
 [gpg "ssh"]
-
-
-{{- if eq .chezmoi.os "windows" }}
-    program = "C:/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign.exe"
-    allowedSignersFile = "C:/Users/{{ $username }}/.ssh/allowed_signers"
-{{- else if and (eq .chezmoi.os "linux") (contains .chezmoi.kernel "microsoft") }}
-    program = "/mnt/c/Users/{{ $username }}/AppData/Local/1Password/app/8/op-ssh-sign-wsl"
-    allowedSignersFile = "{{ .chezmoi.homeDir }}/.ssh/allowed_signers"
-{{- else if eq .chezmoi.os "android" }}
-    program = "op-ssh-sign"
-    allowedSignersFile = "{{ .chezmoi.homeDir }}/.ssh/allowed_signers"
-{{- else }}
-    program = "op-ssh-sign"
-    allowedSignersFile = "{{ .chezmoi.homeDir }}/.ssh/allowed_signers"
-{{- end }}
+    program = "{{ $program }}"
+    allowedSignersFile = "{{ $allowedSignersFile }}"
 
 [commit]
-	gpgsign = true
+    gpgsign = true
 [tag]
-	forceSignAnnotated = true
+    forceSignAnnotated = true
+
 [alias]
-	pom = push origin main -u
-	cim = "!f() { git commit -m \"$*\"; }; f"
-	ci = commit
-	co = checkout
-	cm = checkout main
-	cb = checkout -b
-	st = status -sb
-	sf = show --name-only
-	lg = log --pretty=format:'%Cred%h%Creset %C(bold)%cr%Creset %Cgreen<%an>%Creset %s' --max-count=30
-	incoming = !(git fetch --quiet && git log --pretty=format:'%C(yellow)%h %C(white)- %C(red)%an %C(white)- %C(cyan)%d%Creset %s %C(white)- %ar%Creset' ..@{u})
-	outgoing = !(git fetch --quiet && git log --pretty=format:'%C(yellow)%h %C(white)- %C(red)%an %C(white)- %C(cyan)%d%Creset %s %C(white)- %ar%Creset' @{u}..)
-	unstage = reset HEAD --
-	undo = checkout --
-	rollback = reset --soft HEAD~1
+    pom = push origin main -u
+    cim = "!f() { git commit -m \"$*\"; }; f"
+    ci = commit
+    co = checkout
+    cm = checkout main
+    cb = checkout -b
+    st = status -sb
+    sf = show --name-only
+    lg = log --pretty=format:'%Cred%h%Creset %C(bold)%cr%Creset %Cgreen<%an>%Creset %s' --max-count=30
+    incoming = !(git fetch --quiet && git log --pretty=format:'%C(yellow)%h %C(white)- %C(red)%an %C(white)- %C(cyan)%d%Creset %s %C(white)- %ar%Creset' ..@{u})
+    outgoing = !(git fetch --quiet && git log --pretty=format:'%C(yellow)%h %C(white)- %C(red)%an %C(white)- %C(cyan)%d%Creset %s %C(white)- %ar%Creset' @{u}..)
+    unstage = reset HEAD --
+    undo = checkout --
+    rollback = reset --soft HEAD~1
 
-	# gpg signing
+    # gpg signing
 {{- range (onepassword "Active GPGs" "personal" "my").fields -}}
-  {{- if (eq .type "REFERENCE") -}}
-
-    {{- /* Read full “device@account” title */ -}}
-    {{- $gpgName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
-
-    {{- /* Split into [device, account] */ -}}
+  {{- if eq .type "REFERENCE" -}}
+    {{- $gpgName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
     {{- $parts := split "@" $gpgName -}}
     {{- $device := index $parts "_0" -}}
-
-    {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
-
-      {{- $gpgAlias := onepasswordRead (list "op://Private/" .value "/gpg alias" | join "") "my" -}}
-      {{- $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my" -}}
-      {{- $gpgEmail := onepasswordRead (list "op://Private/" .value "/gpg email" | join "") "my" -}}
-      {{- $gpgFingerprint := onepasswordRead (list "op://Private/" .value "/fingerprint" | join "") "my" }}
-
-	gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
-
+      {{- $gpgAlias := onepasswordRead (printf "op://Private/%s/gpg alias" .value) "my" -}}
+      {{- $gpgUsername := onepasswordRead (printf "op://Private/%s/gpg username" .value) "my" -}}
+      {{- $gpgEmail := onepasswordRead (printf "op://Private/%s/gpg email" .value) "my" -}}
+      {{- $gpgFingerprint := onepasswordRead (printf "op://Private/%s/fingerprint" .value) "my" -}}
+      gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
     {{- end -}}
   {{- end -}}
 {{- end }}
 
-	# ssh signing
+    # ssh signing
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if (eq .type "REFERENCE") -}}
-
-    {{- /* Read full “device@account” title */ -}}
-    {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
-
-    {{- /* Split into [device, account] */ -}}
+  {{- if eq .type "REFERENCE" -}}
+    {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
     {{- $parts := split "@" $sshName -}}
     {{- $device := index $parts "_0" -}}
-
-    {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
-
-      {{- $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my" -}}
-      {{- $sshUsername := onepasswordRead (list "op://Private/" .value "/ssh username" | join "") "my" -}}
-      {{- $sshEmail := onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" -}}
-      {{- $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" }}
-
-	ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
-
+      {{- $sshAlias := onepasswordRead (printf "op://Private/%s/ssh alias" .value) "my" -}}
+      {{- $sshUsername := onepasswordRead (printf "op://Private/%s/ssh username" .value) "my" -}}
+      {{- $sshEmail := onepasswordRead (printf "op://Private/%s/ssh email" .value) "my" -}}
+      {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" -}}
+      ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
     {{- end -}}
   {{- end -}}
 {{- end }}
@@ -126,20 +116,8 @@
 [core]
     autocrlf = input
     editor = vim
-
-{{- if eq .chezmoi.os "windows" }}
-    excludesfile = "C:/Users/{{ $username }}/.gitignore"
-    sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe"
-{{- else if and (eq .chezmoi.os "linux") (contains .chezmoi.kernel "microsoft") }}
-    excludesfile = "{{ .chezmoi.homeDir }}/.gitignore"
-    sshCommand = "ssh.exe"
-{{- else if eq .chezmoi.os "android" }}
-    excludesfile = "{{ .chezmoi.homeDir }}/.gitignore"
-    sshCommand = "ssh"
-{{- else }}
-    excludesfile = "{{ .chezmoi.homeDir }}/.gitignore"
-    sshCommand = "ssh"
-{{- end }}
+    excludesfile = "{{ $excludesfile }}"
+    sshCommand = "{{ $sshCommand }}"
 
 [merge]
     commit = yes
@@ -147,5 +125,5 @@
 [push]
     autoSetupRemote = true
 
-#[includeIf 'gitdir:~/work/acme/'] # every repository under ~/work/acme will use this configuration
-#  path = ~/work/acme/.gitconfig
+# [includeIf 'gitdir:~/work/acme/']
+#   path = ~/work/acme/.gitconfig
