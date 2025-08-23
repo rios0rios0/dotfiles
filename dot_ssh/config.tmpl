@@ -13,10 +13,11 @@ This is because on Android (Termux) only private keys are usable, while other pl
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
       {{- $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my" | trim -}}
+      {{- $identityFile := "" -}}
       {{- if $isAndroid -}}
-        {{- $identityFile := (print "~/.ssh/" $sshName) -}}
+        {{- $identityFile = (print "~/.ssh/" $sshName) -}}
       {{- else -}}
-        {{- $identityFile := (print "~/.ssh/" $sshName ".pub") -}}
+        {{- $identityFile = (print "~/.ssh/" $sshName ".pub") -}}
       {{- end -}}
 
 Host github.com-{{ $sshAlias }}
