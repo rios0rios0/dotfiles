@@ -23,7 +23,7 @@ chmod 700 "$sshFolder"
     {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
 
-      {{- $sshPrivateKey := onepasswordRead (printf "op://Private/%s/ssh private key" .value) "my" | trim }}
+      {{- $sshPrivateKey := onepasswordRead (printf "op://Private/%s/private key" .value) "my" | trim }}
       echo "Creating private key file: $sshFolder/{{ $sshName }} …"
       cat << 'EOF' > "$sshFolder/{{ $sshName }}"
 {{ $sshPrivateKey }}
