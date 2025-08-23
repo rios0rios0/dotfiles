@@ -117,15 +117,21 @@
 {{- end }}
 
 [core]
-	autocrlf = input
-	editor = vim
+    autocrlf = input
+    editor = vim
 
 {{- if eq .chezmoi.os "windows" }}
-	excludesfile = "C:/Users/{{ $username }}/.gitignore"
-	sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe"
+    excludesfile = "C:/Users/{{ $username }}/.gitignore"
+    sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe"
+{{- else if and (eq .chezmoi.os "linux") (contains .chezmoi.kernel "microsoft") }}
+    excludesfile = "{{ .chezmoi.homeDir }}/.gitignore"
+    sshCommand = "ssh.exe"
+{{- else if eq .chezmoi.os "android" }}
+    excludesfile = "{{ .chezmoi.homeDir }}/.gitignore"
+    sshCommand = "ssh"
 {{- else }}
-	excludesfile = "/home/{{ $username }}/.gitignore"
-	sshCommand = ssh.exe
+    excludesfile = "{{ .chezmoi.homeDir }}/.gitignore"
+    sshCommand = "ssh"
 {{- end }}
 
 [merge]
