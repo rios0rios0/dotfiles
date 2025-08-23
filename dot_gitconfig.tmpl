@@ -69,13 +69,25 @@
 	# gpg signing
 {{- range (onepassword "Active GPGs" "personal" "my").fields -}}
   {{- if (eq .type "REFERENCE") -}}
-    {{- $gpgAlias := onepasswordRead (list "op://Private/" .value "/gpg alias" | join "") "my" -}}
-    {{- $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my" -}}
-    {{- $gpgEmail := onepasswordRead (list "op://Private/" .value "/gpg email" | join "") "my" -}}
-    {{- $gpgFingerprint := onepasswordRead (list "op://Private/" .value "/fingerprint" | join "") "my" }}
+
+    {{- /* Read full “device@account” title */ -}}
+    {{- $gpgName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
+
+    {{- /* Split into [device, account] */ -}}
+    {{- $parts := split "@" $gpgName -}}
+    {{- $device := index $parts "_0" -}}
+
+    {{- /* Only emit hosts for the current device */ -}}
+    {{- if eq $device $deviceName -}}
+
+      {{- $gpgAlias := onepasswordRead (list "op://Private/" .value "/gpg alias" | join "") "my" -}}
+      {{- $gpgUsername := onepasswordRead (list "op://Private/" .value "/gpg username" | join "") "my" -}}
+      {{- $gpgEmail := onepasswordRead (list "op://Private/" .value "/gpg email" | join "") "my" -}}
+      {{- $gpgFingerprint := onepasswordRead (list "op://Private/" .value "/fingerprint" | join "") "my" }}
 
 	gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
 
+    {{- end -}}
   {{- end -}}
 {{- end }}
 
