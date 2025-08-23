@@ -18,7 +18,7 @@ This is because on Android (Termux) only private keys are usable, while other pl
         {{- $identityFile = (print "~/.ssh/" $sshName) -}}
       {{- else -}}
         {{- $identityFile = (print "~/.ssh/" $sshName ".pub") -}}
-      {{- end -}}
+      {{- end }}
 
 Host github.com-{{ $sshAlias }}
   HostName github.com
