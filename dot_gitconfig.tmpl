@@ -27,9 +27,6 @@
     {{- $sshCommand = "ssh" -}}
 {{- end }}
 
-{{- /* Helper function for fetching OnePassword fields for a device */ -}}
-{{- $getOpField := (lambda "item" "field" "account" (onepasswordRead (printf "op://Private/%s/%s" .item .field) .account)) -}}
-
 {{- /* Default user fields from 1Password Active SSHs */ -}}
 {{- $defaultUsername := "" -}}
 {{- $defaultUserEmail := "" -}}
