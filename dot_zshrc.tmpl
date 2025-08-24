@@ -121,15 +121,6 @@ alias speed1="$SPEEDTEST/speedtest"
 alias speed2="python $SPEEDTEST/speedtest-cli --bytes"
 alias cydx="$CYCLONEDX/cyclonedx-cli"
 
-{{- if ne .chezmoi.os "android" }}
-ssh() {
-  ssh.exe "$@"
-}
-ssh-add() {
-  ssh-add.exe "$@"
-}
-{{- end }}
-
 ###### Files #######################################################################
 {{- if ne .chezmoi.os "android" }}
 $HOME/.scripts/linux-toolbox-watch-compress-folders.sh &
