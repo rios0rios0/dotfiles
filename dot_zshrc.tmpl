@@ -73,7 +73,7 @@ zinit light zdharma-continuum/fast-syntax-highlighting
 ######################################################
 ######################################################
 typeset -a sshIdentities
-for key in $HOME/.ssh/${CHEZMOI_DEVICE}*(N); do
+for key in "$HOME/.ssh/${CHEZMOI_DEVICE}"*(N); do
   sshIdentities+=$key:t
 done
 zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
