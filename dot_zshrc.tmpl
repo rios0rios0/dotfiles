@@ -72,15 +72,20 @@ zinit light zdharma-continuum/fast-syntax-highlighting
 {{- if eq .chezmoi.os "android" }}
 ######################################################
 ######################################################
+# generate slug from CHEZMOI_DEVICE
 slug=$(printf '%s' "$CHEZMOI_DEVICE" \
-  | sed -e 's/^[[:space:]]*//'\
-  -e 's/[[:space:]]*$//' \
-  -e 's/[[:space:]]\+/-/g' \
+  | sed -e 's/^[[:space:]]*//' \
+        -e 's/[[:space:]]*$//' \
+        -e 's/[[:space:]]\+/-/g' \
   | tr '[:upper:]' '[:lower:]')
+
+# collect only non-.pub files under ~/.ssh/${slug}*
 typeset -a sshIdentities
-for key in "$HOME/.ssh/${slug}"*(N); do
-  sshIdentities+=$key:t
+for key in ${HOME}/.ssh/${slug}*~${HOME}/.ssh/${slug}*.pub(.N); do
+  sshIdentities+=${key:t}
 done
+
+# tell the OMZ ssh-agent plugin which identities to load
 zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
 ######################################################
 {{- end }}
