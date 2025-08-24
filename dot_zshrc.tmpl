@@ -72,7 +72,7 @@ zinit light zdharma-continuum/fast-syntax-highlighting
 {{- if eq .chezmoi.os "android" -}}
 ######################################################
 ######################################################
-typeset -a ssh_idents
+typeset -a sshIdentities
 for key in $HOME/.ssh/${CHEZMOI_DEVICE}*(N); do
   sshIdentities+=$key:t
 done
