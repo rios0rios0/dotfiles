@@ -23,7 +23,7 @@
     {{- $program = printf "/mnt/c/Users/%s/AppData/Local/1Password/app/8/op-ssh-sign-wsl" $username -}}
     {{- $sshCommand = "ssh.exe" -}}
 {{- else if eq .chezmoi.os "android" -}}
-    {{- $program = "op-ssh-sign" -}}
+    {{- $program = "ssh" -}}
     {{- $sshCommand = "ssh" -}}
 {{- end -}}
 
