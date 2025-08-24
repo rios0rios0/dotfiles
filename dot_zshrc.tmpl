@@ -104,9 +104,9 @@ plugins=(
   colorize colored-man-pages command-not-found vim-interaction
   1password
   nmap ssh
-  {{- if eq .chezmoi.os "android" -}}
+  {{ if eq .chezmoi.os "android" }}
   ssh-agent
-  {{- end }}
+  {{ end }}
   aws azure heroku terraform helm
   docker docker-compose kubectl kubectx
   git github git-flow git-flow-avh git-hubflow
