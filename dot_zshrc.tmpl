@@ -116,7 +116,10 @@ source $ZSH/oh-my-zsh.sh
 ######################################################
 ######################################################
 slug=$(printf '%s' "$CHEZMOI_DEVICE" \
-  | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/[[:space:]]\+/-/g')
+  | sed -e 's/^[[:space:]]*//'\
+  -e 's/[[:space:]]*$//' \
+  -e 's/[[:space:]]\+/-/g' \
+  | tr '[:upper:]' '[:lower:]')
 typeset -a sshIdentities
 for key in "$HOME/.ssh/${slug}"*(N); do
   sshIdentities+=$key:t
