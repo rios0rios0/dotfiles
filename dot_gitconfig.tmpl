@@ -107,7 +107,7 @@
       {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" -}}
       ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
     {{- end -}}
-  {{- end -}}
+  {{- end }}
 {{- end }}
 
 [core]
