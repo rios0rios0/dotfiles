@@ -69,7 +69,7 @@ zinit light zsh-users/zsh-autosuggestions
 ######################################################
 ######################################################
 zinit light zdharma-continuum/fast-syntax-highlighting
-{{- if eq .chezmoi.os "android" -}}
+{{ if eq .chezmoi.os "android" }}
 ######################################################
 ######################################################
 typeset -a sshIdentities
@@ -78,7 +78,7 @@ for key in $HOME/.ssh/${CHEZMOI_DEVICE}*(N); do
 done
 zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
 ######################################################
-{{- end -}}
+{{ end }}
 
 ###### P10k CONFIGURATION ###############################################################################################
 [[ ! -f ~/.p10k.zsh ]] || source ~/.p10k.zsh
