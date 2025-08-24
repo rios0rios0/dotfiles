@@ -25,7 +25,7 @@
 {{- else if eq .chezmoi.os "android" -}}
     {{- $program = "op-ssh-sign" -}}
     {{- $sshCommand = "ssh" -}}
-{{- end }}
+{{- end -}}
 
 {{- /* Default user fields from 1Password Active SSHs */ -}}
 {{- $defaultUsername := "" -}}
@@ -43,7 +43,7 @@
       {{- break -}}
     {{- end -}}
   {{- end -}}
-{{- end }}
+{{- end -}}
 
 [user]
     name = "{{ $defaultUsername }}"
@@ -88,8 +88,8 @@
       {{- $gpgAlias := onepasswordRead (printf "op://Private/%s/gpg alias" .value) "my" -}}
       {{- $gpgUsername := onepasswordRead (printf "op://Private/%s/gpg username" .value) "my" -}}
       {{- $gpgEmail := onepasswordRead (printf "op://Private/%s/gpg email" .value) "my" -}}
-      {{- $gpgFingerprint := onepasswordRead (printf "op://Private/%s/fingerprint" .value) "my" -}}
-      gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
+      {{- $gpgFingerprint := onepasswordRead (printf "op://Private/%s/fingerprint" .value) "my" }}
+    gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
     {{- end -}}
   {{- end -}}
 {{- end }}
@@ -105,7 +105,7 @@
       {{- $sshUsername := onepasswordRead (printf "op://Private/%s/ssh username" .value) "my" -}}
       {{- $sshEmail := onepasswordRead (printf "op://Private/%s/ssh email" .value) "my" -}}
       {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" }}
-      ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
+    ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
     {{- end -}}
   {{- end -}}
 {{- end }}
