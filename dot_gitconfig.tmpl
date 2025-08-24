@@ -96,7 +96,7 @@
 
     # ssh signing
 {{ range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if eq .type "REFERENCE" -}}
+  {{ if eq .type "REFERENCE" -}}
     {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
     {{- $parts := split "@" $sshName -}}
     {{- $device := index $parts "_0" -}}
@@ -106,7 +106,7 @@
       {{- $sshEmail := onepasswordRead (printf "op://Private/%s/ssh email" .value) "my" -}}
       {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" -}}
       ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
-    {{- end -}}
+    {{ end -}}
   {{- end -}}
 {{- end }}
 
