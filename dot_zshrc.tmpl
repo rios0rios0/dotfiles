@@ -115,8 +115,10 @@ source $ZSH/oh-my-zsh.sh
 {{- if eq .chezmoi.os "android" }}
 ######################################################
 ######################################################
+slug=$(printf '%s' "$CHEZMOI_DEVICE" \
+  | sed -e 's/^[[:space:]]*//' -e 's/[[:space:]]*$//' -e 's/[[:space:]]\+/-/g')
 typeset -a sshIdentities
-for key in "$HOME/.ssh/${CHEZMOI_DEVICE}"*(N); do
+for key in "$HOME/.ssh/${slug}"*(N); do
   sshIdentities+=$key:t
 done
 zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
