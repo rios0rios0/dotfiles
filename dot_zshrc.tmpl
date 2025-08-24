@@ -79,13 +79,15 @@ slug=$(printf '%s' "$CHEZMOI_DEVICE" \
         -e 's/[[:space:]]\+/-/g' \
   | tr '[:upper:]' '[:lower:]')
 
-# collect only non-.pub files under ~/.ssh/${slug}*
+# collect only non-.pub identities
 typeset -a sshIdentities
-for key in ${HOME}/.ssh/${slug}*~${HOME}/.ssh/${slug}*.pub(.N); do
-  sshIdentities+=${key:t}
+for key in "$HOME/.ssh/$slug"*(.N); do
+  if [[ $key != *.pub ]]; then
+    sshIdentities+=${key:t}
+  fi
 done
 
-# tell the OMZ ssh-agent plugin which identities to load
+# feed them to the OMZ ssh-agent plugin
 zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
 ######################################################
 {{- end }}
