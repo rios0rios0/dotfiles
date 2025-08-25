@@ -10,9 +10,9 @@ mkdir -p $gpgFolderPath
 {{-      if (eq .type "REFERENCE") }}
 
 # read the GPG name and private key from 1Password
-gpgName="{{ onepasswordRead (list "op://Private/" .value "/title" | join "") "my" }}"
-gpgPassword="{{ trimAll "`" (onepasswordRead (list "op://Private/" .value "/password" | join "") "my") }}"
-gpgPrivateKey="{{ trimAll "`" (onepasswordRead (list "op://Private/" .value "/private.key" | join "") "my") }}"
+gpgName="{{ onepasswordRead (printf "op://Private/%s/title" .value) "my" }}"
+gpgPassword="{{ trimAll "`" (onepasswordRead (printf "op://Private/%s/password" .value) "my") }}"
+gpgPrivateKey="{{ trimAll "`" (onepasswordRead (printf "op://Private/%s/private.key" .value) "my") }}"
 
 # create the private key file
 privateKeyFilePath="$gpgFolderPath/$gpgName"

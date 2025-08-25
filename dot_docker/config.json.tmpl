@@ -4,9 +4,9 @@
     {{- $lastIndex := sub (len $items) 1 }}
     {{- range $index, $item := $items }}
     {{-      if (eq $item.type "REFERENCE") }}
-	{{-          $registryUsername := onepasswordRead (list "op://Private/" $item.value "/username" | join "") "my" }}
-    {{-          $registryCredential := onepasswordRead (list "op://Private/" $item.value "/credential" | join "") "my" }}
-	{{-          $registryName := onepasswordRead (list "op://Private/" $item.value "/registry name" | join "") "my" }}
+	{{-          $registryUsername := onepasswordRead (printf "op://Private/%s/username" $item.value) "my" }}
+    {{-          $registryCredential := onepasswordRead (printf "op://Private/%s/credential" $item.value) "my" }}
+	{{-          $registryName := onepasswordRead (printf "op://Private/%s/registry name" $item.value) "my" }}
     "{{ $registryName }}": {
       "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
     }{{ if lt $index $lastIndex }},{{ end }}

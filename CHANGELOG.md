@@ -24,3 +24,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - added Linux WSL features to handle Git and SSH configuration with 1Password 
 - added Shell Script features to handle watching multiple files (and compressing them) for Kubernetes secrets
 - added a new feature to compress and watch many folders instead of just one folder
+
+### Changed
+
+- simplified 1Password calls by replacing list/join patterns with printf format for improved readability and consistency

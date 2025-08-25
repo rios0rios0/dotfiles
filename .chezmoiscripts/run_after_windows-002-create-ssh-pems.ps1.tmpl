@@ -10,8 +10,8 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 {{-      if (eq .type "REFERENCE") }}
 
 # read the PEM name and private key from 1Password
-$pemName = "{{ onepasswordRead (list "op://Private/" .value "/title" | join "") "my" }}"
-$pemPrivateKey = "{{ trimAll "`" (onepasswordRead (list "op://Private/" .value "/notes" | join "") "my") }}"
+$pemName = "{{ onepasswordRead (printf "op://Private/%s/title" .value) "my" }}"
+$pemPrivateKey = "{{ trimAll "`" (onepasswordRead (printf "op://Private/%s/notes" .value) "my") }}"
 
 # create the private key file
 $privateKeyFilePath = "$sshFolderPath\$pemName"
