@@ -4,8 +4,8 @@
 # Language managers and other utilities
 #
 
-# Source shared utilities and config
-SCRIPT_DIR="$(dirname "${BASH_SOURCE[0]}")"
+# Source shared utilities and config (using relative paths)
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 source "$SCRIPT_DIR/../shared/executable_utils.sh"
 source "$SCRIPT_DIR/../shared/executable_config.sh"
 

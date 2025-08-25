@@ -1,310 +1,237 @@
 #!{{ lookPath "bash" }}
+#
+# Refactored Android dependencies installation script
+# Uses shared patterns and DRY principles
+#
 
-# init storage capabilities
-termux-setup-storage
+set -euo pipefail
 
-# update the package list
-apt update
-
-# =========================================================================================================
-# Requirements for this repository to work properly
-requirements=(
-    "git"
-    "curl"
-    "zip"               # required for SDKMan
-    "unzip"             # required for SDKMan
-    "age"               # required for Chezmoi (decrypt files with SSH)
-    "eza"               # it's for "ls" highlighting (https://github.com/eza-community/eza)
-    "sqlite"            # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
-    "vim"               # needed for some operations
-    "neovim"            # preferred editor
-    "binutils-is-llvm"  # required by Azure CLI
-    "bison"             # needed for GVM
-    "make"              # required for many things and GVM
-    "wget"              # required by 1Password CLI
-    "zsh"               # preferred shell
-    "ncurses-utils"     # needed for many packages (like GVM)
-    "proot"             # needed to run binaries with Termux DNS
-    "proot-distro"      # needed to control proot capabilities selecting a distro
-    "file"              # it's for determining file types
-)
-apt install --no-install-recommends --yes "${requirements[@]}"
-# =========================================================================================================
-# Hardware
-hardware=(
-    "htop"          # it's for monitoring system resources
-    "screenfetch"   # it's for displaying system information
-)
-apt install --no-install-recommends --yes "${hardware[@]}"
-# =========================================================================================================
-# Utilities
-utilities=(
-    #"imagemagick"       # it's for image manipulation (convert, identify, etc.) TODO: better to use on Windows?
-    "jq"                # it's for parsing JSON
-    "bat"               # it's for cat with syntax highlighting (https://github.com/sharkdp/bat)
-    "silversearcher-ag" # it's for searching files (https://github.com/ggreer/the_silver_searcher)
-    "inotify-tools"     # it's for watching file changes ("inotifywait")
-    "dos2unix"          # it's for converting text files between Unix and DOS formats
-    "expect"            # it's for automating interactive applications (used in some scripts)
-    #"aria2c"            # cURL alternative with many features (TODO: not found on Termux default repositories)
-    "which"             # it performs command lookups
-    "mlocate"           # it performs file searches (locate and updatedb)
-    "openssh"           # used to clone Git repositories and also authentication
-)
-apt install --no-install-recommends --yes "${utilities[@]}"
-# =========================================================================================================
-# Languages
-languages=(
-    "golang"        # issue described on line 261
-    "rust"          # needed to compile Azure CLI
-    "nodejs"        # issue described on line 261
-    "python"        # issue described on line 261
-    "python-pip"    # issue described on line 261
-)
-apt install --no-install-recommends --yes "${languages[@]}"
-# =========================================================================================================
-# =========================================================================================================
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
+# Include shared utility functions inline
+command_exists() { command -v "$1" >/dev/null 2>&1; }
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $*"; }
+log_error() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $*" >&2; }
+execute_command() { 
+    local description="$1"; shift
+    log "Executing: $description"
+    if "$@"; then log "Success: $description"; else log_error "Failed: $description"; return 1; fi
+}
+is_tool_installed() { 
+    local tool="$1" path="$2"
+    [ -n "$path" ] && [ -f "$path" ] && { log "$tool already installed at $path"; return 0; }
+    command_exists "$tool" && { log "$tool already available"; return 0; }
+    return 1
 }
 
-# https://ohmyz.sh/#install
+# Configuration constants
+readonly GO_VERSION="1.24.5"
+readonly TERRAGRUNT_VERSION="0.76.6"
+readonly NVM_VERSION="0.40.2"
+readonly PYTHON_VERSION="3.13:latest"
+readonly ONEPASSWORD_VERSION="2.31.1"
+
+# Package definitions
+readonly REQUIREMENTS=(
+    "git" "curl" "zip" "unzip" "age" "eza" "sqlite" "vim" "neovim"
+    "binutils-is-llvm" "bison" "make" "wget" "zsh" "ncurses-utils"
+    "proot" "proot-distro" "file"
+)
+readonly HARDWARE=("htop" "screenfetch")
+readonly UTILITIES=(
+    "jq" "bat" "silversearcher-ag" "inotify-tools" "dos2unix" "expect"
+    "which" "mlocate" "openssh"
+)
+readonly LANGUAGES=("golang" "rust" "nodejs" "python" "python-pip")
+
+# Install packages function
+install_packages() {
+    local description="$1"; shift
+    local packages=("$@")
+    log "Installing $description: ${packages[*]}"
+    execute_command "Install $description" apt install --no-install-recommends --yes "${packages[@]}"
+}
+
+# Installer functions with idempotency
 install_oh_my_zsh() {
-    omzPath="$HOME/.oh-my-zsh"
-
-    if [ ! -d "$omzPath" ]; then
+    [ -d "$HOME/.oh-my-zsh" ] && { log "Oh My Zsh already installed"; return 0; }
+    execute_command "Install Oh My Zsh" \
         sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-    else
-        echo "Oh My ZSH is already installed."
-    fi
 }
 
-# https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    if command_exists go; then
-        echo "GoLang detected, means it was previously installed or native package installed..."
-
-        return;
-    fi
-
-    gvmPath="$HOME/.gvm"
-
-    if [ ! -d "$gvmPath" ]; then
-        bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-
-        source "$gvmPath/scripts/gvm"
-        gvm install go1.24.5
-        gvm use go1.24.5
-    else
-        echo "GVM is already installed."
-    fi
+    command_exists go && { log "Go already available"; return 0; }
+    [ -d "$HOME/.gvm" ] && { log "GVM already installed"; return 0; }
+    execute_command "Install GVM" \
+        bash -c "curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash"
+    [ -f "$HOME/.gvm/scripts/gvm" ] && {
+        source "$HOME/.gvm/scripts/gvm"
+        execute_command "Install Go $GO_VERSION" gvm install "$GO_VERSION"
+        execute_command "Use Go $GO_VERSION" gvm use "$GO_VERSION"
+    }
 }
 
 install_wrapper() {
-  proot-distro install alpine
+    execute_command "Install Alpine proot distribution" proot-distro install alpine
 }
 
-# github.com/rios0rios0/terra
 install_terra() {
-    # TODO: can't avoid repetition?
-    binPath="/usr/bin"
-    terraBin="$binPath/terra"
-
-    if proot-distro login alpine -- bash -c "[ ! -f "$terraBin" ]"; then
-        sourcePath="$HOME/Development/github.com/rios0rios0/terra"
-        if [ ! -d "$sourcePath" ]; then
-            git clone https://github.com/rios0rios0/terra.git $sourcePath
-        fi
-        cd $sourcePath
-        # make sure correct environment before installing shell
-        export PATH="$PATH:$HOME/go/bin"
-        make build
-        proot-distro copy bin/terra alpine:/usr/bin
-    else
-        echo "Terra is already installed."
-    fi
-}
-
-# https://terragrunt.gruntwork.io/docs/getting-started/install/
-install_terragrunt() {
-    proot-distro login alpine -- bash <<-'EOF'
-        binPath="/usr/bin"
-        terragruntBin="$binPath/terragrunt"
-
-        if [ ! -f "$terragruntBin" ]; then
-            curl -LO "https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_arm64"
-            mv terragrunt_linux_arm64 "$terragruntBin"
-            chmod +x "$terragruntBin"
-        else
-            echo "Terragrunt is already installed."
-        fi
-EOF
-}
-
-# https://developer.hashicorp.com/terraform/install
-install_terraform() {
-    proot-distro login alpine -- bash <<-'EOF'
-        binPath="/usr/bin"
-        terraformBin="$binPath/terraform"
+    local terra_bin="/usr/bin/terra"
+    proot-distro login alpine -- bash -c "[ -f '$terra_bin' ]" 2>/dev/null && { log "Terra already installed"; return 0; }
     
-        if [ ! -f "$terraformBin" ]; then
-            wget https://releases.hashicorp.com/terraform/1.12.2/terraform_1.12.2_linux_arm64.zip
-            unzip terraform_1.12.2_linux_arm64.zip -d "$binPath"
-            mv "$binPath/terraform" "$terraformBin"
+    local source_path="$HOME/Development/github.com/rios0rios0/terra"
+    [ ! -d "$source_path" ] && {
+        mkdir -p "$(dirname "$source_path")"
+        execute_command "Clone terra repository" git clone https://github.com/rios0rios0/terra.git "$source_path"
+    }
+    
+    (
+        cd "$source_path" || exit 1
+        export PATH="$PATH:$HOME/go/bin"
+        execute_command "Build terra" make build
+        execute_command "Copy terra to proot" proot-distro copy bin/terra alpine:/usr/bin
+    )
+}
+
+install_terraform() {
+    local terraform_bin="/usr/bin/terraform"
+    proot-distro login alpine -- bash -c "[ -f '$terraform_bin' ]" 2>/dev/null && { log "Terraform already installed"; return 0; }
+    
+    execute_command "Install Terraform in proot" \
+        proot-distro login alpine -- bash -c "
+            wget https://releases.hashicorp.com/terraform/1.12.2/terraform_1.12.2_linux_arm64.zip &&
+            unzip terraform_1.12.2_linux_arm64.zip -d /usr/bin &&
+            chmod +x /usr/bin/terraform &&
             rm terraform_1.12.2_linux_arm64.zip
-            rm "$binPath/LICENSE.txt"
-            chmod +x "$terraformBin"
-        else
-            echo "Terraform is already installed."
-        fi
-EOF
+        "
 }
 
-# https://sdkman.io/install/
+install_terragrunt() {
+    local terragrunt_bin="/usr/bin/terragrunt"
+    proot-distro login alpine -- bash -c "[ -f '$terragrunt_bin' ]" 2>/dev/null && { log "Terragrunt already installed"; return 0; }
+    
+    execute_command "Install Terragrunt in proot" \
+        proot-distro login alpine -- bash -c "
+            curl -LO 'https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}/terragrunt_linux_arm64' &&
+            mv terragrunt_linux_arm64 /usr/bin/terragrunt &&
+            chmod +x /usr/bin/terragrunt
+        "
+}
+
 install_sdkman() {
-    sdkPath="$HOME/.sdkman"
-
-    if [ ! -d "$sdkPath" ]; then
-        curl -s "https://get.sdkman.io" | bash
-
-        source "$sdkPath/bin/sdkman-init.sh"
-        sdk install java
-        sdk install gradle
-    else
-        echo "SDKMan is already installed."
-    fi
+    [ -d "$HOME/.sdkman" ] && { log "SDKMan already installed"; return 0; }
+    execute_command "Install SDKMan" curl -s "https://get.sdkman.io" | bash
+    [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && {
+        source "$HOME/.sdkman/bin/sdkman-init.sh"
+        execute_command "Install Java" sdk install java
+        execute_command "Install Gradle" sdk install gradle
+    }
 }
 
-# https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
-    if command_exists npm; then
-        echo "Node detected, means it was previously installed or native package installed..."
-
-        npm install -g corepack
-        corepack enable
-        return;
-    fi
-
-    nvmPath="$HOME/.nvm"
-
-    if [ ! -d "$nvmPath" ]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
-
-        unset PREFIX
-        source "$nvmPath/nvm.sh"
-        nvm install --lts
-
-        npm install -g npm@latest
-        npm install -g corepack
-        corepack enable
-    else
-        echo "NVM is already installed."
-    fi
+    command_exists npm && { 
+        execute_command "Install corepack" npm install -g corepack
+        execute_command "Enable corepack" corepack enable
+        return 0
+    }
+    [ -d "$HOME/.nvm" ] && { log "NVM already installed"; return 0; }
+    execute_command "Install NVM" curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh" | bash
+    [ -f "$HOME/.nvm/nvm.sh" ] && {
+        unset PREFIX  # For Android
+        source "$HOME/.nvm/nvm.sh"
+        execute_command "Install Node LTS" nvm install --lts
+        execute_command "Update npm" npm install -g npm@latest
+        execute_command "Install corepack" npm install -g corepack
+        execute_command "Enable corepack" corepack enable
+    }
 }
 
-# https://github.com/pyenv/pyenv
 install_pyenv() {
-    if command_exists pip; then
-        echo "Python detected, means it was previously installed or native package installed..."
-
-        return;
-    fi
-
-    pyenvPath="$HOME/.pyenv"
-
-    if [ ! -d "$pyenvPath" ]; then
-        curl -fsSL https://pyenv.run | bash
-
-        export PATH="$PATH:$pyenvPath"
-        pyenv install 3.13:latest
-        pyenv global 3.13:latest
-
-        pip install --upgrade pip
-    else
-        echo "Pyenv is already installed."
-    fi
+    command_exists pip && { log "Python/pip already available"; return 0; }
+    [ -d "$HOME/.pyenv" ] && { log "pyenv already installed"; return 0; }
+    execute_command "Install pyenv" curl -fsSL https://pyenv.run | bash
+    [ -d "$HOME/.pyenv" ] && {
+        export PATH="$PATH:$HOME/.pyenv/bin"
+        execute_command "Install Python $PYTHON_VERSION" pyenv install "$PYTHON_VERSION"
+        execute_command "Set Python global" pyenv global "$PYTHON_VERSION"
+        execute_command "Upgrade pip" pip install --upgrade pip
+    }
 }
 
-# https://pypi.org/project/azure-cli/
 install_azure_cli() {
-    if ! command_exists pip; then
-        echo "Install 'pip' first, it seems to be NOT installed..."
-
-        return;
-    fi
-
-    azPath="$HOME/.azure"
-
-    if [ ! -d "$azPath" ]; then
-        # TODO: when installed via Pyenv it should be loaded first on the current shell
-        pip install azure-cli
-    else
-        echo "AZ is already installed."
-    fi
+    command_exists pip || { log_error "pip required for Azure CLI"; return 1; }
+    [ -d "$HOME/.azure" ] && { log "Azure CLI already installed"; return 0; }
+    execute_command "Install Azure CLI" pip install azure-cli
 }
 
-# https://1password.com/downloads/command-line/
 install_1password_cli() {
-    proot-distro login alpine -- bash <<-'EOF'
-        binPath="/usr/bin"
-        opBin="$binPath/op"
-
-        if [ ! -f "$opBin" ]; then
-            ARCH="arm64"
-            wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.31.1/op_linux_${ARCH}_v2.31.1.zip" -O op.zip
-            unzip -d op op.zip
-            mv op/op "$binPath"
-            rm -rf op.zip op
-            chmod +x "$opBin"
-        else
-            echo "1Password CLI is already installed."
-        fi
-EOF
+    local op_bin="/usr/bin/op"
+    proot-distro login alpine -- bash -c "[ -f '$op_bin' ]" 2>/dev/null && { log "1Password CLI already installed"; return 0; }
+    
+    execute_command "Install 1Password CLI in proot" \
+        proot-distro login alpine -- bash -c "
+            wget 'https://cache.agilebits.com/dist/1P/op2/pkg/v${ONEPASSWORD_VERSION}/op_linux_arm64_v${ONEPASSWORD_VERSION}.zip' -O op.zip &&
+            unzip -d op op.zip &&
+            mv op/op /usr/bin/ &&
+            rm -rf op.zip op &&
+            chmod +x /usr/bin/op
+        "
 }
 
-install_oh_my_zsh
-
-# TODO: building Go versions on Termux are breaking, since they don't recognize system critical path (like /etc/resolv.conf) leading to DNS errors
-install_gvm
-
-install_wrapper
-install_terra
-install_terragrunt
-install_terraform
-install_sdkman
-
-# TODO: same of the line 261
-install_nvm
-
-# TODO: same of the line 261
-install_pyenv
-
-install_azure_cli
-install_1password_cli
-
-# =========================================================================================================
-# resolv.config
-configure_dns() {
-    rcfile="/data/data/com.termux/files/usr/etc/resolv.conf"
-
-    echo "nameserver 8.8.8.8" > "$rcfile"
-    echo "nameserver 8.8.4.4" >> "$rcfile"
-    echo "nameserver 1.1.1.1" >> "$rcfile"
+configure_dns_android() {
+    log "Configuring DNS for Android..."
+    local rcfile="/data/data/com.termux/files/usr/etc/resolv.conf"
+    execute_command "Configure DNS servers" bash -c "
+        echo 'nameserver 8.8.8.8' > '$rcfile'
+        echo 'nameserver 8.8.4.4' >> '$rcfile'
+        echo 'nameserver 1.1.1.1' >> '$rcfile'
+    "
 }
 
-# https://docs.astronvim.com/
 configure_neovim() {
-    nvimPath="$HOME/.config/nvim"
-
-    if [ ! -d "$nvimPath" ]; then
-        git clone --depth 1 https://github.com/AstroNvim/template "$nvimPath"
-        rm -rf "$nvimPath/.git"
-        nvim
-    else
-        echo "NeoVIM with AstroVIM is already configured."
-    fi
+    log "Configuring NeoVim with AstroVim..."
+    local nvim_path="$HOME/.config/nvim"
+    [ -d "$nvim_path" ] && { log "NeoVim already configured"; return 0; }
+    
+    mkdir -p "$(dirname "$nvim_path")"
+    execute_command "Clone AstroVim template" \
+        git clone --depth 1 https://github.com/AstroNvim/template "$nvim_path"
+    execute_command "Remove template git history" rm -rf "$nvim_path/.git"
 }
 
-configure_dns
-configure_neovim
-# =========================================================================================================
+# Main installation function
+main() {
+    log "Starting Android/Termux dependencies installation..."
+    
+    # Android-specific setup
+    execute_command "Setup Termux storage" termux-setup-storage
+    
+    # Update package list
+    execute_command "Update package list" apt update
+    
+    # Install system packages
+    install_packages "requirements" "${REQUIREMENTS[@]}"
+    install_packages "hardware monitoring" "${HARDWARE[@]}"
+    install_packages "utilities" "${UTILITIES[@]}"
+    install_packages "programming languages" "${LANGUAGES[@]}"
+    
+    # Install development tools
+    install_oh_my_zsh
+    install_gvm
+    install_wrapper
+    install_terra
+    install_terraform
+    install_terragrunt
+    install_sdkman
+    install_nvm
+    install_pyenv
+    install_azure_cli
+    install_1password_cli
+    
+    # Configure Android-specific settings
+    configure_dns_android
+    configure_neovim
+    
+    log "Android dependencies installation completed successfully!"
+}
+
+# Run main function
+main "$@"
