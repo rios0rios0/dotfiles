@@ -4,7 +4,7 @@
   {{- if (eq .type "REFERENCE") -}}
 
     {{- /* Read full “device@account” title */ -}}
-    {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
+    {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
 
     {{- /* Split into [device, account] */ -}}
     {{- $parts := split "@" $sshName -}}
@@ -13,8 +13,8 @@
     {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
 
-      {{- $sshEmail := onepasswordRead (list "op://Private/" .value "/ssh email" | join "") "my" -}}
-      {{- $sshPublicKey := onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" -}}
+      {{- $sshEmail := onepasswordRead (printf "op://Private/%s/ssh email" .value) "my" -}}
+      {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" -}}
       {{ $sshEmail }} {{ $sshPublicKey }}
 
     {{- end -}}
