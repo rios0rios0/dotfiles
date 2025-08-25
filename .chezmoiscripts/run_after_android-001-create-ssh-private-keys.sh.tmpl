@@ -14,7 +14,7 @@ chmod 700 "$sshFolder"
   {{- if (eq .type "REFERENCE") }}
 
     {{- /* Read full “device@account” title */ -}}
-    {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
+    {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
 
     {{- /* Split into [device, account] */ -}}
     {{- $parts := split "@" $sshName -}}

@@ -10,8 +10,8 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 {{-      if (eq .type "REFERENCE") }}
 
 # read the SSH name and public key from 1Password
-$sshName = "{{ onepasswordRead (list "op://Private/" .value "/title" | join "") "my" }}"
-$sshPublicKey = "{{ onepasswordRead (list "op://Private/" .value "/public key" | join "") "my" }}"
+$sshName = "{{ onepasswordRead (printf "op://Private/%s/title" .value) "my" }}"
+$sshPublicKey = "{{ onepasswordRead (printf "op://Private/%s/public key" .value) "my" }}"
 
 # create the public key file
 $publicKeyFilePath = "$sshFolderPath\$sshName.pub"

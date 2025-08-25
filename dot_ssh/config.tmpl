@@ -8,11 +8,11 @@ This is because on Android (Termux) only private keys are usable, while other pl
 ###### VCS #######################################################################
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
   {{- if eq .type "REFERENCE" -}}
-    {{- $sshName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
+    {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
     {{- $parts := split "@" $sshName -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $sshAlias := onepasswordRead (list "op://Private/" .value "/ssh alias" | join "") "my" | trim -}}
+      {{- $sshAlias := onepasswordRead (printf "op://Private/%s/ssh alias" .value) "my" | trim -}}
       {{- $identityFile := "" -}}
       {{- if $isAndroid -}}
         {{- $identityFile = (print "~/.ssh/" $sshName) -}}
@@ -54,13 +54,13 @@ Host bitbucket.org-{{ $sshAlias }}
 ###### PEM #######################################################################
 {{- range (onepassword "Active PEMs" "personal" "my").fields -}}
   {{- if eq .type "REFERENCE" -}}
-    {{- $pemName := onepasswordRead (list "op://Private/" .value "/title" | join "") "my" | trim -}}
+    {{- $pemName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
     {{- $parts := split "@" $pemName -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $alias := onepasswordRead (list "op://Private/" .value "/pem host alias" | join "") "my" | trim -}}
-      {{- $host := onepasswordRead (list "op://Private/" .value "/pem host" | join "") "my" | trim -}}
-      {{- $user := onepasswordRead (list "op://Private/" .value "/pem user" | join "") "my" | trim -}}
+      {{- $alias := onepasswordRead (printf "op://Private/%s/pem host alias" .value) "my" | trim -}}
+      {{- $host := onepasswordRead (printf "op://Private/%s/pem host" .value) "my" | trim -}}
+      {{- $user := onepasswordRead (printf "op://Private/%s/pem user" .value) "my" | trim -}}
       {{- $pemIdentityFile := (print "~/.ssh/" $pemName ".pem") -}}
 
 Host {{ $alias }}
