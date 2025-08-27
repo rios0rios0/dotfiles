@@ -6,7 +6,7 @@ sshFolder="$HOME/.ssh"
 mkdir -p "$sshFolder"
 chmod 700 "$sshFolder"
 
-# TODO: Try to find a way to use 1Password authentication to fetch private SSH keys directly!
+# TODO: Try to find a way to use 1Password authentication to fetch SSH keys directly!
 
 {{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
 
@@ -24,11 +24,19 @@ chmod 700 "$sshFolder"
     {{- if eq $device $deviceName -}}
 
       {{- $sshPrivateKey := onepasswordRead (printf "op://Private/%s/private key" .value) "my" | trim }}
+      {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" | trim }}
+      
       echo "Creating private key file: $sshFolder/{{ $sshName }} …"
       cat << 'EOF' > "$sshFolder/{{ $sshName }}"
 {{ $sshPrivateKey }}
 EOF
       chmod 600 "$sshFolder/{{ $sshName }}"
+      
+      echo "Creating public key file: $sshFolder/{{ $sshName }}.pub …"
+      cat << 'EOF' > "$sshFolder/{{ $sshName }}.pub"
+{{ $sshPublicKey }}
+EOF
+      chmod 644 "$sshFolder/{{ $sshName }}.pub"
     {{- end -}}
   {{- end -}}
 {{- end }}
