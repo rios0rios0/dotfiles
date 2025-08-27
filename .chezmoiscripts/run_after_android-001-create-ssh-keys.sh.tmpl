@@ -26,17 +26,19 @@ chmod 700 "$sshFolder"
       {{- $sshPrivateKey := onepasswordRead (printf "op://Private/%s/private key" .value) "my" | trim }}
       {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" | trim }}
       
-      echo "Creating private key file: $sshFolder/{{ $sshName }} …"
-      cat << 'EOF' > "$sshFolder/{{ $sshName }}"
+      sshKeyPath="$sshFolder/{{ $sshName }}"
+      
+      echo "Creating private key file: $sshKeyPath …"
+      cat << 'EOF' > "$sshKeyPath"
 {{ $sshPrivateKey }}
 EOF
-      chmod 600 "$sshFolder/{{ $sshName }}"
+      chmod 600 "$sshKeyPath"
       
-      echo "Creating public key file: $sshFolder/{{ $sshName }}.pub …"
-      cat << 'EOF' > "$sshFolder/{{ $sshName }}.pub"
+      echo "Creating public key file: $sshKeyPath.pub …"
+      cat << 'EOF' > "$sshKeyPath.pub"
 {{ $sshPublicKey }}
 EOF
-      chmod 644 "$sshFolder/{{ $sshName }}.pub"
+      chmod 644 "$sshKeyPath.pub"
     {{- end -}}
   {{- end -}}
 {{- end }}
