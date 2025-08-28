@@ -1,0 +1,29 @@
+{
+  "mcpServers": {
+    "github": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "ghcr.io/github/github-mcp-server"
+      ],
+      "env": {
+        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+      }
+    },
+    "context7": {
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "context7-mcp"
+      ],
+      "transportType": "stdio",
+      "autoApprove": [],
+      "disabled": false,
+      "timeout": 60
+    },
+    "jetbrains": {
+      "url": "http://localhost:64342/sse"
+    }
+  }
+}
