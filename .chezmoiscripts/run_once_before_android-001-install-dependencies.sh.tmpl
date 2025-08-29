@@ -292,6 +292,24 @@ configure_dns() {
     echo "nameserver 1.1.1.1" >> "$rcfile"
 }
 
+# Install development tools and AI-related dependencies
+install_ai_dev_tools() {
+    if command_exists npm; then
+        echo "Installing development tools for AI integration..."
+        
+        # Development tools that support AI workflows
+        npm install -g tree-sitter-cli  # Required for better syntax highlighting
+        npm install -g neovim  # Neovim Node.js support
+        npm install -g typescript  # TypeScript support
+        npm install -g typescript-language-server  # TypeScript LSP
+        npm install -g @vtsls/language-server  # Enhanced TypeScript support
+        
+        echo "Development tools installed successfully."
+    else
+        echo "npm not available, skipping development tools installation."
+    fi
+}
+
 # https://docs.astronvim.com/
 configure_neovim() {
     nvimPath="$HOME/.config/nvim"
@@ -299,7 +317,18 @@ configure_neovim() {
     if [ ! -d "$nvimPath" ]; then
         git clone --depth 1 https://github.com/AstroNvim/template "$nvimPath"
         rm -rf "$nvimPath/.git"
-        nvim
+        
+        # Install additional dependencies for AI features
+        if command_exists pip; then
+            echo "Installing Python packages for AI features..."
+            pip install requests anthropic openai
+        fi
+        
+        echo "AstroVIM template installed. Starting nvim to initialize plugins..."
+        # Start nvim in headless mode to install plugins
+        nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
+        
+        echo "NeoVIM with AstroVIM configured successfully."
     else
         echo "NeoVIM with AstroVIM is already configured."
     fi
@@ -307,4 +336,5 @@ configure_neovim() {
 
 configure_dns
 configure_neovim
+install_ai_dev_tools
 # =========================================================================================================
