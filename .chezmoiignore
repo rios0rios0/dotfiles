@@ -53,6 +53,7 @@ pyvenv.cfg
 .local/bin/terraform
 .local/bin/terragrunt
 .local/bin/wrapper
+.config/nvim
 {{- end }}
 
 {{- /* Additional Android exclusions: For example, ignore .gitconfig on Android even if it’s normally managed elsewhere. */ -}}
