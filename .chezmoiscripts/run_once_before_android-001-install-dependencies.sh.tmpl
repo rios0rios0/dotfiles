@@ -318,12 +318,6 @@ configure_neovim() {
         git clone --depth 1 https://github.com/AstroNvim/template "$nvimPath"
         rm -rf "$nvimPath/.git"
         
-        # Install additional dependencies for AI features
-        if command_exists pip; then
-            echo "Installing Python packages for AI features..."
-            pip install requests anthropic openai
-        fi
-        
         echo "AstroVIM template installed. Starting nvim to initialize plugins..."
         # Start nvim in headless mode to install plugins
         nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
