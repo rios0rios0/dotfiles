@@ -121,5 +121,6 @@ Supporting article: https://www.reddit.com/r/termux/comments/zu8ets/do_not_insta
 - check how to use variables from an included template
 - when getting from scratch and changing bashes, it stuck on the new one
 - when getting from scratch and having more than 1Password account, it gets the wrong account order
-- the script `run_once_after_windows-001-create-ssh-known-hosts.ps1` is not working properly, because when calling
-  `ssh.exe` via `git` commands in WSL, the command just freezes. So, the workaround is to do `ssh git@dev.azure.com` to each entry you want.
+- ~~the script `run_once_after_windows-001-create-ssh-known-hosts.ps1` is not working properly, because when calling
+  `ssh.exe` via `git` commands in WSL, the command just freezes. So, the workaround is to do `ssh git@dev.azure.com` to each entry you want.~~ 
+  **FIXED**: Added proper timeout handling, error management, and explicit Windows SSH executable usage to prevent hanging.
