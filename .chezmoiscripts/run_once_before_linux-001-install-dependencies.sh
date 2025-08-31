@@ -1,149 +1,200 @@
 #!/bin/bash
+#
+# Refactored Linux dependencies installation script
+# Uses shared patterns and DRY principles
+#
 
-# update the package list
-sudo apt update
+set -euo pipefail
 
-# =========================================================================================================
-# Requirements for this repository to work properly
-requirements=(
-    "git"
-    "curl"
-    "zip"           # required for SDKMan
-    "unzip"         # required for SDKMan
-    "age"           # required for Chezmoi (decrypt files with SSH)
-    "gpg"           # required for import and export GPGs
-    "gpg-agent"     # required for import and export GPGs
-    "eza"           # it's for "ls" highlighting (https://github.com/eza-community/eza)
-    "sqlite3"       # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
-    "bsdmainutils"  # hexdump is an utility for displaying file contents in hexadecimal required by GVM (Go Version Manager)
-    "binutils"      # required by GVM (Go Version Manager)
-    "bison"         # required by GVM (Go Version Manager)
-    "gcc"           # required for many things and GVM
-    "make"          # required for many things and GVM
+# Include shared utility functions inline
+command_exists() { command -v "$1" >/dev/null 2>&1; }
+log() { echo "$(date '+%Y-%m-%d %H:%M:%S') [INFO] $*"; }
+log_error() { echo "$(date '+%Y-%m-%d %H:%M:%S') [ERROR] $*" >&2; }
+execute_command() { 
+    local description="$1"; shift
+    log "Executing: $description"
+    if "$@"; then log "Success: $description"; else log_error "Failed: $description"; return 1; fi
+}
+is_tool_installed() { 
+    local tool="$1" path="$2"
+    [ -n "$path" ] && [ -f "$path" ] && { log "$tool already installed at $path"; return 0; }
+    command_exists "$tool" && { log "$tool already available"; return 0; }
+    return 1
+}
+
+# Configuration constants
+readonly GO_VERSION="1.24.1"
+readonly TERRAGRUNT_VERSION="0.76.6"
+readonly NVM_VERSION="0.40.2"
+readonly PYTHON_VERSION="3.13.2"
+
+# Package definitions
+readonly REQUIREMENTS=(
+    "git" "curl" "zip" "unzip" "age" "gpg" "gpg-agent" "eza" "sqlite3"
+    "bsdmainutils" "binutils" "bison" "gcc" "make"
 )
-sudo apt install --no-install-recommends --yes "${requirements[@]}"
-# =========================================================================================================
-# Hardware
-hardware=(
-    "htop"          # it's for monitoring system resources
-    "screenfetch"   # it's for displaying system information
+readonly HARDWARE=("htop" "screenfetch")
+readonly UTILITIES=(
+    "jq" "bat" "silversearcher-ag" "inotify-tools" "dos2unix" "expect" "aria2c" "file"
 )
-sudo apt install --no-install-recommends --yes "${hardware[@]}"
-# =========================================================================================================
-# Utilities
-utilities=(
-    #"imagemagick"       # it's for image manipulation (convert, identify, etc.) TODO: better to use on Windows?
-    "jq"                # it's for parsing JSON
-    "bat"               # it's for cat with syntax highlighting (https://github.com/sharkdp/bat)
-    "silversearcher-ag" # it's for searching files (https://github.com/ggreer/the_silver_searcher)
-    "inotify-tools"     # it's for watching file changes ("inotifywait")
-    "dos2unix"          # it's for converting text files between Unix and DOS formats
-    "expect"            # it's for automating interactive applications (used in some scripts)
-    "aria2c"            # cURL alternative with many features
-    "file"              # it's for determining file types
-)
-sudo apt install --no-install-recommends --yes "${utilities[@]}"
-# =========================================================================================================
-# =========================================================================================================
-# https://ohmyz.sh/#install
+
+# Install packages function
+install_packages() {
+    local description="$1"; shift
+    local packages=("$@")
+    log "Installing $description: ${packages[*]}"
+    execute_command "Install $description" sudo apt install --no-install-recommends --yes "${packages[@]}"
+}
+
+# Installer functions with idempotency
 install_oh_my_zsh() {
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    [ -d "$HOME/.oh-my-zsh" ] && { log "Oh My Zsh already installed"; return 0; }
+    execute_command "Install Oh My Zsh" \
+        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
 }
 
-# https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    sudo rm -rf /home/$USER/.gvm
-    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-    gvm install go1.24.1 -B
-    go use go1.24.1
+    command_exists go && { log "Go already available"; return 0; }
+    [ -d "$HOME/.gvm" ] && { log "GVM already installed"; return 0; }
+    [ -d "$HOME/.gvm" ] && execute_command "Remove existing GVM" rm -rf "$HOME/.gvm"
+    execute_command "Install GVM" \
+        bash -c "curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer | bash"
+    [ -f "$HOME/.gvm/scripts/gvm" ] && {
+        source "$HOME/.gvm/scripts/gvm"
+        execute_command "Install Go $GO_VERSION" gvm install "$GO_VERSION" -B
+        execute_command "Use Go $GO_VERSION" gvm use "$GO_VERSION" --default
+    }
 }
 
-# https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 install_kubectl() {
-    sudo mkdir -p -m 755 /etc/apt/keyrings
-    curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-    sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
-
-    echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
-    sudo chmod 644 /etc/apt/sources.list.d/kubernetes.list
-
-    sudo apt update && sudo apt install --no-install-recommends --yes kubectl
+    command_exists kubectl && { log "kubectl already installed"; return 0; }
+    execute_command "Create apt keyrings directory" sudo mkdir -p -m 755 /etc/apt/keyrings
+    execute_command "Add Kubernetes GPG key" \
+        curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    execute_command "Set GPG key permissions" sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
+    execute_command "Add Kubernetes repository" \
+        echo 'deb [signed-by=/etc/apt/keyrings/kubernetes-apt-keyring.gpg] https://pkgs.k8s.io/core:/stable:/v1.32/deb/ /' | sudo tee /etc/apt/sources.list.d/kubernetes.list
+    execute_command "Update package list" sudo apt update
+    install_packages "kubectl" "kubectl"
 }
 
-# https://krew.sigs.k8s.io/docs/user-guide/setup/install/
 install_krew() {
+    command_exists kubectl-krew && { log "krew already installed"; return 0; }
+    local tmpdir; tmpdir="$(mktemp -d)"
     (
-      set -x; cd "$(mktemp -d)" &&
-      OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
-      ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
-      KREW="krew-${OS}_${ARCH}" &&
-      curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
-      tar zxvf "${KREW}.tar.gz" &&
-      ./"${KREW}" install krew
-    )
-
-    k krew install ctx
-    k krew install ns
+        cd "$tmpdir" || exit 1
+        local os arch krew_file
+        os="$(uname | tr '[:upper:]' '[:lower:]')"
+        arch="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/aarch64$/arm64/')"
+        krew_file="krew-${os}_${arch}"
+        curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${krew_file}.tar.gz" &&
+        tar zxf "${krew_file}.tar.gz" &&
+        ./"${krew_file}" install krew
+    ) && {
+        kubectl krew install ctx
+        kubectl krew install ns
+    }
+    rm -rf "$tmpdir"
 }
 
-# https://developer.hashicorp.com/terraform/install
 install_terraform() {
-    wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com bullseye main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-    sudo apt update && sudo apt install terraform
+    command_exists terraform && { log "Terraform already installed"; return 0; }
+    execute_command "Add HashiCorp GPG key" \
+        wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
+    execute_command "Add HashiCorp repository" \
+        echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com bullseye main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
+    execute_command "Update package list" sudo apt update
+    install_packages "Terraform" "terraform"
 }
 
-# https://terragrunt.gruntwork.io/docs/getting-started/install/
 install_terragrunt() {
-    curl -LO https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64
-    sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
-    sudo chmod +x /usr/local/bin/terragrunt
+    command_exists terragrunt && { log "Terragrunt already installed"; return 0; }
+    local arch; arch="$(uname -m | sed 's/x86_64/amd64/')"
+    local url="https://github.com/gruntwork-io/terragrunt/releases/download/v${TERRAGRUNT_VERSION}/terragrunt_linux_${arch}"
+    local tmpfile; tmpfile="$(mktemp)"
+    curl -fsSL "$url" -o "$tmpfile" &&
+    execute_command "Install Terragrunt" sudo mv "$tmpfile" /usr/local/bin/terragrunt &&
+    execute_command "Make Terragrunt executable" sudo chmod +x /usr/local/bin/terragrunt
 }
 
-# https://sdkman.io/install/
 install_sdkman() {
-    curl -s "https://get.sdkman.io" | bash
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
-    sdk install java
-    sdk install gradle
+    [ -d "$HOME/.sdkman" ] && { log "SDKMan already installed"; return 0; }
+    execute_command "Install SDKMan" curl -s "https://get.sdkman.io" | bash
+    [ -f "$HOME/.sdkman/bin/sdkman-init.sh" ] && {
+        source "$HOME/.sdkman/bin/sdkman-init.sh"
+        execute_command "Install Java" sdk install java
+        execute_command "Install Gradle" sdk install gradle
+    }
 }
 
-# https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
-    nvm install --lts
-    npm install -g corepack
-    corepack enable
+    command_exists npm && { 
+        execute_command "Install corepack" npm install -g corepack
+        execute_command "Enable corepack" corepack enable
+        return 0
+    }
+    [ -d "$HOME/.nvm" ] && { log "NVM already installed"; return 0; }
+    execute_command "Install NVM" curl -o- "https://raw.githubusercontent.com/nvm-sh/nvm/v${NVM_VERSION}/install.sh" | bash
+    [ -f "$HOME/.nvm/nvm.sh" ] && {
+        source "$HOME/.nvm/nvm.sh"
+        execute_command "Install Node LTS" nvm install --lts
+        execute_command "Install corepack" npm install -g corepack
+        execute_command "Enable corepack" corepack enable
+    }
 }
 
-# https://github.com/pyenv/pyenv
 install_pyenv() {
-    sudo rm -rf /home/$USER/.pyenv
-    curl https://pyenv.run | bash
-
-    # https://github.com/pyenv/pyenv/wiki#suggested-build-environment
-    sudo apt install --no-install-recommends --yes build-essential libssl-dev zlib1g-dev \
-      libbz2-dev libreadline-dev libsqlite3-dev curl git \
-      libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
-
-    pyenv install 3.13.2
-    pyenv global 3.13.2
+    command_exists pip && { log "Python/pip already available"; return 0; }
+    [ -d "$HOME/.pyenv" ] && { log "pyenv already installed"; return 0; }
+    [ -d "$HOME/.pyenv" ] && execute_command "Remove existing pyenv" rm -rf "$HOME/.pyenv"
+    
+    # Install build dependencies
+    install_packages "pyenv build dependencies" \
+        "build-essential" "libssl-dev" "zlib1g-dev" "libbz2-dev" "libreadline-dev" \
+        "libsqlite3-dev" "libncursesw5-dev" "xz-utils" "tk-dev" "libxml2-dev" \
+        "libxmlsec1-dev" "libffi-dev" "liblzma-dev"
+    
+    execute_command "Install pyenv" curl -fsSL https://pyenv.run | bash
+    [ -d "$HOME/.pyenv" ] && {
+        export PATH="$PATH:$HOME/.pyenv/bin"
+        execute_command "Install Python $PYTHON_VERSION" pyenv install "$PYTHON_VERSION"
+        execute_command "Set Python global" pyenv global "$PYTHON_VERSION"
+        execute_command "Upgrade pip" pip install --upgrade pip
+    }
 }
 
-# https://pypi.org/project/azure-cli/
 install_azure_cli() {
-    pip install --upgrade pip
-    pip install azure-cli
+    command_exists pip || { log_error "pip required for Azure CLI"; return 1; }
+    [ -d "$HOME/.azure" ] && { log "Azure CLI already installed"; return 0; }
+    execute_command "Install Azure CLI" pip install azure-cli
 }
 
-install_oh_my_zsh
-install_gvm
-install_kubectl
-install_krew
-install_terraform
-install_terragrunt
-install_sdkman
-install_nvm
-install_pyenv
-install_azure_cli
-# =========================================================================================================
+# Main installation function
+main() {
+    log "Starting Linux dependencies installation..."
+    
+    # Update package list
+    execute_command "Update package list" sudo apt update
+    
+    # Install system packages
+    install_packages "requirements" "${REQUIREMENTS[@]}"
+    install_packages "hardware monitoring" "${HARDWARE[@]}"
+    install_packages "utilities" "${UTILITIES[@]}"
+    
+    # Install development tools
+    install_oh_my_zsh
+    install_gvm
+    install_kubectl
+    install_krew
+    install_terraform
+    install_terragrunt
+    install_sdkman
+    install_nvm
+    install_pyenv
+    install_azure_cli
+    
+    log "Linux dependencies installation completed successfully!"
+}
+
+# Run main function
+main "$@"
