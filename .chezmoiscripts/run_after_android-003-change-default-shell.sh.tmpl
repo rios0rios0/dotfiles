@@ -1,0 +1,27 @@
+#!{{ lookPath "bash" }}
+
+# Change the default shell to zsh after all dependencies are installed
+# This avoids the hanging issue that occurs when the shell is changed during the bootstrap process
+
+# Check if zsh is installed
+if command -v zsh >/dev/null 2>&1; then
+    # Get the current user's shell from the environment or default
+    current_shell="${SHELL:-/data/data/com.termux/files/usr/bin/bash}"
+    zsh_path="$(which zsh)"
+    
+    # Only change the shell if it's not already zsh
+    if [ "$current_shell" != "$zsh_path" ]; then
+        echo "Changing default shell from $current_shell to $zsh_path..."
+        chsh -s "$zsh_path" 2>/dev/null || {
+            # On Termux, chsh might not be available, so we set the SHELL environment variable
+            echo "chsh not available on Termux, setting SHELL environment variable"
+            echo "export SHELL=$zsh_path" >> ~/.bashrc
+            echo "exec $zsh_path" >> ~/.bashrc
+        }
+        echo "Default shell changed to zsh. Please restart Termux for the change to take effect."
+    else
+        echo "Default shell is already set to zsh."
+    fi
+else
+    echo "Warning: zsh is not installed. Cannot change default shell."
+fi

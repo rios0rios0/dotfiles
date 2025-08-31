@@ -47,7 +47,7 @@ sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 }
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
