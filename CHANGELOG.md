@@ -24,8 +24,11 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - added Linux WSL features to handle Git and SSH configuration with 1Password 
 - added Shell Script features to handle watching multiple files (and compressing them) for Kubernetes secrets
 - added a new feature to compress and watch many folders instead of just one folder
+- added Android-compatible MCP configuration with npx alternatives to Docker-based servers
+- added 1Password integration for MCP server credentials and API keys
 
 ### Changed
 
 - simplified 1Password calls by replacing list/join patterns with printf format for improved readability and consistency
 - enhanced Android SSH script to export both private and public keys from 1Password, renamed from `run_after_android-001-create-ssh-private-keys.sh.tmpl` to `run_after_android-001-create-ssh-keys.sh.tmpl`
+- converted MCP configuration from static JSON to Chezmoi template for cross-platform compatibility and secure credential management
