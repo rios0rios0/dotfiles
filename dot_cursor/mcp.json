@@ -1,29 +1,144 @@
 {
   "mcpServers": {
-    "github": {
+    "Azure Cloud": {
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
+        "-e", "AZURE_CLIENT_ID",
+        "-e", "AZURE_CLIENT_SECRET",
+        "-e", "AZURE_TENANT_ID",
+        "-e", "AZURE_SUBSCRIPTION_ID",
+        "mcr.microsoft.com/azure-sdk/azure-mcp:latest"
+      ],
+      "env": {
+        "AZURE_CLIENT_ID": "",
+        "AZURE_CLIENT_SECRET": "",
+        "AZURE_TENANT_ID": "",
+        "AZURE_SUBSCRIPTION_ID": "",
+        "VENDOR_URL": "https://github.com/microsoft/mcp/tree/main/servers/Azure.Mcp.Server"
+      }
+    },
+    "Kubernetes": {
+      "command": "npx",
+      "args": ["-y", "kubernetes-mcp-server@latest"],
+      "env": {
+        "VENDOR_URL": "https://github.com/containers/kubernetes-mcp-server"
+      }
+    },
+
+
+
+    "OpenSearch": {
+      "command": "uvx",
+      "args": [
+        "opensearch-mcp-server-py",
+        "--mode", "multi",
+        "--config", "/path/to/your/config.yml"
+      ],
+      "env": {
+        "OPENSEARCH_HOSTS": "https://something.io:9200",
+        "OPENSEARCH_USERNAME": "",
+        "OPENSEARCH_PASSWORD": "",
+        "VENDOR_URL": "https://github.com/opensearch-project/opensearch-mcp-server-py/blob/main/USER_GUIDE.md"
+      }
+    },
+    "ElasticSearch": {
+      "command": "uv",
+      "args": [
+      ],
+      "env": {
+        "ELASTICSEARCH_HOSTS": "https://:9200",
+        "ELASTICSEARCH_USERNAME": "elastic",
+        "ELASTICSEARCH_PASSWORD": ""
+      }
+    },
+
+
+
+    "GitHub": {
+      "command": "docker",
+      "args": [
+        "run", "-i","--rm",
         "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
         "ghcr.io/github/github-mcp-server"
       ],
       "env": {
-        "GITHUB_PERSONAL_ACCESS_TOKEN": ""
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "",
+        "VENDOR_URL": "https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp/use-the-github-mcp-server"
       }
     },
-    "context7": {
+    "Azure DevOps": {
+      "type": "stdio",
+      "command": "npx",
+      "args": ["-y", "@azure-devops/mcp@next", "$ADO_ORGANIZATION"],
+      "env": {
+        "ADO_ORGANIZATION": "",
+        "VENDOR_URL": "https://github.com/microsoft/azure-devops-mcp"
+      }
+    },
+    "jetbrains": {
+      "url": "http://localhost:64342/sse",
+      "env": {
+        "VENDOR_URL": "https://github.com/JetBrains/mcp-jetbrains?tab=readme-ov-file"
+      }
+    },
+
+
+
+    "browser": {
+      "command": "npx",
+      "args": ["@browserbasehq/mcp-server-browserbase",
+        "--modelName", "anthropic/claude-3-5-sonnet-latest",
+        "--modelApiKey", ""
+      ],
+      "env": {
+        "BROWSERBASE_API_KEY": "",
+        "BROWSERBASE_PROJECT_ID": "",
+        "GEMINI_API_KEY": "",
+        "VENDOR_URL": "https://github.com/browserbase/mcp-server-browserbase?tab=readme-ov-file"
+      }
+    },
+
+
+
+    "Context7": {
       "command": "docker",
       "args": [
         "run", "-i", "--rm",
         "context7-mcp"
       ],
-      "transportType": "stdio",
+      "env": {
+        "VENDOR_URL": "https://github.com/upstash/context7"
+      },
       "autoApprove": [],
       "disabled": false,
       "timeout": 60
     },
-    "jetbrains": {
-      "url": "http://localhost:64342/sse"
+    "Sequential Thinking": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y", "@smithery/cli@latest", "run", "@smithery-ai/server-sequential-thinking",
+        "--key", "",
+        "--profile", ""
+      ],
+      "env": {
+        "VENDOR_URL1": "https://github.com/smithery-ai/cli",
+        "VENDOR_URL2": "https://smithery.ai/server/@smithery-ai/server-sequential-thinking"
+      }
+    },
+    "EXA Search": {
+      "type": "stdio",
+      "command": "npx",
+      "args": [
+        "-y", "@smithery/cli@latest", "run", "exa",
+        "--key", "",
+        "--profile", ""
+      ],
+      "env": {
+        "VENDOR_URL1": "https://github.com/smithery-ai/cli",
+        "VENDOR_URL2": "https://smithery.ai/server/exa"
+      }
     }
   }
 }
