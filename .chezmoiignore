@@ -54,9 +54,11 @@ pyvenv.cfg
 .local/bin/terragrunt
 .local/bin/wrapper
 .config/nvim
+.config/mcphub
 {{- end }}
 
 {{- /* Additional Android exclusions: For example, ignore .gitconfig on Android even if it’s normally managed elsewhere. */ -}}
 {{- if eq .chezmoi.os "android" }}
 .age_recipients
+.cursor
 {{- end }}

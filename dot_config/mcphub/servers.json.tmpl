@@ -1,15 +1,8 @@
 {
   "mcpServers": {
     "Azure Cloud": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "-e", "AZURE_CLIENT_ID",
-        "-e", "AZURE_CLIENT_SECRET", 
-        "-e", "AZURE_TENANT_ID",
-        "-e", "AZURE_SUBSCRIPTION_ID",
-        "mcr.microsoft.com/azure-sdk/azure-mcp:latest"
-      ],
+      "command": "npx",
+      "args": ["-y", "@azure/mcp-server@latest"],
       "env": {
         "AZURE_CLIENT_ID": "{{ onepasswordRead "op://Private/Azure Client ID/credential" "my" }}",
         "AZURE_CLIENT_SECRET": "{{ onepasswordRead "op://Private/Azure Client Secret/credential" "my" }}",
@@ -25,16 +18,9 @@
         "VENDOR_URL": "https://github.com/containers/kubernetes-mcp-server"
       }
     },
-
-
-
     "OpenSearch": {
-      "command": "uvx",
-      "args": [
-        "opensearch-mcp-server-py",
-        "--mode", "multi",
-        "--config", "/path/to/your/config.yml"
-      ],
+      "command": "npx",
+      "args": ["-y", "opensearch-mcp-server@latest"],
       "env": {
         "OPENSEARCH_HOSTS": "{{ onepasswordRead "op://Private/OpenSearch Hosts/credential" "my" }}",
         "OPENSEARCH_USERNAME": "{{ onepasswordRead "op://Private/OpenSearch Username/credential" "my" }}",
@@ -43,24 +29,17 @@
       }
     },
     "ElasticSearch": {
-      "command": "uv",
-      "args": [],
+      "command": "npx",
+      "args": ["-y", "elasticsearch-mcp-server@latest"],
       "env": {
         "ELASTICSEARCH_HOSTS": "{{ onepasswordRead "op://Private/Elasticsearch Hosts/credential" "my" }}",
         "ELASTICSEARCH_USERNAME": "{{ onepasswordRead "op://Private/Elasticsearch Username/credential" "my" }}",
         "ELASTICSEARCH_PASSWORD": "{{ onepasswordRead "op://Private/Elasticsearch Password/credential" "my" }}"
       }
     },
-
-
-
     "GitHub": {
-      "command": "docker",
-      "args": [
-        "run", "-i","--rm",
-        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
-        "ghcr.io/github/github-mcp-server"
-      ],
+      "command": "npx",
+      "args": ["-y", "@modelcontextprotocol/server-github@latest"],
       "env": {
 {{- $githubToken := onepasswordRead "op://Private/GitHub Personal Access Token/credential" "my" }}
         "GITHUB_PERSONAL_ACCESS_TOKEN": "{{ $githubToken }}",
@@ -82,9 +61,6 @@
         "VENDOR_URL": "https://github.com/JetBrains/mcp-jetbrains?tab=readme-ov-file"
       }
     },
-
-
-
     "browser": {
       "command": "npx",
       "args": ["@browserbasehq/mcp-server-browserbase",
@@ -98,15 +74,9 @@
         "VENDOR_URL": "https://github.com/browserbase/mcp-server-browserbase?tab=readme-ov-file"
       }
     },
-
-
-
     "Context7": {
-      "command": "docker",
-      "args": [
-        "run", "-i", "--rm",
-        "context7-mcp"
-      ],
+      "command": "npx",
+      "args": ["-y", "@upstash/context7-mcp@latest"],
       "env": {
         "VENDOR_URL": "https://github.com/upstash/context7"
       },
