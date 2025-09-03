@@ -32,3 +32,4 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - simplified 1Password calls by replacing list/join patterns with printf format for improved readability and consistency
 - enhanced Android SSH script to export both private and public keys from 1Password, renamed from `run_after_android-001-create-ssh-private-keys.sh.tmpl` to `run_after_android-001-create-ssh-keys.sh.tmpl`
 - converted MCP configuration from static JSON to Chezmoi template for cross-platform compatibility and secure credential management
+- segregated MCP configurations into platform-specific files: `.cursor/mcp.json` for Linux (Docker-based) and `.config/mcphub/servers.json` for Android (npx-based), eliminating cross-platform conditional logic
