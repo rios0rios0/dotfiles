@@ -299,7 +299,12 @@ configure_neovim() {
     if [ ! -d "$nvimPath" ]; then
         git clone --depth 1 https://github.com/AstroNvim/template "$nvimPath"
         rm -rf "$nvimPath/.git"
-        nvim
+        
+        echo "AstroVIM template installed. Starting nvim to initialize plugins..."
+        # Start nvim in headless mode to install plugins
+        nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
+        
+        echo "NeoVIM with AstroVIM configured successfully."
     else
         echo "NeoVIM with AstroVIM is already configured."
     fi
