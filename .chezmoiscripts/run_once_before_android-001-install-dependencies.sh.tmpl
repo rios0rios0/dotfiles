@@ -292,24 +292,6 @@ configure_dns() {
     echo "nameserver 1.1.1.1" >> "$rcfile"
 }
 
-# Install development tools and AI-related dependencies
-install_ai_dev_tools() {
-    if command_exists npm; then
-        echo "Installing development tools for AI integration..."
-        
-        # Development tools that support AI workflows
-        npm install -g tree-sitter-cli  # Required for better syntax highlighting
-        npm install -g neovim  # Neovim Node.js support
-        npm install -g typescript  # TypeScript support
-        npm install -g typescript-language-server  # TypeScript LSP
-        npm install -g @vtsls/language-server  # Enhanced TypeScript support
-        
-        echo "Development tools installed successfully."
-    else
-        echo "npm not available, skipping development tools installation."
-    fi
-}
-
 # https://docs.astronvim.com/
 configure_neovim() {
     nvimPath="$HOME/.config/nvim"
@@ -330,5 +312,4 @@ configure_neovim() {
 
 configure_dns
 configure_neovim
-install_ai_dev_tools
 # =========================================================================================================
