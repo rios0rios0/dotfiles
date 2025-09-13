@@ -50,6 +50,7 @@ utilities=(
     "which"             # it performs command lookups
     "mlocate"           # it performs file searches (locate and updatedb)
     "openssh"           # used to clone Git repositories and also authentication
+    "parallel"          # it runs many threads of a command at the same time
 )
 apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
@@ -158,6 +159,20 @@ install_terraform() {
             echo "Terraform is already installed."
         fi
 EOF
+}
+
+# https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
+install_kubectl() {
+    binPath="$HOME/.local/bin"
+    kubectlBin="$binPath/kubectl"
+
+    if [ ! -f "$kubectlBin" ]; then
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
+        mv kubectl "$kubectlBin"
+        chmod +x "$kubectlBin"
+    else
+        echo "Kubectl is already installed."
+    fi
 }
 
 # https://sdkman.io/install/
@@ -271,6 +286,7 @@ install_wrapper
 install_terra
 install_terragrunt
 install_terraform
+install_kubectl
 install_sdkman
 
 # TODO: same of the line 261
