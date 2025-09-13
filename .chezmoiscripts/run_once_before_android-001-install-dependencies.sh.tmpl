@@ -50,6 +50,7 @@ utilities=(
     "which"             # it performs command lookups
     "mlocate"           # it performs file searches (locate and updatedb)
     "openssh"           # used to clone Git repositories and also authentication
+    "parallel"          # it runs many threads of a command at the same time
 )
 apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
