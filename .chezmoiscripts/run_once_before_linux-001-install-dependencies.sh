@@ -41,6 +41,7 @@ utilities=(
     "expect"            # it's for automating interactive applications (used in some scripts)
     "aria2c"            # cURL alternative with many features
     "file"              # it's for determining file types
+    "parallel"          # it runs many threads of a command at the same time
 )
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
