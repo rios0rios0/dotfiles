@@ -161,6 +161,20 @@ install_terraform() {
 EOF
 }
 
+# https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
+install_kubectl() {
+    binPath="$HOME/.local/bin"
+    kubectlBin="$binPath/kubectl"
+
+    if [ ! -f "$kubectlBin" ]; then
+        curl -LO "https://dl.k8s.io/release/$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/arm64/kubectl"
+        mv kubectl "$kubectlBin"
+        chmod +x "$kubectlBin"
+    else
+        echo "Kubectl is already installed."
+    fi
+}
+
 # https://sdkman.io/install/
 install_sdkman() {
     sdkPath="$HOME/.sdkman"
