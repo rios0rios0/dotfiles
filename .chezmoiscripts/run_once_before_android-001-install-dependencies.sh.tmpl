@@ -277,6 +277,51 @@ install_1password_cli() {
 EOF
 }
 
+# https://github.com/bajrangCoder/acode-plugin-acodex
+install_acodex() {
+    binPath="$HOME/.local/bin"
+    axsBin="$binPath/axs"
+
+    if [ ! -f "$axsBin" ]; then
+        # detect architecture
+        case $(uname -m) in
+            armv7l | armv8l)
+                ARCH="android-armv7"
+                ;;
+            aarch64)
+                ARCH="android-arm64"
+                ;;
+            x86_64)
+                ARCH="android-x86_64"
+                ;;
+            *)
+                echo "Unsupported architecture for AcodeX. Skipping installation."
+                return
+                ;;
+        esac
+
+        echo "Installing AcodeX Terminal Emulator (axs) for $ARCH architecture..."
+        
+        # Create .local/bin directory if it doesn't exist
+        mkdir -p "$binPath"
+        
+        # Download and install the binary
+        BASE_URL="https://github.com/bajrangCoder/acodex_server/releases/latest/download"
+        FILE_NAME="axs-$ARCH"
+        DOWNLOAD_URL="$BASE_URL/$FILE_NAME"
+        
+        if curl --progress-bar --fail -L "$DOWNLOAD_URL" -o "$axsBin"; then
+            chmod +x "$axsBin"
+            echo "AcodeX Terminal Emulator (axs) installed successfully."
+        else
+            echo "Failed to download AcodeX Terminal Emulator. Please check your connection."
+            rm -f "$axsBin"
+        fi
+    else
+        echo "AcodeX Terminal Emulator (axs) is already installed."
+    fi
+}
+
 install_oh_my_zsh
 
 # TODO: building Go versions on Termux are breaking, since they don't recognize system critical path (like /etc/resolv.conf) leading to DNS errors
@@ -297,6 +342,7 @@ install_pyenv
 
 install_azure_cli
 install_1password_cli
+install_acodex
 
 # =========================================================================================================
 # resolv.config
