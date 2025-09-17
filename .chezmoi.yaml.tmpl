@@ -6,3 +6,8 @@ onePassword:
 encryption: "age"
 age:
   identity: "{{ .chezmoi.homeDir }}/.ssh/chezmoi"
+data:
+  onepassword:
+    # 1Password account identifier (shorthand, subdomain, or email)
+    # If not specified, will attempt to auto-detect the correct account
+    account: "{{ env "ONEPASSWORD_ACCOUNT" | default "my" }}"
