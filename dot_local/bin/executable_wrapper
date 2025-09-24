@@ -1,7 +1,7 @@
 #!/data/data/com.termux/files/usr/bin/bash
 
-# all installed binaries inside host, are available inside proot
-# so, there's no need to install them inside proot again
+# All host-installed binaries are visible inside a proot session via binds, but they have different needs,
+# that's why each bind below, describe different needs of each binary which is being executed.
 
 export PROOTNOCALL_VERIFY=1
 export PROOT_LINK2SYMLINK=1
@@ -9,6 +9,7 @@ export PROOT_VERBOSE=0
 
 workspace="/root/workspace"
 proot-distro login alpine \
+    --bind $HOME/.local/bin:/root/.local/bin \
     --bind $HOME/.azure:/root/.azure \
     --bind $(pwd):$workspace \
     --work-dir $workspace -- "$@"

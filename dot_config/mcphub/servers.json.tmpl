@@ -4,10 +4,10 @@
       "command": "npx",
       "args": ["-y", "@azure/mcp-server@latest"],
       "env": {
-        "AZURE_CLIENT_ID": "{{ onepasswordRead "op://Private/Azure Client ID/credential" "my" }}",
-        "AZURE_CLIENT_SECRET": "{{ onepasswordRead "op://Private/Azure Client Secret/credential" "my" }}",
-        "AZURE_TENANT_ID": "{{ onepasswordRead "op://Private/Azure Tenant ID/credential" "my" }}",
-        "AZURE_SUBSCRIPTION_ID": "{{ onepasswordRead "op://Private/Azure Subscription ID/credential" "my" }}",
+        "AZURE_CLIENT_ID": "onepasswordRead 'op://Private/Azure Client ID/credential' 'my'",
+        "AZURE_CLIENT_SECRET": "onepasswordRead 'op://Private/Azure Client Secret/credential' 'my'",
+        "AZURE_TENANT_ID": "onepasswordRead 'op://Private/Azure Tenant ID/credential' 'my'",
+        "AZURE_SUBSCRIPTION_ID": "onepasswordRead 'op://Private/Azure Subscription ID/credential' 'my'",
         "VENDOR_URL": "https://github.com/microsoft/mcp/tree/main/servers/Azure.Mcp.Server"
       }
     },
@@ -22,9 +22,9 @@
       "command": "npx",
       "args": ["-y", "opensearch-mcp-server@latest"],
       "env": {
-        "OPENSEARCH_HOSTS": "{{ onepasswordRead "op://Private/OpenSearch Hosts/credential" "my" }}",
-        "OPENSEARCH_USERNAME": "{{ onepasswordRead "op://Private/OpenSearch Username/credential" "my" }}",
-        "OPENSEARCH_PASSWORD": "{{ onepasswordRead "op://Private/OpenSearch Password/credential" "my" }}",
+        "OPENSEARCH_HOSTS": "onepasswordRead 'op://Private/OpenSearch Hosts/credential' 'my'",
+        "OPENSEARCH_USERNAME": "onepasswordRead 'op://Private/OpenSearch Username/credential' 'my'",
+        "OPENSEARCH_PASSWORD": "onepasswordRead 'op://Private/OpenSearch Password/credential' 'my'",
         "VENDOR_URL": "https://github.com/opensearch-project/opensearch-mcp-server-py/blob/main/USER_GUIDE.md"
       }
     },
@@ -32,26 +32,25 @@
       "command": "npx",
       "args": ["-y", "elasticsearch-mcp-server@latest"],
       "env": {
-        "ELASTICSEARCH_HOSTS": "{{ onepasswordRead "op://Private/Elasticsearch Hosts/credential" "my" }}",
-        "ELASTICSEARCH_USERNAME": "{{ onepasswordRead "op://Private/Elasticsearch Username/credential" "my" }}",
-        "ELASTICSEARCH_PASSWORD": "{{ onepasswordRead "op://Private/Elasticsearch Password/credential" "my" }}"
+        "ELASTICSEARCH_HOSTS": "onepasswordRead 'op://Private/Elasticsearch Hosts/credential' 'my'",
+        "ELASTICSEARCH_USERNAME": "onepasswordRead 'op://Private/Elasticsearch Username/credential' 'my'",
+        "ELASTICSEARCH_PASSWORD": "onepasswordRead 'op://Private/Elasticsearch Password/credential' 'my'"
       }
     },
     "GitHub": {
       "command": "npx",
       "args": ["-y", "@modelcontextprotocol/server-github@latest"],
       "env": {
-{{- $githubToken := onepasswordRead "op://Private/GitHub Personal Access Token/credential" "my" }}
-        "GITHUB_PERSONAL_ACCESS_TOKEN": "{{ $githubToken }}",
+        "GITHUB_PERSONAL_ACCESS_TOKEN": "onepasswordRead 'op://Private/GitHub Personal Access Token/credential' 'my'",
         "VENDOR_URL": "https://docs.github.com/en/copilot/how-tos/provide-context/use-mcp/use-the-github-mcp-server"
       }
     },
     "Azure DevOps": {
       "type": "stdio", 
       "command": "npx",
-      "args": ["-y", "@azure-devops/mcp@next", "{{ onepasswordRead "op://Private/Azure DevOps Organization/credential" "my" }}"],
+      "args": ["-y", "@azure-devops/mcp@next", "onepasswordRead 'op://Private/Azure DevOps Organization/credential' 'my'"],
       "env": {
-        "ADO_ORGANIZATION": "{{ onepasswordRead "op://Private/Azure DevOps Organization/credential" "my" }}",
+        "ADO_ORGANIZATION": "onepasswordRead 'op://Private/Azure DevOps Organization/credential' 'my'",
         "VENDOR_URL": "https://github.com/microsoft/azure-devops-mcp"
       }
     },
@@ -65,12 +64,12 @@
       "command": "npx",
       "args": ["@browserbasehq/mcp-server-browserbase",
         "--modelName", "anthropic/claude-3-5-sonnet-latest",
-        "--modelApiKey", "{{ onepasswordRead "op://Private/Anthropic API Key/credential" "my" }}"
+        "--modelApiKey", "onepasswordRead 'op://Private/Anthropic API Key/credential' 'my'"
       ],
       "env": {
-        "BROWSERBASE_API_KEY": "{{ onepasswordRead "op://Private/Browserbase API Key/credential" "my" }}",
-        "BROWSERBASE_PROJECT_ID": "{{ onepasswordRead "op://Private/Browserbase Project ID/credential" "my" }}",
-        "GEMINI_API_KEY": "{{ onepasswordRead "op://Private/Gemini API Key/credential" "my" }}",
+        "BROWSERBASE_API_KEY": "onepasswordRead 'op://Private/Browserbase API Key/credential' 'my'",
+        "BROWSERBASE_PROJECT_ID": "onepasswordRead 'op://Private/Browserbase Project ID/credential' 'my'",
+        "GEMINI_API_KEY": "onepasswordRead 'op://Private/Gemini API Key/credential' 'my'",
         "VENDOR_URL": "https://github.com/browserbase/mcp-server-browserbase?tab=readme-ov-file"
       }
     },
@@ -89,8 +88,8 @@
       "command": "npx",
       "args": [
         "-y", "@smithery/cli@latest", "run", "@smithery-ai/server-sequential-thinking",
-        "--key", "{{ onepasswordRead "op://Private/Smithery API Key/credential" "my" }}",
-        "--profile", "{{ onepasswordRead "op://Private/Smithery Profile/credential" "my" }}"
+        "--key", "onepasswordRead 'op://Private/Smithery API Key/credential' 'my'",
+        "--profile", "onepasswordRead 'op://Private/Smithery Profile/credential' 'my'"
       ],
       "env": {
         "VENDOR_URL1": "https://github.com/smithery-ai/cli",
@@ -102,8 +101,8 @@
       "command": "npx",
       "args": [
         "-y", "@smithery/cli@latest", "run", "exa",
-        "--key", "{{ onepasswordRead "op://Private/EXA Search API Key/credential" "my" }}",
-        "--profile", "{{ onepasswordRead "op://Private/EXA Search Profile/credential" "my" }}"
+        "--key", "onepasswordRead 'op://Private/EXA Search API Key/credential' 'my'",
+        "--profile", "onepasswordRead 'op://Private/EXA Search Profile/credential' 'my'"
       ],
       "env": {
         "VENDOR_URL1": "https://github.com/smithery-ai/cli",

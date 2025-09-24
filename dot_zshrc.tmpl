@@ -191,12 +191,13 @@ alias play="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema play"
 
 ###### Engineering ######################################################################################################
 ###### Cloud #######################################################################
-aws-prof() {
-  export AWS_PROFILE=$1
-}
-az-subs() {
-  az account set --subscription $1
-}
+aws-prof() { export AWS_PROFILE=$1 }
+azm-subs() { az account set --subscription $1 }
+{{- if eq .chezmoi.os "android" }}
+alias terraw="wrapper terra"            # when called, the other 2 will be inside proot already
+alias terraformw="wrapper terraform"    # useful when needed to call alone (it might not be needed)
+alias terragruntw="wrapper terragrunt"  # useful when needed to call alone (it might not be needed)
+{{- end }}
 
 ###### K8s #########################################################################
 export KREW_BIN="${KREW_ROOT:-$HOME/.krew}/bin" && export PATH=$KREW_BIN:$PATH

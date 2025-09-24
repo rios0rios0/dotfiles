@@ -51,6 +51,8 @@ utilities=(
     "mlocate"           # it performs file searches (locate and updatedb)
     "openssh"           # used to clone Git repositories and also authentication
     "parallel"          # it runs many threads of a command at the same time
+    "rsync"             # provides file sync function
+    "dnsutils"          # provides "nslookup" function
 )
 apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
@@ -102,63 +104,43 @@ install_gvm() {
 }
 
 install_wrapper() {
-  proot-distro install alpine
+  distro="alpine"
+  profilePath="/etc/profile"
+
+  proot-distro install "$distro"
+
+  proot-distro login "$distro" -- sh -c "
+      if grep -Fq '\$HOME/.local/bin' \"$profilePath\" 2>/dev/null; then
+          echo 'proot PATH already patched.'
+      else
+          # append the literal $HOME form (keep $ unexpanded inside the file)
+          printf '%s\n' 'export PATH=\$PATH:\$HOME/.local/bin' >> \"$profilePath\"
+          echo 'proot PATH patched.'
+      fi
+  "
 }
 
 # github.com/rios0rios0/terra
+# https://terragrunt.gruntwork.io/docs/getting-started/install/
+# https://developer.hashicorp.com/terraform/install
 install_terra() {
     # TODO: can't avoid repetition?
-    binPath="/usr/bin"
+    binPath="$HOME/.local/bin"
     terraBin="$binPath/terra"
 
-    if proot-distro login alpine -- bash -c "[ ! -f "$terraBin" ]"; then
+    if [ ! -f "$terraBin" ]; then
         sourcePath="$HOME/Development/github.com/rios0rios0/terra"
         if [ ! -d "$sourcePath" ]; then
             git clone https://github.com/rios0rios0/terra.git $sourcePath
         fi
-        cd $sourcePath
-        # make sure correct environment before installing shell
-        export PATH="$PATH:$HOME/go/bin"
-        make build
-        proot-distro copy bin/terra alpine:/usr/bin
+        cd $sourcePath && git fetch --all && git pull --rebase
+
+        make install
     else
         echo "Terra is already installed."
     fi
-}
 
-# https://terragrunt.gruntwork.io/docs/getting-started/install/
-install_terragrunt() {
-    proot-distro login alpine -- bash <<-'EOF'
-        binPath="/usr/bin"
-        terragruntBin="$binPath/terragrunt"
-
-        if [ ! -f "$terragruntBin" ]; then
-            curl -LO "https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_arm64"
-            mv terragrunt_linux_arm64 "$terragruntBin"
-            chmod +x "$terragruntBin"
-        else
-            echo "Terragrunt is already installed."
-        fi
-EOF
-}
-
-# https://developer.hashicorp.com/terraform/install
-install_terraform() {
-    proot-distro login alpine -- bash <<-'EOF'
-        binPath="/usr/bin"
-        terraformBin="$binPath/terraform"
-    
-        if [ ! -f "$terraformBin" ]; then
-            wget https://releases.hashicorp.com/terraform/1.12.2/terraform_1.12.2_linux_arm64.zip
-            unzip terraform_1.12.2_linux_arm64.zip -d "$binPath"
-            mv "$binPath/terraform" "$terraformBin"
-            rm terraform_1.12.2_linux_arm64.zip
-            rm "$binPath/LICENSE.txt"
-            chmod +x "$terraformBin"
-        else
-            echo "Terraform is already installed."
-        fi
-EOF
+    terra update
 }
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
@@ -253,6 +235,7 @@ install_azure_cli() {
     if [ ! -d "$azPath" ]; then
         # TODO: when installed via Pyenv it should be loaded first on the current shell
         pip install azure-cli
+        az extension add --name azure-devops
     else
         echo "AZ is already installed."
     fi
@@ -284,8 +267,6 @@ install_gvm
 
 install_wrapper
 install_terra
-install_terragrunt
-install_terraform
 install_kubectl
 install_sdkman
 
@@ -317,7 +298,6 @@ configure_neovim() {
         rm -rf "$nvimPath/.git"
         
         echo "AstroVIM template installed. Starting nvim to initialize plugins..."
-        # Start nvim in headless mode to install plugins
         nvim --headless -c 'autocmd User PackerComplete quitall' -c 'PackerSync'
         
         echo "NeoVIM with AstroVIM configured successfully."

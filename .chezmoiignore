@@ -50,8 +50,6 @@ pyvenv.cfg
 {{- /* Android‑exclusive files – only for Android. When not running Android, ignore them. */ -}}
 {{- if ne .chezmoi.os "android" }}
 .chezmoiscripts/android-*.sh
-.local/bin/terraform
-.local/bin/terragrunt
 .local/bin/wrapper
 .config/nvim
 .config/mcphub
