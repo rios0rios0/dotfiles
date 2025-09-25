@@ -2,9 +2,8 @@
 
 #!/data/data/com.termux/files/usr/bin/bash
 
-# this can't be an alias/function, because it needs to be sourced from different shells and contexts
-# and it just works inside proot context (because the folders it uses, that must be owned by the same user)
-wrapper op "$@"
+# this can't be an alias/function, because it needs to be sourced from different shells and contexts (eg. Chezmoi)
+wrapper op_linux_arm64 "$@"
 
 {{- else -}}
 

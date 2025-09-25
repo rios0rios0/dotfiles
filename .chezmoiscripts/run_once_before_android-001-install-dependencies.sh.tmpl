@@ -243,21 +243,19 @@ install_azure_cli() {
 
 # https://1password.com/downloads/command-line/
 install_1password_cli() {
-    proot-distro login alpine -- bash <<-'EOF'
-        binPath="/usr/bin"
-        opBin="$binPath/op"
+    binPath="$HOME/.local/bin"
+    opBin="$binPath/op_linux_arm64"
 
-        if [ ! -f "$opBin" ]; then
-            ARCH="arm64"
-            wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.31.1/op_linux_${ARCH}_v2.31.1.zip" -O op.zip
-            unzip -d op op.zip
-            mv op/op "$binPath"
-            rm -rf op.zip op
-            chmod +x "$opBin"
-        else
-            echo "1Password CLI is already installed."
-        fi
-EOF
+    if [ ! -f "$opBin" ]; then
+        ARCH="arm64"
+        wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.31.1/op_linux_${ARCH}_v2.31.1.zip" -O op.zip
+        unzip -d op op.zip
+        mv op/op "$opBin"
+        chmod +x "$opBin"
+        rm -rf op.zip op
+    else
+        echo "1Password CLI is already installed."
+    fi
 }
 
 install_oh_my_zsh

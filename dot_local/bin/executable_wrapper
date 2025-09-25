@@ -10,6 +10,7 @@ export PROOT_VERBOSE=0
 workspace="/root/workspace"
 proot-distro login alpine \
     --bind $HOME/.local/bin:/root/.local/bin \
+    --bind $HOME/.config/op:/root/.config/op \
     --bind $HOME/.azure:/root/.azure \
     --bind $(pwd):$workspace \
     --work-dir $workspace -- "$@"
