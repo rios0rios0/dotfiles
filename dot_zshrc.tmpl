@@ -215,7 +215,7 @@ export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 gvmRoot="$HOME/.gvm"
 if [ -d "$gvmRoot" ]; then
     [[ -s "$gvmRoot/scripts/gvm" ]] && source "$gvmRoot/scripts/gvm"
-    gvm use go1.24.5
+    [ -f "$(pwd)/go.mod" ] && gvm install go1.25.0 && gvm use go1.25.0
 fi
 
 ###### Java ########################################################################
