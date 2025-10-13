@@ -116,6 +116,9 @@ Supporting article: https://www.reddit.com/r/termux/comments/zu8ets/do_not_insta
 - https://www.chezmoi.io/reference/special-files-and-directories/chezmoiscripts/
 - https://masterminds.github.io/sprig/
 
+## Inspiration
+- https://github.com/romkatv/dotfiles-public
+
 ## TODO:
 - check how to avoid 1Password duplicated calls
 - check how to use variables from an included template
