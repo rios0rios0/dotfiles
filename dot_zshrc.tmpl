@@ -215,7 +215,23 @@ export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 gvmRoot="$HOME/.gvm"
 if [ -d "$gvmRoot" ]; then
     [[ -s "$gvmRoot/scripts/gvm" ]] && source "$gvmRoot/scripts/gvm"
-    [ -f "$(pwd)/go.mod" ] && gvm install go1.25.0 && gvm use go1.25.0
+    
+    # Detect and use Go version from go.mod if it exists
+    if [ -f "$(pwd)/go.mod" ]; then
+        goVersion=$(grep -E '^go [0-9]+\.[0-9]+' "$(pwd)/go.mod" | awk '{print $2}')
+        if [ -n "$goVersion" ]; then
+            goVersionFull="go$goVersion"
+            
+            # Check if the version is installed
+            if ! gvm list | grep -q "$goVersionFull"; then
+                echo "Installing Go version $goVersionFull..."
+                gvm install "$goVersionFull" -B
+            fi
+            
+            # Use the detected version
+            gvm use "$goVersionFull"
+        fi
+    fi
 fi
 
 ###### Java ########################################################################
