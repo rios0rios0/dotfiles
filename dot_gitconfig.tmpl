@@ -15,12 +15,12 @@
 {{- $sshCommand := "ssh" -}}
 
 {{- if eq .chezmoi.os "windows" -}}
-    {{- $program = printf "%s/AppData/Local/1Password/app/8/op-ssh-sign.exe" $windowsHome -}}
+    {{- $program = printf "%s/AppData/Local/Microsoft/WindowsApps/op-ssh-sign.exe" $windowsHome -}}
     {{- $allowedSignersFile = printf "%s/.ssh/allowed_signers" $windowsHome -}}
     {{- $excludesfile = printf "%s/.gitignore" $windowsHome -}}
     {{- $sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe" -}}
 {{- else if and (eq .chezmoi.os "linux") (contains .chezmoi.kernel "microsoft") -}}
-    {{- $program = printf "/mnt/c/Users/%s/AppData/Local/1Password/app/8/op-ssh-sign-wsl" $username -}}
+    {{- $program = printf "/mnt/c/Users/%s/AppData/Local/Microsoft/WindowsApps/op-ssh-sign-wsl.exe" $username -}}
     {{- $sshCommand = "ssh.exe" -}}
 {{- else if eq .chezmoi.os "android" -}}
     {{- $program = "ssh-keygen" -}}
