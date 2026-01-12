@@ -4,7 +4,7 @@
     {
       "alignment": "left",
       "segments": [
-		{
+        {
           "foreground": "#444444",
           "style": "plain",
           "template": "\u256d\u2500",
@@ -18,15 +18,15 @@
           "template": " {{ if .WSL }}WSL at {{ end }}{{.Icon}} ",
           "type": "os"
         },
-		{
-		  "background": "#1c1c1c",
+        {
+          "background": "#1c1c1c",
           "foreground": "#6c6c6c",
           "style": "plain",
           "template": "\uE0B1",
           "type": "text"
         },
-		{
-		  "background": "#1c1c1c",
+        {
+          "background": "#1c1c1c",
           "foreground": "#ff0000",
           "style": "plain",
           "template": " \uf07c",
@@ -35,7 +35,7 @@
         {
           "background": "#1c1c1c",
           "foreground": "#0000ff",
-		  "trailing_diamond": "\ue0b0",
+          "trailing_diamond": "\ue0b0",
           "properties": {
             "home_icon": "~",
             "style": "full"
@@ -192,8 +192,8 @@
           "template": " {{ if gt .Code 0 }}{{ reason .Code }}{{ else }}✔{{ end }} ",
           "type": "status"
         },
-		{
-		  "background": "#1c1c1c",
+        {
+          "background": "#1c1c1c",
           "foreground": "#6c6c6c",
           "style": "plain",
           "template": "\uE0B3",
@@ -205,7 +205,7 @@
           "invert_powerline": true,
           "style": "diamond",
           "template": " {{ .CurrentDate | date .Format }} \uf017 ",
-		  "trailing_diamond": "\ue0b0",
+          "trailing_diamond": "\ue0b0",
           "type": "time"
         }
       ],

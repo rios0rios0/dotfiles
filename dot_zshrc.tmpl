@@ -214,21 +214,21 @@ export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 
 gvmRoot="$HOME/.gvm"
 if [ -d "$gvmRoot" ]; then
-    [[ -s "$gvmRoot/scripts/gvm" ]] && source "$gvmRoot/scripts/gvm"
-    
-    # Detect and use Go version from go.mod if it exists
+
+    # detect and use Go version from go.mod if it exists
     if [ -f "$(pwd)/go.mod" ]; then
         goVersion=$(grep -E '^go [0-9]+\.[0-9]+' "$(pwd)/go.mod" | awk '{print $2}')
         if [ -n "$goVersion" ]; then
             goVersionFull="go$goVersion"
-            
-            # Check if the version is installed
+
+            # check if the version is installed
+            [[ -s "$gvmRoot/scripts/gvm" ]] && source "$gvmRoot/scripts/gvm"
             if ! gvm list | grep -q "$goVersionFull"; then
                 echo "Installing Go version $goVersionFull..."
                 gvm install "$goVersionFull" -B
             fi
-            
-            # Use the detected version
+
+            # use the detected version
             gvm use "$goVersionFull"
         fi
     fi

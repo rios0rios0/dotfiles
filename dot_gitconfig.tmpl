@@ -19,8 +19,9 @@
     {{- $allowedSignersFile = printf "%s/.ssh/allowed_signers" $windowsHome -}}
     {{- $excludesfile = printf "%s/.gitignore" $windowsHome -}}
     {{- $sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe" -}}
-{{- else if and (eq .chezmoi.os "linux") (contains .chezmoi.kernel "microsoft") -}}
+{{- else if and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
     {{- $program = printf "/mnt/c/Users/%s/AppData/Local/Microsoft/WindowsApps/op-ssh-sign-wsl.exe" $username -}}
+    {{- $allowedSignersFile = printf "/mnt/c/Users/%s/.ssh/allowed_signers" $username -}}
     {{- $sshCommand = "ssh.exe" -}}
 {{- else if eq .chezmoi.os "android" -}}
     {{- $program = "ssh-keygen" -}}
@@ -49,19 +50,15 @@
     name = "{{ $defaultUsername }}"
     email = "{{ $defaultUserEmail }}"
     signingkey = "{{ $defaultUserSigningkey }}"
-
 [gpg]
     format = ssh
-
 [gpg "ssh"]
     program = "{{ $program }}"
     allowedSignersFile = "{{ $allowedSignersFile }}"
-
 [commit]
     gpgsign = true
 [tag]
     forceSignAnnotated = true
-
 [alias]
     pom = push origin main -u
     cim = "!f() { git commit -m \"$*\"; }; f"
@@ -109,13 +106,11 @@
     {{- end -}}
   {{- end -}}
 {{- end }}
-
 [core]
     autocrlf = input
     editor = vim
     excludesfile = "{{ $excludesfile }}"
     sshCommand = "{{ $sshCommand }}"
-
 [merge]
     commit = yes
     ff = yes
