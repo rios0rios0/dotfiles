@@ -58,5 +58,4 @@ pyvenv.cfg
 {{- /* Additional Android exclusions: For example, ignore .gitconfig on Android even if it’s normally managed elsewhere. */ -}}
 {{- if eq .chezmoi.os "android" }}
 .age_recipients
-.cursor
 {{- end }}
