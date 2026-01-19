@@ -49,7 +49,7 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
 
 2. Install some dependencies using `winget` in PowerShell:
     ```powershell
-    winget install Git.Git
+    winget install Git.Git # if you have ASLR protection enabled, install Git from https://git-scm.com/download/win
     winget install FiloSottile.age # add the age executable to the PATH manually
     winget install 1password-cli
     ```

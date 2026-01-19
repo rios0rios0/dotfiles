@@ -1,5 +1,5 @@
 # Retrieve installed packages in JSON format and extract their IDs.
-$installedPackageData = winget list --source winget --output json | ConvertFrom-Json
+$installedPackageData = winget export --output allPackages.json # TODO: error here
 $installedPackageIds  = $installedPackageData | ForEach-Object { $_.Id }
 
 function Is-PackageInstalled {
