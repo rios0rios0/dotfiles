@@ -132,7 +132,7 @@ plugins=(
   ssh-agent
   {{- end }}
   aws azure heroku terraform helm
-  docker docker-compose kubectl kubectx
+  kubectl kubectx
   git github git-flow git-flow-avh git-hubflow
   golang
   mvn gradle spring
@@ -140,6 +140,11 @@ plugins=(
   composer laravel5 symfony6
   python pip pipenv virtualenv pep8
 )
+
+# conditionally add docker plugins if docker is available (avoids errors when Docker Desktop is not running)
+if command -v docker &>/dev/null; then
+  plugins+=(docker docker-compose)
+fi
 
 # for a full list of active aliases, run `alias`
 source $ZSH/oh-my-zsh.sh
@@ -218,8 +223,10 @@ export KREW_BIN="${KREW_ROOT:-$HOME/.krew}/bin" && export PATH=$KREW_BIN:$PATH
 source "$HOME/.scripts/linux-engineering-detect-kube-config-files.sh"
 
 ###### Docker ######################################################################
-zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
-
+# only load docker completions and aliases if docker is available (avoids errors when Docker Desktop is not running)
+if command -v docker &>/dev/null; then
+  zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
+fi
 source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
 
 ###### GoLang ######################################################################
