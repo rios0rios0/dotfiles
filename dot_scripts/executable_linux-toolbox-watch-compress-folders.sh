@@ -1,133 +1,210 @@
 #!/bin/bash
 #
-# This script watches specific directories for changes (create, modify, delete, or move),
-# archives them using tar (ensuring the archive is fully built before handing off to chezmoi),
-# and then updates chezmoi with the encrypted archive.
+# This script watches specific directories for changes and archives them using chezmoi.
+# It uses a single global lock to ensure only one instance runs across all terminals.
 #
-# It uses a file lock mechanism (flock) so that duplicate watchers on the same directory are not started.
-# All log messages are written to a dedicated daily log file (with logs older than one day deleted)
-# and each log line is prefixed with a timestamp.
+# Lock strategy: Single lock for all folders is preferred because:
+# - inotifywait efficiently watches multiple directories in one process
+# - Simpler code with fewer race conditions
+# - Lock is automatically released when process exits (flock releases on fd close)
+#
+
+set -euo pipefail
+
+#######################################
+# Configuration
+#######################################
+LOCK_FILE="/tmp/linux-toolbox-watch-compress-folders.lock"
+LOG_FILE="/tmp/linux-toolbox-watch-compress-folders.log"
+PID_FILE="/tmp/linux-toolbox-watch-compress-folders.pid"
+DEBOUNCE_TIME=5
+MAX_LOG_AGE_SECONDS=86400  # 1 day in seconds
+
+WATCH_DIRS=(
+  "$HOME/.histdb"
+  "$HOME/.john"
+  "$HOME/.kube/config-files"
+  "$HOME/.sqlmap"
+)
+
+#######################################
+# Log Rotation Function
+# Keeps only logs from the last 24 hours
+#######################################
+rotate_logs() {
+  if [[ ! -f "$LOG_FILE" ]]; then
+    return
+  fi
+
+  local temp_file="${LOG_FILE}.tmp"
+  local cutoff_time
+  cutoff_time=$(date -d "1 day ago" '+%Y-%m-%d %H:%M:%S' 2>/dev/null || date -v-1d '+%Y-%m-%d %H:%M:%S' 2>/dev/null || echo "")
+
+  if [[ -z "$cutoff_time" ]]; then
+    # If date command doesn't support these options, just truncate if file is too large (>1MB)
+    local file_size
+    file_size=$(stat -f%z "$LOG_FILE" 2>/dev/null || stat -c%s "$LOG_FILE" 2>/dev/null || echo "0")
+    if (( file_size > 1048576 )); then
+      tail -n 1000 "$LOG_FILE" > "$temp_file" && mv "$temp_file" "$LOG_FILE"
+    fi
+    return
+  fi
+
+  # Keep only lines newer than cutoff time
+  awk -v cutoff="$cutoff_time" '$0 >= cutoff || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}/' "$LOG_FILE" > "$temp_file" 2>/dev/null && mv "$temp_file" "$LOG_FILE" || true
+}
 
 #######################################
 # Logging Function
 #######################################
 log() {
-    echo "$(date '+%Y-%m-%d %H:%M:%S') $*"
+  echo "$(date '+%Y-%m-%d %H:%M:%S') $*" >> "$LOG_FILE"
 }
-export -f log
 
 #######################################
-# Setup Logging
+# Check if watcher is already running
 #######################################
-LOG_DIR="/tmp/inotify_watcher"
-mkdir -p "$LOG_DIR"
-
-# Remove log files older than 1 day.
-find "$LOG_DIR" -type f -mtime +1 -delete
-
-LOG_FILE="$LOG_DIR/$(date '+%Y-%m-%d').log"
+if [[ -f "$PID_FILE" ]]; then
+  existing_pid=$(cat "$PID_FILE" 2>/dev/null || echo "")
+  if [[ -n "$existing_pid" ]] && kill -0 "$existing_pid" 2>/dev/null; then
+    # Watcher is already running, exit silently
+    exit 0
+  fi
+  # Stale PID file, remove it
+  rm -f "$PID_FILE"
+fi
 
 #######################################
-# Configuration
+# Acquire lock (non-blocking)
+# Lock is automatically released when:
+# - Process exits normally
+# - Process is killed
+# - Terminal closes (OS closes all file descriptors)
 #######################################
-WATCH_DIRS=(
-    "$HOME/.histdb"
-    "$HOME/.john"
-    "$HOME/.kube/config-files"
-    "$HOME/.sqlmap"
-)
+exec 9>"$LOCK_FILE"
+if ! flock -n 9; then
+  # Another instance is starting up, exit silently
+  exit 0
+fi
 
-# Debounce time in seconds (e.g., wait 2 seconds after an event before archiving)
-DEBOUNCE_TIME=2
+# Write our PID
+echo $$ > "$PID_FILE"
 
-# Associative array to hold the timestamp of the last archive per directory (requires Bash 4+)
-declare -A LAST_ARCHIVE
+# Rotate logs before starting
+rotate_logs
+
+log "Starting folder watcher (PID: $$)"
+
+#######################################
+# Cleanup on exit
+#######################################
+cleanup() {
+  log "Stopping folder watcher (PID: $$)"
+  rm -f "$PID_FILE"
+  # Lock file is kept (flock releases automatically on fd close)
+  # Kill all child processes
+  pkill -P $$ 2>/dev/null || true
+}
+trap cleanup EXIT
 
 #######################################
 # Archive Function
-# Writes the archive to a file then invokes chezmoi to add it.
+# Creates a tar archive in the original directory location
+# and adds it to chezmoi with encryption
 #######################################
 archive_dir() {
-    local dir="$1"
-    local tar_file
-    tar_file="${dir//\//-}.tar.gz"
-    log "Archiving directory [$dir] to file [$tar_file]..."
+  local dir="$1"
+  local dir_name
+  local parent_dir
+  local tar_file
 
-    if tar -czf "$tar_file" -C "$dir" .; then
-        log "Archive complete: [$tar_file]"
-        log "Running chezmoi on archive: [$tar_file]"
-        chezmoi add --encrypt --recipients-file "$HOME/.age_recipients" "./$tar_file"
-        log "chezmoi.add complete for [$tar_file]"
+  dir_name=$(basename "$dir")
+  parent_dir=$(dirname "$dir")
+  tar_file="${parent_dir}/${dir_name}.tar"
+
+  if [[ ! -d "$dir" ]]; then
+    log "Directory does not exist: [$dir]"
+    return 1
+  fi
+
+  log "Archiving directory: [$dir] -> [$tar_file]"
+
+  # Create tar archive in the same parent directory as the source
+  if tar -cf "$tar_file" -C "$parent_dir" "$dir_name" 2>>"$LOG_FILE"; then
+    log "Archive created: [$tar_file]"
+
+    # Add to chezmoi with encryption
+    if chezmoi add --encrypt "$tar_file" 2>>"$LOG_FILE"; then
+      log "Successfully added to chezmoi: [$tar_file]"
     else
-        log "Error: Failed to create archive for [$dir]."
+      log "Failed to add to chezmoi: [$tar_file]"
     fi
+
+    # Clean up the tar file after adding to chezmoi
+    rm -f "$tar_file"
+  else
+    log "Failed to create archive for: [$dir]"
+  fi
 }
 
 #######################################
-# Watch Function
-#
-# Uses process substitution so that the while-loop runs in the current shell
-# (preserving variables such as the associative array for debouncing).
-# The inotifywait command now includes the -q flag to silence inotifywait’s default
-# informational messages (e.g., "Watches established." and "Setting up watches.").
+# Build watch directories list (only existing ones)
 #######################################
-start_watching() {
-    local dir="$1"
-    log "Starting watcher for directory: [$dir]"
-
-    while read -r changed_file; do
-        log "Change detected: [$changed_file] in directory [$dir]"
-        local now debounce_nano diff
-        now=$(date +%s%N)  # current time in nanoseconds
-
-        if (( DEBOUNCE_TIME > 0 )); then
-            debounce_nano=$(( DEBOUNCE_TIME * 1000000000 ))
-            if [[ -n "${LAST_ARCHIVE[$dir]}" ]]; then
-                diff=$(( now - LAST_ARCHIVE[$dir] ))
-                if (( diff < debounce_nano )); then
-                    log "Debouncing archive for [$dir] (only $(awk 'BEGIN {printf "%.2f", '"$diff"'/1000000000}') seconds since last archive)"
-                    continue
-                fi
-            fi
-            LAST_ARCHIVE[$dir]=$now
-        fi
-
-        archive_dir "$dir"
-    done < <(inotifywait -q -m -r -e create,modify,delete,move --format '%w%f' "$dir")
-}
-
-#######################################
-# Main: Start Watchers with Lock Mechanism
-#
-# For each directory in WATCH_DIRS, a subshell is launched. Each subshell:
-# - Redirects output to the daily log file.
-# - Acquires a file lock using a sanitized lock file name.
-# - Starts the watcher if the lock is obtained.
-#######################################
+existing_dirs=()
 for dir in "${WATCH_DIRS[@]}"; do
-    (
-        # Redirect all output of this subshell to the log file.
-        exec >> "$LOG_FILE" 2>&1
-
-        # Uncomment the following block if you want to ensure the log() function exists here.
-        if ! type log >/dev/null 2>&1; then
-            log() {
-                echo "$(date '+%Y-%m-%d %H:%M:%S') $*"
-            }
-        fi
-
-        # Create a lock file in /tmp (sanitize the directory name for a safe filename).
-        lock_file="/tmp/inotify_watcher_$(echo "$dir" | sed 's/[^a-zA-Z0-9]/_/g').lock"
-        exec {lock_fd}> "$lock_file" || { log "Cannot open lock file $lock_file"; exit 1; }
-
-        if ! flock -n "$lock_fd"; then
-            log "Watcher already running for [$dir] (lock file busy)"
-            exit 0
-        fi
-
-        start_watching "$dir"
-    ) &
+  if [[ -d "$dir" ]]; then
+    existing_dirs+=("$dir")
+    log "Will watch: [$dir]"
+  else
+    log "Skipping non-existent directory: [$dir]"
+  fi
 done
 
-# Wait for all background watchers (they run indefinitely).
-wait
+if [[ ${#existing_dirs[@]} -eq 0 ]]; then
+  log "No directories to watch, exiting"
+  exit 0
+fi
+
+#######################################
+# Check if inotifywait is available
+#######################################
+if ! command -v inotifywait &>/dev/null; then
+  log "inotifywait not found, exiting"
+  exit 1
+fi
+
+#######################################
+# Main watch loop with debouncing
+# Uses process substitution to keep the while loop in the main shell
+# so the associative array persists across iterations
+#######################################
+declare -A last_event_time
+
+# Rotate logs periodically (every hour)
+last_rotation=$(date +%s)
+
+while read -r changed_path; do
+  # Periodic log rotation (every hour)
+  now=$(date +%s)
+  if (( now - last_rotation > 3600 )); then
+    rotate_logs
+    last_rotation=$now
+  fi
+
+  # Find which watched directory this change belongs to
+  for dir in "${existing_dirs[@]}"; do
+    if [[ "$changed_path" == "$dir"* ]]; then
+      last_time="${last_event_time[$dir]:-0}"
+
+      # Debounce: skip if we archived this directory recently
+      if (( now - last_time < DEBOUNCE_TIME )); then
+        continue
+      fi
+
+      last_event_time[$dir]=$now
+      log "Change detected in: [$dir]"
+      archive_dir "$dir" &
+      break
+    fi
+  done
+done < <(inotifywait -q -m -r -e create,modify,delete,move --format '%w' "${existing_dirs[@]}" 2>>"$LOG_FILE")

@@ -2,8 +2,8 @@
 # enable Powerlevel10k instant prompt. Should stay close to the top of ~/.zshrc.
 # Initialization code that may require console input (password prompts, [y/n]
 # confirmations, etc.) must go above this block; everything else may go below.
-# Only load instant prompt if we have a real TTY (prevents errors in non-TTY contexts like zsh -i -c)
-if [[ -t 0 && -t 1 && -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
+# Removed TTY check as it was causing random fallbacks in WSL
+if [[ -r "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh" ]]; then
   source "${XDG_CACHE_HOME:-$HOME/.cache}/p10k-instant-prompt-${(%):-%n}.zsh"
 fi
 
@@ -42,11 +42,9 @@ export LESS_TERMCAP_us=$'\e[1;4;31m'
 ###### ZINIT Plugins ###############################################################
 # TODO: this should be in another file before configuration, installing those dependencies
 ######################################################
-# only load powerlevel10k in TTY environments to avoid gitstatus errors
-if [[ -t 0 && -t 1 ]]; then
-    zinit light romkatv/powerlevel10k
-    [[ ! -L $HOME/.oh-my-zsh/custom/themes/powerlevel10k ]] && ln -sf $HOME/.local/share/zinit/plugins/romkatv---powerlevel10k $HOME/.oh-my-zsh/custom/themes/powerlevel10k
-fi
+# load powerlevel10k - removed TTY check as it was causing random fallbacks in WSL
+zinit light romkatv/powerlevel10k
+[[ ! -L $HOME/.oh-my-zsh/custom/themes/powerlevel10k ]] && ln -sf $HOME/.local/share/zinit/plugins/romkatv---powerlevel10k $HOME/.oh-my-zsh/custom/themes/powerlevel10k 2>/dev/null
 ######################################################
 ######################################################
 zinit light larkery/zsh-histdb
@@ -105,8 +103,8 @@ zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
 {{- end }}
 
 ###### P10k CONFIGURATION ###############################################################################################
-# Only load p10k config in TTY environments
-[[ -t 0 && -t 1 && -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
+# load p10k config - removed TTY check as it was causing random fallbacks in WSL
+[[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
 
 
 ###### ZSH CONFIGURATION ################################################################################################
@@ -114,12 +112,8 @@ setopt HIST_FIND_NO_DUPS
 setopt HIST_IGNORE_ALL_DUPS
 
 export ZSH="$HOME/.oh-my-zsh"
-# only use powerlevel10k theme in TTY environments to avoid gitstatus errors
-if [[ -t 0 && -t 1 ]]; then
-    ZSH_THEME="powerlevel10k/powerlevel10k"
-else
-    ZSH_THEME="robbyrussell"  # fallback theme for non-TTY
-fi
+# always use powerlevel10k theme - the TTY check was causing random fallbacks in WSL
+ZSH_THEME="powerlevel10k/powerlevel10k"
 # true = if pasting URLs and other text is messed up
 DISABLE_MAGIC_FUNCTIONS="true"
 
@@ -163,8 +157,10 @@ alias cydx="$CYCLONEDX/cyclonedx-cli"
 
 ###### Files #######################################################################
 {{- if ne .chezmoi.os "android" }}
-# only run background script in interactive shells
-[[ -o interactive ]] && $HOME/.scripts/linux-toolbox-watch-compress-folders.sh &>/dev/null &
+# only run background script in interactive shells (script handles single-instance check internally)
+if [[ -o interactive ]]; then
+  (nohup "$HOME/.scripts/linux-toolbox-watch-compress-folders.sh" &>/dev/null &)
+fi
 {{- end }}
 
 alias top5size='sudo du -hs * | sort -rh | head -5'
@@ -291,9 +287,11 @@ fi
 ###### Python ######################################################################
 pyenvRoot="$HOME/.pyenv"
 if [ -d "$pyenvRoot" ]; then
-    export PYENV_ROOT="$pyenvRoot"
-    [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)"
+  export PYENV_ROOT="$pyenvRoot"
+  [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+  # Use --no-rehash to avoid lock contention and speed up shell startup
+  # Rehash happens lazily when needed instead of on every shell init
+  eval "$(pyenv init - --no-rehash)"
 fi
 
 ###### Rust ########################################################################
