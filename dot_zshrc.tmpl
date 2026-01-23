@@ -225,32 +225,16 @@ if command -v docker &>/dev/null; then
 fi
 source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
 
+###### Version Manager Utilities ###################################################
+source "$HOME/.scripts/linux-engineering-version-manager.sh"
+
 ###### GoLang ######################################################################
 export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 
 gvmRoot="$HOME/.gvm"
 if [ -d "$gvmRoot" ]; then
-    # always source GVM first to make the gvm command available
     [[ -s "$gvmRoot/scripts/gvm" ]] && source "$gvmRoot/scripts/gvm"
-
-    # detect and use Go version from go.mod if it exists (only in interactive shells)
-    if [[ -o interactive ]] && [ -f "$(pwd)/go.mod" ]; then
-        goVersion=$(grep -E '^go [0-9]+\.[0-9]+' "$(pwd)/go.mod" | awk '{print $2}')
-        if [ -n "$goVersion" ]; then
-            goVersionFull="go$goVersion"
-
-            # check if gvm command is available and the version is installed
-            if command -v gvm &>/dev/null; then
-                if ! gvm list 2>/dev/null | grep -q "$goVersionFull"; then
-                    echo "Installing Go version $goVersionFull..."
-                    gvm install "$goVersionFull" -B 2>/dev/null || echo "Warning: Failed to install $goVersionFull"
-                fi
-
-                # use the detected version (suppress errors if version doesn't exist)
-                gvm use "$goVersionFull" 2>/dev/null || true
-            fi
-        fi
-    fi
+    _vm_use_go
 fi
 
 ###### Java ########################################################################
@@ -269,29 +253,29 @@ if [ -d "$nvmRoot" ]; then
     export NVM_HOME="$nvmRoot"
     [ -s "$NVM_HOME/nvm.sh" ] && \. "$NVM_HOME/nvm.sh"
     [ -s "$NVM_HOME/bash_completion" ] && \. "$NVM_HOME/bash_completion"
-
-    # if .nvmrc exists, install (if needed) and use that version.
-    if [ -f "$(pwd)/.nvmrc" ]; then
-        nvmrc_version=$(tr -d '\r\n' < .nvmrc)
-        if ! nvm ls "$nvmrc_version" >/dev/null 2>&1; then
-            echo "Installing Node version $nvmrc_version..."
-            nvm install "$nvmrc_version"
-        fi
-        nvm use "$nvmrc_version"
-    # otherwise, if this directory looks like a Node project, try to use current/default node.
-    elif [ -f "$(pwd)/package.json" ]; then
-        nvm use || true
-    fi
+    _vm_use_node
 fi
 
 ###### Python ######################################################################
 pyenvRoot="$HOME/.pyenv"
 if [ -d "$pyenvRoot" ]; then
-  export PYENV_ROOT="$pyenvRoot"
-  [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
-  # Use --no-rehash to avoid lock contention and speed up shell startup
-  # Rehash happens lazily when needed instead of on every shell init
-  eval "$(pyenv init - --no-rehash)"
+    export PYENV_ROOT="$pyenvRoot"
+    [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+
+    # Clean up stale pyenv shim locks to prevent rehash failures
+    _vm_cleanup_pyenv_locks
+
+    # Use --no-rehash to avoid lock contention and speed up shell startup
+    # Rehash happens lazily when needed instead of on every shell init
+    eval "$(pyenv init - --no-rehash)"
+
+    # Define pyenv wrapper AFTER init to handle noclobber issues with rehash
+    # The wrapper is defined in the version manager script and handles:
+    # - Temporarily disabling noclobber (which causes "cannot overwrite" errors)
+    # - Cleaning up stale lock files before operations
+
+    # Detect and use Python version from pyproject.toml
+    _vm_use_python
 fi
 
 ###### Rust ########################################################################
