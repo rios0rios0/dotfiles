@@ -1,7 +1,10 @@
 # TODO: it's not possible to use 1password commands on this file, because it's linked with Windows .exe not installed on WSL
-{{- if eq .chezmoi.os "linux" }}
+{{- if eq .chezmoi.os "windows" }}
 onePassword:
-  command: op.exe
+  command: "op.exe"
+{{- else }}
+onePassword:
+  command: "{{ .chezmoi.homeDir }}/.local/bin/op"
 {{- end }}
 encryption: "age"
 age:
