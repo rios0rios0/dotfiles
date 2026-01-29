@@ -13,6 +13,11 @@ echo "Creating wrapper and op in ~/.local/bin..."
 # Create the .local/bin directory if it doesn't exist
 mkdir -p "$HOME/.local/bin"
 
+# Create directories that will be mounted by proot
+# These must exist before proot tries to bind them
+mkdir -p "$HOME/.config/op"
+mkdir -p "$HOME/.azure"
+
 # First, create the wrapper script that op depends on
 cat > "$HOME/.local/bin/wrapper" << 'WRAPPER_EOF'
 #!/data/data/com.termux/files/usr/bin/bash
@@ -41,6 +46,21 @@ cat > "$HOME/.local/bin/op" << 'OP_EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
 # this can't be an alias/function, because it needs to be sourced from different shells and contexts (eg. Chezmoi)
+
+# check if the user is already signed in by running 'op whoami'
+# if it fails, trigger the signin flow
+if ! ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 whoami &>/dev/null; then
+    echo "1Password: Not signed in. Initiating signin..."
+    signin_output=$(~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 signin --account my 2>&1)
+    signin_exit_code=$?
+    if [ $signin_exit_code -ne 0 ]; then
+        echo "1Password: Signin failed with exit code $signin_exit_code" >&2
+        echo "$signin_output" >&2
+        exit 1
+    fi
+    eval "$signin_output"
+fi
+
 ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 "$@"
 OP_EOF
 
