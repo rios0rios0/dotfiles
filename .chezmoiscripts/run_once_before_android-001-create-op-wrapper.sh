@@ -41,7 +41,7 @@ cat > "$HOME/.local/bin/op" << 'OP_EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
 # this can't be an alias/function, because it needs to be sourced from different shells and contexts (eg. Chezmoi)
-wrapper op_linux_arm64 "$@"
+~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 "$@"
 OP_EOF
 
 # Make op executable

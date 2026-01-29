@@ -6,7 +6,7 @@
 #
 
 # Generic function to detect version from a file and use the appropriate version manager
-# Usage: _vm_detect_and_use <language> <version_file> <extract_func> <list_cmd> <install_cmd> <use_cmd> [version_prefix]
+# Usage: _vm_detect_and_use <language> <version_file> <extract_func> <list_cmd> <install_cmd> <use_cmd> [version_prefix] [install_suffix]
 #
 # Parameters:
 #   language       - Language name for messages (e.g., "Go", "Node", "Python")
@@ -16,6 +16,7 @@
 #   install_cmd    - Command to install a version (version appended)
 #   use_cmd        - Command to use/switch to a version (version appended)
 #   version_prefix - Optional prefix to add to version (e.g., "go" for "go1.21")
+#   install_suffix - Optional flags to append after version in install command (e.g., "-B" for gvm)
 _vm_detect_and_use() {
     local language="$1"
     local version_file="$2"
@@ -24,6 +25,7 @@ _vm_detect_and_use() {
     local install_cmd="$5"
     local use_cmd="$6"
     local version_prefix="${7:-}"
+    local install_suffix="${8:-}"
 
     # Only run in interactive shells
     [[ ! -o interactive ]] && return 0
@@ -42,7 +44,7 @@ _vm_detect_and_use() {
     # Check if version is already installed
     if ! eval "$list_cmd" 2>/dev/null | grep -q "$full_version"; then
         echo "Installing $language version $full_version..."
-        eval "$install_cmd $full_version" 2>/dev/null || {
+        eval "$install_cmd $full_version $install_suffix" 2>/dev/null || {
             echo "Warning: Failed to install $language $full_version"
             return 1
         }
@@ -100,9 +102,10 @@ _vm_use_go() {
     _vm_detect_and_use "Go" "$go_mod" \
         "_vm_extract_go_version" \
         "gvm list" \
-        "gvm install -B" \
+        "gvm install" \
         "gvm use" \
-        "go"
+        "go" \
+        "-B"
 }
 
 # Wrapper function for Node version detection from .nvmrc
