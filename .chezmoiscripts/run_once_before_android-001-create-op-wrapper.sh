@@ -48,8 +48,23 @@ cat > "$HOME/.local/bin/op" << 'OP_EOF'
 # this can't be an alias/function, because it needs to be sourced from different shells and contexts (eg. Chezmoi)
 
 # check if the user is already signed in by running 'op whoami'
-# if it fails, trigger the signin flow
+# if it fails, check if accounts are configured and trigger the signin flow
 if ! ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 whoami &>/dev/null; then
+    # check if any accounts are configured (only when not signed in)
+    # using --format=json to get reliable output that can be parsed
+    accounts_json=$(~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 account list --format=json 2>/dev/null || echo "[]")
+    
+    # check if accounts array is empty
+    if [ "$accounts_json" = "[]" ] || [ -z "$accounts_json" ]; then
+        echo "1Password: No accounts configured. Adding account..."
+        ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 account add --address my.1password.com --shorthand my
+        add_exit_code=$?
+        if [ $add_exit_code -ne 0 ]; then
+            echo "1Password: Account add failed with exit code $add_exit_code" >&2
+            exit 1
+        fi
+    fi
+
     echo "1Password: Not signed in. Initiating signin..."
     signin_output=$(~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 signin --account my 2>&1)
     signin_exit_code=$?
