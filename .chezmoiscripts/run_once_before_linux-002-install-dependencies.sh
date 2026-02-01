@@ -15,7 +15,7 @@ requirements=(
     "gpg-agent"     # required for import and export GPGs
     "eza"           # it's for "ls" highlighting (https://github.com/eza-community/eza)
     "sqlite3"       # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
-    "bsdmainutils"  # hexdump is an utility for displaying file contents in hexadecimal required by GVM (Go Version Manager)
+    "bsdmainutils"  # hexdump is a utility for displaying file contents in hexadecimal required by GVM (Go Version Manager)
     "binutils"      # required by GVM (Go Version Manager)
     "bison"         # required by GVM (Go Version Manager)
     "gcc"           # required for many things and GVM
@@ -39,7 +39,7 @@ utilities=(
     "inotify-tools"     # it's for watching file changes ("inotifywait")
     "dos2unix"          # it's for converting text files between Unix and DOS formats
     "expect"            # it's for automating interactive applications (used in some scripts)
-    "aria2c"            # cURL alternative with many features
+    "aria2"             # cURL alternative with many features (command is aria2c)
     "file"              # it's for determining file types
     "parallel"          # it runs many threads of a command at the same time
 )
@@ -48,15 +48,21 @@ sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
+    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 }
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
     sudo rm -rf /home/$USER/.gvm
     bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-    gvm install go1.24.1 -B
-    go use go1.24.1
+
+    # Source GVM to make it available in the current shell
+    export GVM_ROOT="$HOME/.gvm"
+    # shellcheck source=/dev/null
+    [[ -s "$GVM_ROOT/scripts/gvm" ]] && source "$GVM_ROOT/scripts/gvm"
+
+    gvm install go1.25.5 -B
+    gvm use go1.25.5 --default
 }
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
@@ -83,8 +89,11 @@ install_krew() {
       ./"${KREW}" install krew
     )
 
-    k krew install ctx
-    k krew install ns
+    # Add krew to PATH for current session
+    export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
+
+    kubectl krew install ctx
+    kubectl krew install ns
 }
 
 # https://developer.hashicorp.com/terraform/install
@@ -104,7 +113,12 @@ install_terragrunt() {
 # https://sdkman.io/install/
 install_sdkman() {
     curl -s "https://get.sdkman.io" | bash
-    source "$HOME/.sdkman/bin/sdkman-init.sh"
+
+    # Source SDKMAN to make it available in the current shell
+    export SDKMAN_DIR="$HOME/.sdkman"
+    # shellcheck source=/dev/null
+    [[ -s "$SDKMAN_DIR/bin/sdkman-init.sh" ]] && source "$SDKMAN_DIR/bin/sdkman-init.sh"
+
     sdk install java
     sdk install gradle
 }
@@ -112,6 +126,12 @@ install_sdkman() {
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
     curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+
+    # Source NVM to make it available in the current shell
+    export NVM_DIR="$HOME/.nvm"
+    # shellcheck source=/dev/null
+    [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
+
     nvm install --lts
     npm install -g corepack
     corepack enable
@@ -122,6 +142,11 @@ install_pyenv() {
     sudo rm -rf /home/$USER/.pyenv
     curl https://pyenv.run | bash
 
+    # Source pyenv to make it available in the current shell
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init -)"
+
     # https://github.com/pyenv/pyenv/wiki#suggested-build-environment
     sudo apt install --no-install-recommends --yes build-essential libssl-dev zlib1g-dev \
       libbz2-dev libreadline-dev libsqlite3-dev curl git \
@@ -129,10 +154,18 @@ install_pyenv() {
 
     pyenv install 3.13.2
     pyenv global 3.13.2
+
+    # Rehash to make pyenv/pip available
+    eval "$(pyenv init -)"
 }
 
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
+    # Ensure pip is available from pyenv's Python
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init -)"
+
     pip install --upgrade pip
     pip install azure-cli
 }
