@@ -11,16 +11,16 @@
 
 {{- $program := "op-ssh-sign" -}}
 {{- $allowedSignersFile := printf "%s/.ssh/allowed_signers" $defaultHome -}}
-{{- $excludesfile := printf "%s/.gitignore" $defaultHome -}}
+{{- $excludesFile := printf "%s/.gitignore" $defaultHome -}}
 {{- $sshCommand := "ssh" -}}
 
 {{- if eq .chezmoi.os "windows" -}}
-    {{- $program = printf "%s/AppData/Local/Microsoft/WindowsApps/op-ssh-sign.exe" $windowsHome -}}
+    {{- $program = "C:/Program Files/1Password/app/8/op-ssh-sign.exe" -}}
     {{- $allowedSignersFile = printf "%s/.ssh/allowed_signers" $windowsHome -}}
-    {{- $excludesfile = printf "%s/.gitignore" $windowsHome -}}
+    {{- $excludesFile = printf "%s/.gitignore" $windowsHome -}}
     {{- $sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe" -}}
 {{- else if and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
-    {{- $program = printf "/mnt/c/Users/%s/AppData/Local/Microsoft/WindowsApps/op-ssh-sign-wsl.exe" $username -}}
+    {{- $program = "/mnt/c/Program Files/1Password/app/8/op-ssh-sign-wsl" -}}
     {{- $allowedSignersFile = printf "/mnt/c/Users/%s/.ssh/allowed_signers" $username -}}
     {{- $sshCommand = "ssh.exe" -}}
 {{- else if eq .chezmoi.os "android" -}}
@@ -109,7 +109,7 @@
 [core]
     autocrlf = input
     editor = vim
-    excludesfile = "{{ $excludesfile }}"
+    excludesfile = "{{ $excludesFile }}"
     sshCommand = "{{ $sshCommand }}"
 [merge]
     commit = yes
