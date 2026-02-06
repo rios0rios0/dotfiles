@@ -1,0 +1,142 @@
+# ~/.zshenv: sourced for ALL zsh invocations (interactive, non-interactive, login, non-login)
+# This file sets up PATH for tools that need to be available in all shell contexts,
+# including non-interactive shells spawned by IDEs like Cursor, VSCode, etc.
+
+# Avoid running this file multiple times in the SAME shell process
+# Using $$ (current PID) ensures new shell processes still get initialized
+[[ "$__ZSHENV_SOURCED_PID" == "$$" ]] && return
+export __ZSHENV_SOURCED_PID="$$"
+
+###### Essential PATH Setup ##############################################################################################
+# Local bin directory
+if [[ -d "$HOME/.local/bin" ]]; then
+    export PATH="$HOME/.local/bin:$PATH"
+fi
+
+###### Version Managers PATH Setup #######################################################################################
+# These only add paths - full initialization happens in .zshrc for interactive shells
+
+# SDKMAN - Java ecosystem (java, gradle, maven, etc.)
+# SDKMAN uses "current" symlinks for active versions
+sdkmanRoot="$HOME/.sdkman"
+if [[ -d "$sdkmanRoot/candidates" ]]; then
+    export SDKMAN_DIR="$sdkmanRoot"
+    for candidate in "$sdkmanRoot/candidates"/*/; do
+        if [[ -d "${candidate}current/bin" ]]; then
+            export PATH="${candidate}current/bin:$PATH"
+        fi
+    done
+fi
+
+# NVM - Node.js version manager
+# Read the default alias to determine which Node version to use
+nvmRoot="$HOME/.nvm"
+if [[ -d "$nvmRoot" ]]; then
+    export NVM_DIR="$nvmRoot"
+    nvmNodeBin=""
+    # Try to get the default Node version from NVM alias
+    if [[ -f "$nvmRoot/alias/default" ]]; then
+        nvmDefault=$(command cat "$nvmRoot/alias/default" 2>/dev/null)
+        # Handle different alias formats
+        if [[ "$nvmDefault" == lts/* || "$nvmDefault" == "lts/*" ]]; then
+            # For LTS aliases (lts/*, lts/iron, etc.), use the latest installed version
+            # NVM sorts versions, so the last one alphabetically is usually the latest
+            latestNode=$(command ls -1 "$nvmRoot/versions/node" 2>/dev/null | sort -V | tail -1)
+            if [[ -n "$latestNode" ]]; then
+                nvmNodeBin="$nvmRoot/versions/node/$latestNode/bin"
+            fi
+        elif [[ "$nvmDefault" =~ ^[0-9] || "$nvmDefault" =~ ^v[0-9] ]]; then
+            # Direct version number (20.18.3 or v20.18.3)
+            nvmNodeBin="$nvmRoot/versions/node/v${nvmDefault#v}/bin"
+        else
+            # Other aliases - try to resolve from alias file
+            if [[ -f "$nvmRoot/alias/$nvmDefault" ]]; then
+                resolvedVersion=$(command cat "$nvmRoot/alias/$nvmDefault" 2>/dev/null)
+                nvmNodeBin="$nvmRoot/versions/node/v${resolvedVersion#v}/bin"
+            fi
+        fi
+    fi
+    # Fallback: if no alias found, use the latest installed version
+    if [[ -z "$nvmNodeBin" || ! -d "$nvmNodeBin" ]]; then
+        latestNode=$(command ls -1 "$nvmRoot/versions/node" 2>/dev/null | sort -V | tail -1)
+        if [[ -n "$latestNode" ]]; then
+            nvmNodeBin="$nvmRoot/versions/node/$latestNode/bin"
+        fi
+    fi
+    if [[ -d "$nvmNodeBin" ]]; then
+        export PATH="$nvmNodeBin:$PATH"
+    fi
+fi
+
+# GVM - Go version manager
+gvmRoot="$HOME/.gvm"
+if [[ -d "$gvmRoot" ]]; then
+    export GVM_ROOT="$gvmRoot"
+    # Read the default GVM environment to get the configured Go version
+    gvmGoVersion=""
+    if [[ -f "$gvmRoot/environments/default" ]]; then
+        gvmGoVersion=$(command grep 'gvm_go_name=' "$gvmRoot/environments/default" 2>/dev/null | command sed 's/.*gvm_go_name="//;s/".*//')
+    fi
+    # Fallback: pick the latest installed Go version (excluding "system" which breaks sort -V)
+    if [[ -z "$gvmGoVersion" || "$gvmGoVersion" == "system" ]]; then
+        gvmGoVersion=$(command ls -1 "$gvmRoot/gos" 2>/dev/null | command grep -v '^system$' | sort -V | tail -1)
+    fi
+    # Set up Go paths if we found a valid version
+    if [[ -n "$gvmGoVersion" && -d "$gvmRoot/gos/$gvmGoVersion/bin" ]]; then
+        export GOROOT="$gvmRoot/gos/$gvmGoVersion"
+        export PATH="$GOROOT/bin:$PATH"
+        # Add GVM pkgsets paths (where "go install" binaries live under GVM)
+        gvmPkgset="$gvmRoot/pkgsets/$gvmGoVersion/global"
+        if [[ -d "$gvmPkgset" ]]; then
+            export GOPATH="$gvmPkgset"
+            export PATH="$gvmPkgset/bin:$gvmPkgset/overlay/bin:$PATH"
+        fi
+    fi
+    # Also add the GVM bin directory
+    if [[ -d "$gvmRoot/bin" ]]; then
+        export PATH="$gvmRoot/bin:$PATH"
+    fi
+fi
+
+# Go workspace bin (for go install'd binaries outside of GVM)
+if [[ -z "$GOPATH" && -d "$HOME/go/bin" ]]; then
+    export GOPATH="$HOME/go"
+    export PATH="$HOME/go/bin:$PATH"
+fi
+
+# Pyenv - Python version manager
+pyenvRoot="$HOME/.pyenv"
+if [[ -d "$pyenvRoot" ]]; then
+    export PYENV_ROOT="$pyenvRoot"
+    # Add pyenv bin directory
+    if [[ -d "$PYENV_ROOT/bin" ]]; then
+        export PATH="$PYENV_ROOT/bin:$PATH"
+    fi
+    # Add pyenv shims (this is how pyenv intercepts python commands)
+    if [[ -d "$PYENV_ROOT/shims" ]]; then
+        export PATH="$PYENV_ROOT/shims:$PATH"
+    fi
+fi
+
+# Cargo/Rust
+if [[ -d "$HOME/.cargo/bin" ]]; then
+    export CARGO_HOME="$HOME/.cargo"
+    export PATH="$HOME/.cargo/bin:$PATH"
+fi
+
+# Krew (kubectl plugin manager)
+if [[ -d "$HOME/.krew/bin" ]]; then
+    export PATH="$HOME/.krew/bin:$PATH"
+fi
+
+# Android SDK
+if [[ -d "$HOME/Android/Sdk" ]]; then
+    export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
+    [[ -d "$ANDROID_SDK_ROOT/emulator" ]] && export PATH="$ANDROID_SDK_ROOT/emulator:$PATH"
+    [[ -d "$ANDROID_SDK_ROOT/platform-tools" ]] && export PATH="$ANDROID_SDK_ROOT/platform-tools:$PATH"
+fi
+
+# Yarn global binaries
+if [[ -d "$HOME/.yarn/bin" ]]; then
+    export PATH="$HOME/.yarn/bin:$PATH"
+fi

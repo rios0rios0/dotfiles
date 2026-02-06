@@ -35,6 +35,7 @@ utilities=(
     #"imagemagick"       # it's for image manipulation (convert, identify, etc.) TODO: better to use on Windows?
     "jq"                # it's for parsing JSON
     "bat"               # it's for cat with syntax highlighting (https://github.com/sharkdp/bat)
+    "ripgrep"           # it's for recursively searching files with regex (https://github.com/BurntSushi/ripgrep)
     "silversearcher-ag" # it's for searching files (https://github.com/ggreer/the_silver_searcher)
     "inotify-tools"     # it's for watching file changes ("inotifywait")
     "dos2unix"          # it's for converting text files between Unix and DOS formats
@@ -159,6 +160,21 @@ install_pyenv() {
     eval "$(pyenv init -)"
 }
 
+# https://cursor.com/docs/cli/installation
+install_cursor_cli() {
+    curl https://cursor.com/install -fsSL | bash
+}
+
+# https://github.com/google-gemini/gemini-cli
+install_gemini_cli() {
+    npm install -g @google/gemini-cli
+}
+
+# https://github.com/anthropics/claude-code
+install_claude_cli() {
+    npm install -g @anthropic-ai/claude-code
+}
+
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
     # Ensure pip is available from pyenv's Python
@@ -178,6 +194,9 @@ install_terraform
 install_terragrunt
 install_sdkman
 install_nvm
+install_cursor_cli
+install_gemini_cli
+install_claude_cli
 install_pyenv
 install_azure_cli
 # =========================================================================================================

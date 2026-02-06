@@ -90,6 +90,8 @@ Install-PackageList $communication
 # =========================================================================================================
 # Development
 $development = @(
+    "Anysphere.Cursor",
+    "Anthropic.ClaudeCode",
     "CoreyButler.NVMforWindows",
     "Docker.DockerDesktop",
     "ExpressVPN.ExpressVPN",
@@ -100,6 +102,7 @@ $development = @(
     "Mirantis.Lens",
     "OpenVPNTechnologies.OpenVPNConnect",
     "Postman.Postman",
+    "BurntSushi.ripgrep.MSVC",
     "jqlang.jq",
     "sharkdp.bat"
 )
@@ -118,3 +121,7 @@ Install-PackageList $gaming
 # =========================================================================================================
 # Refresh the PATH environment variable
 $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
+# =========================================================================================================
+# npm-based CLIs (requires NVM for Windows to be installed and a Node.js version active)
+# https://github.com/google-gemini/gemini-cli
+npm install -g @google/gemini-cli

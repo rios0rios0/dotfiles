@@ -225,7 +225,12 @@ if command -v docker &>/dev/null; then
 fi
 source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
 
-###### Version Manager Utilities ###################################################
+###### Version Manager Full Initialization #########################################
+# These heavy initializations (GVM cd wrapper, NVM, SDKMAN, pyenv) are only needed
+# in interactive shells. Non-interactive shells (e.g. Cursor sandbox, IDE tasks)
+# get their PATH and environment from .zshenv instead.
+if [[ -o interactive ]]; then
+
 source "$HOME/.scripts/linux-engineering-version-manager.sh"
 
 ###### GoLang ######################################################################
@@ -284,6 +289,8 @@ if [ -d "$cargoRoot" ]; then
     export CARGO_ROOT="$cargoRoot"
     [[ -d $CARGO_ROOT/bin ]] && export PATH="$CARGO_ROOT/bin:$PATH"
 fi
+
+fi # end [[ -o interactive ]]
 
 ###### Workspace Information #######################################################
 {{- if ne .chezmoi.os "android" }}
