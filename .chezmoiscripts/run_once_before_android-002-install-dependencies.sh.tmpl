@@ -233,6 +233,41 @@ install_claude_cli() {
     npm install -g @anthropic-ai/claude-code
 }
 
+# https://1password.com/downloads/command-line/
+install_1password_cli() {
+    binPath="$HOME/.local/bin"
+    opBin="$binPath/op_linux_arm64"
+
+    if [ ! -f "$opBin" ]; then
+        ARCH="arm64"
+        wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.31.1/op_linux_${ARCH}_v2.31.1.zip" -O op.zip
+        unzip -d op op.zip
+        mv op/op "$opBin"
+        chmod +x "$opBin"
+        rm -rf op.zip op
+    else
+        echo "1Password CLI is already installed."
+    fi
+}
+
+# https://cli.github.com/manual/installation
+install_github_cli() {
+    binPath="$HOME/.local/bin"
+    ghBin="$binPath/gh"
+
+    if [ ! -f "$ghBin" ]; then
+        GH_VERSION="2.67.0"
+        ARCH="linux_arm64"
+        wget "https://github.com/cli/cli/releases/download/v${GH_VERSION}/gh_${GH_VERSION}_${ARCH}.tar.gz" -O gh.tar.gz
+        tar -xzf gh.tar.gz
+        mv "gh_${GH_VERSION}_${ARCH}/bin/gh" "$ghBin"
+        chmod +x "$ghBin"
+        rm -rf gh.tar.gz "gh_${GH_VERSION}_${ARCH}"
+    else
+        echo "GitHub CLI is already installed."
+    fi
+}
+
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
     if ! command_exists pip; then
@@ -249,23 +284,6 @@ install_azure_cli() {
         az extension add --name azure-devops
     else
         echo "AZ is already installed."
-    fi
-}
-
-# https://1password.com/downloads/command-line/
-install_1password_cli() {
-    binPath="$HOME/.local/bin"
-    opBin="$binPath/op_linux_arm64"
-
-    if [ ! -f "$opBin" ]; then
-        ARCH="arm64"
-        wget "https://cache.agilebits.com/dist/1P/op2/pkg/v2.31.1/op_linux_${ARCH}_v2.31.1.zip" -O op.zip
-        unzip -d op op.zip
-        mv op/op "$opBin"
-        chmod +x "$opBin"
-        rm -rf op.zip op
-    else
-        echo "1Password CLI is already installed."
     fi
 }
 
@@ -287,8 +305,9 @@ install_claude_cli
 # TODO: same of the line 261
 install_pyenv
 
-install_azure_cli
 install_1password_cli
+install_github_cli
+install_azure_cli
 
 # =========================================================================================================
 # resolv.config

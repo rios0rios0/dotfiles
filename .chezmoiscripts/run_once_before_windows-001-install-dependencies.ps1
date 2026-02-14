@@ -95,6 +95,7 @@ $development = @(
     "CoreyButler.NVMforWindows",
     "Docker.DockerDesktop",
     "ExpressVPN.ExpressVPN",
+    "GitHub.cli",                   # GitHub CLI
     "GoLang.Go",
     "JetBrains.Toolbox",
     "Microsoft.AzureStorageExplorer",

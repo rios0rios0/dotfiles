@@ -165,14 +165,25 @@ install_cursor_cli() {
     curl https://cursor.com/install -fsSL | bash
 }
 
+# https://github.com/anthropics/claude-code
+install_claude_cli() {
+    npm install -g @anthropic-ai/claude-code
+}
+
 # https://github.com/google-gemini/gemini-cli
 install_gemini_cli() {
     npm install -g @google/gemini-cli
 }
 
-# https://github.com/anthropics/claude-code
-install_claude_cli() {
-    npm install -g @anthropic-ai/claude-code
+# https://cli.github.com/manual/installation
+install_github_cli() {
+    sudo mkdir -p -m 755 /etc/apt/keyrings
+    curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
+    sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
+
+    echo "deb [arch=$(dpkg --print-architecture) signed-by=/etc/apt/keyrings/githubcli-archive-keyring.gpg] https://cli.github.com/packages stable main" | sudo tee /etc/apt/sources.list.d/github-cli.list > /dev/null
+
+    sudo apt update && sudo apt install --no-install-recommends --yes gh
 }
 
 # https://pypi.org/project/azure-cli/
@@ -194,9 +205,12 @@ install_terraform
 install_terragrunt
 install_sdkman
 install_nvm
-install_cursor_cli
-install_gemini_cli
-install_claude_cli
 install_pyenv
+
+install_cursor_cli
+install_claude_cli
+install_gemini_cli
+
+install_github_cli
 install_azure_cli
 # =========================================================================================================
