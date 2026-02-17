@@ -64,16 +64,6 @@ if ! ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 whoami &>/dev/null; then
             exit 1
         fi
     fi
-
-    echo "1Password: Not signed in. Initiating signin..."
-    signin_output=$(~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 signin --account my 2>&1)
-    signin_exit_code=$?
-    if [ $signin_exit_code -ne 0 ]; then
-        echo "1Password: Signin failed with exit code $signin_exit_code" >&2
-        echo "$signin_output" >&2
-        exit 1
-    fi
-    eval "$signin_output"
 fi
 
 ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 "$@"
