@@ -1,3 +1,6 @@
+# This script installs MesloLGS NF, Meslo Nerd Font, and FiraCode Nerd Font on Windows.
+# The same fonts are installed on Linux/Android via run_once_before_install-fonts.sh.
+
 # Ensure the script is run as Administrator.
 if (-not ([Security.Principal.WindowsPrincipal] [Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole(
     [Security.Principal.WindowsBuiltInRole]"Administrator"))
@@ -56,14 +59,22 @@ function Install-Font
     Write-Host "Installed font: $fontFileName"
 }
 
-# Accept an array of URLs as a parameter. Customize these URLs as needed.
+# Resolve the latest Nerd Fonts release tag (https://github.com/ryanoasis/nerd-fonts)
+$nerdFontsRelease = Invoke-RestMethod -Uri "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest"
+$nerdFontsVersion = $nerdFontsRelease.tag_name
+Write-Host "Resolved Nerd Fonts version: $nerdFontsVersion"
+
+$nerdFontsBaseUrl = "https://github.com/ryanoasis/nerd-fonts/releases/download/$nerdFontsVersion"
+$mesloBaseUrl = "https://github.com/romkatv/powerlevel10k-media/raw/master"
+
+# Font URLs: Nerd Font patched FiraCode and Meslo, plus MesloLGS NF for Powerlevel10k.
 $Urls = @(
-    "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/FiraCode.zip"
-    "https://github.com/ryanoasis/nerd-fonts/releases/download/v3.3.0/Meslo.zip"
-    "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Regular.ttf"
-    "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold.ttf"
-    "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Italic.ttf"
-    "https://github.com/romkatv/powerlevel10k-media/raw/master/MesloLGS%20NF%20Bold%20Italic.ttf"
+    "$nerdFontsBaseUrl/FiraCode.zip"
+    "$nerdFontsBaseUrl/Meslo.zip"
+    "$mesloBaseUrl/MesloLGS%20NF%20Regular.ttf"
+    "$mesloBaseUrl/MesloLGS%20NF%20Bold.ttf"
+    "$mesloBaseUrl/MesloLGS%20NF%20Italic.ttf"
+    "$mesloBaseUrl/MesloLGS%20NF%20Bold%20Italic.ttf"
 )
 
 foreach ($url in $Urls)
