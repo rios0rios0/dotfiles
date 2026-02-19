@@ -43,6 +43,12 @@ utilities=(
     "aria2"             # cURL alternative with many features (command is aria2c)
     "file"              # it's for determining file types
     "parallel"          # it runs many threads of a command at the same time
+    "cloc"              # it's for counting lines of code
+    "rename"            # it's for bulk file renaming
+    "whois"             # it's for domain lookup
+    "ffmpeg"            # it's for media processing (used by conversion aliases in .zshrc)
+    "rsync"             # it's for file synchronization
+    "asciinema"         # it's for recording terminal sessions (https://asciinema.org/)
 )
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
@@ -197,6 +203,12 @@ install_azure_cli() {
     pip install azure-cli
 }
 
+# https://www.speedtest.net/apps/cli
+install_speedtest_cli() {
+    curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash
+    sudo apt install --no-install-recommends --yes speedtest
+}
+
 install_oh_my_zsh
 install_gvm
 install_kubectl
@@ -213,4 +225,6 @@ install_gemini_cli
 
 install_github_cli
 install_azure_cli
+
+install_speedtest_cli
 # =========================================================================================================

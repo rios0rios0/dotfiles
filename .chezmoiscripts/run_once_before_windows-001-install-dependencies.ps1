@@ -60,18 +60,19 @@ Install-PackageList $hardware
 # Utilities
 $utilities = @(
     "Adobe.Acrobat.Reader.64-bit",
-    "CharlesMilette.TranslucentTB"
+    "CharlesMilette.TranslucentTB",
     "EaseUS.PartitionMaster",
     "GIMP.GIMP",
     "Google.ChromeRemoteDesktopHost",
     "Grammarly.Grammarly",
     "Microsoft.OneDrive",
     "Notepad++.Notepad++",
-    "PDFLabs.PDFtk.Free"
+    "PDFLabs.PDFtk.Free",
     "Piriform.CCleaner",
     "Piriform.Recuva",
-    "RevoUninstaller.RevoUninstallerPro"
-    #"Spotify.Spotify"               # TODO: error when installing (code 29)
+    "RevoUninstaller.RevoUninstallerPro",
+    "Spotify.Spotify",
+    "Oracle.VirtualBox"
 )
 Install-PackageList $utilities
 # Utilities for Desktop
@@ -95,7 +96,7 @@ $development = @(
     "CoreyButler.NVMforWindows",
     "Docker.DockerDesktop",
     "ExpressVPN.ExpressVPN",
-    "GitHub.cli",                   # GitHub CLI
+    "GitHub.cli",
     "GoLang.Go",
     "JetBrains.Toolbox",
     "Microsoft.AzureStorageExplorer",
