@@ -1,0 +1,12 @@
+#!/bin/bash
+
+# This script installs MesloLGS NF, Meslo Nerd Font, and FiraCode Nerd Font on Linux (baremetal/WSL).
+# The same fonts are installed on Windows via run_once_before_windows-003-install-fonts.ps1.
+# The same fonts are installed on Android via run_once_before_android-003-install-fonts.sh.
+
+set -euo pipefail
+
+{{ template "lib-install-fonts.sh" }}
+
+install_fonts "$HOME/.fonts"
+fc-cache -f -v

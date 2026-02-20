@@ -1,10 +1,4 @@
-#!/bin/bash
-
-# This script installs MesloLGS NF, Meslo Nerd Font, and FiraCode Nerd Font
-# on Linux (baremetal/WSL) and Android (Termux).
-# The same fonts are installed on Windows via run_once_before_windows-003-install-fonts.ps1.
-
-set -euo pipefail
+# Shared font-installation library included by platform-specific wrappers.
 
 NERD_FONTS_BASE_URL="https://github.com/ryanoasis/nerd-fonts/releases/download"
 MESLO_BASE_URL="https://raw.githubusercontent.com/romkatv/powerlevel10k-media/master"
@@ -48,23 +42,16 @@ install_meslo_lgs_nf() {
         curl -fsSL -o "$FONT_DIR/$(printf '%b' "${file//%/\\x}")" "$MESLO_BASE_URL/$file"
     done
 }
-# =========================================================================================================
 
-# =========================================================================================================
-if [ "$(uname -o 2>/dev/null)" = "Android" ]; then
-    FONT_BASE="$HOME/.local/share/fonts"
-else
-    FONT_BASE="$HOME/.fonts"
-fi
+# Main entry point – call with the target font base directory.
+install_fonts() {
+    local FONT_BASE="$1"
 
-NERD_FONTS_VERSION="$(resolve_nerd_fonts_version)"
+    local NERD_FONTS_VERSION
+    NERD_FONTS_VERSION="$(resolve_nerd_fonts_version)"
 
-install_nerd_font_zip "FiraCode" "$NERD_FONTS_VERSION" "$FONT_BASE/FiraCode"
-install_nerd_font_zip "Meslo"    "$NERD_FONTS_VERSION" "$FONT_BASE/Meslo"
-install_meslo_lgs_nf "$FONT_BASE/MesloLGS NF"
-
-# Rebuild and clean the fonts cache (not available on Android/Termux)
-if [ "$(uname -o 2>/dev/null)" != "Android" ]; then
-    fc-cache -f -v
-fi
+    install_nerd_font_zip "FiraCode" "$NERD_FONTS_VERSION" "$FONT_BASE/FiraCode"
+    install_nerd_font_zip "Meslo"    "$NERD_FONTS_VERSION" "$FONT_BASE/Meslo"
+    install_meslo_lgs_nf "$FONT_BASE/MesloLGS NF"
+}
 # =========================================================================================================

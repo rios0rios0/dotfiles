@@ -1,0 +1,20 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# This script installs MesloLGS NF, Meslo Nerd Font, and FiraCode Nerd Font on Android (Termux).
+# The same fonts are installed on Windows via run_once_before_windows-003-install-fonts.ps1.
+# The same fonts are installed on Linux via run_once_before_linux-004-install-fonts.sh.
+
+set -euo pipefail
+
+{{ template "lib-install-fonts.sh" }}
+
+FONT_DIR="$HOME/.local/share/fonts"
+install_fonts "$FONT_DIR"
+
+# Termux reads its terminal font from ~/.termux/font{,-bold,-italic,-bold-italic}.ttf
+mkdir -p "$HOME/.termux"
+cp "$FONT_DIR/MesloLGS NF/MesloLGS NF Regular.ttf" "$HOME/.termux/font.ttf"
+cp "$FONT_DIR/MesloLGS NF/MesloLGS NF Bold.ttf" "$HOME/.termux/font-bold.ttf"
+cp "$FONT_DIR/MesloLGS NF/MesloLGS NF Italic.ttf" "$HOME/.termux/font-italic.ttf"
+cp "$FONT_DIR/MesloLGS NF/MesloLGS NF Bold Italic.ttf" "$HOME/.termux/font-bold-italic.ttf"
+termux-reload-settings
