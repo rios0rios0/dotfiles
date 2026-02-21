@@ -29,4 +29,6 @@ fabric.properties
 # Visual Studio
 .vs
 
+.cursor
+.claude
 .wakatime-project

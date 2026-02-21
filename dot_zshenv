@@ -132,8 +132,12 @@ fi
 # Android SDK
 if [[ -d "$HOME/Android/Sdk" ]]; then
     export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
-    [[ -d "$ANDROID_SDK_ROOT/emulator" ]] && export PATH="$ANDROID_SDK_ROOT/emulator:$PATH"
-    [[ -d "$ANDROID_SDK_ROOT/platform-tools" ]] && export PATH="$ANDROID_SDK_ROOT/platform-tools:$PATH"
+    if [[ -d "$ANDROID_SDK_ROOT/emulator" ]]; then
+        export PATH="$ANDROID_SDK_ROOT/emulator:$PATH"
+    fi
+    if [[ -d "$ANDROID_SDK_ROOT/platform-tools" ]]; then
+        export PATH="$ANDROID_SDK_ROOT/platform-tools:$PATH"
+    fi
 fi
 
 # Yarn global binaries

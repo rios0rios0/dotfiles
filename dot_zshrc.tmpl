@@ -20,9 +20,6 @@ unset _JAVA_OPTIONS
 
 {{- if eq .chezmoi.os "android" }}
 export CHEZMOI_DEVICE="$(getprop ro.product.model)"
-
-# TODO: nvm is not compatible with the "PREFIX" environment variable. This is generated because of ZSH plugins
-unset PREFIX
 {{- end }}
 
 ###### ZINIT CONFIGURATION ##############################################################################################
@@ -103,9 +100,9 @@ zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
 {{- end }}
 
 ###### P10k CONFIGURATION ###############################################################################################
+typeset -g POWERLEVEL9K_INSTANT_PROMPT=quiet
 # load p10k config - removed TTY check as it was causing random fallbacks in WSL
 [[ -f ~/.p10k.zsh ]] && source ~/.p10k.zsh
-
 
 ###### ZSH CONFIGURATION ################################################################################################
 setopt HIST_FIND_NO_DUPS
@@ -118,31 +115,34 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 DISABLE_MAGIC_FUNCTIONS="true"
 
 plugins=(
-  common-aliases zsh-histdb # history history-substring-search (history managed by "histdb")
-  colorize colored-man-pages command-not-found vim-interaction
+  common-aliases zsh-histdb
+  colorize colored-man-pages
   1password
   nmap ssh
-  {{- if eq .chezmoi.os "android" }}
-  ssh-agent
-  {{- end }}
   aws azure heroku terraform helm
   kubectl kubectx
-  git github git-flow git-flow-avh git-hubflow
+  git github
   golang
   mvn gradle spring
   node npm yarn nvm react-native
   composer laravel5 symfony6
   python pip pipenv virtualenv pep8
 )
+{{- if eq .chezmoi.os "android" }}
+# Android-only plugins
+plugins+=(ssh-agent)
+{{- else }}
+# non-Android-only plugins
+plugins+=(command-not-found vim-interaction)
 
 # conditionally add docker plugins if docker is available (avoids errors when Docker Desktop is not running)
 if command -v docker &>/dev/null; then
   plugins+=(docker docker-compose)
 fi
+{{- end }}
 
 # for a full list of active aliases, run `alias`
 source $ZSH/oh-my-zsh.sh
-
 
 ###### Toolbox ##########################################################################################################
 ###### General #####################################################################
@@ -163,7 +163,11 @@ if [[ -o interactive ]]; then
 fi
 {{- end }}
 
+{{- if eq .chezmoi.os "android" }}
+alias top5size='du -hs * | sort -rh | head -5'
+{{- else }}
 alias top5size='sudo du -hs * | sort -rh | head -5'
+{{- end }}
 clear-h() {
   rm -rf ~/.bash_history
   rm -rf ~/.bashrc.original
@@ -174,9 +178,11 @@ clear-h() {
   rm -rf ~/.zcompdump*
   rm -rf ~/.zshrc.pre-oh-my-zsh
 }
+{{- if ne .chezmoi.os "android" }}
 clear-logs() {
   sudo find /var/log -name "*.log" -type f -mtime +5 -exec rm -f {} \;
 }
+{{- end }}
 pdf-join() {
   pdftk $1 $2 cat output result.pdf
 }
@@ -202,7 +208,6 @@ alias t="eza --tree --header --classify --icons --group-directories-first"
 alias record="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema rec"
 alias play="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema play"
 
-
 ###### Engineering ######################################################################################################
 ###### Cloud #######################################################################
 aws-prof() { export AWS_PROFILE=$1 }
@@ -218,81 +223,105 @@ export KREW_BIN="${KREW_ROOT:-$HOME/.krew}/bin" && export PATH=$KREW_BIN:$PATH
 
 source "$HOME/.scripts/linux-engineering-detect-kube-config-files.sh"
 
+{{- if ne .chezmoi.os "android" }}
 ###### Docker ######################################################################
 # only load docker completions and aliases if docker is available (avoids errors when Docker Desktop is not running)
 if command -v docker &>/dev/null; then
   zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
 fi
 source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
+{{- end }}
 
-###### Version Manager Full Initialization #########################################
-# These heavy initializations (GVM cd wrapper, NVM, SDKMAN, pyenv) are only needed
-# in interactive shells. Non-interactive shells (e.g. Cursor sandbox, IDE tasks)
-# get their PATH and environment from .zshenv instead.
 if [[ -o interactive ]]; then
+    # These heavy initializations (GVM cd wrapper, N
+    # in interactive shells. Non-interactive shells
+    # get their PATH and environment from .zshenv instead.
 
-source "$HOME/.scripts/linux-engineering-version-manager.sh"
+    source "$HOME/.scripts/linux-engineering-version-manager.sh"
 
 ###### GoLang ######################################################################
-export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
+    export GOLANG_BIN="$HOME/go/bin" && export PATH="$GOLANG_BIN:$PATH"
 
-gvmRoot="$HOME/.gvm"
-if [ -d "$gvmRoot" ]; then
-    [[ -s "$gvmRoot/scripts/gvm" ]] && source "$gvmRoot/scripts/gvm"
-    _vm_use_go
-fi
+    gvmRoot="$HOME/.gvm"
+    if [ -d "$gvmRoot" ]; then
+        if [[ -s "$gvmRoot/scripts/gvm" ]]; then
+            source "$gvmRoot/scripts/gvm"
+        fi
+        _vm_use_go
+    fi
 
 ###### Java ########################################################################
-export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
-export PATH="$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/platform-tools/adb:$PATH"
+    {{- if ne .chezmoi.os "android" }}
+    export ANDROID_SDK_ROOT="$HOME/Android/Sdk"
+    export PATH="$ANDROID_SDK_ROOT/emulator:$ANDROID_SDK_ROOT/platform-tools/adb:$PATH"
+    {{- end }}
 
-sdkmanRoot="$HOME/.sdkman"
-if [ -d "$sdkmanRoot" ]; then
-    export SDKMAN_DIR="$sdkmanRoot"
-    [[ -s "$sdkmanRoot/bin/sdkman-init.sh" ]] && source "$sdkmanRoot/bin/sdkman-init.sh"
-fi
+    sdkmanRoot="$HOME/.sdkman"
+    if [ -d "$sdkmanRoot" ]; then
+        export SDKMAN_DIR="$sdkmanRoot"
+        if [[ -s "$sdkmanRoot/bin/sdkman-init.sh" ]]; then
+            source "$sdkmanRoot/bin/sdkman-init.sh"
+        fi
+    fi
 
 ###### Node ########################################################################
-nvmRoot="$HOME/.nvm"
-if [ -d "$nvmRoot" ]; then
-    export NVM_HOME="$nvmRoot"
-    [ -s "$NVM_HOME/nvm.sh" ] && \. "$NVM_HOME/nvm.sh"
-    [ -s "$NVM_HOME/bash_completion" ] && \. "$NVM_HOME/bash_completion"
-    _vm_use_node
-fi
+    nvmRoot="$HOME/.nvm"
+    if [ -d "$nvmRoot" ]; then
+        export NVM_HOME="$nvmRoot"
+        {{- if eq .chezmoi.os "android" }}
+        # nvm is not compatible with Termux's PREFIX variable, so temporarily unset it
+        # during nvm initialization and restore it afterwards
+        typeset _saved_prefix="${PREFIX:-}"
+        unset PREFIX
+        {{- end }}
+        if [ -s "$NVM_HOME/nvm.sh" ]; then
+            \. "$NVM_HOME/nvm.sh"
+        fi
+        if [ -s "$NVM_HOME/bash_completion" ]; then
+            \. "$NVM_HOME/bash_completion"
+        fi
+        _vm_use_node
+        if [[ -n "$_saved_prefix" ]]; then
+            export PREFIX="$_saved_prefix"
+        fi
+    fi
 
 ###### Python ######################################################################
-pyenvRoot="$HOME/.pyenv"
-if [ -d "$pyenvRoot" ]; then
-    export PYENV_ROOT="$pyenvRoot"
-    [[ -d $PYENV_ROOT/bin ]] && export PATH="$PYENV_ROOT/bin:$PATH"
+    pyenvRoot="$HOME/.pyenv"
+    if [ -d "$pyenvRoot" ]; then
+        export PYENV_ROOT="$pyenvRoot"
+        if [[ -d $PYENV_ROOT/bin ]]; then
+            export PATH="$PYENV_ROOT/bin:$PATH"
+        fi
 
-    # Clean up stale pyenv shim locks to prevent rehash failures
-    _vm_cleanup_pyenv_locks
+        # Clean up stale pyenv shim locks to prevent rehash failures
+        _vm_cleanup_pyenv_locks
 
-    # Use --no-rehash to avoid lock contention and speed up shell startup
-    # Rehash happens lazily when needed instead of on every shell init
-    eval "$(pyenv init - --no-rehash)"
+        # Use --no-rehash to avoid lock contention and speed up shell startup
+        # Rehash happens lazily when needed instead of on every shell init
+        eval "$(pyenv init - --no-rehash)"
 
-    # Define pyenv wrapper AFTER init to handle noclobber issues with rehash
-    # The wrapper is defined in the version manager script and handles:
-    # - Temporarily disabling noclobber (which causes "cannot overwrite" errors)
-    # - Cleaning up stale lock files before operations
+        # Define pyenv wrapper AFTER init to handle noclobber issues with rehash
+        # The wrapper is defined in the version manager script and handles:
+        # - Temporarily disabling noclobber (which causes "cannot overwrite" errors)
+        # - Cleaning up stale lock files before operations
 
-    # Detect and use Python version from pyproject.toml
-    _vm_use_python
-fi
+        # Detect and use Python version from pyproject.toml
+        _vm_use_python
+    fi
 
 ###### Rust ########################################################################
-cargoRoot="$HOME/.cargo"
-if [ -d "$cargoRoot" ]; then
-    export CARGO_ROOT="$cargoRoot"
-    [[ -d $CARGO_ROOT/bin ]] && export PATH="$CARGO_ROOT/bin:$PATH"
-fi
+    cargoRoot="$HOME/.cargo"
+    if [ -d "$cargoRoot" ]; then
+        export CARGO_ROOT="$cargoRoot"
+        if [[ -d $CARGO_ROOT/bin ]]; then
+            export PATH="$CARGO_ROOT/bin:$PATH"
+        fi
+    fi
+fi # -o interactive
 
-fi # end [[ -o interactive ]]
-
-###### Workspace Information #######################################################
 {{- if ne .chezmoi.os "android" }}
+###### Workspace Information #######################################################
 source "$HOME/.scripts/linux-engineering-workspace-information.sh"
 {{- end }}
+
