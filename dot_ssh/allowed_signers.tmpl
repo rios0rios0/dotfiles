@@ -15,7 +15,7 @@
 
       {{- $sshEmail := onepasswordRead (printf "op://Private/%s/ssh email" .value) "my" -}}
       {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" -}}
-      {{ $sshEmail }} {{ $sshPublicKey }}
+      {{- printf "%s %s\n" $sshEmail $sshPublicKey -}}
 
     {{- end -}}
   {{- end -}}

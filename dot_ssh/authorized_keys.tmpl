@@ -14,7 +14,7 @@
     {{- if eq $device $deviceName -}}
 
       {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" -}}
-      {{ $sshPublicKey }}
+      {{- printf "%s\n" $sshPublicKey -}}
 
     {{- end -}}
   {{- end -}}
