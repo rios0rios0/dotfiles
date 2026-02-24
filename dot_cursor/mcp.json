@@ -1,13 +1,11 @@
 {
   "mcpServers": {
     "github": {
+      "type": "stdio",
       "command": "docker",
       "args": [
-        "run",
-        "-i",
-        "--rm",
-        "-e",
-        "GITHUB_PERSONAL_ACCESS_TOKEN",
+        "run", "-i", "--rm",
+        "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
         "ghcr.io/github/github-mcp-server"
       ],
       "env": {
@@ -16,12 +14,25 @@
     },
     "azure-devops": {
       "type": "stdio",
-      "command": "npx",
-      "args": ["-y", "@azure-devops/mcp", "${ADO_ORGANIZATION_NAME}"],
+      "command": "docker",
+      "args": [
+        "run", "-i", "--rm",
+        "-e", "ADO_ORG",
+        "-e", "ADO_MCP_AUTH_TOKEN",
+        "ghcr.io/helgeu/ado-mcp-docker-img"
+      ],
+      "env": {
+        "ADO_ORG": "${ADO_ORGANIZATION_NAME}",
+        "ADO_MCP_AUTH_TOKEN": "${ADO_PERSONAL_ACCESS_TOKEN}"
+      }
     },
     "kubernetes": {
+      "type": "stdio",
       "command": "npx",
-      "args": ["-y", "kubernetes-mcp-server@latest"]
+      "args": [
+        "-y",
+        "kubernetes-mcp-server@latest"
+      ]
     }
   }
 }
