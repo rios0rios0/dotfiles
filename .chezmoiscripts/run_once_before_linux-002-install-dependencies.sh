@@ -205,7 +205,7 @@ install_azure_cli() {
 
 # https://www.speedtest.net/apps/cli
 install_speedtest_cli() {
-    curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo bash
+    curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo os=debian dist=bookworm bash
     sudo apt install --no-install-recommends --yes speedtest
 }
 
