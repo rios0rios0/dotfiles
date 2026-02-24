@@ -1,6 +1,12 @@
 # Retrieve installed packages in JSON format and extract their IDs.
-$installedPackageData = winget export --output allPackages.json # TODO: error here
-$installedPackageIds  = $installedPackageData | ForEach-Object { $_.Id }
+$tempFile = [System.IO.Path]::GetTempFileName() -replace '\.tmp$', '.json'
+winget export --output $tempFile | Out-Null
+$installedPackageIds = @()
+if (Test-Path $tempFile) {
+    $json = Get-Content $tempFile -Raw | ConvertFrom-Json
+    $installedPackageIds = $json.Sources.Packages | ForEach-Object { $_.PackageIdentifier }
+    Remove-Item $tempFile -Force
+}
 
 function Is-PackageInstalled {
     param (
