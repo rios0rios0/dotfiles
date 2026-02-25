@@ -13,6 +13,7 @@ requirements=(
     "age"           # required for Chezmoi (decrypt files with SSH)
     "gpg"           # required for import and export GPGs
     "gpg-agent"     # required for import and export GPGs
+    "zsh"           # required as the target shell (must be installed before oh-my-zsh and shell change)
     "eza"           # it's for "ls" highlighting (https://github.com/eza-community/eza)
     "sqlite3"       # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
     "bsdmainutils"  # hexdump is a utility for displaying file contents in hexadecimal required by GVM (Go Version Manager)
@@ -211,6 +212,9 @@ install_speedtest_cli() {
 }
 
 install_oh_my_zsh
+# change the default shell to zsh so that new terminal sessions start in zsh
+# sudo usermod is used to avoid an interactive password prompt from chsh
+sudo usermod --shell "$(which zsh)" "$USER"
 install_gvm
 install_kubectl
 install_krew
