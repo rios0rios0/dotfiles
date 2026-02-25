@@ -1,11 +1,18 @@
-# dotfiles
-My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/) and 1Password for sensitive information.
+<h1 align="center">dotfiles</h1>
+<p align="center">
+    <a href="https://github.com/rios0rios0/dotfiles/releases/latest">
+        <img src="https://img.shields.io/github/release/rios0rios0/dotfiles.svg?style=for-the-badge&logo=github" alt="Latest Release"/></a>
+    <a href="https://github.com/rios0rios0/dotfiles/blob/main/LICENSE">
+        <img src="https://img.shields.io/github/license/rios0rios0/dotfiles.svg?style=for-the-badge&logo=github" alt="License"/></a>
+</p>
 
-## Highlights
+Personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/) and 1Password for sensitive information.
 
-- **Cross-platform**: Configurations for Kali Linux in WSL, Windows 11 and Termux (Android).
-- **Shells**: Zsh and PowerShell.
-- **Terminal**: Windows Terminal.
+## Features
+
+- **Cross-platform**: Configurations for Kali Linux in WSL, Windows 11 and Termux (Android)
+- **Shells**: Zsh and PowerShell
+- **Terminal**: Windows Terminal
 
 ![Kali Linux on WSL](.docs/wsl-with-kali.png)
 ![PowerShell 7 on Windows](.docs/windows-with-powershell-7.png)
@@ -26,89 +33,97 @@ My personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/)
     - [age](https://github.com/FiloSottile/age)
     - [1Password CLI](https://developer.1password.com/docs/cli/get-started)
 
-### Installation Steps
-
-#### Kali Linux on WSL
+### Kali Linux on WSL
 
 1. Install prerequisites:
-    ```sh
-    sudo apt install git age
-    ```
+
+```sh
+sudo apt install git age
+```
 
 2. Install `chezmoi` and apply the `dotfiles`:
-    ```sh
-    sh -c "$(curl -fsLS get.chezmoi.io/lb)" -- init --apply rios0rios0
-    ```
 
-#### PowerShell 7 on Windows
+```sh
+sh -c "$(curl -fsLS get.chezmoi.io/lb)" -- init --apply rios0rios0
+```
+
+### PowerShell 7 on Windows
 
 1. Install PowerShell 7:
-    ```powershell
-    winget install Microsoft.PowerShell
-    ```
+
+```powershell
+winget install Microsoft.PowerShell
+```
 
 2. Install some dependencies using `winget` in PowerShell:
-    ```powershell
-    winget install Git.Git # if you have ASLR protection enabled, install Git from https://git-scm.com/download/win
-    winget install FiloSottile.age # add the age executable to the PATH manually
-    winget install 1password-cli
-    ```
+
+```powershell
+winget install Git.Git # if you have ASLR protection enabled, install Git from https://git-scm.com/download/win
+winget install FiloSottile.age # add the age executable to the PATH manually
+winget install 1password-cli
+```
 
 3. Clone this repository and apply the dotfiles:
-    ```powershell
-    Set-ExecutionPolicy RemoteSigned -Scope Process
-    chezmoi init --apply rios0rios0
-    ```
 
-#### Termux on Android
+```powershell
+Set-ExecutionPolicy RemoteSigned -Scope Process
+chezmoi init --apply rios0rios0
+```
 
-!! IMPORTANT: You should avoid using Termux from the Play Store, as it may not be up-to-date. Instead, use the official Termux app from [F-Droid](https://f-droid.org/en/packages/com.termux/).
+### Termux on Android
+
+**IMPORTANT**: Avoid using Termux from the Play Store, as it may not be up-to-date. Instead, use the official Termux app from [F-Droid](https://f-droid.org/en/packages/com.termux/).
 Supporting article: https://www.reddit.com/r/termux/comments/zu8ets/do_not_install_termux_from_play_store/
 
 1. Install prerequisites and `chezmoi`:
-    ```sh
-    apt install git chezmoi
-    ```
+
+```sh
+apt install git chezmoi
+```
 
 2. Apply the `dotfiles`:
-    ```sh
-    chezmoi init --apply rios0rios0
-    ```
+
+```sh
+chezmoi init --apply rios0rios0
+```
 
 ## Configuration
 
 ### Encryption
-- Sensitive files are encrypted using [age](https://github.com/FiloSottile/age).
+
+- Sensitive files are encrypted using [age](https://github.com/FiloSottile/age)
 - Unix-specific decryption script: `run_before_decrypt-private-key-unix.sh.tmpl`
 - Windows-specific decryption script: `run_before_decrypt-private-key-windows.ps1.tmpl`
 
 ### Debugging Ideas
-- Check the `chezmoi doctor` command to check the status of the installation.
-- Run `git` commands with `GIT_TRACE=1` to see what's happening.
+
+- Check the `chezmoi doctor` command to check the status of the installation
+- Run `git` commands with `GIT_TRACE=1` to see what's happening
 
 ### Known Issues
-1. Git stuck while doing any command with SSH.
-   1. Zsh is using `ssh.exe` from Windows via alias/function. 
-   2. Git is using `ssh.exe` from Windows via configuration file.
-      * Due to "i" and "ii": `git` commands could be stuck when the `known_hosts` file is not created.
-      * Workaround: run `ssh git@<YOUR_HOST>` to add the host to the `known_hosts` file via WSL using `ssh.exe` from Windows.
-      * See TODO section for more information.
 
-2. Notice that using `chezmoi age` you are not able to decrypt using SSH keys.
+1. **Git stuck while doing any command with SSH.**
+   - Zsh is using `ssh.exe` from Windows via alias/function
+   - Git is using `ssh.exe` from Windows via configuration file
+   - Due to the above: `git` commands could be stuck when the `known_hosts` file is not created
+   - Workaround: run `ssh git@<YOUR_HOST>` to add the host to the `known_hosts` file via WSL using `ssh.exe` from Windows
+
+2. **Notice that using `chezmoi age` you are not able to decrypt using SSH keys.**
    That's why it's a prerequisite to install `age` to force `chezmoi` to use it for decryption.
-   If you don't it, you could have errors like this:
+   Without it, you could have errors like:
    ```bash
    chezmoi: error at line 1: malformed secret key: separator
    ```
 
-3. Notice that Windows has `path` size limitations (256 characters).
-   If you are using WSL interoperability (calling `.exe` files inside WSL), you could have errors like this:
+3. **Windows has `path` size limitations (256 characters).**
+   If you are using WSL interoperability (calling `.exe` files inside WSL), you could have errors like:
    ```bash
    /mnt/c/WINDOWS/system32/notepad.exe: Invalid argument
    ```
-   That means, you exceeded the `path` size limitation on the current `path` you are running the command.
+   That means you exceeded the `path` size limitation on the current `path` you are running the command.
 
-## References:
+## References
+
 - https://github.com/patrick-5546/dotfiles
 - https://github.com/budimanjojo/dotfiles
 - https://www.chezmoi.io/user-guide/command-overview/
@@ -117,12 +132,13 @@ Supporting article: https://www.reddit.com/r/termux/comments/zu8ets/do_not_insta
 - https://masterminds.github.io/sprig/
 
 ## Inspiration
+
 - https://github.com/romkatv/dotfiles-public
 
-## TODO:
-- check how to avoid 1Password duplicated calls
-- check how to use variables from an included template
-- when getting from scratch and changing bashes, it stuck on the new one
-- when getting from scratch and having more than 1Password account, it gets the wrong account order
-- the script `run_once_after_windows-001-create-ssh-known-hosts.ps1` is not working properly, because when calling
-  `ssh.exe` via `git` commands in WSL, the command just freezes. So, the workaround is to do `ssh git@dev.azure.com` to each entry you want.
+## Contributing
+
+Contributions are welcome! Please feel free to submit a Pull Request.
+
+## License
+
+See [LICENSE](LICENSE) for details.
