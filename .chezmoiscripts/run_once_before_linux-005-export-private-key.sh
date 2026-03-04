@@ -9,12 +9,13 @@ op() {
 # when multiple accounts are configured, --account my ensures the personal account is used
 # if 'my' shorthand is missing, add the personal account first with:
 #   op account add --address my.1password.com --shorthand my
-if ! eval "$(op signin --account my)"; then
+if ! signin_output=$(op signin --account my); then
     echo "ERROR: Could not sign into 1Password personal account (shorthand 'my')."
     echo "If you have multiple accounts, ensure the personal account uses the 'my' shorthand:"
     echo "  op account add --address my.1password.com --shorthand my"
     exit 1
 fi
+eval "$signin_output"
 
 # define the path to the ".ssh" folder
 sshFolderPath="$HOME/.ssh"
