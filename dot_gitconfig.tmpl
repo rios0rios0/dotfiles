@@ -32,7 +32,8 @@
 {{- $defaultUsername := "" -}}
 {{- $defaultUserEmail := "" -}}
 {{- $defaultUserSigningkey := "" -}}
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- $activeSshFields := (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- range $activeSshFields -}}
   {{- if eq .type "REFERENCE" -}}
     {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
     {{- $parts := split "@" $sshName -}}
@@ -92,7 +93,7 @@
 {{- end }}
 
     # ssh signing
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- range $activeSshFields -}}
   {{- if eq .type "REFERENCE" -}}
     {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
     {{- $parts := split "@" $sshName -}}
