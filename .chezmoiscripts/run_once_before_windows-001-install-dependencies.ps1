@@ -112,6 +112,7 @@ $development = @(
     "Postman.Postman",
     "BurntSushi.ripgrep.MSVC",
     "jqlang.jq",
+    "MikeFarah.yq",
     "sharkdp.bat"
 )
 Install-PackageList $development
