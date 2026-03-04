@@ -13,6 +13,7 @@ README.md
 .aws
 .azure
 AppData
+.claude
 .oh-my-posh.json
 .wakatime.cfg
 {{- end }}
