@@ -43,25 +43,101 @@ Always reference these instructions first and fallback to search or bash command
   apt install git chezmoi
   chezmoi init --apply rios0rios0
   ```
+- Android setup includes a proot/Alpine wrapper for running Linux binaries (1Password CLI, terraform, etc.) that cannot run natively on Termux.
 
 ### Dependency Installation Scripts
-The repository includes comprehensive dependency installation scripts that run automatically during chezmoi application:
+The repository includes comprehensive dependency installation scripts that run automatically during chezmoi application. Scripts are numbered to control execution order.
 
-#### Linux Dependencies (`.chezmoiscripts/run_once_before_linux-001-install-dependencies.sh`)
+#### Script Execution Order
+
+Scripts execute in this order per platform (numbers = execution priority):
+
+| Order | Linux (WSL)                                            | Windows                          | Android (Termux)                       |
+|-------|--------------------------------------------------------|----------------------------------|----------------------------------------|
+| 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-op-wrapper.sh`                 |
+| 002   | `install-dependencies.sh` *(also baremetal variant)*   | `configure-dependencies.ps1`     | `install-dependencies.sh.tmpl`         |
+| 003   | `configure-dependencies.sh`                            | `install-fonts.ps1`              | `install-fonts.sh.tmpl`                |
+| 004   | `install-fonts.sh.tmpl`                                | `export-private-key.ps1`         | —                                      |
+| 005   | `export-private-key.sh`                                | —                                | —                                      |
+
+After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, then `run_after_*` scripts execute on every `chezmoi apply`.
+
+#### Linux Dependencies (`.chezmoiscripts/run_once_before_linux-002-install-dependencies.sh`)
 - **TIMING**: Takes 45-90 minutes to complete. NEVER CANCEL - Set timeout to 120+ minutes.
-- 149-line script that installs: Oh My Zsh, GVM (Go), kubectl, krew, terraform, terragrunt, SDKMAN, NVM, pyenv, Azure CLI
+- Installs system packages: git, curl, zip/unzip, age, gpg, zsh, eza, sqlite3, gcc, make, etc.
+- Installs development tools via dedicated functions:
+  - **Oh My Zsh** — default Zsh framework
+  - **GVM** — Go version manager (installs go1.25.5 by default)
+  - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)
+  - **Terraform** (HashiCorp apt repository) + **Terragrunt** (v0.76.6)
+  - **SDKMAN** — Java/Gradle ecosystem (installs latest Java and Gradle)
+  - **NVM** (v0.40.2) — Node.js version manager (installs LTS + corepack)
+  - **Pyenv** — Python version manager (installs Python 3.13.2)
+  - **Cursor CLI** — AI code editor CLI
+  - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
+  - **Gemini CLI** (`@google/gemini-cli` npm package)
+  - **GitHub CLI** (gh, via apt repository)
+  - **Azure CLI** (via pip, installed into pyenv Python)
+  - **Speedtest CLI** (Ookla, via packagecloud)
 - Each tool installation can take 5-15 minutes individually
 - **Critical**: Script requires internet access for downloading tools
-- **Note**: Script may need execution permissions: `chmod +x .chezmoiscripts/run_once_before_linux-001-install-dependencies.sh`
+
+#### Linux Baremetal Dependencies (`.chezmoiscripts/run_once_before_linux-002-install-dependencies(baremetal).sh`)
+- Only runs on native Linux (skips automatically on WSL and Android)
+- Installs GUI/desktop applications: barrier, bleachbit, GIMP, Octave, scrcpy, VLC, pdftk
+- Installs Genymotion Android emulator
+
+#### Linux Configuration (`.chezmoiscripts/run_once_before_linux-003-configure-dependencies.sh`)
+- Creates `~/.local/bin/bat` symlink (workaround for Debian's `batcat` naming)
+
+#### Android Dependencies (`.chezmoiscripts/run_once_before_android-002-install-dependencies.sh.tmpl`)
+- **TIMING**: Takes 45-90 minutes. NEVER CANCEL.
+- Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
+- Sets up proot/Alpine wrapper for running Linux binaries natively
+- Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
+- Installs: Claude CLI, Gemini CLI, 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip)
+- Configures NeoVim with AstroVim template (`~/.config/nvim`)
+- Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 
 #### Windows Dependencies (`.chezmoiscripts/run_once_before_windows-001-install-dependencies.ps1`)
 - **TIMING**: Takes 30-60 minutes to complete. NEVER CANCEL - Set timeout to 90+ minutes.
-- Uses winget for package management
-- Installs development tools, hardware utilities, and communication apps
+- Uses winget with explicit package IDs (checks already-installed packages before installing)
+- Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
+- Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, Brother drivers, PerformanceTest
+- Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify, VirtualBox, Grammarly, etc.
+- Installs development: Cursor, Claude Code, NVM for Windows, Docker Desktop, GitHub CLI, JetBrains Toolbox, Postman, ripgrep, jq, yq, bat, etc.
+- Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy
+- Installs npm CLI tools: `@google/gemini-cli`
+
+#### Windows Configuration (`.chezmoiscripts/run_once_before_windows-002-configure-dependencies.ps1`)
+- Installs/updates Kali Linux WSL distro and sets it as default
+
+#### Font Installation
+- All platforms install MesloLGS NF (for Powerlevel10k) and Nerd Fonts (FiraCode, Meslo)
+- Linux: `run_once_before_linux-004-install-fonts.sh.tmpl` → installs to `~/.fonts`
+- Windows: `run_once_before_windows-003-install-fonts.ps1` → installs to Windows Fonts directory (requires admin)
+- Android: `run_once_before_android-003-install-fonts.sh.tmpl`
+- Shared font library: `.chezmoitemplates/lib-install-fonts.sh`
+
+#### Private Key Export
+- Linux: `run_once_before_linux-005-export-private-key.sh` — reads `op://personal/Chezmoi Key/private key` from 1Password, writes to `~/.ssh/chezmoi`
+- Windows: `run_once_before_windows-004-export-private-key.ps1` — same, writes to `~\.ssh\chezmoi`
+- Android: Key is retrieved by the `op` wrapper during chezmoi template rendering
+
+#### Post-Apply Scripts (`run_once_after_*` and `run_after_*`)
+- `run_once_after_linux-001-extract-compressed-folders.sh` — extracts `.tar.gz` archives for `~/.histdb`, `~/.john`, `~/.kube/config-files`, `~/.sqlmap`
+- `run_once_after_linux-002-clone-pentesting-tools.sh` — clones pentesting tools (VHostScan, dirsearch, StegCracker, stegbrute) to `~/Development/Tools/`
+- `run_once_after_windows-001-create-ssh-known-hosts.ps1` — pre-populates `~/.ssh/known_hosts` for GitHub, GitLab, Azure DevOps, Bitbucket (avoids SSH freeze in WSL)
+- `run_after_linux-001-execute-chezmoi-templates.sh` — re-processes `~/.scripts/*-template.sh` files through `chezmoi execute-template`
+- `run_after_linux-002-import-gpg-keys.sh.tmpl` — imports GPG keys from 1Password ("Active GPGs" item)
+- `run_after_windows-001-create-ssh-public-keys.ps1.tmpl` — creates SSH public key files from 1Password ("Active SSHs" item)
+- `run_after_windows-002-create-ssh-pems.ps1.tmpl` — creates SSH PEM files on Windows
+- `run_after_windows-003-copy-app-data-files.ps1.tmpl` — copies files from `AppData/` in the repo to `~\AppData\` on Windows (directory names use `+` as wildcard for version-specific paths)
+- `run_after_android-001-create-ssh-keys.sh.tmpl` — creates SSH private/public key files from 1Password ("Active SSHs" item)
 
 #### Manual Validation After Installation
-- Verify shell configuration: `zsh --version` (Linux) or `pwsh --version` (Windows)
-- Test Oh My Zsh theme: Open new terminal and verify prompt appears correctly
+- Verify shell configuration: `zsh --version` (Linux/Android) or `pwsh --version` (Windows)
+- Test Oh My Zsh/p10k theme: Open new terminal and verify Powerlevel10k prompt appears
 - Verify age encryption: `age --version`
 - Test chezmoi: `chezmoi status` should show managed files
 - Verify 1Password CLI: `op --version` (requires authentication setup first)
@@ -74,15 +150,46 @@ The repository includes comprehensive dependency installation scripts that run a
 - `dot_*` files: Managed dotfiles (become `.filename` in home directory)
 - `dot_*.tmpl`: Template files processed by chezmoi (e.g., `dot_zshrc.tmpl` → `~/.zshrc`)
 - `encrypted_*.age`: Encrypted files using age encryption (format: "age encrypted file, ASCII armored")
-- `.chezmoi.yaml.tmpl`: Main chezmoi configuration template
-- `.chezmoiignore`: Files to ignore during processing
-- `.chezmoiscripts/`: Automated setup and configuration scripts
+- `.chezmoi.yaml.tmpl`: Main chezmoi config — sets age encryption and platform-specific `op` command path
+- `.chezmoiignore`: Platform-conditional file exclusion (uses Go templates with `.chezmoi.os`)
+- `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
+- `.chezmoitemplates/`: Shared template fragments (`lib-install-fonts.sh`, `username.tmpl`)
+- `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
+
+### Key Managed Files
+- `dot_zshrc.tmpl` → `~/.zshrc`: Zsh configuration with ZINIT plugins, version managers, aliases
+- `dot_zshenv` → `~/.zshenv`: PATH setup for all Zsh invocations (critical for IDE integration)
+- `dot_gitconfig.tmpl` → `~/.gitconfig`: Git config with 1Password SSH/GPG signing, per-device keys
+- `dot_p10k.zsh` → `~/.p10k.zsh`: Powerlevel10k theme configuration
+- `dot_oh-my-posh.json` → `~/.oh-my-posh.json`: Oh My Posh theme (Windows only)
+- `dot_age_recipients.tmpl` → `~/.age_recipients`: Age encryption recipients
+- `dot_cursor/mcp.json` → `~/.cursor/mcp.json`: MCP servers for Cursor (Linux, Docker-based)
+- `dot_config/mcphub/servers.json.tmpl` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android, npx-based)
+- `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
+- `dot_scripts/` → `~/.scripts/`: User utility scripts
 
 ### Scripts and Automation
-- `.chezmoiscripts/`: Automated setup and configuration scripts
-- `dot_scripts/`: User scripts deployed to `~/.scripts/`
-- `run_once_before_*`: Scripts that run once before applying configurations
-- `run_after_*`: Scripts that run after applying configurations
+- `.chezmoiscripts/`: All automated setup scripts
+- `dot_scripts/`: User scripts deployed to `~/.scripts/`:
+  - `linux-engineering-version-manager.sh`: Auto-detects `go.mod`/`.nvmrc`/`pyproject.toml` and switches Go/Node/Python versions
+  - `linux-engineering-detect-kube-config-files.sh`: Auto-loads kubeconfig files from `~/.kube/config-files/`
+  - `linux-engineering-docker-aliases.sh`: Docker aliases (`dip`, `dreset`)
+  - `linux-engineering-workspace-information-template.sh.tmpl`: Workspace info template (re-processed on every apply)
+  - `linux-toolbox-watch-compress-folders.sh`: Background script watching and compressing `~/.histdb`, `~/.john`, etc.
+
+### Platform Matrix
+
+| Aspect           | Linux (WSL/Kali)                        | Windows 11                          | Android (Termux)                        |
+|------------------|-----------------------------------------|-------------------------------------|-----------------------------------------|
+| Shell            | Zsh + Oh My Zsh + Powerlevel10k         | PowerShell + Oh My Posh             | Zsh + Oh My Zsh + Powerlevel10k         |
+| Prompt theme     | Powerlevel10k (`~/.p10k.zsh`)           | Oh My Posh (`~/.oh-my-posh.json`)   | Powerlevel10k (`~/.p10k.zsh`)           |
+| Script extension | `.sh`                                   | `.ps1`                              | `.sh`                                   |
+| Editor           | (any)                                   | Cursor / Visual Studio              | NeoVim (AstroVim, `~/.config/nvim/`)    |
+| MCP config       | `~/.cursor/mcp.json` (Docker-based)     | N/A                                 | `~/.config/mcphub/servers.json` (npx)   |
+| Terraform        | Native binaries                         | N/A                                 | proot/Alpine wrapper (`terra` command)  |
+| 1Password CLI    | `~/.local/bin/op` wrapper → `op.exe`    | Native `op.exe`                     | `~/.local/bin/op` → proot Alpine binary |
+| Docker           | Native                                  | Docker Desktop                      | N/A (uses proot)                        |
+| SSH keys         | `~/.ssh/chezmoi` (age private key)      | `~\.ssh\chezmoi` (age private key)  | Retrieved via `op` wrapper              |
 
 ## Validation Scenarios
 
@@ -98,20 +205,21 @@ The repository includes comprehensive dependency installation scripts that run a
 
 2. **Shell Configuration Test**:
    - Start new shell session
-   - Verify prompt theme appears correctly
-   - Test aliases: `ll`, `la` (should use eza/exa)
+   - Verify Powerlevel10k prompt appears correctly (Linux/Android)
+   - Test aliases: `ll`, `la` (should use eza with icons)
    - Verify PATH includes custom scripts: `echo $PATH`
 
 3. **Encryption Test**:
    ```bash
-   chezmoi cat ~/.ssh/config  # Should decrypt and display SSH config
    age --version  # Verify age is available
    file encrypted_dot_npmrc.age  # Should show "age encrypted file, ASCII armored"
+   test -f ~/.ssh/chezmoi && echo "Private key exists" || echo "Missing private key"
    ```
 
 4. **Cross-platform Validation**:
-   - Linux: Verify Zsh configuration and Oh My Zsh theme
+   - Linux: Verify Zsh + Powerlevel10k configuration
    - Windows: Verify PowerShell profile and Oh My Posh theme
+   - Android: Verify NeoVim and proot wrapper work
    - Test Windows Terminal settings on Windows
 
 5. **Development Tools Test** (after dependency installation):
@@ -130,7 +238,7 @@ The repository includes comprehensive dependency installation scripts that run a
 1. **Environment Setup Test**:
    ```bash
    # Check shell is properly configured
-   echo $SHELL  # Should show zsh path on Linux
+   echo $SHELL  # Should show zsh path on Linux/Android
    which zsh    # Should find zsh executable
    
    # Verify custom PATH additions
@@ -140,7 +248,7 @@ The repository includes comprehensive dependency installation scripts that run a
 2. **Configuration Files Test**:
    ```bash
    # Check dotfiles are properly linked/copied
-   ls -la ~/.zshrc ~/.gitconfig ~/.oh-my-posh.json
+   ls -la ~/.zshrc ~/.zshenv ~/.gitconfig
    
    # Verify templates were processed correctly
    grep -q "LOCAL_ROOT" ~/.zshrc && echo "Template processed" || echo "Template issue"
@@ -148,11 +256,11 @@ The repository includes comprehensive dependency installation scripts that run a
 
 3. **Encryption and Secrets Test**:
    ```bash
-   # Test age encryption is working
-   chezmoi cat ~/.ssh/config > /dev/null && echo "Decryption works" || echo "Decryption failed"
-   
-   # Verify private key exists
+   # Test age encryption key exists
    test -f ~/.ssh/chezmoi && echo "Private key exists" || echo "Missing private key"
+   
+   # Verify chezmoi can decrypt files
+   chezmoi cat ~/.npmrc > /dev/null && echo "Decryption works" || echo "Decryption failed"
    ```
 
 4. **Development Environment Test**:
@@ -167,8 +275,8 @@ The repository includes comprehensive dependency installation scripts that run a
    # Test aliases and functions work
    type ll >/dev/null 2>&1 && echo "Aliases configured" || echo "Aliases missing"
    
-   # Test prompt theme
-   echo $PROMPT  # Should show Oh My Zsh theme configuration
+   # Test version manager auto-switching (run inside a Go project)
+   # Should automatically switch Go version when go.mod is detected
    ```
 
 ## Common Tasks and Troubleshooting
@@ -178,6 +286,7 @@ The repository includes comprehensive dependency installation scripts that run a
 2. Test with: `chezmoi add ~/.filename`
 3. Apply changes: `chezmoi apply`
 4. **Always verify**: Check file appears correctly in home directory
+5. Update `.chezmoiignore` if the file should be excluded on certain platforms
 
 ### Working with Encrypted Files
 1. Use age encryption for sensitive files
@@ -189,13 +298,14 @@ The repository includes comprehensive dependency installation scripts that run a
 - Check chezmoi status: `chezmoi doctor`
 - View verbose output: `chezmoi apply --verbose`
 - Check script execution: Look for logs in `/tmp/` during installation
-- **SSH Issues**: Run `ssh git@<host>` to add to known_hosts manually
+- **SSH Issues**: Windows pre-populates known_hosts via `run_once_after_windows-001-create-ssh-known-hosts.ps1`. For Linux, run `ssh -o StrictHostKeyChecking=accept-new git@github.com` manually.
 
 ### Known Limitations and Workarounds
-1. **WSL SSH Issues**: Git may freeze with SSH - manually add hosts to known_hosts
+1. **WSL SSH Issues**: Git may freeze with SSH against unknown hosts — Windows script pre-populates known_hosts to prevent this
 2. **Windows Path Limits**: 256 character limitation when using WSL interoperability
-3. **1Password Calls**: Multiple calls during installation (see TODO in README)
+3. **1Password Calls**: Multiple 1Password vault reads during installation (templates fetch SSH keys, GPG keys, credentials per device)
 4. **Internet Required**: All installations require internet access for downloads
+5. **Android NVM/Go**: Native Termux packages are used when GVM build fails due to DNS issues in Termux
 
 ## Time Expectations
 - **Full fresh installation**: 60-120 minutes
@@ -229,50 +339,58 @@ chezmoi edit ~/.zshrc
 
 # Add new file to management
 chezmoi add ~/.new-config-file
+
+# Re-execute a run_once script (delete its hash to force re-run)
+chezmoi state delete-bucket --bucket=scriptStates
 ```
 
 ### Template Processing
 - Template files use Go template syntax
-- Variables available: `.chezmoi.os`, `.chezmoi.arch`, `.chezmoi.hostname`
+- Variables available: `.chezmoi.os`, `.chezmoi.arch`, `.chezmoi.hostname`, `.chezmoi.homeDir`
+- `.chezmoi.kernel` — used to detect WSL (contains `"microsoft"` string on WSL)
+- `onepasswordRead` / `onepassword` — fetch secrets from 1Password at template render time
 - Test templates: `chezmoi execute-template < template-file`
 
 ## Security and Encryption
-- Private key location: `~/.ssh/chezmoi`
-- Age recipients file: `~/.age_recipients`
-- 1Password integration: Requires `op` CLI authentication
-- **Never commit**: Raw sensitive files - always use encryption
+- Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
+- Age recipients file: `~/.age_recipients` (template: `dot_age_recipients.tmpl`)
+- 1Password integration: Uses `op` CLI; Linux/WSL wraps `op.exe` via `~/.local/bin/op`; Android wraps ARM64 binary via proot Alpine
+- SSH commit signing: 1Password `op-ssh-sign` — different binary per platform (`op-ssh-sign-wsl` on WSL, `op-ssh-sign.exe` on Windows, `ssh-keygen` on Android)
+- Git signing keys: Read per-device from 1Password "Active SSHs" and "Active GPGs" items (matched by device name `hostname@account` format)
+- **Never commit**: Raw sensitive files — always use encryption or 1Password references
 
 ### Expected Successful Operation
 
 **A successful dotfiles installation should result in**:
 
 1. **Shell Experience**:
-   - Beautiful, themed terminal prompt (Oh My Zsh on Linux, Oh My Posh on Windows)
+   - Powerlevel10k themed terminal prompt (Linux/Android) or Oh My Posh (Windows)
    - Enhanced `ls` command using `eza` with colors and icons
-   - Custom aliases: `ll`, `la`, `k` (kubectl), etc.
-   - Properly configured PATH with `~/.local/bin` included
+   - Custom aliases: `ll`, `la`, `lp`, `lt`, `t` (eza variants), `k` (kubectl), etc.
+   - Properly configured PATH with `~/.local/bin` and all version manager bins
 
 2. **Configuration Files**:
-   - `~/.zshrc` (Linux) or PowerShell profile (Windows) with custom settings
-   - `~/.gitconfig` with personal settings and commit signing
-   - `~/.ssh/config` with SSH configurations (decrypted from encrypted file)
-   - Windows Terminal configuration with custom settings and themes
+   - `~/.zshrc` (Linux/Android) or PowerShell profile (Windows) with custom settings
+   - `~/.zshenv` (Linux/Android) for IDE-compatible PATH setup
+   - `~/.gitconfig` with per-device SSH signing via 1Password
+   - `~/.cursor/mcp.json` (Linux) or `~/.config/mcphub/servers.json` (Android) with MCP servers
 
 3. **Development Environment**:
    - kubectl, terraform, terragrunt available in PATH
-   - Go, Node.js, Python environments set up via version managers
+   - Go (GVM), Node.js (NVM), Python (pyenv), Java (SDKMAN), Rust (Cargo) via version managers
+   - Version managers auto-switch based on project files (`go.mod`, `.nvmrc`, `pyproject.toml`)
    - Docker aliases and Kubernetes shortcuts configured
 
 4. **Security Setup**:
    - Age encryption working with private key at `~/.ssh/chezmoi`
    - 1Password CLI integration for secrets management
-   - SSH keys and configurations properly deployed
+   - SSH keys and GPG keys deployed from 1Password per device
 
 **Failure Indicators**:
 - Plain, unstyled terminal prompts
 - Missing command aliases or PATH issues
-- Chezmoi errors about missing encryption keys
+- Chezmoi errors about missing encryption keys or 1Password not signed in
 - Tools like kubectl, terraform not found in PATH
-- SSH configuration errors or missing files
+- SSH signing failures or `op` wrapper not found
 
 Always run validation scenarios after any changes to ensure the dotfiles apply correctly across target platforms.
