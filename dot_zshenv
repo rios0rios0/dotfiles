@@ -72,15 +72,12 @@ fi
 gvmRoot="$HOME/.gvm"
 if [[ -d "$gvmRoot" ]]; then
     export GVM_ROOT="$gvmRoot"
-    # Read the default GVM environment to get the configured Go version
-    gvmGoVersion=""
-    if [[ -f "$gvmRoot/environments/default" ]]; then
-        gvmGoVersion=$(command grep 'gvm_go_name=' "$gvmRoot/environments/default" 2>/dev/null | command sed 's/.*gvm_go_name="//;s/".*//')
-    fi
-    # Fallback: pick the latest installed Go version (excluding "system" which breaks sort -V)
-    if [[ -z "$gvmGoVersion" || "$gvmGoVersion" == "system" ]]; then
-        gvmGoVersion=$(command ls -1 "$gvmRoot/gos" 2>/dev/null | command grep -v '^system$' | sort -V | tail -1)
-    fi
+    # Always use the latest installed Go version for non-interactive shells.
+    # The GVM default file is for interactive session management (gvm use --default)
+    # and may lag behind after installing a newer version. Non-interactive shells
+    # just need the newest Go binary in PATH — Go's toolchain directive in go.mod
+    # handles per-project version selection at build time.
+    gvmGoVersion=$(command ls -1 "$gvmRoot/gos" 2>/dev/null | command grep -v '^system$' | sort -V | tail -1)
     # Set up Go paths if we found a valid version
     if [[ -n "$gvmGoVersion" && -d "$gvmRoot/gos/$gvmGoVersion/bin" ]]; then
         export GOROOT="$gvmRoot/gos/$gvmGoVersion"
