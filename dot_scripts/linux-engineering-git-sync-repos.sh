@@ -1,7 +1,7 @@
 _git_sync_single_repo() {
     local repo_dir="$1"
     local root="$2"
-    local wip_branch="wip/auto-stash-$(date +%Y%m%d-%H%M%S)-$$"
+    local wip_branch="wip/auto-stash-$(date +%Y%m%d-%H%M%S-%N)-$RANDOM-$$"
     local name="${repo_dir#$root/}"
     local status_label="SYNCED"
 
@@ -28,7 +28,16 @@ _git_sync_single_repo() {
             return 1
         fi
         git -C "$repo_dir" add -A </dev/null >/dev/null 2>&1
-        git -C "$repo_dir" commit --no-verify -m "wip: auto-stash uncommitted changes" </dev/null >/dev/null 2>&1
+        if ! git -C "$repo_dir" commit --no-verify -m "wip: auto-stash uncommitted changes" </dev/null >/dev/null 2>&1; then
+            local cleanup_note=""
+            if ! git -C "$repo_dir" checkout "$current_branch" </dev/null >/dev/null 2>&1; then
+                cleanup_note="; additionally, failed to restore original branch '$current_branch'. You may still be on '$wip_branch'; resolve issues and clean up this WIP branch manually."
+            elif ! git -C "$repo_dir" branch -D "$wip_branch" </dev/null >/dev/null 2>&1; then
+                cleanup_note="; additionally, failed to delete temporary WIP branch '$wip_branch'. You are back on '$current_branch'; delete '$wip_branch' manually when safe."
+            fi
+            printf "%-50s FAIL (could not auto-commit wip changes; see git status%s)\n" "$name" "$cleanup_note"
+            return 1
+        fi
     fi
 
     # checkout default branch and sync
@@ -97,7 +106,13 @@ git-sync-repos() {
     local max_jobs
     max_jobs=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
     local tmp_dir
-    tmp_dir=$(mktemp -d)
+    tmp_dir=$(mktemp -d) || { echo "ERROR: could not create temp directory"; return 1; }
+
+    # Save and replace INT/TERM traps to clean up tmp_dir on signal; restore before returning
+    local _saved_int _saved_term
+    _saved_int=$(trap -p INT 2>/dev/null)
+    _saved_term=$(trap -p TERM 2>/dev/null)
+    trap 'rm -rf "$tmp_dir"' INT TERM
 
     echo "Syncing $total repositories ($max_jobs parallel workers)..."
     echo ""
@@ -108,17 +123,22 @@ git-sync-repos() {
         local batch_end=$((i + max_jobs))
         [[ $batch_end -gt $total ]] && batch_end=$total
 
+        local pids=()
         local j
         for ((j = i; j < batch_end; j++)); do
-            _git_sync_single_repo "${repos[$((j + 1))]}" "$root" > "$tmp_dir/$j.out" 2>&1 &
+            _git_sync_single_repo "${repos[$j]}" "$root" > "$tmp_dir/$j.out" 2>&1 &
+            pids+=("$!")
         done
-        wait
+        if [[ ${#pids[@]} -gt 0 ]]; then
+            wait "${pids[@]}"
+        fi
 
         i=$batch_end
     done
 
     # print results and tally
     local synced=0 stashed=0 failed=0
+    local j
     for ((j = 0; j < total; j++)); do
         local line
         line=$(cat "$tmp_dir/$j.out")
@@ -130,9 +150,11 @@ git-sync-repos() {
         esac
     done
 
-    rm -rf "$tmp_dir"
-
     echo ""
     echo "--- Summary ---"
     echo "Total: $total | Synced: $synced | WIP commits: $stashed | Failed: $failed"
+
+    rm -rf "$tmp_dir"
+    if [[ -n "$_saved_int" ]]; then eval "$_saved_int"; else trap - INT; fi
+    if [[ -n "$_saved_term" ]]; then eval "$_saved_term"; else trap - TERM; fi
 }
