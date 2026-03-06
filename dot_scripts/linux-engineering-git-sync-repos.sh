@@ -1,7 +1,7 @@
 _git_sync_single_repo() {
     local repo_dir="$1"
     local root="$2"
-    local wip_branch="wip/auto-stash-$(date +%Y%m%d-%H%M%S)-$$"
+    local wip_branch="wip/auto-stash-$(date +%Y%m%d-%H%M%S-%N)-$RANDOM-$$"
     local name="${repo_dir#$root/}"
     local status_label="SYNCED"
 
@@ -28,7 +28,12 @@ _git_sync_single_repo() {
             return 1
         fi
         git -C "$repo_dir" add -A </dev/null >/dev/null 2>&1
-        git -C "$repo_dir" commit --no-verify -m "wip: auto-stash uncommitted changes" </dev/null >/dev/null 2>&1
+        if ! git -C "$repo_dir" commit --no-verify -m "wip: auto-stash uncommitted changes" </dev/null >/dev/null 2>&1; then
+            git -C "$repo_dir" checkout "$current_branch" </dev/null >/dev/null 2>&1
+            git -C "$repo_dir" branch -D "$wip_branch" </dev/null >/dev/null 2>&1
+            printf "%-50s FAIL (could not auto-commit wip changes; see git status)\n" "$name"
+            return 1
+        fi
     fi
 
     # checkout default branch and sync
@@ -97,7 +102,8 @@ git-sync-repos() {
     local max_jobs
     max_jobs=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo 4)
     local tmp_dir
-    tmp_dir=$(mktemp -d)
+    tmp_dir=$(mktemp -d) || { echo "ERROR: could not create temp directory"; return 1; }
+    trap 'rm -rf "$tmp_dir"' RETURN INT TERM
 
     echo "Syncing $total repositories ($max_jobs parallel workers)..."
     echo ""
@@ -108,11 +114,14 @@ git-sync-repos() {
         local batch_end=$((i + max_jobs))
         [[ $batch_end -gt $total ]] && batch_end=$total
 
-        local j
+        local pids=()
         for ((j = i; j < batch_end; j++)); do
-            _git_sync_single_repo "${repos[$((j + 1))]}" "$root" > "$tmp_dir/$j.out" 2>&1 &
+            _git_sync_single_repo "${repos[$j]}" "$root" > "$tmp_dir/$j.out" 2>&1 &
+            pids+=("$!")
         done
-        wait
+        if [[ ${#pids[@]} -gt 0 ]]; then
+            wait "${pids[@]}"
+        fi
 
         i=$batch_end
     done
@@ -129,8 +138,6 @@ git-sync-repos() {
             *FAIL*) failed=$((failed + 1)) ;;
         esac
     done
-
-    rm -rf "$tmp_dir"
 
     echo ""
     echo "--- Summary ---"
