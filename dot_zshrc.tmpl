@@ -22,6 +22,11 @@ unset _JAVA_OPTIONS
 
 {{- if eq .chezmoi.os "android" }}
 export CHEZMOI_DEVICE="$(getprop ro.product.model)"
+
+# Workaround: Claude Code hardcodes /tmp/claude paths which are not writable on Termux.
+# This script patches cli.js in the installed npm package to use os.tmpdir() instead.
+# See: https://github.com/anthropics/claude-code/issues/15637
+source "$HOME/.scripts/android-patch-claude-code-tmpdir.sh"
 {{- end }}
 
 ###### ZINIT CONFIGURATION ##############################################################################################
