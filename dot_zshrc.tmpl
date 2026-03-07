@@ -24,15 +24,9 @@ unset _JAVA_OPTIONS
 export CHEZMOI_DEVICE="$(getprop ro.product.model)"
 
 # Workaround: Claude Code hardcodes /tmp/claude paths which are not writable on Termux.
-# Termux sets $TMPDIR to $PREFIX/tmp, but Claude Code ignores it in many code paths.
-# This ensures both CLAUDE_CODE_TMPDIR and TMPDIR point to a writable location,
-# and pre-creates the directory structure Claude Code expects.
+# This script patches cli.js in the installed npm package to use os.tmpdir() instead.
 # See: https://github.com/anthropics/claude-code/issues/15637
-if [[ -n "$PREFIX" ]]; then
-    export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
-    export CLAUDE_CODE_TMPDIR="$TMPDIR"
-    mkdir -p "$TMPDIR/claude" 2>/dev/null
-fi
+source "$HOME/.scripts/android-patch-claude-code-tmpdir.sh"
 {{- end }}
 
 ###### ZINIT CONFIGURATION ##############################################################################################
