@@ -7,6 +7,14 @@
 [[ "$__ZSHENV_SOURCED_PID" == "$$" ]] && return
 export __ZSHENV_SOURCED_PID="$$"
 
+###### Termux TMPDIR Fix #################################################################################################
+# On Termux/Android, /tmp is owned by shell:shell (0771) and not writable by app processes.
+# TMPDIR must be set before any tool (Node.js, Claude Code, etc.) calls os.tmpdir(),
+# which defaults to /tmp on Linux when TMPDIR is unset.
+if [[ -n "$PREFIX" && -d "$PREFIX/tmp" ]]; then
+    export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
+fi
+
 ###### Essential PATH Setup ##############################################################################################
 # Local bin directory
 if [[ -d "$HOME/.local/bin" ]]; then

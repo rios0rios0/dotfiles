@@ -23,8 +23,8 @@ unset _JAVA_OPTIONS
 {{- if eq .chezmoi.os "android" }}
 export CHEZMOI_DEVICE="$(getprop ro.product.model)"
 
-# Workaround: Claude Code hardcodes /tmp/claude paths which are not writable on Termux.
-# This script patches cli.js in the installed npm package to use os.tmpdir() instead.
+# Workaround: Claude Code hardcodes /tmp paths which are not writable on Termux.
+# This script patches cli.js to use process.env.TMPDIR and symlinks system ripgrep.
 # See: https://github.com/anthropics/claude-code/issues/15637
 source "$HOME/.scripts/android-patch-claude-code-tmpdir.sh"
 {{- end }}
