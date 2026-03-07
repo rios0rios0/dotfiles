@@ -13,7 +13,13 @@ README.md
 .aws
 .azure
 AppData
+{{-   if eq .chezmoi.os "android" }}
+.claude/**
+!.claude/settings.json
+!.claude/.claude.json
+{{-   else }}
 .claude
+{{-   end }}
 .oh-my-posh.json
 .wakatime.cfg
 {{- end }}

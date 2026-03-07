@@ -13,4 +13,4 @@ proot-distro login alpine \
     --bind $HOME/.config/op:/root/.config/op \
     --bind $HOME/.azure:/root/.azure \
     --bind $(pwd):$workspace \
-    --work-dir $workspace -- "$@"
+    --work-dir $workspace -- "$@" 2> >(grep -v "^proot warning:" >&2)
