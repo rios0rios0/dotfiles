@@ -40,7 +40,11 @@ _patch_claude_code_tmpdir() {
     fi
 
     # create a backup before patching
-    cp "$cli_js" "${cli_js}.bak" 2>/dev/null
+    if ! cp "$cli_js" "${cli_js}.bak"; then
+        echo "[claude-code-patch] Failed to create backup: ${cli_js}.bak" >&2
+        echo "[claude-code-patch] Aborting patch to avoid modifying cli.js without backup." >&2
+        return 1
+    fi
 
     local patched=0
 
@@ -116,7 +120,16 @@ _patch_claude_code_tmpdir() {
 
     # add sentinel comment to mark this file as patched
     if [[ $patched -gt 0 ]]; then
-        sed -i '1s#^#/* __TERMUX_TMPDIR_PATCHED__ */\n#' "$cli_js"
+        # insert sentinel after shebang if present, otherwise append at EOF
+        if head -n 1 "$cli_js" | grep -q '^#!'; then
+            {
+                head -n 1 "$cli_js"
+                printf '/* __TERMUX_TMPDIR_PATCHED__ */\n'
+                tail -n +2 "$cli_js"
+            } > "${cli_js}.tmp" && mv "${cli_js}.tmp" "$cli_js"
+        else
+            printf '/* __TERMUX_TMPDIR_PATCHED__ */\n' >> "$cli_js"
+        fi
         echo "[claude-code-patch] Patched $patched hardcoded /tmp path(s) in cli.js"
     else
         echo "[claude-code-patch] No known patterns found — cli.js may have been updated"
