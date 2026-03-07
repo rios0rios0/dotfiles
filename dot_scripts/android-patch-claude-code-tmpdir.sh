@@ -120,15 +120,11 @@ _patch_claude_code_tmpdir() {
 
     # add sentinel comment to mark this file as patched
     if [[ $patched -gt 0 ]]; then
-        # insert sentinel after shebang if present, otherwise append at EOF
+        # insert sentinel after shebang if present, otherwise prepend to first line
         if head -n 1 "$cli_js" | grep -q '^#!'; then
-            {
-                head -n 1 "$cli_js"
-                printf '/* __TERMUX_TMPDIR_PATCHED__ */\n'
-                tail -n +2 "$cli_js"
-            } > "${cli_js}.tmp" && mv "${cli_js}.tmp" "$cli_js"
+            sed -i '1a\/* __TERMUX_TMPDIR_PATCHED__ */' "$cli_js"
         else
-            printf '/* __TERMUX_TMPDIR_PATCHED__ */\n' >> "$cli_js"
+            sed -i '1i\/* __TERMUX_TMPDIR_PATCHED__ */' "$cli_js"
         fi
         echo "[claude-code-patch] Patched $patched hardcoded /tmp path(s) in cli.js"
     else
