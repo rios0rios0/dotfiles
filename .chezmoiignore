@@ -57,6 +57,7 @@ pyvenv.cfg
 .local/bin/wrapper
 .config/nvim
 .config/mcphub
+.termux
 {{- end }}
 
 {{- /* Additional Android exclusions: For example, ignore .gitconfig on Android even if it’s normally managed elsewhere. */ -}}

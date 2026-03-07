@@ -1,0 +1,32 @@
+#!{{ lookPath "bash" }}
+
+# This modify_ script patches only managed keys in termux.properties,
+# preserving the rest of the file (comments, defaults, future Termux additions).
+
+export DESIRED
+DESIRED="$(cat <<'KEYS'
+extra-keys = [['ESC','/','-','HOME','UP','END','PGUP'], \
+              ['TAB','CTRL','SHIFT','LEFT','DOWN','RIGHT','PGDN']]
+KEYS
+)"
+
+contents="$(cat)"
+
+# Replace existing uncommented extra-keys line(s) (including continuation lines) in-place
+result="$(echo "$contents" | awk '
+  /^extra-keys[[:space:]]*=/ {
+    while (/\\$/) {
+      if ((getline) <= 0) break
+    }
+    print ENVIRON["DESIRED"]
+    next
+  }
+  { print }
+')"
+
+# If no extra-keys line existed, append it
+if ! echo "$result" | grep -q "^extra-keys[[:space:]]*="; then
+  result="$(printf '%s\n%s' "$result" "$DESIRED")"
+fi
+
+printf '%s\n' "$result"
