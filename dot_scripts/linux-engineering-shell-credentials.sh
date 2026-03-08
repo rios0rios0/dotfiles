@@ -8,9 +8,20 @@ source "$HOME/.scripts/linux-engineering-op-loader.sh"
 
 _cred_cache="$HOME/.cache/op-credentials.env"
 
+# use cache if fresh (< 24h) — avoids all proot/op calls on most shell opens
+if [[ -f "$_cred_cache" ]]; then
+  _mtime=$(stat -c %Y "$_cred_cache" 2>/dev/null)
+  _now=$(date +%s)
+  if (( _now - _mtime < 86400 )); then
+    source "$_cred_cache"
+    unset _mtime _now _cred_cache
+    return 0 2>/dev/null || true
+  fi
+  unset _mtime _now
+fi
+
 _on_credential() {
   export "${1}=${2}"
-  # append to cache file (created fresh each interactive session)
   printf 'export %s=%q\n' "$1" "$2" >> "$_cred_cache"
 }
 
