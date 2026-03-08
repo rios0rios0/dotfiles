@@ -18,23 +18,40 @@ mkdir -p "$HOME/.local/bin"
 mkdir -p "$HOME/.config/op"
 mkdir -p "$HOME/.azure"
 
-# First, create the wrapper script that op depends on
+# First, create the wrapper script that op depends on.
+# Uses direct proot instead of proot-distro (~2000-line bash script) for faster startup.
+# Only binds the directories actually needed by op/az, skipping the ~20 fake /proc/* mounts.
 cat > "$HOME/.local/bin/wrapper" << 'WRAPPER_EOF'
 #!/data/data/com.termux/files/usr/bin/bash
 
+ALPINE_ROOT="$PREFIX/var/lib/proot-distro/installed-rootfs/alpine"
+
 # forward any OP_SESSION_* tokens from host to proot (set by 'op signin')
-env_flags=()
+env_args=()
 for _var in $(compgen -v OP_SESSION_ 2>/dev/null); do
-  env_flags+=(--env "${_var}=${!_var}")
+  env_args+=("${_var}=${!_var}")
 done
 
-proot-distro login alpine --no-arch-warning \
-    "${env_flags[@]}" \
-    --bind $HOME/.local/bin:/root/.local/bin \
-    --bind $HOME/.config/op:/root/.config/op \
-    --bind $HOME/.azure:/root/.azure \
-    --bind $(pwd):/root/workspace \
-    --work-dir /root/workspace -- "$@"
+exec proot \
+    --link2symlink \
+    --kill-on-exit \
+    --rootfs="$ALPINE_ROOT" \
+    --root-id \
+    --cwd=/root \
+    --bind=/dev \
+    --bind=/proc \
+    --bind=/sys \
+    --bind="$HOME/.local/bin:/root/.local/bin" \
+    --bind="$HOME/.config/op:/root/.config/op" \
+    --bind="$HOME/.azure:/root/.azure" \
+    --bind="$(pwd):/root/workspace" \
+    /usr/bin/env -i \
+    HOME=/root \
+    PATH=/usr/local/bin:/usr/bin:/bin:/root/.local/bin \
+    TERM="$TERM" \
+    TMPDIR=/tmp \
+    "${env_args[@]}" \
+    "$@"
 WRAPPER_EOF
 
 # Make wrapper executable
