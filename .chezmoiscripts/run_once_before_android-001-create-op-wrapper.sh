@@ -30,7 +30,15 @@ export PROOT_LINK2SYMLINK=1
 export PROOT_VERBOSE=-1
 
 workspace="/root/workspace"
+
+# forward any OP_SESSION_* tokens from host to proot (set by 'op signin')
+env_flags=()
+for _var in $(compgen -v OP_SESSION_ 2>/dev/null); do
+  env_flags+=(--env "${_var}=${!_var}")
+done
+
 proot-distro login alpine --no-arch-warning \
+    "${env_flags[@]}" \
     --bind $HOME/.local/bin:/root/.local/bin \
     --bind $HOME/.config/op:/root/.config/op \
     --bind $HOME/.azure:/root/.azure \
