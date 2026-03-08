@@ -7,13 +7,21 @@ This is because on Android (Termux) only private keys are usable, while other pl
 
 ###### VCS #######################################################################
 {{- warnf "[ssh-config] fetching Active SSHs..." -}}
+{{- $sshNotes := "" -}}
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if eq .type "REFERENCE" -}}
-    {{- $parts := split "@" .label -}}
+  {{- if eq .label "notesPlain" -}}
+    {{- $sshNotes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $sshNotes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
     {{- $device := index $parts "_0" -}}
+    {{- warnf "[ssh-config] checking \"%s\"" $title -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf "[ssh-config] matched \"%s\" for VCS hosts" .label -}}
-      {{- $item := onepassword .value "Private" "my" -}}
+      {{- warnf "[ssh-config] matched \"%s\" for VCS hosts" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
       {{- $sshName := $item.title | trim -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
@@ -62,13 +70,21 @@ Host bitbucket.org-{{ $sshAlias }}
 
 ###### PEM #######################################################################
 {{- warnf "[ssh-config] fetching Active PEMs..." -}}
+{{- $pemNotes := "" -}}
 {{- range (onepassword "Active PEMs" "personal" "my").fields -}}
-  {{- if eq .type "REFERENCE" -}}
-    {{- $parts := split "@" .label -}}
+  {{- if eq .label "notesPlain" -}}
+    {{- $pemNotes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $pemNotes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
     {{- $device := index $parts "_0" -}}
+    {{- warnf "[ssh-config] checking PEM \"%s\"" $title -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf "[ssh-config] matched \"%s\" for PEM hosts" .label -}}
-      {{- $item := onepassword .value "Private" "my" -}}
+      {{- warnf "[ssh-config] matched \"%s\" for PEM hosts" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
       {{- $pemName := $item.title | trim -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}

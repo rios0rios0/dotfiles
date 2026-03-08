@@ -9,11 +9,18 @@ gpgFolderPath="$HOME/.gpg"
 mkdir -p $gpgFolderPath
 
 {{- warnf "[linux-gpg-keys] fetching Active GPGs..." -}}
-{{- range (onepassword "Active GPGs" "personal" "my").fields }}
-{{-      if (eq .type "REFERENCE") }}
+{{- $gpgNotes := "" -}}
+{{- range (onepassword "Active GPGs" "personal" "my").fields -}}
+  {{- if eq .label "notesPlain" -}}
+    {{- $gpgNotes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $gpgNotes }}
+{{-      $title := . | trim -}}
+{{-      if ne $title "" }}
 
 # read the GPG name and private key from 1Password
-{{- $item := onepassword .value "Private" "my" -}}
+{{- $item := onepassword $title "Private" "my" -}}
 {{- warnf "[linux-gpg-keys] importing GPG key \"%s\"" $item.title -}}
 {{- $f := dict -}}
 {{- range $item.fields -}}

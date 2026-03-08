@@ -1,25 +1,34 @@
 {
   "auths": {
     {{- warnf "[docker-config] fetching Active Docker Registries..." }}
-    {{- $items := (onepassword "Active Docker Registries" "personal" "my").fields }}
-    {{- $lastIndex := sub (len $items) 1 }}
-    {{- range $index, $item := $items }}
-    {{-      if (eq $item.type "REFERENCE") }}
-	{{-          $opItem := onepassword $item.value "Private" "my" }}
-	{{-          $f := dict }}
-	{{-          range $opItem.fields }}
-	{{-            if hasKey . "value" }}
-	{{-              $_ := set $f .label .value }}
-	{{-            end }}
-	{{-          end }}
-	{{-          $registryUsername := index $f "username" }}
-    {{-          $registryCredential := index $f "credential" }}
-	{{-          $registryName := index $f "registry name" }}
-    {{-          warnf "[docker-config] configuring registry \"%s\"" $registryName }}
+    {{- $dockerNotes := "" }}
+    {{- range (onepassword "Active Docker Registries" "personal" "my").fields }}
+    {{-   if eq .label "notesPlain" }}
+    {{-     $dockerNotes = .value }}
+    {{-   end }}
+    {{- end }}
+    {{- $titles := splitList "\n" $dockerNotes }}
+    {{- $first := true }}
+    {{- range $titles }}
+    {{-   $title := . | trim }}
+    {{-   if ne $title "" }}
+    {{-     $opItem := onepassword $title "Private" "my" }}
+    {{-     $f := dict }}
+    {{-     range $opItem.fields }}
+    {{-       if hasKey . "value" }}
+    {{-         $_ := set $f .label .value }}
+    {{-       end }}
+    {{-     end }}
+    {{-     $registryUsername := index $f "username" }}
+    {{-     $registryCredential := index $f "credential" }}
+    {{-     $registryName := index $f "registry name" }}
+    {{-     warnf "[docker-config] configuring registry \"%s\"" $registryName }}
+    {{- if not $first }},{{ end }}
     "{{ $registryName }}": {
       "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
-    }{{ if lt $index $lastIndex }},{{ end }}
-	{{-      end }}
+    }
+    {{-     $first = false }}
+    {{-   end }}
     {{- end }}
   }
 }

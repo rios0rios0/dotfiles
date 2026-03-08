@@ -25,19 +25,27 @@
     {{- $sshCommand = "ssh" -}}
 {{- end -}}
 
-{{- /* Default user fields from 1Password Active SSHs */ -}}
+{{- /* Default user fields from 1Password Active SSHs (notes-based) */ -}}
 {{- $defaultUsername := "" -}}
 {{- $defaultUserEmail := "" -}}
 {{- $defaultUserSigningkey := "" -}}
 {{- warnf "[gitconfig] fetching Active SSHs..." -}}
-{{- $activeSshFields := (onepassword "Active SSHs" "personal" "my").fields -}}
-{{- range $activeSshFields -}}
-  {{- if eq .type "REFERENCE" -}}
-    {{- $parts := split "@" .label -}}
+{{- $activeSsh := onepassword "Active SSHs" "personal" "my" -}}
+{{- $sshNotes := "" -}}
+{{- range $activeSsh.fields -}}
+  {{- if eq .label "notesPlain" -}}
+    {{- $sshNotes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $sshNotes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
     {{- $device := index $parts "_0" -}}
+    {{- warnf "[gitconfig] checking \"%s\"" $title -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf "[gitconfig] matched \"%s\" for SSH defaults" .label -}}
-      {{- $item := onepassword .value "Private" "my" -}}
+      {{- warnf "[gitconfig] matched \"%s\" for SSH defaults" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}
@@ -83,13 +91,21 @@
 
     # gpg signing
 {{- warnf "[gitconfig] fetching Active GPGs..." -}}
+{{- $gpgNotes := "" -}}
 {{- range (onepassword "Active GPGs" "personal" "my").fields -}}
-  {{- if eq .type "REFERENCE" -}}
-    {{- $parts := split "@" .label -}}
+  {{- if eq .label "notesPlain" -}}
+    {{- $gpgNotes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $gpgNotes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
     {{- $device := index $parts "_0" -}}
+    {{- warnf "[gitconfig] checking GPG \"%s\"" $title -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf "[gitconfig] matched \"%s\" for GPG alias" .label -}}
-      {{- $item := onepassword .value "Private" "my" -}}
+      {{- warnf "[gitconfig] matched \"%s\" for GPG alias" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}
@@ -106,13 +122,14 @@
 {{- end }}
 
     # ssh signing
-{{- range $activeSshFields -}}
-  {{- if eq .type "REFERENCE" -}}
-    {{- $parts := split "@" .label -}}
+{{- range splitList "\n" $sshNotes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf "[gitconfig] matched \"%s\" for SSH alias" .label -}}
-      {{- $item := onepassword .value "Private" "my" -}}
+      {{- warnf "[gitconfig] matched \"%s\" for SSH alias" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}

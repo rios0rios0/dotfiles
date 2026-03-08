@@ -9,14 +9,21 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 {{- $deviceName := .deviceName -}}
 
 {{- warnf "[windows-ssh-keys] fetching Active SSHs..." -}}
-{{- range (onepassword "Active SSHs" "personal" "my").fields }}
-{{-      if (eq .type "REFERENCE") }}
+{{- $sshNotes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if eq .label "notesPlain" -}}
+    {{- $sshNotes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $sshNotes }}
+{{-      $title := . | trim -}}
+{{-      if ne $title "" }}
 
-{{-        $parts := split "@" .label -}}
+{{-        $parts := split "@" $title -}}
 {{-        $device := index $parts "_0" -}}
 
 {{-        if eq $device $deviceName }}
-{{-        $item := onepassword .value "Private" "my" -}}
+{{-        $item := onepassword $title "Private" "my" -}}
 {{-        $sshName := $item.title | trim -}}
 {{-        warnf "[windows-ssh-keys] creating public key for \"%s\"" $sshName -}}
 

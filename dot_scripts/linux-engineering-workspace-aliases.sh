@@ -1,5 +1,5 @@
 # Per-device workspace aliases from 1Password.
-# Central item "Active Workspaces" (vault: personal) with REFERENCE fields.
+# Central item "Active Workspaces" (vault: personal) with titles in notesPlain.
 # Referenced items: title "<device-slug>@<alias-name>", field "credential"/"password" = directory path.
 
 source "$HOME/.scripts/linux-engineering-op-loader.sh"

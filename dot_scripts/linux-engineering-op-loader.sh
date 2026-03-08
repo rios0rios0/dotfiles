@@ -1,6 +1,6 @@
-# Shared 1Password reference loader for per-device items.
-# Iterates REFERENCE fields in a central 1Password item, filters by device slug,
-# and calls a user-provided callback for each matching entry.
+# Shared 1Password notes-based loader for per-device items.
+# Reads item titles from the notesPlain field of a central 1Password item,
+# filters by device slug locally (no API call), then fetches only matching items.
 #
 # Usage:
 #   source "$HOME/.scripts/linux-engineering-op-loader.sh"
@@ -47,40 +47,42 @@ _op_load_references() {
     return 0
   fi
 
-  local _ol_refs
-  _ol_refs=$(printf '%s' "$_ol_json" | jq -r '.fields[]? | select(.type == "REFERENCE") | .value' 2>/dev/null)
-  if [[ -z "$_ol_refs" ]]; then
-    _ol_log "WARN: no REFERENCE fields found in '$_ol_item'"
+  local _ol_notes
+  _ol_notes=$(printf '%s' "$_ol_json" | jq -r '.fields[]? | select(.label == "notesPlain") | .value // empty' 2>/dev/null)
+  if [[ -z "$_ol_notes" ]]; then
+    _ol_log "WARN: no notesPlain field found in '$_ol_item'"
     unset -f _ol_log
     return 0
   fi
 
   local _ol_loaded=0
   local _ol_skipped=0
-  local _ol_ref _ol_entry _ol_title _ol_value
+  local _ol_title _ol_entry _ol_value
 
-  while IFS= read -r _ol_ref; do
-    [[ -z "$_ol_ref" ]] && continue
+  while IFS= read -r _ol_title; do
+    # trim whitespace
+    _ol_title="${_ol_title#"${_ol_title%%[![:space:]]*}"}"
+    _ol_title="${_ol_title%"${_ol_title##*[![:space:]]}"}"
+    [[ -z "$_ol_title" ]] && continue
 
-    if ! _ol_entry=$(op item get "$_ol_ref" --account my --format json 2>&1); then
-      _ol_log "WARN: failed to fetch referenced item '$_ol_ref': $_ol_entry"
-      _ol_skipped=$((_ol_skipped + 1))
-      continue
-    fi
-    [[ -z "$_ol_entry" ]] && { _ol_skipped=$((_ol_skipped + 1)); continue; }
-
-    _ol_title=$(printf '%s' "$_ol_entry" | jq -r '.title // empty' 2>/dev/null)
     if [[ "$_ol_title" != *@* ]]; then
-      _ol_log "SKIP: item title '$_ol_title' has no '@' separator"
+      _ol_log "SKIP: title '$_ol_title' has no '@' separator"
       _ol_skipped=$((_ol_skipped + 1))
       continue
     fi
 
-    # silent skip for items belonging to other devices
+    # skip items belonging to other devices (no API call needed)
     if [[ "${_ol_title%%@*}" != "$_ol_slug" ]]; then
       _ol_skipped=$((_ol_skipped + 1))
       continue
     fi
+
+    if ! _ol_entry=$(op item get "$_ol_title" --vault private --account my --format json 2>&1); then
+      _ol_log "WARN: failed to fetch item '$_ol_title': $_ol_entry"
+      _ol_skipped=$((_ol_skipped + 1))
+      continue
+    fi
+    [[ -z "$_ol_entry" ]] && { _ol_skipped=$((_ol_skipped + 1)); continue; }
 
     _ol_value=$(printf '%s' "$_ol_entry" | jq -r '(.fields[]? | select(.id == "credential" or .id == "password") | .value) // empty' 2>/dev/null | head -1)
     if [[ -n "$_ol_value" ]]; then
@@ -90,7 +92,7 @@ _op_load_references() {
       _ol_log "WARN: no credential/password field in item '${_ol_title#*@}'"
       _ol_skipped=$((_ol_skipped + 1))
     fi
-  done <<< "$_ol_refs"
+  done <<< "$_ol_notes"
 
   _ol_log "done: $_ol_loaded loaded, $_ol_skipped skipped"
   unset -f _ol_log

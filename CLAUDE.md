@@ -75,33 +75,33 @@ Commonly used chezmoi template variables in this repo:
 
 ## 1Password Template Pattern
 
-All templates that fetch referenced items from 1Password use a single `onepassword` call per item, then build a local field map with sprig `dict`/`set`:
+"Active *" items (e.g., "Active SSHs") are Secure Notes in the personal vault. Item titles are listed **one per line in the notes field** (`notesPlain`). Templates read notes, filter by device locally, and only fetch matching items by title — avoiding unnecessary API calls.
 
+**Notes-based pattern with device filtering:**
 ```go
-{{- $item := onepassword .value "Private" "my" -}}
-{{- $name := $item.title | trim -}}
-{{- $f := dict -}}
-{{- range $item.fields -}}
-  {{- if hasKey . "value" -}}
-    {{- $_ := set $f .label .value -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if eq .label "notesPlain" -}}
+    {{- $notes = .value -}}
   {{- end -}}
 {{- end -}}
-{{- $val := index $f "field name" -}}
+{{- range splitList "\n" $notes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
+    {{- if eq $device $deviceName -}}
+      {{- $item := onepassword $title "Private" "my" -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $val := index $f "field name" -}}
 ```
 
 **Always guard with `hasKey . "value"`** — some 1Password fields lack a `value` property; accessing it without a guard causes `map has no entry for key "value"`.
-
-**Filter by device from REFERENCE label** — when templates filter by `deviceName`, parse `.label` (not `$item.title`) of the REFERENCE field to extract the device name *before* calling `onepassword .value`. This avoids unnecessary API calls for non-matching devices:
-
-```go
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if eq .type "REFERENCE" -}}
-    {{- $parts := split "@" .label -}}
-    {{- $device := index $parts "_0" -}}
-    {{- if eq $device $deviceName -}}
-      {{- $item := onepassword .value "Private" "my" -}}
-      ...
-```
 
 **Do not use `onepasswordItemFields`** — it only returns section-level fields and misses built-in properties like `"public key"` and `"private key"` on SSH Key items. The `onepassword` + `dict`/`set` pattern accesses all fields and chezmoi caches the underlying `op item get` call across all template files automatically.
 

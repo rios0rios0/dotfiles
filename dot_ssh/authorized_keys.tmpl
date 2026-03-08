@@ -1,24 +1,27 @@
 {{- $deviceName := .deviceName -}}
 
-{{- warnf “[authorized-keys] fetching Active SSHs...” -}}
-{{- range (onepassword “Active SSHs” “personal” “my”).fields -}}
-  {{- if (eq .type “REFERENCE”) -}}
-
-    {{- $parts := split “@” .label -}}
-    {{- $device := index $parts “_0” -}}
-
+{{- warnf "[authorized-keys] fetching Active SSHs..." -}}
+{{- $sshNotes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if eq .label "notesPlain" -}}
+    {{- $sshNotes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $sshNotes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf “[authorized-keys] matched \”%s\”” .label -}}
-      {{- $item := onepassword .value “Private” “my” -}}
-
+      {{- warnf "[authorized-keys] matched \"%s\"" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
-        {{- if hasKey . “value” -}}
+        {{- if hasKey . "value" -}}
           {{- $_ := set $f .label .value -}}
         {{- end -}}
       {{- end -}}
-      {{- printf “%s\n” (index $f “public key”) -}}
-
+      {{- printf "%s\n" (index $f "public key") -}}
     {{- end -}}
   {{- end -}}
 {{- end }}

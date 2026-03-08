@@ -10,35 +10,42 @@ chmod 700 "$sshFolder"
 
 {{- $deviceName := .deviceName -}}
 
-{{- warnf “[android-ssh-keys] fetching Active SSHs...” -}}
-{{- range (onepassword “Active SSHs” “personal” “my”).fields }}
-  {{- if (eq .type “REFERENCE”) }}
+{{- warnf "[android-ssh-keys] fetching Active SSHs..." -}}
+{{- $sshNotes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if eq .label "notesPlain" -}}
+    {{- $sshNotes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $sshNotes }}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" }}
 
-    {{- $parts := split “@” .label -}}
-    {{- $device := index $parts “_0” -}}
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
 
     {{- if eq $device $deviceName -}}
-      {{- $item := onepassword .value “Private” “my” -}}
+      {{- $item := onepassword $title "Private" "my" -}}
       {{- $sshName := $item.title | trim -}}
-      {{- warnf “[android-ssh-keys] creating keys for \”%s\”” $sshName -}}
+      {{- warnf "[android-ssh-keys] creating keys for \"%s\"" $sshName -}}
 
       {{- $f := dict -}}
       {{- range $item.fields -}}
-        {{- if hasKey . “value” -}}
+        {{- if hasKey . "value" -}}
           {{- $_ := set $f .label .value -}}
         {{- end -}}
       {{- end -}}
-      {{- $sshPrivateKey := index $f “private key” | trim }}
-      {{- $sshPublicKey := index $f “public key” | trim }}
-      
+      {{- $sshPrivateKey := index $f "private key" | trim }}
+      {{- $sshPublicKey := index $f "public key" | trim }}
+
       sshKeyPath="$sshFolder/{{ $sshName }}"
-      
+
       echo "[android-ssh-keys] creating private key: $sshKeyPath" >&2
       cat << 'EOF' > "$sshKeyPath"
 {{ $sshPrivateKey }}
 EOF
       chmod 600 "$sshKeyPath"
-      
+
       echo "[android-ssh-keys] creating public key: $sshKeyPath.pub" >&2
       cat << 'EOF' > "$sshKeyPath.pub"
 {{ $sshPublicKey }}

@@ -39,7 +39,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - suppressed proot warnings on Android using `PROOT_VERBOSE=-1` and `--no-arch-warning` flags
 - unified `deviceName` computation into `.chezmoi.yaml.tmpl` data section, removing duplication across 7 template files
 - replaced `onepasswordRead` + `onepasswordItemFields` with single `onepassword` call per item across all templates, using `dict`/`set` to build local field maps — halves API calls per referenced item and fixes missing built-in fields (`public key`, `private key`)
-- optimized device-filtered templates to parse REFERENCE `.label` for device name before fetching items — avoids unnecessary 1Password API calls for non-matching devices
+- switched all "Active *" item lookups from REFERENCE field iteration to notes-based (`notesPlain`) filtering — reads item titles from notes, filters by device locally, and only fetches matching items by title (reduces API calls from N+1 to 2 per device-filtered loop)
+- updated `linux-engineering-op-loader.sh` to use notes-based filtering with `--vault private` for title-based lookups
 - standardized logging convention across 20 files with `[prefix]` format to stderr using `warnf` (templates), `echo >&2` (shell), and `Write-Host` (PowerShell)
 - added `warnf` progress logging to all 1Password template operations (`gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`) showing item fetch, device match, and per-item progress
 - added `[prefix]` logging to previously silent scripts: `clone-tools`, `ssh-known-hosts`, `configure-deps`, `kube-config`, `termux-config`, `fonts`
@@ -53,3 +54,4 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - fixed `onepasswordItemFields` not returning built-in SSH Key fields (`public key`, `private key`) — these are top-level detail fields not accessible via `onepasswordItemFields` which only reads section-level fields
 - fixed `warnf` double newlines by removing explicit `\n` from format strings (chezmoi appends its own newline)
 - fixed `map has no entry for key "value"` crash in `dict`/`set` field loops by adding `hasKey` guard for 1Password fields without a value property
+- fixed Unicode curly quotes (U+201C/U+201D) inadvertently introduced in 3 template files
