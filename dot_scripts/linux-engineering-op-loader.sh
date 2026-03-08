@@ -26,6 +26,16 @@ _op_load_references() {
     return 0
   fi
 
+  # ensure 1Password is authenticated before making API calls
+  if ! op whoami --account my &>/dev/null; then
+    _ol_log "not signed in, attempting signin..."
+    if ! op signin --account my &>/dev/null; then
+      _ol_log "ERROR: could not sign in to 1Password (unlock the desktop app or run 'op signin --account my')"
+      unset -f _ol_log
+      return 0
+    fi
+  fi
+
   local _ol_device
   if [[ -n "$CHEZMOI_DEVICE" ]]; then
     _ol_device="$CHEZMOI_DEVICE"
