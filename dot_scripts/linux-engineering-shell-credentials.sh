@@ -8,8 +8,8 @@ source "$HOME/.scripts/linux-engineering-op-loader.sh"
 
 _cred_cache="$HOME/.cache/op-credentials.env"
 
-# use cache if fresh (< 24h) — avoids all proot/op calls on most shell opens
-if [[ -f "$_cred_cache" ]]; then
+# use cache if fresh (< 24h) and non-empty — avoids all proot/op calls on most shell opens
+if [[ -s "$_cred_cache" ]]; then
   _mtime=$(stat -c %Y "$_cred_cache" 2>/dev/null)
   _now=$(date +%s)
   if (( _now - _mtime < 86400 )); then
@@ -31,6 +31,9 @@ rm -f "$_cred_cache"
 install -m 600 /dev/null "$_cred_cache"
 
 _op_load_references "credentials" "Active Shell Credentials" _on_credential
+
+# remove empty cache (loader failed to populate)
+[[ -f "$_cred_cache" && ! -s "$_cred_cache" ]] && rm -f "$_cred_cache"
 
 unset -f _on_credential
 unset _cred_cache
