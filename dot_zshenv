@@ -150,18 +150,19 @@ if [[ -d "$HOME/.yarn/bin" ]]; then
     export PATH="$HOME/.yarn/bin:$PATH"
 fi
 
-###### Cached 1Password Credentials ############################################################################
-# Written by shell-credentials.sh in interactive shells, auto-deleted after 24h.
-# Provides env vars (e.g. GITHUB_PERSONAL_ACCESS_TOKEN) to non-interactive shells (MCPs, IDE subshells).
-_cred_cache="$HOME/.cache/op-credentials.env"
-if [[ -f "$_cred_cache" ]]; then
-    _mtime=$(stat -c %Y "$_cred_cache" 2>/dev/null)
-    _now=$(date +%s)
-    if (( _now - _mtime > 86400 )); then
-        rm -f "$_cred_cache"  # expired → delete
-    else
-        source "$_cred_cache"  # valid → load
+###### Cached 1Password Credentials & Workspaces ###############################################################
+# Written by shell-credentials.sh and workspace-aliases.sh in interactive shells, auto-deleted after 24h.
+# Provides env vars and aliases to non-interactive shells (MCPs, IDE subshells).
+for _cache_file in "$HOME/.cache/op-credentials.env" "$HOME/.cache/op-workspaces.env"; do
+    if [[ -f "$_cache_file" ]]; then
+        _mtime=$(stat -c %Y "$_cache_file" 2>/dev/null)
+        _now=$(date +%s)
+        if (( _now - _mtime > 86400 )); then
+            rm -f "$_cache_file"  # expired → delete
+        else
+            source "$_cache_file"  # valid → load
+        fi
+        unset _mtime _now
     fi
-    unset _mtime _now
-fi
-unset _cred_cache
+done
+unset _cache_file
