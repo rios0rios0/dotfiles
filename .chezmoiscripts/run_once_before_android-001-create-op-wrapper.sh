@@ -27,10 +27,10 @@ cat > "$HOME/.local/bin/wrapper" << 'WRAPPER_EOF'
 
 export PROOTNOCALL_VERIFY=1
 export PROOT_LINK2SYMLINK=1
-export PROOT_VERBOSE=0
+export PROOT_VERBOSE=-1
 
 workspace="/root/workspace"
-proot-distro login alpine \
+proot-distro login alpine --no-arch-warning \
     --bind $HOME/.local/bin:/root/.local/bin \
     --bind $HOME/.config/op:/root/.config/op \
     --bind $HOME/.azure:/root/.azure \
