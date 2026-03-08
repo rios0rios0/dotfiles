@@ -30,6 +30,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 ### Changed
 
 - converted MCP configuration from static JSON to Chezmoi template for cross-platform compatibility and secure credential management
+- deduplicated MCP server merge scripts into a shared `lib-modify-mcp-servers.sh` chezmoi template
+- deduplicated shell credentials and workspace aliases into a shared `linux-engineering-op-loader.sh` loader with structured logging
 - enhanced Android SSH script to export both private and public keys from 1Password, renamed from `run_after_android-001-create-ssh-private-keys.sh.tmpl` to `run_after_android-001-create-ssh-keys.sh.tmpl`
+- improved logging across modify scripts with `[prefix]` tags for `mcp-servers`, `claude-trust`, `claude-settings`, `credentials`, `workspaces`, and `git-sync`
+- reduced 1Password API calls by replacing per-field `onepasswordRead` with `onepasswordItemFields` across 9 template files (~18 fewer `op` CLI invocations per apply)
 - segregated MCP configurations into platform-specific files: `.cursor/mcp.json` for Linux (Docker-based) and `.config/mcphub/servers.json` for Android (npx-based), eliminating cross-platform conditional logic
 - simplified 1Password calls by replacing list/join patterns with printf format for improved readability and consistency
+- suppressed proot warnings on Android using `PROOT_VERBOSE=-1` and `--no-arch-warning` flags
+- unified `deviceName` computation into `.chezmoi.yaml.tmpl` data section, removing duplication across 7 template files
