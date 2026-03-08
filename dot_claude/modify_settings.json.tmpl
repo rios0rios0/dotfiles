@@ -1,0 +1,56 @@
+#!{{ lookPath "bash" }}
+# Merges broad permission rules into ~/.claude/settings.json
+# Receives current file content on stdin, outputs desired content on stdout.
+
+python3 << 'PYEOF'
+import json, sys
+
+# Read current settings (empty string if file doesn't exist)
+current = sys.stdin.read().strip()
+if current:
+    try:
+        data = json.loads(current)
+    except json.JSONDecodeError:
+        data = {}
+else:
+    data = {}
+
+# Ensure effortLevel
+data.setdefault("effortLevel", "high")
+
+# Merge broad permission rules
+desired_allow = [
+    "Bash(git:*)",
+    "Bash(chezmoi:*)",
+    "Bash(ls:*)",
+    "Bash(cat:*)",
+    "Bash(head:*)",
+    "Bash(tail:*)",
+    "Bash(find:*)",
+    "Bash(grep:*)",
+    "Bash(rg:*)",
+    "Bash(gh:*)",
+    "Bash(test:*)",
+    "Bash(echo:*)",
+    "Bash(chmod:*)",
+    "Bash(mkdir:*)",
+    "Bash(cp:*)",
+    "Bash(mv:*)",
+    "Read",
+    "Edit",
+    "Write",
+    "Glob",
+    "Grep",
+    "WebSearch",
+    "mcp__github__*",
+]
+
+permissions = data.setdefault("permissions", {})
+existing_allow = set(permissions.get("allow", []))
+# Add desired rules, preserving any extra user-added rules
+merged = list(dict.fromkeys(desired_allow + list(existing_allow)))
+permissions["allow"] = merged
+
+json.dump(data, sys.stdout, indent=2)
+sys.stdout.write("\n")
+PYEOF

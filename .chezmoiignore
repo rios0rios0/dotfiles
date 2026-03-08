@@ -2,7 +2,7 @@
 .docs
 .editorconfig
 CHANGELOG.md
-CLAUDE.md
+**/CLAUDE.md
 CONTRIBUTING.md
 LICENSE
 README.md
@@ -13,11 +13,7 @@ README.md
 .aws
 .azure
 AppData
-{{-   if eq .chezmoi.os "android" }}
-.claude/**
-!.claude/settings.json
-!.claude/.claude.json
-{{-   else }}
+{{-   if ne .chezmoi.os "android" }}
 .claude
 {{-   end }}
 .oh-my-posh.json

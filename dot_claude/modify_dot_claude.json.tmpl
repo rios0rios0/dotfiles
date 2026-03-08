@@ -1,0 +1,47 @@
+#!{{ lookPath "bash" }}
+# Patches hasTrustDialogAccepted into ~/.claude/.claude.json
+# Receives current file content on stdin, outputs desired content on stdout.
+# If stdin is empty (file doesn't exist), tries to restore from backup.
+
+python3 << 'PYEOF'
+import json, os, sys, glob
+
+current = sys.stdin.read().strip()
+
+# If file doesn't exist, try restoring from backup
+if not current:
+    backup_pattern = os.path.expanduser("~/.claude/backups/.claude.json.backup.*")
+    backups = sorted(glob.glob(backup_pattern), reverse=True)
+    if backups:
+        with open(backups[0]) as f:
+            current = f.read().strip()
+        print(f"[claude-config] Restoring from backup: {backups[0]}", file=sys.stderr)
+
+if current:
+    try:
+        data = json.loads(current)
+    except json.JSONDecodeError:
+        data = {}
+else:
+    data = {}
+
+projects = data.setdefault("projects", {})
+dev_base = os.path.expanduser("~/Development/github.com/rios0rios0")
+
+# Trust home dir and dev base
+trust_dirs = [os.path.expanduser("~"), dev_base]
+
+# Auto-discover project subdirectories
+if os.path.isdir(dev_base):
+    for entry in os.listdir(dev_base):
+        full = os.path.join(dev_base, entry)
+        if os.path.isdir(full):
+            trust_dirs.append(full)
+
+for d in trust_dirs:
+    proj = projects.setdefault(d, {})
+    proj["hasTrustDialogAccepted"] = True
+
+json.dump(data, sys.stdout, indent=2)
+sys.stdout.write("\n")
+PYEOF
