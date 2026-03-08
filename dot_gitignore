@@ -30,5 +30,6 @@ fabric.properties
 .vs
 
 .cursor
-.claude
+.claude/
+!.claude/settings.json
 .wakatime-project

@@ -2,7 +2,7 @@
 .docs
 .editorconfig
 CHANGELOG.md
-**/CLAUDE.md
+/CLAUDE.md
 CONTRIBUTING.md
 LICENSE
 README.md

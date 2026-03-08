@@ -149,6 +149,10 @@ The three `modify_*.tmpl` files are chezmoi [modify scripts](https://www.chezmoi
 
 > **Note**: The `dot_claude/` directory is deployed only on **Windows** and **Android** (excluded on Linux via `.chezmoiignore`).
 
+### Gitignore Design
+
+The global `~/.gitignore` (managed via `dot_gitignore`) ignores `.claude/` by default to prevent accidentally committing Claude Code's internal files (caches, memory, `settings.local.json`) across all repositories. However, `.claude/settings.json` is explicitly un-ignored because Claude Code designates it as team-shared project configuration — meant to be committed alongside the codebase. Personal or machine-specific settings belong in `.claude/settings.local.json`, which remains ignored.
+
 ## Chezmoi Conventions
 
 | Prefix/Suffix | Meaning |
