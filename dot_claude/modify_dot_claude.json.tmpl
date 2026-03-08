@@ -13,6 +13,7 @@ if current:
     try:
         data = json.loads(current)
     except json.JSONDecodeError:
+        print("[claude-trust] WARN: invalid JSON input, starting fresh", file=sys.stderr)
         data = {}
 else:
     data = {}
@@ -34,7 +35,11 @@ for d in trust_dirs:
     proj = projects.setdefault(d, {})
     proj["hasTrustDialogAccepted"] = True
 
+print(f"[claude-trust] trusted {len(trust_dirs)} directories", file=sys.stderr)
 json.dump(data, sys.stdout, indent=2)
 sys.stdout.write("\n")
 PYEOF
-python3 "$_script"
+if ! python3 "$_script"; then
+    echo "[claude-trust] ERROR: Python script failed" >&2
+    exit 1
+fi

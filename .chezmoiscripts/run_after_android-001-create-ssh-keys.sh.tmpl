@@ -8,7 +8,7 @@ chmod 700 "$sshFolder"
 
 # TODO: Try to find a way to use 1Password authentication to fetch SSH keys directly!
 
-{{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
+{{- $deviceName := .deviceName -}}
 
 {{- range (onepassword "Active SSHs" "personal" "my").fields }}
   {{- if (eq .type "REFERENCE") }}
@@ -23,8 +23,9 @@ chmod 700 "$sshFolder"
     {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
 
-      {{- $sshPrivateKey := onepasswordRead (printf "op://Private/%s/private key" .value) "my" | trim }}
-      {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" | trim }}
+      {{- $f := onepasswordItemFields .value "Private" "my" -}}
+      {{- $sshPrivateKey := (index $f "private key").value | trim }}
+      {{- $sshPublicKey := (index $f "public key").value | trim }}
       
       sshKeyPath="$sshFolder/{{ $sshName }}"
       

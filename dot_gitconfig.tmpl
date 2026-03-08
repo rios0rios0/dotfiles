@@ -1,8 +1,5 @@
-{{- /* TODO: how to avoid repetition with templates? */ -}}
 {{- /* TODO: when the Windows username is different than WSL username, the 1Password path is different breaking the commit signing */ -}}
-
-{{- /* Helper: Get 1Password device fields for current device */ -}}
-{{- $deviceName := (default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower) -}}
+{{- $deviceName := .deviceName -}}
 {{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 
 {{- /* OS-dependent paths and executables */ -}}
@@ -39,9 +36,10 @@
     {{- $parts := split "@" $sshName -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $defaultUsername = onepasswordRead (printf "op://Private/%s/ssh username" .value) "my" -}}
-      {{- $defaultUserEmail = onepasswordRead (printf "op://Private/%s/ssh email" .value) "my" -}}
-      {{- $defaultUserSigningkey = onepasswordRead (printf "op://Private/%s/public key" .value) "my" -}}
+      {{- $f := onepasswordItemFields .value "Private" "my" -}}
+      {{- $defaultUsername = (index $f "ssh username").value -}}
+      {{- $defaultUserEmail = (index $f "ssh email").value -}}
+      {{- $defaultUserSigningkey = (index $f "public key").value -}}
       {{- break -}}
     {{- end -}}
   {{- end -}}
@@ -83,10 +81,11 @@
     {{- $parts := split "@" $gpgName -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $gpgAlias := onepasswordRead (printf "op://Private/%s/gpg alias" .value) "my" -}}
-      {{- $gpgUsername := onepasswordRead (printf "op://Private/%s/gpg username" .value) "my" -}}
-      {{- $gpgEmail := onepasswordRead (printf "op://Private/%s/gpg email" .value) "my" -}}
-      {{- $gpgFingerprint := onepasswordRead (printf "op://Private/%s/fingerprint" .value) "my" }}
+      {{- $f := onepasswordItemFields .value "Private" "my" -}}
+      {{- $gpgAlias := (index $f "gpg alias").value -}}
+      {{- $gpgUsername := (index $f "gpg username").value -}}
+      {{- $gpgEmail := (index $f "gpg email").value -}}
+      {{- $gpgFingerprint := (index $f "fingerprint").value }}
     gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
     {{- end -}}
   {{- end -}}
@@ -99,10 +98,11 @@
     {{- $parts := split "@" $sshName -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $sshAlias := onepasswordRead (printf "op://Private/%s/ssh alias" .value) "my" -}}
-      {{- $sshUsername := onepasswordRead (printf "op://Private/%s/ssh username" .value) "my" -}}
-      {{- $sshEmail := onepasswordRead (printf "op://Private/%s/ssh email" .value) "my" -}}
-      {{- $sshPublicKey := onepasswordRead (printf "op://Private/%s/public key" .value) "my" }}
+      {{- $f := onepasswordItemFields .value "Private" "my" -}}
+      {{- $sshAlias := (index $f "ssh alias").value -}}
+      {{- $sshUsername := (index $f "ssh username").value -}}
+      {{- $sshEmail := (index $f "ssh email").value -}}
+      {{- $sshPublicKey := (index $f "public key").value }}
     ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
     {{- end -}}
   {{- end -}}

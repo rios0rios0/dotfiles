@@ -9,3 +9,5 @@ onePassword:
 encryption: "age"
 age:
   identity: "{{ .chezmoi.homeDir }}/.ssh/chezmoi"
+data:
+  deviceName: "{{ default .chezmoi.hostname (env "CHEZMOI_DEVICE") | replaceAllRegex " " "-" | trim | lower }}"

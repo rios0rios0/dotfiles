@@ -13,6 +13,7 @@ if current:
     try:
         data = json.loads(current)
     except json.JSONDecodeError:
+        print("[claude-settings] WARN: invalid JSON input, starting fresh", file=sys.stderr)
         data = {}
 else:
     data = {}
@@ -53,7 +54,11 @@ existing_allow = set(permissions.get("allow", []))
 merged = list(dict.fromkeys(desired_allow + list(existing_allow)))
 permissions["allow"] = merged
 
+print(f"[claude-settings] merged {len(merged)} permission rules", file=sys.stderr)
 json.dump(data, sys.stdout, indent=2)
 sys.stdout.write("\n")
 PYEOF
-python3 "$_script"
+if ! python3 "$_script"; then
+    echo "[claude-settings] ERROR: Python script failed" >&2
+    exit 1
+fi

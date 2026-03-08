@@ -11,8 +11,9 @@ mkdir -p $gpgFolderPath
 
 # read the GPG name and private key from 1Password
 gpgName="{{ onepasswordRead (printf "op://Private/%s/title" .value) "my" }}"
-gpgPassword="{{ trimAll "`" (onepasswordRead (printf "op://Private/%s/password" .value) "my") }}"
-gpgPrivateKey="{{ trimAll "`" (onepasswordRead (printf "op://Private/%s/private.key" .value) "my") }}"
+{{- $f := onepasswordItemFields .value "Private" "my" -}}
+gpgPassword="{{ trimAll "`" (index $f "password").value }}"
+gpgPrivateKey="{{ trimAll "`" (index $f "private.key").value }}"
 
 # create the private key file
 privateKeyFilePath="$gpgFolderPath/$gpgName"

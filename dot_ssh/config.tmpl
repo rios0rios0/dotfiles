@@ -2,7 +2,7 @@
 TODO: The IdentityFile logic is inverted on Android (uses private key), all other OSes use public key.
 This is because on Android (Termux) only private keys are usable, while other platforms require public keys for SSH config.
 */ -}}
-{{- $deviceName := default .chezmoi.hostname (env "CHEZMOI_DEVICE" | replaceAllRegex " " "-" | trim) | lower -}}
+{{- $deviceName := .deviceName -}}
 {{- $isAndroid := eq .chezmoi.os "android" -}}
 
 ###### VCS #######################################################################
@@ -12,7 +12,8 @@ This is because on Android (Termux) only private keys are usable, while other pl
     {{- $parts := split "@" $sshName -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $sshAlias := onepasswordRead (printf "op://Private/%s/ssh alias" .value) "my" | trim -}}
+      {{- $f := onepasswordItemFields .value "Private" "my" -}}
+      {{- $sshAlias := (index $f "ssh alias").value | trim -}}
       {{- $identityFile := "" -}}
       {{- if $isAndroid -}}
         {{- $identityFile = (print "~/.ssh/" $sshName) -}}
@@ -58,9 +59,10 @@ Host bitbucket.org-{{ $sshAlias }}
     {{- $parts := split "@" $pemName -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $alias := onepasswordRead (printf "op://Private/%s/pem host alias" .value) "my" | trim -}}
-      {{- $host := onepasswordRead (printf "op://Private/%s/pem host" .value) "my" | trim -}}
-      {{- $user := onepasswordRead (printf "op://Private/%s/pem user" .value) "my" | trim -}}
+      {{- $f := onepasswordItemFields .value "Private" "my" -}}
+      {{- $alias := (index $f "pem host alias").value | trim -}}
+      {{- $host := (index $f "pem host").value | trim -}}
+      {{- $user := (index $f "pem user").value | trim -}}
       {{- $pemIdentityFile := (print "~/.ssh/" $pemName ".pem") -}}
 
 Host {{ $alias }}
