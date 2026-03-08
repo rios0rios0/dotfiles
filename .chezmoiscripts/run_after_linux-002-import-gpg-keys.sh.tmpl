@@ -1,29 +1,37 @@
 #!/bin/bash
 
+set -euo pipefail
+
 # define the path to the ".gpg" folder
 gpgFolderPath="$HOME/.gpg"
 
 # ensure the ".gpg" folder exists
 mkdir -p $gpgFolderPath
 
+{{- warnf "[linux-gpg-keys] fetching Active GPGs...\n" -}}
 {{- range (onepassword "Active GPGs" "personal" "my").fields }}
 {{-      if (eq .type "REFERENCE") }}
 
 # read the GPG name and private key from 1Password
-gpgName="{{ onepasswordRead (printf "op://Private/%s/title" .value) "my" }}"
-{{- $f := onepasswordItemFields .value "Private" "my" -}}
-gpgPassword="{{ trimAll "`" (index $f "password").value }}"
-gpgPrivateKey="{{ trimAll "`" (index $f "private.key").value }}"
+{{- $item := onepassword .value "Private" "my" -}}
+{{- warnf "[linux-gpg-keys] importing GPG key \"%s\"\n" $item.title -}}
+{{- $f := dict -}}
+{{- range $item.fields -}}
+  {{- $_ := set $f .label .value -}}
+{{- end }}
+gpgName="{{ $item.title }}"
+gpgPassword="{{ trimAll "`" (index $f "password") }}"
+gpgPrivateKey="{{ trimAll "`" (index $f "private.key") }}"
 
 # create the private key file
 privateKeyFilePath="$gpgFolderPath/$gpgName"
-echo "Creating private key file: \"$privateKeyFilePath\"..."
+echo "[linux-gpg-keys] creating private key: \"$privateKeyFilePath\"" >&2
 echo "$gpgPrivateKey" > "$privateKeyFilePath"
 
 # import GPG keys into GPG keyring
 gpg --batch --passphrase "$gpgPassword" --import "$privateKeyFilePath"
 
-echo "Private key file has been created successfully."
+echo "[linux-gpg-keys] importing into GPG keyring..." >&2
 
 {{-      end -}}
 {{- end }}

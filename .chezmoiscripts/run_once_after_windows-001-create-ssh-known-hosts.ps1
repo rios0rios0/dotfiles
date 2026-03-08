@@ -14,5 +14,7 @@ New-Item $knownHostsPath -Type File -Force
 # this avoids the freeze that occurs when ssh.exe is called via git from WSL and encounters an unknown host
 $gitHosts = @("github.com", "gitlab.com", "ssh.dev.azure.com", "bitbucket.org")
 foreach ($gitHost in $gitHosts) {
+    Write-Host "[ssh-known-hosts] scanning $gitHost..."
     ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10 -T "git@$gitHost" 2>&1 | Out-Null
 }
+Write-Host "[ssh-known-hosts] known_hosts populated with $($gitHosts.Count) hosts"

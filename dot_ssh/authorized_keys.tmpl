@@ -1,21 +1,25 @@
 {{- $deviceName := .deviceName -}}
 
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if (eq .type "REFERENCE") -}}
+{{- warnf “[authorized-keys] fetching Active SSHs...\n” -}}
+{{- range (onepassword “Active SSHs” “personal” “my”).fields -}}
+  {{- if (eq .type “REFERENCE”) -}}
 
-    {{- /* Read full “device@account” title */ -}}
-    {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
+    {{- $item := onepassword .value “Private” “my” -}}
+    {{- warnf “[authorized-keys] checking SSH item \”%s\”...\n” $item.title -}}
 
-    {{- /* Split into [device, account] */ -}}
-    {{- $parts := split "@" $sshName -}}
-    {{- $device := index $parts "_0" -}}
+    {{- /* Split title into [device, account] */ -}}
+    {{- $parts := split “@” $item.title -}}
+    {{- $device := index $parts “_0” -}}
 
     {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
+      {{- warnf “[authorized-keys] matched device \”%s\”\n” $deviceName -}}
 
-      {{- $f := onepasswordItemFields .value "Private" "my" -}}
-      {{- $sshPublicKey := (index $f "public key").value -}}
-      {{- printf "%s\n" $sshPublicKey -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- $_ := set $f .label .value -}}
+      {{- end -}}
+      {{- printf “%s\n” (index $f “public key”) -}}
 
     {{- end -}}
   {{- end -}}

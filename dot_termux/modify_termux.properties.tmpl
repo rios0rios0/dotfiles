@@ -3,6 +3,8 @@
 # This modify_ script patches only managed keys in termux.properties,
 # preserving the rest of the file (comments, defaults, future Termux additions).
 
+echo "[termux-config] configuring extra keys layout" >&2
+
 export DESIRED
 DESIRED="$(cat <<'KEYS'
 extra-keys = [['ESC','/','-','HOME','UP','END','PGUP'], \

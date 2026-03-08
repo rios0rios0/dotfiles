@@ -22,7 +22,7 @@ install_nerd_font_zip() {
     local FONT_DIR="$3"
     mkdir -p "$FONT_DIR"
 
-    echo "Installing $NAME Nerd Font ($VERSION)..."
+    echo "[fonts] installing $NAME Nerd Font ($VERSION)..." >&2
     local TEMP_DIR
     TEMP_DIR="$(mktemp -d)"
 
@@ -34,7 +34,7 @@ install_nerd_font_zip() {
 
 # MesloLGS NF - Nerd Font for Powerlevel10k (https://github.com/romkatv/powerlevel10k#fonts)
 install_meslo_lgs_nf() {
-    echo "Installing MesloLGS NF fonts..."
+    echo "[fonts] installing MesloLGS NF fonts..." >&2
     local FONT_DIR="$1"
     mkdir -p "$FONT_DIR"
 

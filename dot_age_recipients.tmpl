@@ -1,3 +1,4 @@
 {{- if ne .chezmoi.os "android" }}
+{{- warnf "[age-recipients] fetching Chezmoi encryption public key...\n" }}
 {{ onepasswordRead "op://personal/Chezmoi Key/public key" "my" }}
 {{- end }}

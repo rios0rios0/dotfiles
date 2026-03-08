@@ -70,7 +70,43 @@ Commonly used chezmoi template variables in this repo:
 - `.chezmoi.os` — `"linux"`, `"windows"`, `"android"`
 - `.chezmoi.hostname`, `.chezmoi.homeDir`, `.chezmoi.arch`
 - `.chezmoi.kernel` — Used to detect WSL (`microsoft` in kernel name)
-- `onepasswordRead` / `onepassword` — Fetch secrets from 1Password
+- `onepassword` — Fetch full item by name/UUID from 1Password (preferred — returns `.title` + `.fields`)
+- `onepasswordRead` — Fetch a single scalar field by `op://` URI (use only for simple direct reads)
+
+## 1Password Template Pattern
+
+All templates that fetch referenced items from 1Password use a single `onepassword` call per item, then build a local field map with sprig `dict`/`set`:
+
+```go
+{{- $item := onepassword .value "Private" "my" -}}
+{{- $name := $item.title | trim -}}
+{{- $f := dict -}}
+{{- range $item.fields -}}
+  {{- $_ := set $f .label .value -}}
+{{- end -}}
+{{- $val := index $f "field name" -}}
+```
+
+**Do not use `onepasswordItemFields`** — it only returns section-level fields and misses built-in properties like `"public key"` and `"private key"` on SSH Key items. The `onepassword` + `dict`/`set` pattern accesses all fields and chezmoi caches the underlying `op item get` call across all template files automatically.
+
+## Logging Convention
+
+All scripts and templates use a standardized `[prefix]` logging format to stderr:
+
+```
+[prefix] message              # informational (default)
+[prefix] WARN: message        # non-fatal issues, skips
+[prefix] ERROR: message       # fatal issues before exit
+```
+
+| Channel | How |
+|---------|-----|
+| Templates (`.tmpl`) | `warnf "[prefix] message\n"` — writes to stderr during rendering |
+| Shell scripts (`.sh`) | `echo "[prefix] message" >&2` |
+| PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
+| Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
+
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `op-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `git-sync`
 
 ## Important Timing Constraints
 

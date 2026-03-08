@@ -28,7 +28,7 @@ foreach ($dir in $directories) {
             }
 
             # Copy the file
-            Write-Host "Copying `"$($file.FullName.Substring($chezmoiRoot.Length + 1))`" to `"$destinationPath`"..."
+            Write-Host "[copy-appdata] copying `"$($file.FullName.Substring($chezmoiRoot.Length + 1))`" to `"$destinationPath`""
             Copy-Item -Path $file.FullName -Destination $destinationPath -Force
         }
     }

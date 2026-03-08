@@ -1,13 +1,19 @@
 {
   "auths": {
+    {{- warnf "[docker-config] fetching Active Docker Registries...\n" }}
     {{- $items := (onepassword "Active Docker Registries" "personal" "my").fields }}
     {{- $lastIndex := sub (len $items) 1 }}
     {{- range $index, $item := $items }}
     {{-      if (eq $item.type "REFERENCE") }}
-	{{-          $f := onepasswordItemFields $item.value "Private" "my" }}
-	{{-          $registryUsername := (index $f "username").value }}
-    {{-          $registryCredential := (index $f "credential").value }}
-	{{-          $registryName := (index $f "registry name").value }}
+	{{-          $opItem := onepassword $item.value "Private" "my" }}
+	{{-          $f := dict }}
+	{{-          range $opItem.fields }}
+	{{-            $_ := set $f .label .value }}
+	{{-          end }}
+	{{-          $registryUsername := index $f "username" }}
+    {{-          $registryCredential := index $f "credential" }}
+	{{-          $registryName := index $f "registry name" }}
+    {{-          warnf "[docker-config] configuring registry \"%s\"\n" $registryName }}
     "{{ $registryName }}": {
       "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
     }{{ if lt $index $lastIndex }},{{ end }}

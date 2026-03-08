@@ -29,17 +29,23 @@
 {{- $defaultUsername := "" -}}
 {{- $defaultUserEmail := "" -}}
 {{- $defaultUserSigningkey := "" -}}
+{{- warnf "[gitconfig] fetching Active SSHs...\n" -}}
 {{- $activeSshFields := (onepassword "Active SSHs" "personal" "my").fields -}}
 {{- range $activeSshFields -}}
   {{- if eq .type "REFERENCE" -}}
-    {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
-    {{- $parts := split "@" $sshName -}}
+    {{- $item := onepassword .value "Private" "my" -}}
+    {{- warnf "[gitconfig] checking SSH item \"%s\"...\n" $item.title -}}
+    {{- $parts := split "@" $item.title -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $f := onepasswordItemFields .value "Private" "my" -}}
-      {{- $defaultUsername = (index $f "ssh username").value -}}
-      {{- $defaultUserEmail = (index $f "ssh email").value -}}
-      {{- $defaultUserSigningkey = (index $f "public key").value -}}
+      {{- warnf "[gitconfig] matched device \"%s\" for SSH defaults\n" $deviceName -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- $_ := set $f .label .value -}}
+      {{- end -}}
+      {{- $defaultUsername = index $f "ssh username" -}}
+      {{- $defaultUserEmail = index $f "ssh email" -}}
+      {{- $defaultUserSigningkey = index $f "public key" -}}
       {{- break -}}
     {{- end -}}
   {{- end -}}
@@ -75,17 +81,23 @@
     rollback = reset --soft HEAD~1
 
     # gpg signing
+{{- warnf "[gitconfig] fetching Active GPGs...\n" -}}
 {{- range (onepassword "Active GPGs" "personal" "my").fields -}}
   {{- if eq .type "REFERENCE" -}}
-    {{- $gpgName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
-    {{- $parts := split "@" $gpgName -}}
+    {{- $item := onepassword .value "Private" "my" -}}
+    {{- warnf "[gitconfig] checking GPG item \"%s\"...\n" $item.title -}}
+    {{- $parts := split "@" $item.title -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $f := onepasswordItemFields .value "Private" "my" -}}
-      {{- $gpgAlias := (index $f "gpg alias").value -}}
-      {{- $gpgUsername := (index $f "gpg username").value -}}
-      {{- $gpgEmail := (index $f "gpg email").value -}}
-      {{- $gpgFingerprint := (index $f "fingerprint").value }}
+      {{- warnf "[gitconfig] matched device \"%s\" for GPG alias\n" $deviceName -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- $_ := set $f .label .value -}}
+      {{- end -}}
+      {{- $gpgAlias := index $f "gpg alias" -}}
+      {{- $gpgUsername := index $f "gpg username" -}}
+      {{- $gpgEmail := index $f "gpg email" -}}
+      {{- $gpgFingerprint := index $f "fingerprint" }}
     gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
     {{- end -}}
   {{- end -}}
@@ -94,15 +106,20 @@
     # ssh signing
 {{- range $activeSshFields -}}
   {{- if eq .type "REFERENCE" -}}
-    {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
-    {{- $parts := split "@" $sshName -}}
+    {{- $item := onepassword .value "Private" "my" -}}
+    {{- warnf "[gitconfig] checking SSH item \"%s\"...\n" $item.title -}}
+    {{- $parts := split "@" $item.title -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $f := onepasswordItemFields .value "Private" "my" -}}
-      {{- $sshAlias := (index $f "ssh alias").value -}}
-      {{- $sshUsername := (index $f "ssh username").value -}}
-      {{- $sshEmail := (index $f "ssh email").value -}}
-      {{- $sshPublicKey := (index $f "public key").value }}
+      {{- warnf "[gitconfig] matched device \"%s\" for SSH alias\n" $deviceName -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- $_ := set $f .label .value -}}
+      {{- end -}}
+      {{- $sshAlias := index $f "ssh alias" -}}
+      {{- $sshUsername := index $f "ssh username" -}}
+      {{- $sshEmail := index $f "ssh email" -}}
+      {{- $sshPublicKey := index $f "public key" }}
     ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
     {{- end -}}
   {{- end -}}

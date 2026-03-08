@@ -8,7 +8,7 @@
 
 set -e
 
-echo "Creating wrapper and op in ~/.local/bin..."
+echo "[op-wrapper] creating wrapper and op in ~/.local/bin..." >&2
 
 # Create the .local/bin directory if it doesn't exist
 mkdir -p "$HOME/.local/bin"
@@ -56,11 +56,11 @@ if ! ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 whoami &>/dev/null; then
     
     # check if accounts array is empty
     if [ "$accounts_json" = "[]" ] || [ -z "$accounts_json" ]; then
-        echo "1Password: No accounts configured. Adding account..."
+        echo "[op-wrapper] no accounts configured, adding account..." >&2
         ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 account add --address my.1password.com --shorthand my
         add_exit_code=$?
         if [ $add_exit_code -ne 0 ]; then
-            echo "1Password: Account add failed with exit code $add_exit_code" >&2
+            echo "[op-wrapper] ERROR: account add failed with exit code $add_exit_code" >&2
             exit 1
         fi
     fi
@@ -72,4 +72,4 @@ OP_EOF
 # Make op executable
 chmod +x "$HOME/.local/bin/op"
 
-echo "wrapper and op created successfully"
+echo "[op-wrapper] wrapper and op created successfully" >&2

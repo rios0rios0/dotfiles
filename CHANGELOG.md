@@ -34,8 +34,19 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - deduplicated shell credentials and workspace aliases into a shared `linux-engineering-op-loader.sh` loader with structured logging
 - enhanced Android SSH script to export both private and public keys from 1Password, renamed from `run_after_android-001-create-ssh-private-keys.sh.tmpl` to `run_after_android-001-create-ssh-keys.sh.tmpl`
 - improved logging across modify scripts with `[prefix]` tags for `mcp-servers`, `claude-trust`, `claude-settings`, `credentials`, `workspaces`, and `git-sync`
-- reduced 1Password API calls by replacing per-field `onepasswordRead` with `onepasswordItemFields` across 9 template files (~18 fewer `op` CLI invocations per apply)
 - segregated MCP configurations into platform-specific files: `.cursor/mcp.json` for Linux (Docker-based) and `.config/mcphub/servers.json` for Android (npx-based), eliminating cross-platform conditional logic
 - simplified 1Password calls by replacing list/join patterns with printf format for improved readability and consistency
 - suppressed proot warnings on Android using `PROOT_VERBOSE=-1` and `--no-arch-warning` flags
 - unified `deviceName` computation into `.chezmoi.yaml.tmpl` data section, removing duplication across 7 template files
+- replaced `onepasswordRead` + `onepasswordItemFields` with single `onepassword` call per item across all templates, using `dict`/`set` to build local field maps — halves API calls per referenced item and fixes missing built-in fields (`public key`, `private key`)
+- standardized logging convention across 20 files with `[prefix]` format to stderr using `warnf` (templates), `echo >&2` (shell), and `Write-Host` (PowerShell)
+- added `warnf` progress logging to all 1Password template operations (`gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`) showing item fetch, device match, and per-item progress
+- added `[prefix]` logging to previously silent scripts: `clone-tools`, `ssh-known-hosts`, `configure-deps`, `kube-config`, `termux-config`, `fonts`
+- moved script echo output from stdout to stderr in `android-ssh-keys`, `linux-gpg-keys`, `copy-appdata` to avoid mixing logs with generated content
+- standardized bare `echo` messages with `[prefix]` format in `op-wrapper`, `extract-folders`, `export-key`
+- added `set -euo pipefail` error handling to 5 scripts missing it: `linux-gpg-keys`, `extract-folders`, `clone-tools`, `configure-deps`, `export-key`
+- documented 1Password template pattern (`onepassword` + `dict`/`set`) and logging convention in CLAUDE.md
+
+### Fixed
+
+- fixed `onepasswordItemFields` not returning built-in SSH Key fields (`public key`, `private key`) — these are top-level detail fields not accessible via `onepasswordItemFields` which only reads section-level fields

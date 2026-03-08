@@ -8,7 +8,7 @@
 
 set -e
 
-echo "Creating op wrapper in ~/.local/bin..."
+echo "[op-wrapper] creating op wrapper in ~/.local/bin..." >&2
 
 # Create the .local/bin directory if it doesn't exist
 mkdir -p "$HOME/.local/bin"
@@ -28,4 +28,4 @@ EOF
 # Make the script executable
 chmod +x "$HOME/.local/bin/op"
 
-echo "op wrapper created successfully"
+echo "[op-wrapper] op wrapper created successfully" >&2

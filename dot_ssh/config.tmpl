@@ -6,14 +6,21 @@ This is because on Android (Termux) only private keys are usable, while other pl
 {{- $isAndroid := eq .chezmoi.os "android" -}}
 
 ###### VCS #######################################################################
+{{- warnf "[ssh-config] fetching Active SSHs...\n" -}}
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
   {{- if eq .type "REFERENCE" -}}
-    {{- $sshName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
+    {{- $item := onepassword .value "Private" "my" -}}
+    {{- $sshName := $item.title | trim -}}
+    {{- warnf "[ssh-config] checking SSH item \"%s\"...\n" $sshName -}}
     {{- $parts := split "@" $sshName -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $f := onepasswordItemFields .value "Private" "my" -}}
-      {{- $sshAlias := (index $f "ssh alias").value | trim -}}
+      {{- warnf "[ssh-config] matched device \"%s\"\n" $deviceName -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- $_ := set $f .label .value -}}
+      {{- end -}}
+      {{- $sshAlias := index $f "ssh alias" | trim -}}
       {{- $identityFile := "" -}}
       {{- if $isAndroid -}}
         {{- $identityFile = (print "~/.ssh/" $sshName) -}}
@@ -53,16 +60,23 @@ Host bitbucket.org-{{ $sshAlias }}
 {{- end }}
 
 ###### PEM #######################################################################
+{{- warnf "[ssh-config] fetching Active PEMs...\n" -}}
 {{- range (onepassword "Active PEMs" "personal" "my").fields -}}
   {{- if eq .type "REFERENCE" -}}
-    {{- $pemName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
+    {{- $item := onepassword .value "Private" "my" -}}
+    {{- $pemName := $item.title | trim -}}
+    {{- warnf "[ssh-config] checking PEM item \"%s\"...\n" $pemName -}}
     {{- $parts := split "@" $pemName -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- $f := onepasswordItemFields .value "Private" "my" -}}
-      {{- $alias := (index $f "pem host alias").value | trim -}}
-      {{- $host := (index $f "pem host").value | trim -}}
-      {{- $user := (index $f "pem user").value | trim -}}
+      {{- warnf "[ssh-config] matched device \"%s\"\n" $deviceName -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- $_ := set $f .label .value -}}
+      {{- end -}}
+      {{- $alias := index $f "pem host alias" | trim -}}
+      {{- $host := index $f "pem host" | trim -}}
+      {{- $user := index $f "pem user" | trim -}}
       {{- $pemIdentityFile := (print "~/.ssh/" $pemName ".pem") -}}
 
 Host {{ $alias }}

@@ -8,19 +8,26 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 
 {{- $deviceName := .deviceName -}}
 
+{{- warnf "[windows-pem-keys] fetching Active PEMs...\n" -}}
 {{- range (onepassword "Active PEMs" "personal" "my").fields }}
 {{-      if (eq .type "REFERENCE") }}
 
-{{-        $pemName := onepasswordRead (printf "op://Private/%s/title" .value) "my" | trim -}}
+{{-        $item := onepassword .value "Private" "my" -}}
+{{-        $pemName := $item.title | trim -}}
+{{-        warnf "[windows-pem-keys] checking PEM item \"%s\"...\n" $pemName -}}
 {{-        $parts := split "@" $pemName -}}
 {{-        $device := index $parts "_0" -}}
 
 {{-        if eq $device $deviceName }}
+{{-        warnf "[windows-pem-keys] creating PEM key for \"%s\"\n" $pemName -}}
 
 # read the PEM private key from 1Password
 $pemName = "{{ $pemName }}"
-{{- $f := onepasswordItemFields .value "Private" "my" -}}
-$pemPrivateKey = "{{ trimAll "`" (index $f "notesPlain").value }}"
+{{- $f := dict -}}
+{{- range $item.fields -}}
+  {{- $_ := set $f .label .value -}}
+{{- end }}
+$pemPrivateKey = "{{ trimAll "`" (index $f "notesPlain") }}"
 
 # create the private key file
 $privateKeyFilePath = "$sshFolderPath\$pemName"
