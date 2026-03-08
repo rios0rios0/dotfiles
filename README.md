@@ -12,134 +12,182 @@
         <img src="https://img.shields.io/cii/level/12024?style=for-the-badge&logo=opensourceinitiative" alt="OpenSSF Best Practices"/></a>
 </p>
 
-Personal dotfiles repository, managed with [chezmoi](https://www.chezmoi.io/) and 1Password for sensitive information.
-
-## Features
-
-- **Cross-platform**: Configurations for Kali Linux in WSL, Windows 11 and Termux (Android)
-- **Shells**: Zsh and PowerShell
-- **Terminal**: Windows Terminal
+Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Password CLI](https://developer.1password.com/docs/cli/) for secrets, and [age](https://github.com/FiloSottile/age) for file encryption. Targets three platforms: **Linux (Kali on WSL)**, **Windows 11**, and **Android (Termux)**.
 
 ![Kali Linux on WSL](.docs/wsl-with-kali.png)
 ![PowerShell 7 on Windows](.docs/windows-with-powershell-7.png)
 ![Termux on Android](.docs/android-with-termux.png)
 
+## What's Managed
+
+### Shells and Prompt
+
+| Component | Linux (WSL) | Windows | Android (Termux) |
+|-----------|-------------|---------|------------------|
+| Shell | Zsh | PowerShell 7 | Zsh |
+| Framework | Oh My Zsh + ZINIT | Oh My Posh | Oh My Zsh + ZINIT |
+| Theme | Powerlevel10k | Oh My Posh (custom) | Powerlevel10k |
+
+### Version Managers
+
+- **GVM** (Go), **NVM** (Node.js), **Pyenv** (Python), **SDKMAN** (Java, Gradle, Maven, Kotlin), **Cargo** (Rust)
+- Automatic version switching via `dot_scripts/linux-engineering-version-manager.sh` (detects `go.mod`, `.nvmrc`, `pyproject.toml`)
+
+### Cloud and Infrastructure
+
+- **Kubernetes**: kubectl, krew (ctx/ns plugins), kubeconfig auto-detection
+- **Terraform** + Terragrunt
+- **AWS CLI**, **Azure CLI**, **Heroku CLI**, **GitHub CLI**
+- **Docker** + Docker Compose
+
+### Development Tools
+
+- **Cursor** (AI editor with Docker-based MCP servers on Linux)
+- **Claude Code** + **Gemini CLI** (AI coding assistants)
+- **Neovim** with AstroVim (Android)
+
+### Security and Pentesting
+
+- John the Ripper, SQLMap, VHostScan, dirsearch, StegCracker, stegbrute
+
+### Utilities
+
+- eza (ls replacement), bat (syntax highlighting), ripgrep, jq/yq, ffmpeg, ImageMagick, pdftk, asciinema, Speedtest CLI, CycloneDX (SBOM)
+
+## Platform Matrix
+
+| Aspect | Linux (WSL/Kali) | Windows 11 | Android (Termux) |
+|--------|------------------|------------|------------------|
+| Shell | Zsh + Oh My Zsh + p10k | PowerShell + Oh My Posh | Zsh + Oh My Zsh + p10k |
+| Scripts | `.sh` (bash) | `.ps1` (PowerShell) | `.sh` (bash) |
+| 1Password | `op` wrapper (calls `op.exe` from WSL) | Native `op.exe` | `op` wrapper (proot Alpine) |
+| Docker | Native | Docker Desktop | N/A (proot wrappers) |
+| MCP Config | `~/.cursor/mcp.json` (Docker) | N/A | `~/.config/mcphub/servers.json` (npx) |
+| Editor | Any | Cursor | Neovim (AstroVim) |
+
 ## Installation
 
 ### Prerequisites
 
-- **Linux (WSL or Android)**:
-    - [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-    - [age](https://github.com/FiloSottile/age)
-    - [1Password CLI](https://developer.1password.com/docs/cli/get-started)
-
-- **Windows 11**:
-    - [PowerShell 7](https://learn.microsoft.com/en-us/powershell/scripting/install/installing-powershell-on-windows?view=powershell-7.4)
-    - [git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
-    - [age](https://github.com/FiloSottile/age)
-    - [1Password CLI](https://developer.1password.com/docs/cli/get-started)
+All platforms require:
+- [Git](https://git-scm.com/book/en/v2/Getting-Started-Installing-Git)
+- [age](https://github.com/FiloSottile/age)
+- [1Password CLI](https://developer.1password.com/docs/cli/get-started)
 
 ### Kali Linux on WSL
 
-1. Install prerequisites:
-
 ```sh
 sudo apt install git age
-```
-
-2. Install `chezmoi` and apply the `dotfiles`:
-
-```sh
 sh -c "$(curl -fsLS get.chezmoi.io/lb)" -- init --apply rios0rios0
 ```
 
 ### PowerShell 7 on Windows
 
-1. Install PowerShell 7:
-
 ```powershell
 winget install Microsoft.PowerShell
-```
-
-2. Install some dependencies using `winget` in PowerShell:
-
-```powershell
-winget install Git.Git # if you have ASLR protection enabled, install Git from https://git-scm.com/download/win
-winget install FiloSottile.age # add the age executable to the PATH manually
+winget install Git.Git           # if ASLR is enabled, install from https://git-scm.com/download/win
+winget install FiloSottile.age   # add the age executable to PATH manually
 winget install 1password-cli
-```
 
-3. Clone this repository and apply the dotfiles:
-
-```powershell
 Set-ExecutionPolicy RemoteSigned -Scope Process
 chezmoi init --apply rios0rios0
 ```
 
 ### Termux on Android
 
-**IMPORTANT**: Avoid using Termux from the Play Store, as it may not be up-to-date. Instead, use the official Termux app from [F-Droid](https://f-droid.org/en/packages/com.termux/).
-Supporting article: https://www.reddit.com/r/termux/comments/zu8ets/do_not_install_termux_from_play_store/
-
-1. Install prerequisites and `chezmoi`:
+> **Important**: Install Termux from [F-Droid](https://f-droid.org/en/packages/com.termux/), not the Play Store ([reason](https://www.reddit.com/r/termux/comments/zu8ets/do_not_install_termux_from_play_store/)).
 
 ```sh
 apt install git chezmoi
-```
-
-2. Apply the `dotfiles`:
-
-```sh
 chezmoi init --apply rios0rios0
 ```
 
-## Configuration
+> **Note**: Full dependency installation takes 45-120 minutes. Do not cancel mid-execution.
 
-### Encryption
+## Repository Structure
 
-- Sensitive files are encrypted using [age](https://github.com/FiloSottile/age)
-- Unix-specific decryption script: `run_before_decrypt-private-key-unix.sh.tmpl`
-- Windows-specific decryption script: `run_before_decrypt-private-key-windows.ps1.tmpl`
+```
+.chezmoiscripts/         # 21 platform-specific setup scripts (run_once_before_*, run_after_*)
+.chezmoitemplates/       # Shared template fragments (font installer, MCP server logic, username)
+dot_claude/              # Claude Code config (settings, permissions, trust) -> ~/.claude/
+dot_config/              # XDG config (mcphub MCP servers for Android) -> ~/.config/
+dot_cursor/              # Cursor MCP config (Docker-based, Linux only) -> ~/.cursor/
+dot_docker/              # Docker daemon config -> ~/.docker/
+dot_scripts/             # Utility scripts (version manager, credential loader, git sync, etc.)
+dot_ssh/                 # SSH config, keys, signing (1Password-backed) -> ~/.ssh/
+dot_aws/                 # Encrypted AWS credentials -> ~/.aws/
+dot_azure/               # Encrypted Azure profile -> ~/.azure/
+dot_kube/                # Encrypted Kubernetes configs -> ~/.kube/
+AppData/                 # Windows Terminal settings (Windows only)
+modify_dot_claude.json.tmpl  # MCP server config for Claude Code -> ~/.claude.json
+```
 
-### Debugging Ideas
+Chezmoi translates `dot_` prefixes to `.` in the target path (e.g., `dot_zshrc.tmpl` becomes `~/.zshrc`).
 
-- Check the `chezmoi doctor` command to check the status of the installation
-- Run `git` commands with `GIT_TRACE=1` to see what's happening
+## Secrets and Encryption
+
+This repository uses a layered approach to secrets management:
+
+- **1Password CLI** fetches SSH keys, GPG keys, and credentials at template render time via `onepasswordRead` / `onepassword` template functions
+- **Age encryption** protects sensitive files at rest (AWS, Azure, Kubernetes configs, npmrc). Private key stored at `~/.ssh/chezmoi`, recipients at `~/.age_recipients`
+- **Per-device SSH/GPG signing** matches keys by hostname against 1Password items ("Active SSHs", "Active GPGs")
+
+Encrypted files end in `.age` and are automatically decrypted during `chezmoi apply`.
+
+## Claude Code Configuration
+
+This repository manages four Claude Code configuration files. Each targets a different file on disk because Claude Code separates instructions, permissions, and MCP servers into distinct subsystems that cannot be consolidated into a single file.
+
+| Repository Path | Deployed To | Purpose |
+|-----------------|-------------|---------|
+| `dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global instructions loaded into every Claude Code session (WSL preferences) |
+| `dot_claude/modify_settings.json.tmpl` | `~/.claude/settings.json` | Default permission rules (`allow` list) and effort level |
+| `dot_claude/modify_dot_claude.json.tmpl` | `~/.claude/.claude.json` | Auto-trusts project directories to skip the trust dialog |
+| `modify_dot_claude.json.tmpl` (root) | `~/.claude.json` | User-scoped MCP servers (GitHub, Azure DevOps, SonarQube, Kubernetes) |
+
+The three `modify_*.tmpl` files are chezmoi [modify scripts](https://www.chezmoi.io/reference/source-state-attributes/#modify): they receive the current file content on stdin, merge desired settings via embedded Python, and output the result. This preserves any user-added configuration while ensuring defaults are always present.
+
+> **Note**: The `dot_claude/` directory is deployed only on **Windows** and **Android** (excluded on Linux via `.chezmoiignore`).
+
+## Chezmoi Conventions
+
+| Prefix/Suffix | Meaning |
+|---------------|---------|
+| `dot_` | Becomes `.` in target (e.g., `dot_zshrc` becomes `~/.zshrc`) |
+| `.tmpl` | Processed as Go template before deployment |
+| `encrypted_*.age` | Age-encrypted file, decrypted on apply |
+| `run_once_before_*` | Script runs once before file application |
+| `run_after_*` | Script runs after every application |
+| `private_` | File deployed with restricted permissions |
+| `modify_` | Script that merges changes into an existing file |
+
+Platform-specific scripts are prefixed: `linux-*`, `windows-*`, `android-*`. Exclusion rules in `.chezmoiignore` ensure only the correct platform's files are applied.
+
+## Debugging
+
+- Run `chezmoi doctor` to diagnose installation issues
+- Run `chezmoi diff` to preview pending changes before applying
+- Use `GIT_TRACE=1` for verbose Git output
+- Use `chezmoi execute-template < file.tmpl` to test template rendering
 
 ### Known Issues
 
-1. **Git stuck while doing any command with SSH.**
-   - Zsh is using `ssh.exe` from Windows via alias/function
-   - Git is using `ssh.exe` from Windows via configuration file
-   - Due to the above: `git` commands could be stuck when the `known_hosts` file is not created
-   - Workaround: run `ssh git@<YOUR_HOST>` to add the host to the `known_hosts` file via WSL using `ssh.exe` from Windows
+1. **Git stuck on SSH commands (WSL)**: Zsh and Git both use `ssh.exe` from Windows. If `known_hosts` is missing, commands hang. Fix: run `ssh git@<HOST>` once to populate `known_hosts`.
 
-2. **Notice that using `chezmoi age` you are not able to decrypt using SSH keys.**
-   That's why it's a prerequisite to install `age` to force `chezmoi` to use it for decryption.
-   Without it, you could have errors like:
-   ```bash
+2. **Age decryption errors**: Chezmoi's built-in age support cannot decrypt with SSH keys. The standalone `age` binary is required. Without it:
+   ```
    chezmoi: error at line 1: malformed secret key: separator
    ```
 
-3. **Windows has `path` size limitations (256 characters).**
-   If you are using WSL interoperability (calling `.exe` files inside WSL), you could have errors like:
-   ```bash
-   /mnt/c/WINDOWS/system32/notepad.exe: Invalid argument
-   ```
-   That means you exceeded the `path` size limitation on the current `path` you are running the command.
+3. **Windows path length limit (256 chars)**: WSL interop calls to `.exe` files may fail with `Invalid argument` if the working directory path is too long.
 
 ## References
 
-- https://github.com/patrick-5546/dotfiles
-- https://github.com/budimanjojo/dotfiles
-- https://www.chezmoi.io/user-guide/command-overview/
-- https://www.chezmoi.io/reference/templates/variables/
-- https://www.chezmoi.io/reference/special-files-and-directories/chezmoiscripts/
-- https://masterminds.github.io/sprig/
-
-## Inspiration
-
-- https://github.com/romkatv/dotfiles-public
+- [chezmoi documentation](https://www.chezmoi.io/user-guide/command-overview/)
+- [chezmoi template variables](https://www.chezmoi.io/reference/templates/variables/)
+- [chezmoi scripts reference](https://www.chezmoi.io/reference/special-files-and-directories/chezmoiscripts/)
+- [Sprig template functions](https://masterminds.github.io/sprig/)
+- Inspired by [patrick-5546/dotfiles](https://github.com/patrick-5546/dotfiles), [budimanjojo/dotfiles](https://github.com/budimanjojo/dotfiles), [romkatv/dotfiles-public](https://github.com/romkatv/dotfiles-public)
 
 ## Contributing
 
