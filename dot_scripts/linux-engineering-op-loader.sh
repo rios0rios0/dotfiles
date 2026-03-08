@@ -28,9 +28,18 @@ _op_load_references() {
 
   # ensure 1Password is authenticated before making API calls
   if ! op whoami --account my &>/dev/null; then
-    _ol_log "not signed in, attempting signin..."
-    if ! op signin --account my &>/dev/null; then
-      _ol_log "ERROR: could not sign in to 1Password (unlock the desktop app or run 'op signin --account my')"
+    if [[ -z "$_OP_SIGNIN_ATTEMPTED" ]]; then
+      export _OP_SIGNIN_ATTEMPTED=1
+      _ol_log "not signed in, attempting signin..."
+      local _ol_signin_output
+      if ! _ol_signin_output=$(op signin --account my); then
+        _ol_log "ERROR: could not sign in to 1Password (unlock the desktop app or run 'op signin --account my')"
+        unset -f _ol_log
+        return 0
+      fi
+      eval "$_ol_signin_output"
+    else
+      _ol_log "ERROR: 1Password not authenticated (signin already attempted)"
       unset -f _ol_log
       return 0
     fi
