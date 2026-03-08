@@ -1,0 +1,18 @@
+#!/bin/bash
+set -euo pipefail
+
+echo "[ai-rules] Installing AI rules from guide repository..."
+
+GUIDE_REPO="$HOME/Development/github.com/rios0rios0/guide"
+
+if [ ! -d "$GUIDE_REPO" ]; then
+  echo "[ai-rules] Guide repo not found at $GUIDE_REPO, cloning..."
+  mkdir -p "$(dirname "$GUIDE_REPO")"
+  git clone https://github.com/rios0rios0/guide.git "$GUIDE_REPO"
+fi
+
+# Run the install script globally (no argument = installs to ~/)
+# Use 'yes' to auto-overwrite existing files
+yes | "$GUIDE_REPO/install-rules.sh"
+
+echo "[ai-rules] AI rules installed successfully."
