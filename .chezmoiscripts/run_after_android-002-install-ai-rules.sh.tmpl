@@ -12,7 +12,6 @@ if [ ! -d "$GUIDE_REPO" ]; then
 fi
 
 # Run the install script globally (no argument = installs to ~/)
-# Use 'yes' to auto-overwrite existing files
-yes | "$GUIDE_REPO/install-rules.sh"
+"$GUIDE_REPO/install-rules.sh" --force
 
 echo "[ai-rules] AI rules installed successfully."
