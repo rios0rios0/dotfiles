@@ -82,9 +82,25 @@ All templates that fetch referenced items from 1Password use a single `onepasswo
 {{- $name := $item.title | trim -}}
 {{- $f := dict -}}
 {{- range $item.fields -}}
-  {{- $_ := set $f .label .value -}}
+  {{- if hasKey . "value" -}}
+    {{- $_ := set $f .label .value -}}
+  {{- end -}}
 {{- end -}}
 {{- $val := index $f "field name" -}}
+```
+
+**Always guard with `hasKey . "value"`** — some 1Password fields lack a `value` property; accessing it without a guard causes `map has no entry for key "value"`.
+
+**Filter by device from REFERENCE label** — when templates filter by `deviceName`, parse `.label` (not `$item.title`) of the REFERENCE field to extract the device name *before* calling `onepassword .value`. This avoids unnecessary API calls for non-matching devices:
+
+```go
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if eq .type "REFERENCE" -}}
+    {{- $parts := split "@" .label -}}
+    {{- $device := index $parts "_0" -}}
+    {{- if eq $device $deviceName -}}
+      {{- $item := onepassword .value "Private" "my" -}}
+      ...
 ```
 
 **Do not use `onepasswordItemFields`** — it only returns section-level fields and misses built-in properties like `"public key"` and `"private key"` on SSH Key items. The `onepassword` + `dict`/`set` pattern accesses all fields and chezmoi caches the underlying `op item get` call across all template files automatically.
@@ -101,7 +117,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 
 | Channel | How |
 |---------|-----|
-| Templates (`.tmpl`) | `warnf "[prefix] message\n"` — writes to stderr during rendering |
+| Templates (`.tmpl`) | `warnf "[prefix] message"` — writes to stderr during rendering (do NOT add `\n`, chezmoi appends its own newline) |
 | Shell scripts (`.sh`) | `echo "[prefix] message" >&2` |
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |

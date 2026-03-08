@@ -10,25 +10,23 @@ chmod 700 "$sshFolder"
 
 {{- $deviceName := .deviceName -}}
 
-{{- warnf “[android-ssh-keys] fetching Active SSHs...\n” -}}
+{{- warnf “[android-ssh-keys] fetching Active SSHs...” -}}
 {{- range (onepassword “Active SSHs” “personal” “my”).fields }}
   {{- if (eq .type “REFERENCE”) }}
 
-    {{- $item := onepassword .value “Private” “my” -}}
-    {{- $sshName := $item.title | trim -}}
-    {{- warnf “[android-ssh-keys] checking SSH item \”%s\”...\n” $sshName -}}
-
-    {{- /* Split title into [device, account] */ -}}
-    {{- $parts := split “@” $sshName -}}
+    {{- $parts := split “@” .label -}}
     {{- $device := index $parts “_0” -}}
 
-    {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf “[android-ssh-keys] creating keys for \”%s\”\n” $sshName -}}
+      {{- $item := onepassword .value “Private” “my” -}}
+      {{- $sshName := $item.title | trim -}}
+      {{- warnf “[android-ssh-keys] creating keys for \”%s\”” $sshName -}}
 
       {{- $f := dict -}}
       {{- range $item.fields -}}
-        {{- $_ := set $f .label .value -}}
+        {{- if hasKey . “value” -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
       {{- end -}}
       {{- $sshPrivateKey := index $f “private key” | trim }}
       {{- $sshPublicKey := index $f “public key” | trim }}

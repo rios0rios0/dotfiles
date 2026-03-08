@@ -1,23 +1,21 @@
 {{- $deviceName := .deviceName -}}
 
-{{- warnf “[authorized-keys] fetching Active SSHs...\n” -}}
+{{- warnf “[authorized-keys] fetching Active SSHs...” -}}
 {{- range (onepassword “Active SSHs” “personal” “my”).fields -}}
   {{- if (eq .type “REFERENCE”) -}}
 
-    {{- $item := onepassword .value “Private” “my” -}}
-    {{- warnf “[authorized-keys] checking SSH item \”%s\”...\n” $item.title -}}
-
-    {{- /* Split title into [device, account] */ -}}
-    {{- $parts := split “@” $item.title -}}
+    {{- $parts := split “@” .label -}}
     {{- $device := index $parts “_0” -}}
 
-    {{- /* Only emit hosts for the current device */ -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf “[authorized-keys] matched device \”%s\”\n” $deviceName -}}
+      {{- warnf “[authorized-keys] matched \”%s\”” .label -}}
+      {{- $item := onepassword .value “Private” “my” -}}
 
       {{- $f := dict -}}
       {{- range $item.fields -}}
-        {{- $_ := set $f .label .value -}}
+        {{- if hasKey . “value” -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
       {{- end -}}
       {{- printf “%s\n” (index $f “public key”) -}}
 

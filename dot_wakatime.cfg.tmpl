@@ -1,9 +1,9 @@
-{{- warnf "[wakatime] fetching API key...\n" -}}
+{{- warnf "[wakatime] fetching API key..." -}}
 [settings]
 api_key = {{ onepasswordRead "op://personal/Wakatime/api key" "my" }}
 hide_project_folder = true
 hide_file_names = true
 hide_branch_names = true
 hide_project_names =
-{{- warnf "[wakatime] fetching hidden projects...\n" }}
+{{- warnf "[wakatime] fetching hidden projects..." }}
 {{ onepasswordRead "op://personal/Wakatime/hidden projects" "my" }}

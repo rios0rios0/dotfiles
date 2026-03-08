@@ -303,7 +303,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 ### Known Limitations and Workarounds
 1. **WSL SSH Issues**: Git may freeze with SSH against unknown hosts — Windows script pre-populates known_hosts to prevent this
 2. **Windows Path Limits**: 256 character limitation when using WSL interoperability
-3. **1Password Calls**: Multiple 1Password vault reads during installation (templates fetch SSH keys, GPG keys, credentials per device)
+3. **1Password Calls**: Templates fetch SSH keys, GPG keys, and credentials per device. API calls are minimized by filtering REFERENCE labels by device before fetching items, and chezmoi caches `onepassword` results across all template files
 4. **Internet Required**: All installations require internet access for downloads
 5. **Android NVM/Go**: Native Termux packages are used when GVM build fails due to DNS issues in Termux
 
@@ -348,8 +348,58 @@ chezmoi state delete-bucket --bucket=scriptStates
 - Template files use Go template syntax
 - Variables available: `.chezmoi.os`, `.chezmoi.arch`, `.chezmoi.hostname`, `.chezmoi.homeDir`
 - `.chezmoi.kernel` — used to detect WSL (contains `"microsoft"` string on WSL)
-- `onepasswordRead` / `onepassword` — fetch secrets from 1Password at template render time
+- `onepassword` — fetch full item by name/UUID (preferred — returns `.title` + `.fields`)
+- `onepasswordRead` — fetch a single scalar field by `op://` URI (use only for simple direct reads)
 - Test templates: `chezmoi execute-template < template-file`
+
+### 1Password Template Pattern
+All templates that fetch referenced items from 1Password use a single `onepassword` call per item, then build a local field map with sprig `dict`/`set`:
+
+```go
+{{- $item := onepassword .value "Private" "my" -}}
+{{- $name := $item.title | trim -}}
+{{- $f := dict -}}
+{{- range $item.fields -}}
+  {{- if hasKey . "value" -}}
+    {{- $_ := set $f .label .value -}}
+  {{- end -}}
+{{- end -}}
+{{- $val := index $f "field name" -}}
+```
+
+**Always guard with `hasKey . "value"`** — some 1Password fields lack a `value` property; accessing it without a guard causes `map has no entry for key "value"`.
+
+**Filter by device from REFERENCE label** — when templates filter by `deviceName`, parse `.label` of the REFERENCE field to extract the device name *before* calling `onepassword .value`. This avoids unnecessary API calls for non-matching devices:
+
+```go
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if eq .type "REFERENCE" -}}
+    {{- $parts := split "@" .label -}}
+    {{- $device := index $parts "_0" -}}
+    {{- if eq $device $deviceName -}}
+      {{- $item := onepassword .value "Private" "my" -}}
+      ...
+```
+
+**Do not use `onepasswordItemFields`** — it only returns section-level fields and misses built-in properties like `"public key"` and `"private key"` on SSH Key items. The `onepassword` + `dict`/`set` pattern accesses all fields and chezmoi caches the underlying `op item get` call across all template files automatically.
+
+### Logging Convention
+All scripts and templates use a standardized `[prefix]` logging format to stderr:
+
+```
+[prefix] message              # informational (default)
+[prefix] WARN: message        # non-fatal issues, skips
+[prefix] ERROR: message       # fatal issues before exit
+```
+
+| Channel | How |
+|---------|-----|
+| Templates (`.tmpl`) | `warnf "[prefix] message"` — writes to stderr during rendering (do NOT add `\n`, chezmoi appends its own newline) |
+| Shell scripts (`.sh`) | `echo "[prefix] message" >&2` |
+| PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
+| Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
+
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `op-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `git-sync`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

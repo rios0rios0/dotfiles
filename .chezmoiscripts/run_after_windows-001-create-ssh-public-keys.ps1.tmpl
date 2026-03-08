@@ -8,24 +8,25 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 
 {{- $deviceName := .deviceName -}}
 
-{{- warnf "[windows-ssh-keys] fetching Active SSHs...\n" -}}
+{{- warnf "[windows-ssh-keys] fetching Active SSHs..." -}}
 {{- range (onepassword "Active SSHs" "personal" "my").fields }}
 {{-      if (eq .type "REFERENCE") }}
 
-{{-        $item := onepassword .value "Private" "my" -}}
-{{-        $sshName := $item.title | trim -}}
-{{-        warnf "[windows-ssh-keys] checking SSH item \"%s\"...\n" $sshName -}}
-{{-        $parts := split "@" $sshName -}}
+{{-        $parts := split "@" .label -}}
 {{-        $device := index $parts "_0" -}}
 
 {{-        if eq $device $deviceName }}
-{{-        warnf "[windows-ssh-keys] creating public key for \"%s\"\n" $sshName -}}
+{{-        $item := onepassword .value "Private" "my" -}}
+{{-        $sshName := $item.title | trim -}}
+{{-        warnf "[windows-ssh-keys] creating public key for \"%s\"" $sshName -}}
 
 # read the SSH public key from 1Password
 $sshName = "{{ $sshName }}"
 {{- $f := dict -}}
 {{- range $item.fields -}}
-  {{- $_ := set $f .label .value -}}
+  {{- if hasKey . "value" -}}
+    {{- $_ := set $f .label .value -}}
+  {{- end -}}
 {{- end }}
 $sshPublicKey = "{{ index $f "public key" }}"
 

@@ -6,19 +6,20 @@ This is because on Android (Termux) only private keys are usable, while other pl
 {{- $isAndroid := eq .chezmoi.os "android" -}}
 
 ###### VCS #######################################################################
-{{- warnf "[ssh-config] fetching Active SSHs...\n" -}}
+{{- warnf "[ssh-config] fetching Active SSHs..." -}}
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
   {{- if eq .type "REFERENCE" -}}
-    {{- $item := onepassword .value "Private" "my" -}}
-    {{- $sshName := $item.title | trim -}}
-    {{- warnf "[ssh-config] checking SSH item \"%s\"...\n" $sshName -}}
-    {{- $parts := split "@" $sshName -}}
+    {{- $parts := split "@" .label -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf "[ssh-config] matched device \"%s\"\n" $deviceName -}}
+      {{- warnf "[ssh-config] matched \"%s\" for VCS hosts" .label -}}
+      {{- $item := onepassword .value "Private" "my" -}}
+      {{- $sshName := $item.title | trim -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
-        {{- $_ := set $f .label .value -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
       {{- end -}}
       {{- $sshAlias := index $f "ssh alias" | trim -}}
       {{- $identityFile := "" -}}
@@ -60,19 +61,20 @@ Host bitbucket.org-{{ $sshAlias }}
 {{- end }}
 
 ###### PEM #######################################################################
-{{- warnf "[ssh-config] fetching Active PEMs...\n" -}}
+{{- warnf "[ssh-config] fetching Active PEMs..." -}}
 {{- range (onepassword "Active PEMs" "personal" "my").fields -}}
   {{- if eq .type "REFERENCE" -}}
-    {{- $item := onepassword .value "Private" "my" -}}
-    {{- $pemName := $item.title | trim -}}
-    {{- warnf "[ssh-config] checking PEM item \"%s\"...\n" $pemName -}}
-    {{- $parts := split "@" $pemName -}}
+    {{- $parts := split "@" .label -}}
     {{- $device := index $parts "_0" -}}
     {{- if eq $device $deviceName -}}
-      {{- warnf "[ssh-config] matched device \"%s\"\n" $deviceName -}}
+      {{- warnf "[ssh-config] matched \"%s\" for PEM hosts" .label -}}
+      {{- $item := onepassword .value "Private" "my" -}}
+      {{- $pemName := $item.title | trim -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
-        {{- $_ := set $f .label .value -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
       {{- end -}}
       {{- $alias := index $f "pem host alias" | trim -}}
       {{- $host := index $f "pem host" | trim -}}
