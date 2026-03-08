@@ -3,7 +3,7 @@
     {{- warnf "[docker-config] fetching Active Docker Registries..." }}
     {{- $dockerNotes := "" }}
     {{- range (onepassword "Active Docker Registries" "personal" "my").fields }}
-    {{-   if eq .label "notesPlain" }}
+    {{-   if and (eq .label "notesPlain") (hasKey . "value") }}
     {{-     $dockerNotes = .value }}
     {{-   end }}
     {{- end }}

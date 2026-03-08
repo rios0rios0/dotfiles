@@ -13,7 +13,7 @@ chmod 700 "$sshFolder"
 {{- warnf "[android-ssh-keys] fetching Active SSHs..." -}}
 {{- $sshNotes := "" -}}
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if eq .label "notesPlain" -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $sshNotes = .value -}}
   {{- end -}}
 {{- end -}}

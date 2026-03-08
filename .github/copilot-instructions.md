@@ -359,7 +359,7 @@ chezmoi state delete-bucket --bucket=scriptStates
 ```go
 {{- $notes := "" -}}
 {{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if eq .label "notesPlain" -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $notes = .value -}}
   {{- end -}}
 {{- end -}}

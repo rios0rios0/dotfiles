@@ -33,7 +33,7 @@
 {{- $activeSsh := onepassword "Active SSHs" "personal" "my" -}}
 {{- $sshNotes := "" -}}
 {{- range $activeSsh.fields -}}
-  {{- if eq .label "notesPlain" -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $sshNotes = .value -}}
   {{- end -}}
 {{- end -}}
@@ -93,7 +93,7 @@
 {{- warnf "[gitconfig] fetching Active GPGs..." -}}
 {{- $gpgNotes := "" -}}
 {{- range (onepassword "Active GPGs" "personal" "my").fields -}}
-  {{- if eq .label "notesPlain" -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $gpgNotes = .value -}}
   {{- end -}}
 {{- end -}}

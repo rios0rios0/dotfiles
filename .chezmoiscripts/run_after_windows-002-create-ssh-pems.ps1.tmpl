@@ -11,7 +11,7 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 {{- warnf "[windows-pem-keys] fetching Active PEMs..." -}}
 {{- $pemNotes := "" -}}
 {{- range (onepassword "Active PEMs" "personal" "my").fields -}}
-  {{- if eq .label "notesPlain" -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $pemNotes = .value -}}
   {{- end -}}
 {{- end -}}
