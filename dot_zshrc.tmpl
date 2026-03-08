@@ -330,8 +330,9 @@ fi # -o interactive
 ###### Git Sync ################################################################
 source "$HOME/.scripts/linux-engineering-git-sync-repos.sh"
 
-{{- if ne .chezmoi.os "android" }}
-###### Workspace Information #######################################################
-source "$HOME/.scripts/linux-engineering-workspace-information.sh"
-{{- end }}
+###### Shell Credentials ###########################################################
+source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
+
+###### Workspace Aliases ###########################################################
+source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
 
