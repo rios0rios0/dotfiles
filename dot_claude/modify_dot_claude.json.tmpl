@@ -1,21 +1,13 @@
 #!{{ lookPath "bash" }}
 # Patches hasTrustDialogAccepted into ~/.claude/.claude.json
 # Receives current file content on stdin, outputs desired content on stdout.
-# If stdin is empty (file doesn't exist), tries to restore from backup.
 
-python3 << 'PYEOF'
-import json, os, sys, glob
+_script="$(mktemp)"
+trap 'rm -f "$_script"' EXIT
+cat > "$_script" << 'PYEOF'
+import json, os, sys
 
 current = sys.stdin.read().strip()
-
-# If file doesn't exist, try restoring from backup
-if not current:
-    backup_pattern = os.path.expanduser("~/.claude/backups/.claude.json.backup.*")
-    backups = sorted(glob.glob(backup_pattern), reverse=True)
-    if backups:
-        with open(backups[0]) as f:
-            current = f.read().strip()
-        print(f"[claude-config] Restoring from backup: {backups[0]}", file=sys.stderr)
 
 if current:
     try:
@@ -45,3 +37,4 @@ for d in trust_dirs:
 json.dump(data, sys.stdout, indent=2)
 sys.stdout.write("\n")
 PYEOF
+python3 "$_script"

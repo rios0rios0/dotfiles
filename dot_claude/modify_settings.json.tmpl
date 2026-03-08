@@ -2,7 +2,9 @@
 # Merges broad permission rules into ~/.claude/settings.json
 # Receives current file content on stdin, outputs desired content on stdout.
 
-python3 << 'PYEOF'
+_script="$(mktemp)"
+trap 'rm -f "$_script"' EXIT
+cat > "$_script" << 'PYEOF'
 import json, sys
 
 # Read current settings (empty string if file doesn't exist)
@@ -54,3 +56,4 @@ permissions["allow"] = merged
 json.dump(data, sys.stdout, indent=2)
 sys.stdout.write("\n")
 PYEOF
+python3 "$_script"
