@@ -2,19 +2,5 @@
 set -euo pipefail
 
 echo "[ai-rules] Installing AI rules from guide repository..."
-
-GUIDE_REPO="$HOME/Development/github.com/rios0rios0/guide"
-
-if [ ! -d "$GUIDE_REPO" ]; then
-  echo "[ai-rules] Guide repo not found at $GUIDE_REPO, cloning..."
-  mkdir -p "$(dirname "$GUIDE_REPO")"
-  git clone https://github.com/rios0rios0/guide.git "$GUIDE_REPO"
-else
-  echo "[ai-rules] Updating guide repository..."
-  git -C "$GUIDE_REPO" pull --rebase --quiet
-fi
-
-# Run the install script globally (no argument = installs to ~/)
-"$GUIDE_REPO/install-rules.sh" --force
-
+curl -fsSL https://raw.githubusercontent.com/rios0rios0/guide/generated/install-rules.sh | sh -s -- --force
 echo "[ai-rules] AI rules installed successfully."
