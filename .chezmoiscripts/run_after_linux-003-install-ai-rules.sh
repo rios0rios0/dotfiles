@@ -9,6 +9,9 @@ if [ ! -d "$GUIDE_REPO" ]; then
   echo "[ai-rules] Guide repo not found at $GUIDE_REPO, cloning..."
   mkdir -p "$(dirname "$GUIDE_REPO")"
   git clone https://github.com/rios0rios0/guide.git "$GUIDE_REPO"
+else
+  echo "[ai-rules] Updating guide repository..."
+  git -C "$GUIDE_REPO" pull --rebase --quiet
 fi
 
 # Run the install script globally (no argument = installs to ~/)
