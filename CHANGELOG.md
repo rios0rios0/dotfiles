@@ -16,6 +16,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.1.0] - 2026-03-10
+
 ### Added
 
 - added 1Password integration for MCP server credentials and API keys
@@ -55,3 +57,4 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - fixed `warnf` double newlines by removing explicit `\n` from format strings (chezmoi appends its own newline)
 - fixed `map has no entry for key "value"` crash in `dict`/`set` field loops by adding `hasKey` guard for 1Password fields without a value property
 - fixed Unicode curly quotes (U+201C/U+201D) inadvertently introduced in 3 template files
+
