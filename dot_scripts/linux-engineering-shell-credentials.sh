@@ -6,6 +6,13 @@
 
 source "$HOME/.scripts/linux-engineering-op-loader.sh"
 
+reload-credentials() {
+  rm -f "$HOME/.cache/op-credentials.env" "$HOME/.cache/op-workspaces.env"
+  source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
+  source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
+  echo "[credentials] reloaded from 1Password" >&2
+}
+
 _cred_cache="$HOME/.cache/op-credentials.env"
 
 # use cache if fresh (< 24h) and non-empty — avoids all proot/op calls on most shell opens
@@ -39,10 +46,3 @@ _op_load_references "credentials" "Active Shell Credentials" _on_credential
 
 unset -f _on_credential
 unset _cred_cache
-
-reload-credentials() {
-  rm -f "$HOME/.cache/op-credentials.env" "$HOME/.cache/op-workspaces.env"
-  source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
-  source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
-  echo "[credentials] reloaded from 1Password" >&2
-}
