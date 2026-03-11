@@ -32,7 +32,7 @@ mkdir -p $gpgFolderPath
 {{- if hasKey $f "password" -}}
   {{- $gpgPassword = trimAll "`" (index $f "password") -}}
 {{- end -}}
-{{- $gpgPrivateKey := onepasswordRead (printf "op://Private/%s/private.key" $title) "my" }}
+{{- $gpgPrivateKey := onepasswordRead (printf "op://Private/%s/private.key" $item.id) "my" }}
 gpgName="{{ $item.title }}"
 gpgPassword="{{ $gpgPassword }}"
 gpgPrivateKey="{{ trimAll "`" $gpgPrivateKey }}"
