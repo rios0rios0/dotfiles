@@ -28,7 +28,10 @@ if [[ -s "$_cred_cache" ]]; then
 fi
 
 _on_credential() {
-  if [[ -z "${!1+x}" ]]; then
+  if [[ -v $1 ]]; then
+    printf '[credentials] SKIP: "%s" (already set)\n' "$1" >&2
+  else
+    printf '[credentials] exporting "%s"\n' "$1" >&2
     export "${1}=${2}"
     printf 'export %s=%q\n' "$1" "$2" >> "$_cred_cache"
   fi
