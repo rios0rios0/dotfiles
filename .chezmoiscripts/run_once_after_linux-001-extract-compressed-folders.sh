@@ -7,7 +7,7 @@ WATCH_DIRS=("$HOME/.histdb" "$HOME/.john" "$HOME/.kube/config-files" "$HOME/.sql
 
 for DIR in "${WATCH_DIRS[@]}"; do
     echo "[extract-folders] killing watchers for \"$DIR\"..." >&2
-    pkill -f "inotifywait -m -r -e create,modify,delete --format %w%f $DIR"
+    pkill -f "inotifywait -m -r -e create,modify,delete --format %w%f $DIR" || true
 
     # construct TAR file name by replacing slashes with dashes and appending .tar.gz
     TAR_FILE="${DIR//\//-}.tar.gz"
