@@ -21,8 +21,10 @@ if [[ -s "$_ws_cache" ]]; then
 fi
 
 _on_workspace() {
-  alias "${1}=cd ${2}"
-  printf 'alias %s=%q\n' "$1" "cd ${2}" >> "$_ws_cache"
+  if ! alias "$1" &>/dev/null; then
+    alias "${1}=cd ${2}"
+    printf 'alias %s=%q\n' "$1" "cd ${2}" >> "$_ws_cache"
+  fi
 }
 
 # create fresh cache file with restricted permissions
