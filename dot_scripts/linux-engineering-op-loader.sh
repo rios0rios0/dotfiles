@@ -78,7 +78,7 @@ _op_load_references() {
   local _ol_skipped=0
   local _ol_title _ol_entry _ol_value
 
-  while IFS= read -r _ol_title; do
+  while IFS= read -r _ol_title <&3; do
     # trim whitespace
     _ol_title="${_ol_title#"${_ol_title%%[![:space:]]*}"}"
     _ol_title="${_ol_title%"${_ol_title##*[![:space:]]}"}"
@@ -111,7 +111,7 @@ _op_load_references() {
       _ol_log "WARN: no credential/password field in item '${_ol_title#*@}'"
       _ol_skipped=$((_ol_skipped + 1))
     fi
-  done <<< "$_ol_notes"
+  done 3<<< "$_ol_notes"
 
   _ol_log "done: $_ol_loaded loaded, $_ol_skipped skipped"
   unset -f _ol_log
