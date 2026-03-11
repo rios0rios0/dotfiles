@@ -28,6 +28,7 @@ mkdir -p $gpgFolderPath
     {{- $_ := set $f .label .value -}}
   {{- end -}}
 {{- end }}
+{{- if and (hasKey $f "password") (hasKey $f "private.key") }}
 gpgName="{{ $item.title }}"
 gpgPassword="{{ trimAll "`" (index $f "password") }}"
 gpgPrivateKey="{{ trimAll "`" (index $f "private.key") }}"
@@ -41,6 +42,9 @@ echo "$gpgPrivateKey" > "$privateKeyFilePath"
 gpg --batch --passphrase "$gpgPassword" --import "$privateKeyFilePath"
 
 echo "[linux-gpg-keys] importing into GPG keyring..." >&2
+{{- else }}
+echo "[linux-gpg-keys] WARN: skipping \"{{ $item.title }}\" (missing password or private key)" >&2
+{{- end }}
 
 {{-      end -}}
 {{- end }}
