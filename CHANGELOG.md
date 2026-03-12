@@ -20,6 +20,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Added
 
+- added `gh` CLI proot wrapper for Termux that forwards GitHub tokens (`GH_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`, `GITHUB_TOKEN`) through proot-distro Alpine
 - added 1Password integration for MCP server credentials and API keys
 - added Android-compatible MCP configuration with npx alternatives to Docker-based servers
 - added Linux WSL features to handle Git and SSH configuration with 1Password 
@@ -31,6 +32,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Changed
 
+- refactored shared proot `wrapper` to accept `--env` flags from tool wrappers instead of hardcoding tool-specific env var forwarding
+- moved `OP_SESSION_*` env var forwarding from shared `wrapper` into the `op` wrapper script
 - converted MCP configuration from static JSON to Chezmoi template for cross-platform compatibility and secure credential management
 - deduplicated MCP server merge scripts into a shared `lib-modify-mcp-servers.sh` chezmoi template
 - deduplicated shell credentials and workspace aliases into a shared `linux-engineering-op-loader.sh` loader with structured logging
@@ -53,6 +56,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Fixed
 
+- fixed `gh` CLI failing DNS lookups in Termux by routing it through proot-distro Alpine (Go reads `/etc/resolv.conf` which doesn't exist in Termux)
 - fixed `onepasswordItemFields` not returning built-in SSH Key fields (`public key`, `private key`) — these are top-level detail fields not accessible via `onepasswordItemFields` which only reads section-level fields
 - fixed `warnf` double newlines by removing explicit `\n` from format strings (chezmoi appends its own newline)
 - fixed `map has no entry for key "value"` crash in `dict`/`set` field loops by adding `hasKey` guard for 1Password fields without a value property

@@ -29,14 +29,25 @@ export PROOTNOCALL_VERIFY=1
 export PROOT_LINK2SYMLINK=1
 export PROOT_VERBOSE=-1
 
-workspace="/root/workspace"
-
-# forward any OP_SESSION_* tokens from host to proot (set by 'op signin')
+# Parse --env flags from arguments (tool wrappers pass their env vars this way)
 env_flags=()
-for _var in $(compgen -v OP_SESSION_ 2>/dev/null); do
-  env_flags+=(--env "${_var}=${!_var}")
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        --env)
+            env_flags+=(--env "$2")
+            shift 2
+            ;;
+        --)
+            shift
+            break
+            ;;
+        *)
+            break
+            ;;
+    esac
 done
 
+workspace="/root/workspace"
 proot-distro login alpine --no-arch-warning \
     "${env_flags[@]}" \
     --bind $HOME/.local/bin:/root/.local/bin \
@@ -55,17 +66,29 @@ cat > "$HOME/.local/bin/op" << 'OP_EOF'
 
 # this can't be an alias/function, because it needs to be sourced from different shells and contexts (eg. Chezmoi)
 
+# forward any OP_SESSION_* tokens from host to proot (set by 'op signin')
+env_flags=()
+for _var in $(compgen -v OP_SESSION_ 2>/dev/null); do
+  env_flags+=(--env "${_var}=${!_var}")
+done
+
+# build the wrapper call with env flags (if any)
+wrapper_cmd=(~/.local/bin/wrapper)
+if [[ ${#env_flags[@]} -gt 0 ]]; then
+    wrapper_cmd+=("${env_flags[@]}" --)
+fi
+
 # check if the user is already signed in by running 'op whoami'
 # if it fails, check if accounts are configured and trigger the signin flow
-if ! ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 whoami &>/dev/null; then
+if ! "${wrapper_cmd[@]}" ~/.local/bin/op_linux_arm64 whoami &>/dev/null; then
     # check if any accounts are configured (only when not signed in)
     # using --format=json to get reliable output that can be parsed
-    accounts_json=$(~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 account list --format=json 2>/dev/null || echo "[]")
-    
+    accounts_json=$("${wrapper_cmd[@]}" ~/.local/bin/op_linux_arm64 account list --format=json 2>/dev/null || echo "[]")
+
     # check if accounts array is empty
     if [ "$accounts_json" = "[]" ] || [ -z "$accounts_json" ]; then
         echo "[op-wrapper] no accounts configured, adding account..." >&2
-        ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 account add --address my.1password.com --shorthand my
+        "${wrapper_cmd[@]}" ~/.local/bin/op_linux_arm64 account add --address my.1password.com --shorthand my
         add_exit_code=$?
         if [ $add_exit_code -ne 0 ]; then
             echo "[op-wrapper] ERROR: account add failed with exit code $add_exit_code" >&2
@@ -74,7 +97,7 @@ if ! ~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 whoami &>/dev/null; then
     fi
 fi
 
-~/.local/bin/wrapper ~/.local/bin/op_linux_arm64 "$@"
+"${wrapper_cmd[@]}" ~/.local/bin/op_linux_arm64 "$@"
 OP_EOF
 
 # Make op executable
