@@ -16,6 +16,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.2.0] - 2026-03-15
+
 ### Added
 
 - added GitHub Copilot CLI extension (`gh copilot`) installation to Android dependencies with best-effort authentication check
@@ -23,8 +25,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Changed
 
-- split Android wrapper bootstrap into three single-responsibility scripts: generic proot wrapper (`001`), op wrapper (`001a`), and gh wrapper (`001b`)
 - extracted `gh` CLI proot wrapper from install-dependencies script into its own `run_once_before` script
+- split Android wrapper bootstrap into three single-responsibility scripts: generic proot wrapper (`001`), op wrapper (`001a`), and gh wrapper (`001b`)
 
 ## [0.1.0] - 2026-03-12
 
