@@ -28,6 +28,7 @@ func main() {
 		"mozillaInstallHash":  func(path string) string { return "stub-hash" },
 		"include":             func(name string, data ...interface{}) string { return "" },
 		"output":              func(name string, args ...string) string { return "" },
+		"replaceAllRegex":     func(pattern, repl, s string) string { return s },
 	}
 	for k, v := range chezmoiFuncs {
 		funcMap[k] = v
