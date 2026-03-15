@@ -1,0 +1,8 @@
+{
+  "id": "mock-wakatime-id",
+  "title": "Wakatime",
+  "fields": [
+    {"id": "api_key", "label": "api key", "value": "stub-wakatime-api-key"},
+    {"id": "hidden_projects", "label": "hidden projects", "value": "stub-hidden-project"}
+  ]
+}

@@ -11,6 +11,7 @@ development practices, refer to the **[Development Guide](https://github.com/rio
 - [Git](https://git-scm.com/downloads) 2.30+
 - [age](https://github.com/FiloSottile/age) (for encrypted file handling)
 - [1Password CLI](https://developer.1password.com/docs/cli/get-started) (for secrets management)
+- [Make](https://www.gnu.org/software/make/)
 
 ## Development Workflow
 
@@ -28,13 +29,20 @@ development practices, refer to the **[Development Guide](https://github.com/rio
    ```bash
    chezmoi apply -v
    ```
-6. Verify the installation health:
+6. Validate:
+   ```bash
+   make lint
+   make test
+   make sast
+   ```
+7. Verify the installation health:
    ```bash
    chezmoi doctor
    ```
-7. If editing encrypted files, re-encrypt with age:
+8. If editing encrypted files, re-encrypt with age:
    ```bash
    chezmoi encrypt <file>
    ```
-8. Commit following the [commit conventions](https://github.com/rios0rios0/guide/wiki/Life-Cycle/Git-Flow)
-9. Open a pull request against `main`
+9. Update `CHANGELOG.md` under `[Unreleased]`
+10. Commit following the [commit conventions](https://github.com/rios0rios0/guide/wiki/Life-Cycle/Git-Flow)
+11. Open a pull request against `main`

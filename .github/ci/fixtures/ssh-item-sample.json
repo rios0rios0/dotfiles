@@ -1,0 +1,19 @@
+{
+  "id": "mock-ssh-item-id",
+  "title": "testdevice@Test SSH Key",
+  "fields": [
+    {"id": "username", "label": "ssh username", "value": "testuser"},
+    {"id": "email", "label": "ssh email", "value": "test@example.com"},
+    {"id": "public_key", "label": "public key", "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestPublicKeyStubForCITesting test@example.com"},
+    {"id": "private_key", "label": "private key", "value": "-----BEGIN OPENSSH PRIVATE KEY-----\nstub-private-key-for-ci-testing\n-----END OPENSSH PRIVATE KEY-----"},
+    {"id": "host", "label": "host", "value": "github.com"},
+    {"id": "hostname", "label": "hostname", "value": "github.com"},
+    {"id": "user", "label": "user", "value": "git"},
+    {"id": "port", "label": "port", "value": "22"},
+    {"id": "gpg_key_id", "label": "gpg key id", "value": "ABCDEF1234567890"},
+    {"id": "gpg_alias", "label": "gpg alias", "value": "test-gpg"},
+    {"id": "registry", "label": "registry", "value": "ghcr.io"},
+    {"id": "registry_username", "label": "registry username", "value": "testuser"},
+    {"id": "registry_password", "label": "registry password", "value": "stub-registry-token"}
+  ]
+}
