@@ -1,0 +1,12 @@
+{
+  "id": "mock-active-pems-id",
+  "title": "Active PEMs",
+  "fields": [
+    {
+      "id": "notesPlain",
+      "type": "STRING",
+      "label": "notesPlain",
+      "value": "testdevice@Test PEM Key"
+    }
+  ]
+}

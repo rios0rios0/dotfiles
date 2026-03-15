@@ -1,0 +1,12 @@
+{
+  "id": "mock-active-docker-id",
+  "title": "Active Docker Registries",
+  "fields": [
+    {
+      "id": "notesPlain",
+      "type": "STRING",
+      "label": "notesPlain",
+      "value": "testdevice@Test Docker Registry"
+    }
+  ]
+}
