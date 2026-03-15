@@ -6,7 +6,20 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Cross-platform dotfiles managed with **chezmoi** targeting three platforms: **Linux (Kali on WSL)**, **Windows 11**, and **Android (Termux)**. Secrets are managed via **1Password CLI** and sensitive files are encrypted with **age**.
 
-There is no traditional build/lint/test pipeline. The "build" is `chezmoi apply`.
+The "build" is `chezmoi apply`. A CI pipeline validates templates, scripts, and platform logic.
+
+## Quality Commands
+
+```bash
+make lint                           # shellcheck, Go template syntax, Python, PowerShell, YAML/JSON
+make test                           # template rendering (mock op), .chezmoiignore logic, script order
+make sast                           # gitleaks secret detection
+make lint-shellcheck                # shell scripts only
+make lint-templates                 # Go template syntax only
+make test-template-render           # template rendering with mock 1Password
+make test-chezmoiignore             # platform file inclusion logic
+make test-script-order              # script dependency ordering
+```
 
 ## Essential Commands
 

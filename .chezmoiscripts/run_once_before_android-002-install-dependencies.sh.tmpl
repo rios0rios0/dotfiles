@@ -85,25 +85,15 @@ install_oh_my_zsh() {
     fi
 }
 
+# GVM is intentionally SKIPPED on Android/Termux.
+# GVM installs standard linux/arm64 Go builds that use the faccessat2 syscall (439),
+# which is blocked by Android's seccomp filter, causing "SIGSYS: bad system call".
+# The Termux-native Go package (apt install golang) builds with GOOS=android and
+# avoids blocked syscalls. Always use the Termux package on Android.
+#
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    if command_exists go; then
-        echo "GoLang detected, means it was previously installed or native package installed..."
-
-        return;
-    fi
-
-    gvmPath="$HOME/.gvm"
-
-    if [ ! -d "$gvmPath" ]; then
-        bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
-
-        source "$gvmPath/scripts/gvm"
-        gvm install go1.24.5
-        gvm use go1.24.5
-    else
-        echo "GVM is already installed."
-    fi
+    echo "GVM skipped on Android/Termux (standard Go builds crash due to seccomp; use Termux's native package)."
 }
 
 install_wrapper() {

@@ -1,0 +1,12 @@
+{
+  "id": "mock-active-sshs-id",
+  "title": "Active SSHs",
+  "fields": [
+    {
+      "id": "notesPlain",
+      "type": "STRING",
+      "label": "notesPlain",
+      "value": "testdevice@Test SSH Key\notherdevice@Other SSH Key"
+    }
+  ]
+}

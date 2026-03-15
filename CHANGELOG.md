@@ -18,12 +18,20 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Added
 
+- added CI/CD validation pipeline with GitHub Actions: shellcheck, Go template syntax validation, Python/PowerShell linting, YAML/JSON syntax checks, and gitleaks SAST
+- added template rendering tests with mock 1Password CLI returning deterministic fixtures
+- added `.chezmoiignore` platform logic tests validating file inclusion per OS (linux, windows, android)
+- added script dependency ordering tests verifying alphabetical sort matches execution requirements
+- added Go template syntax validator (`cmd/tmplcheck`) that parses all `.tmpl` files with sprig/chezmoi function stubs
+- added Makefile with `lint`, `test`, and `sast` targets following the pipelines repo pattern
+- added `replaceAllRegex` stub to Go template validator for chezmoi's regex replacement function
 - added GitHub Copilot CLI extension (`gh copilot`) installation to Android dependencies with best-effort authentication check
 - added `.local/share` proot bind for persistent gh extensions, fonts, and zinit plugin data
 
 ### Changed
 
 - split Android wrapper bootstrap into three single-responsibility scripts: generic proot wrapper (`001`), op wrapper (`001a`), and gh wrapper (`001b`)
+- skipped GVM on Android/Termux because standard `linux/arm64` Go builds use `faccessat2` syscall blocked by Android's seccomp filter, causing `SIGSYS` crashes
 - extracted `gh` CLI proot wrapper from install-dependencies script into its own `run_once_before` script
 
 ## [0.1.0] - 2026-03-12
