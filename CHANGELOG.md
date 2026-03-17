@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- skipped GVM on Android/Termux because standard `linux/arm64` Go builds use `faccessat2` syscall blocked by Android's seccomp filter, causing `SIGSYS` crashes
+
 ## [0.2.0] - 2026-03-15
 
 ### Added
