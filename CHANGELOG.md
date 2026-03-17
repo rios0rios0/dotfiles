@@ -16,10 +16,6 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
-### Fixed
-
-- fixed `warnf` function not defined error in `dot_age_recipients.tmpl` by removing the call (unavailable during chezmoi's encryption bootstrap phase)
-
 ## [0.2.0] - 2026-03-15
 
 ### Added
