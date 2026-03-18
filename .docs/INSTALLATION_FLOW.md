@@ -395,15 +395,15 @@ graph TD
 
 ### Automation Percentage by Category
 
-| Category | Automated | Manual | Total |
-|----------|-----------|--------|-------|
-| Development Tools | 90% | 10% | 100% |
-| System Utilities | 95% | 5% | 100% |
-| Office Utilities | 70% | 30% | 100% |
-| Gaming Platforms | 80% | 20% | 100% |
-| Hardware/Drivers | 20% | 80% | 100% |
-| Communication | 60% | 40% | 100% |
-| **Overall** | **70%** | **30%** | **100%** |
+| Category | Automated | Semi-automated | Manual | Total |
+|----------|-----------|----------------|--------|-------|
+| Development Tools | 80% | 10% | 10% | 100% |
+| System Utilities | 85% | 10% | 5% | 100% |
+| Office Utilities | 60% | 30% | 10% | 100% |
+| Gaming Platforms | 70% | 20% | 10% | 100% |
+| Hardware/Drivers | 10% | 20% | 70% | 100% |
+| Communication | 50% | 30% | 20% | 100% |
+| **Overall** | **70%** | **20%** | **10%** | **100%** |
 
 ---
 

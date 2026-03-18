@@ -127,7 +127,8 @@ Welcome to the dotfiles documentation! This directory contains comprehensive gui
 | Installation Checklist | 755 | ~8,000 | Completeness |
 | Installation Flow | 414 | ~3,000 | Visualization |
 | Implementation Roadmap | 787 | ~10,000 | Future Development |
-| **Total** | **2,303** | **~23,500** | **Comprehensive** |
+| README | 327 | ~2,000 | Index/Meta |
+| **Total** | **2,630** | **~25,500** | **Comprehensive** |
 
 ---
 

@@ -291,7 +291,7 @@ This will automatically install the following via `.chezmoiscripts/run_once_befo
 | Software | Method | Status | Installation Function |
 |----------|--------|--------|----------------------|
 | Oh My Zsh | Script | ✅ Automated | `install_oh_my_zsh()` |
-| Powerlevel10k | Manual | ❓ | Not in current scripts (needs investigation) |
+| Powerlevel10k | Not automated (planned) | 🚧 Planned | Implementation code ready (Sprint 1) |
 | GVM (Go Version Manager) | Script | ✅ Automated | `install_gvm()` |
 | kubectl | Script | ✅ Automated | `install_kubectl()` |
 | krew | Script | ✅ Automated | `install_krew()` |
