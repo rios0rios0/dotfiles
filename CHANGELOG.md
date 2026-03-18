@@ -27,6 +27,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 - extended `termux.properties` modify script to set `terminal-transcript-rows`, `bell-character`, and `terminal-cursor-blink-rate` for better performance
 
+### Fixed
+
+- pinned yq (`v4.45.1`) and gitleaks (`v8.24.0`) to specific versions in CI workflow instead of fetching `releases/latest`
+- removed flawed cross-prefix comparison in script ordering test that compared `run_once_before` vs `run_after` filenames (chezmoi determines execution order by prefix type, not alphabetical sort)
+- made `sast` Makefile target self-contained instead of depending on external `common.mk` targets
+
 ## [0.2.1] - 2026-03-18
 
 ### Changed

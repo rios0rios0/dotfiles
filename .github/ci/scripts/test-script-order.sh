@@ -66,23 +66,6 @@ check_order "windows" \
     "003-install-fonts" \
     "004-export-private-key"
 
-# Verify run_once_before sorts before run_after for each platform
-for platform in android linux windows; do
-    # Get the last run_once_before script name
-    last_before=$(find "$SCRIPTS_DIR" -name "run_once_before_${platform}-*" -type f | sort | tail -1 || true)
-    # Get the first run_after script name
-    first_after=$(find "$SCRIPTS_DIR" -name "run_after_${platform}-*" -type f | sort | head -1 || true)
-
-    if [ -n "$last_before" ] && [ -n "$first_after" ]; then
-        last_before_name=$(basename "$last_before")
-        first_after_name=$(basename "$first_after")
-        if [[ "$last_before_name" > "$first_after_name" ]]; then
-            echo "[test-script-order] FAIL ($platform): run_once_before '$last_before_name' sorts after run_after '$first_after_name'" >&2
-            EXIT_CODE=1
-        fi
-    fi
-done
-
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-script-order] all script ordering tests passed" >&2
 fi

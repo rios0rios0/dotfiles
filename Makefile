@@ -42,8 +42,12 @@ test-script-order:
 test-modify-scripts:
 	@bash $(CI_DIR)/scripts/test-modify-scripts.sh
 
-# === SAST targets (override common.mk to only run relevant tools) ===
+# === SAST targets ===
 
 .PHONY: sast
 
-sast: gitleaks semgrep
+sast:
+	@echo '[sast] running gitleaks...' >&2
+	gitleaks detect --source . --verbose
+	@echo '[sast] running semgrep...' >&2
+	semgrep --config auto .

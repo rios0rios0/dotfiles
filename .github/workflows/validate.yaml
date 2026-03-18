@@ -67,9 +67,11 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - name: Install tools
+        env:
+          YQ_VERSION: '4.45.1'
         run: |
           sudo apt-get install -y jq
-          sudo wget -qO /usr/local/bin/yq https://github.com/mikefarah/yq/releases/latest/download/yq_linux_amd64
+          sudo wget -qO /usr/local/bin/yq "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64"
           sudo chmod +x /usr/local/bin/yq
       - name: Validate YAML/JSON syntax
         run: make lint-syntax
@@ -122,8 +124,9 @@ jobs:
         with:
           fetch-depth: 0
       - name: Install gitleaks
+        env:
+          GITLEAKS_VERSION: '8.24.0'
         run: |
-          GITLEAKS_VERSION=$(curl -s https://api.github.com/repos/gitleaks/gitleaks/releases/latest | jq -r '.tag_name' | sed 's/^v//')
           wget -qO gitleaks.tar.gz "https://github.com/gitleaks/gitleaks/releases/download/v${GITLEAKS_VERSION}/gitleaks_${GITLEAKS_VERSION}_linux_x64.tar.gz"
           tar -xzf gitleaks.tar.gz gitleaks
           sudo mv gitleaks /usr/local/bin/
