@@ -114,9 +114,12 @@ git-sync-repos() {
     fi
 
     # collect all repos first (avoids stdin issues with the loop)
+    # skip the root directory itself — it is the workspace, not a project repo
     local repos=()
     while IFS= read -r git_dir; do
-        repos+=("${git_dir%/.git}")
+        local repo_path="${git_dir%/.git}"
+        [[ "$repo_path" == "$root" ]] && continue
+        repos+=("$repo_path")
     done < <(find "$root" -name .git -type d 2>/dev/null | sort)
 
     local total=${#repos[@]}
