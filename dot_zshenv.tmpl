@@ -92,10 +92,14 @@ if [[ -d "$gvmRoot" ]]; then
         fi
     done
     unset _v
-    # Set up Go paths if we found a valid version
+    # Set up Go paths if we found a valid version.
+    # IMPORTANT: Do NOT export GOROOT. Go auto-detects it from the binary location.
+    # Exporting GOROOT breaks Go's toolchain auto-download: when go.mod requires a
+    # newer version (e.g., go1.26.1), Go downloads and re-execs the new binary, but
+    # the inherited GOROOT still points to the old version's stdlib, causing:
+    #   compile: version "go1.25.5" does not match go tool version "go1.26.1"
     if [[ -n "$gvmGoVersion" ]]; then
-        export GOROOT="$gvmRoot/gos/$gvmGoVersion"
-        export PATH="$GOROOT/bin:$PATH"
+        export PATH="$gvmRoot/gos/$gvmGoVersion/bin:$PATH"
         # Add GVM pkgsets paths (where "go install" binaries live under GVM)
         gvmPkgset="$gvmRoot/pkgsets/$gvmGoVersion/global"
         if [[ -d "$gvmPkgset" ]]; then
