@@ -21,7 +21,7 @@ if [[ -s "$_ws_cache" ]]; then
 fi
 
 _on_workspace() {
-  if alias "$1" &>/dev/null; then
+  if alias "$1" &>/dev/null && [[ -z "$_OP_FORCE_RELOAD" ]]; then
     printf '[workspaces] SKIP: alias "%s" (already set)\n' "$1" >&2
   else
     printf '[workspaces] creating alias "%s"\n' "$1" >&2

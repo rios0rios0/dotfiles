@@ -7,9 +7,13 @@
 source "$HOME/.scripts/linux-engineering-op-loader.sh"
 
 reload-credentials() {
+  if [[ "$1" == "--force" ]]; then
+    export _OP_FORCE_RELOAD=1
+  fi
   rm -f "$HOME/.cache/op-credentials.env" "$HOME/.cache/op-workspaces.env"
   source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
   source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
+  unset _OP_FORCE_RELOAD
   echo "[credentials] reloaded from 1Password" >&2
 }
 
@@ -28,7 +32,7 @@ if [[ -s "$_cred_cache" ]]; then
 fi
 
 _on_credential() {
-  if [[ -v $1 ]]; then
+  if [[ -v $1 ]] && [[ -z "$_OP_FORCE_RELOAD" ]]; then
     printf '[credentials] SKIP: "%s" (already set)\n' "$1" >&2
   else
     printf '[credentials] exporting "%s"\n' "$1" >&2
