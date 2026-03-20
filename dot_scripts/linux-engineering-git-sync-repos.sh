@@ -107,6 +107,7 @@ _git_sync_single_repo() {
 
 git-sync-repos() {
     local root="${1:-$PWD}"
+    root="${root%/}"
 
     if [[ ! -d "$root" ]]; then
         echo "[git-sync] ERROR: directory not found: $root"
