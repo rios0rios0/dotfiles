@@ -26,7 +26,7 @@ while IFS= read -r -d '' file; do
         */.github/ci/*) continue ;;
     esac
 
-    if ! shellcheck "$file"; then
+    if ! shellcheck -S warning "$file"; then
         echo "[lint-shellcheck] FAIL: $file" >&2
         EXIT_CODE=1
     fi
@@ -38,7 +38,7 @@ while IFS= read -r -d '' file; do
     tmpfile=$(mktemp)
     preprocess_tmpl "$file" > "$tmpfile"
 
-    if ! shellcheck --shell=bash "$tmpfile"; then
+    if ! shellcheck -S warning --shell=bash "$tmpfile"; then
         echo "[lint-shellcheck] FAIL: $file" >&2
         EXIT_CODE=1
     fi

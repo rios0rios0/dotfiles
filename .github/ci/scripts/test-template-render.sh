@@ -43,7 +43,7 @@ for tmpl in "${!TEMPLATE_CHECKS[@]}"; do
     err_file="$TMPDIR/err-$(echo "$tmpl" | tr '/' '-')"
     output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$file" 2>"$err_file") || {
         echo "[test-template-render] FAIL: $tmpl (template execution failed)" >&2
-        grep -v '^\[' "$err_file" >&2 || true
+        cat "$err_file" >&2 || true
         EXIT_CODE=1
         continue
     }
@@ -72,7 +72,7 @@ if [ -f "$docker_tmpl" ]; then
         fi
     else
         echo "[test-template-render] FAIL: dot_docker/config.json.tmpl (execution failed)" >&2
-        grep -v '^\[' "$err_file" >&2 || true
+        cat "$err_file" >&2 || true
         EXIT_CODE=1
     fi
 fi

@@ -4,6 +4,9 @@
 
 FIXTURES_DIR="$(cd "$(dirname "$0")" && pwd)"
 
+# Debug: log all arguments received
+echo "[mock-op] called with: $*" >&2
+
 # Parse the command
 CMD="$1"
 shift

@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared 1Password notes-based loader for per-device items.
 # Reads item titles from the notesPlain field of a central 1Password item,
 # filters by device slug locally (no API call), then fetches only matching items.
