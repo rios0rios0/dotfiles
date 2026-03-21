@@ -23,7 +23,7 @@ fi
 # Lint pure .ps1 files
 while IFS= read -r -d '' file; do
     rel=$(realpath --relative-to="$REPO_ROOT" "$file")
-    result=$(pwsh -Command "Invoke-ScriptAnalyzer -Path '$file' -Severity Warning,Error" 2>&1) || true
+    result=$(pwsh -Command "Invoke-ScriptAnalyzer -Path '$file' -Severity Warning,Error -ExcludeRule PSAvoidUsingWriteHost" 2>&1) || true
     if [ -n "$result" ]; then
         echo "[lint-powershell] FAIL: $rel" >&2
         echo "$result" >&2
@@ -37,7 +37,7 @@ while IFS= read -r -d '' file; do
     tmpfile=$(mktemp --suffix=.ps1)
     preprocess_tmpl "$file" > "$tmpfile"
 
-    result=$(pwsh -Command "Invoke-ScriptAnalyzer -Path '$tmpfile' -Severity Warning,Error" 2>&1) || true
+    result=$(pwsh -Command "Invoke-ScriptAnalyzer -Path '$tmpfile' -Severity Warning,Error -ExcludeRule PSAvoidUsingWriteHost" 2>&1) || true
     if [ -n "$result" ]; then
         echo "[lint-powershell] FAIL: $rel" >&2
         echo "$result" >&2

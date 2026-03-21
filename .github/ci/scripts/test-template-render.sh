@@ -60,15 +60,16 @@ done
 # Test docker config template (must be valid JSON)
 docker_tmpl="$REPO_ROOT/dot_docker/config.json.tmpl"
 if [ -f "$docker_tmpl" ]; then
-    output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$docker_tmpl" 2>/dev/null) || {
+    if output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$docker_tmpl" 2>/dev/null); then
+        if [ -n "$output" ] && ! echo "$output" | jq empty 2>/dev/null; then
+            echo "[test-template-render] FAIL: dot_docker/config.json.tmpl (invalid JSON output)" >&2
+            EXIT_CODE=1
+        else
+            echo "[test-template-render] PASS: dot_docker/config.json.tmpl" >&2
+        fi
+    else
         echo "[test-template-render] FAIL: dot_docker/config.json.tmpl (execution failed)" >&2
         EXIT_CODE=1
-    }
-    if [ -n "$output" ] && ! echo "$output" | jq empty 2>/dev/null; then
-        echo "[test-template-render] FAIL: dot_docker/config.json.tmpl (invalid JSON output)" >&2
-        EXIT_CODE=1
-    else
-        echo "[test-template-render] PASS: dot_docker/config.json.tmpl" >&2
     fi
 fi
 

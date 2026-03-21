@@ -62,6 +62,7 @@ _patch_claude_code_tmpdir() {
             # revert require("os").tmpdir() → "/tmp"
             sed -i 's#require("os").tmpdir()#"/tmp"#g' "$cli_js"
             # revert template literals ${require("os").tmpdir()} → /tmp
+            # shellcheck disable=SC2016
             sed -i 's#${require("os").tmpdir()}#/tmp#g' "$cli_js"
             echo "[claude-code-patch] Reverted old require()-based patches"
         fi
@@ -124,6 +125,7 @@ _patch_claude_code_tmpdir() {
         # FROM: `/tmp/${
         #   TO: `${process.env.TMPDIR||"/tmp"}/${
         # -----------------------------------------------------------------
+        # shellcheck disable=SC2016
         if grep -q '`/tmp/${' "$cli_js"; then
             sed -i "s#\`/tmp/\${#\`\${process.env.TMPDIR||\"/tmp\"}/\${#g" "$cli_js"
             patched=$((patched + 1))

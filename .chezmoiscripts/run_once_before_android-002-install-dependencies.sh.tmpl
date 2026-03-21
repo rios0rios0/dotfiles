@@ -125,9 +125,9 @@ install_terra() {
     if [ ! -f "$terraBin" ]; then
         sourcePath="$HOME/Development/github.com/rios0rios0/terra"
         if [ ! -d "$sourcePath" ]; then
-            git clone https://github.com/rios0rios0/terra.git $sourcePath
+            git clone https://github.com/rios0rios0/terra.git "$sourcePath"
         fi
-        cd $sourcePath && git fetch --all && git pull --rebase
+        cd "$sourcePath" && git fetch --all && git pull --rebase
 
         make install
     else
@@ -158,6 +158,7 @@ install_sdkman() {
     if [ ! -d "$sdkPath" ]; then
         curl -s "https://get.sdkman.io" | bash
 
+        # shellcheck disable=SC1091
         source "$sdkPath/bin/sdkman-init.sh"
         sdk install java
         sdk install gradle
@@ -182,6 +183,7 @@ install_nvm() {
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
 
         unset PREFIX
+        # shellcheck disable=SC1091
         source "$nvmPath/nvm.sh"
         nvm install --lts
 

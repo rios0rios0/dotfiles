@@ -23,13 +23,11 @@ check_platform() {
     done
 
     # Render the .chezmoiignore template for this OS
+    # chezmoi execute-template doesn't support overriding .chezmoi.os,
+    # so we preprocess the template by substituting .chezmoi.os with the target value
     local rendered
-    rendered=$(chezmoi execute-template \
-        --init \
-        -d "chezmoi.os=$os" \
-        -d "chezmoi.hostname=testhost" \
-        -d "chezmoi.homeDir=/home/testuser" \
-        < "$IGNORE_FILE" 2>/dev/null) || {
+    rendered=$(sed "s/\.chezmoi\.os/\"$os\"/g" "$IGNORE_FILE" \
+        | chezmoi execute-template 2>/dev/null) || {
         echo "[test-chezmoiignore] FAIL: failed to render .chezmoiignore for os=$os" >&2
         EXIT_CODE=1
         return

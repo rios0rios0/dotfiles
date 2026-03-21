@@ -10,10 +10,17 @@
     {"id": "hostname", "label": "hostname", "value": "github.com"},
     {"id": "user", "label": "user", "value": "git"},
     {"id": "port", "label": "port", "value": "22"},
+    {"id": "ssh_alias", "label": "ssh alias", "value": "test"},
     {"id": "gpg_key_id", "label": "gpg key id", "value": "ABCDEF1234567890"},
     {"id": "gpg_alias", "label": "gpg alias", "value": "test-gpg"},
-    {"id": "registry", "label": "registry", "value": "ghcr.io"},
-    {"id": "registry_username", "label": "registry username", "value": "testuser"},
-    {"id": "registry_password", "label": "registry password", "value": "stub-registry-token"}
+    {"id": "gpg_username", "label": "gpg username", "value": "testuser"},
+    {"id": "gpg_email", "label": "gpg email", "value": "test@example.com"},
+    {"id": "fingerprint", "label": "fingerprint", "value": "ABCDEF1234567890"},
+    {"id": "registry_name", "label": "registry name", "value": "ghcr.io"},
+    {"id": "credential", "label": "credential", "value": "stub-registry-token"},
+    {"id": "docker_username", "label": "username", "value": "testuser"},
+    {"id": "pem_host_alias", "label": "pem host alias", "value": "test-server"},
+    {"id": "pem_host", "label": "pem host", "value": "192.168.1.1"},
+    {"id": "pem_user", "label": "pem user", "value": "ubuntu"}
   ]
 }
