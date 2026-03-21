@@ -18,6 +18,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Added
 
+- added `git-clone-repos` function that discovers remote repos from GitHub or Azure DevOps, clones missing ones using SSH aliases, and prompts to delete local repos no longer found on the remote
 - added CI/CD validation pipeline with GitHub Actions: shellcheck, Go template syntax validation, Python/PowerShell linting, YAML/JSON syntax checks, and gitleaks SAST
 - added template rendering tests with mock 1Password CLI returning deterministic fixtures
 - added `.chezmoiignore` platform logic tests validating file inclusion per OS (linux, windows, android)
