@@ -13,6 +13,7 @@ fi
 # your additional kubeconfig files should be inside ~/.kube/config-files
 ADD_KUBECONFIG_FILES="$HOME/.kube/config-files"
 if [[ -d "${ADD_KUBECONFIG_FILES}" ]]; then
+  # shellcheck disable=SC2044
   for kubeconfigFile in $(find "${ADD_KUBECONFIG_FILES}" -type f -name "*.yml" -o -name "*.yaml")
   do
     export KUBECONFIG="$kubeconfigFile:$KUBECONFIG"

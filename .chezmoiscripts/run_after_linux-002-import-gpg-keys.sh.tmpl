@@ -6,7 +6,7 @@ set -euo pipefail
 gpgFolderPath="$HOME/.gpg"
 
 # ensure the ".gpg" folder exists
-mkdir -p $gpgFolderPath
+mkdir -p "$gpgFolderPath"
 
 {{- warnf "[linux-gpg-keys] fetching Active GPGs..." -}}
 {{- $gpgNotes := "" -}}
@@ -51,4 +51,4 @@ echo "[linux-gpg-keys] importing into GPG keyring..." >&2
 {{- end }}
 
 # cleanup the ".gpg" folder
-rm -rf $gpgFolderPath
+rm -rf "$gpgFolderPath"

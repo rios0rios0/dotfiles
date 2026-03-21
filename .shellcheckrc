@@ -1,0 +1,8 @@
+# Can't follow non-constant source (chezmoi sourced scripts)
+disable=SC1090
+
+# Not following sourced files (external dependencies like oh-my-zsh, gvm, nvm)
+disable=SC1091
+
+# Variables appear unused but are used in sourced scripts
+disable=SC2034

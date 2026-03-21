@@ -1,7 +1,9 @@
+# shellcheck shell=bash
 _git_sync_single_repo() {
     local repo_dir="$1"
     local root="$2"
-    local wip_branch="wip/auto-stash-$(date +%Y%m%d-%H%M%S-%N)-$RANDOM-$$"
+    local wip_branch
+    wip_branch="wip/auto-stash-$(date +%Y%m%d-%H%M%S-%N)-$RANDOM-$$"
     local name="${repo_dir#$root/}"
     local status_label="SYNCED"
     local _err

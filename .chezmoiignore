@@ -1,10 +1,13 @@
 # Common files (ignored on all systems)
 .docs
 .editorconfig
+.github
+.shellcheckrc
 CHANGELOG.md
 /CLAUDE.md
 CONTRIBUTING.md
 LICENSE
+Makefile
 README.md
 
 {{- /* Windows-specific files – these are only useful on Windows. When not on Windows, ignore them. */ -}}

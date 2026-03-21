@@ -18,6 +18,13 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Added
 
+- added CI/CD validation pipeline with GitHub Actions: shellcheck, Go template syntax validation, Python/PowerShell linting, YAML/JSON syntax checks, and gitleaks SAST
+- added template rendering tests with mock 1Password CLI returning deterministic fixtures
+- added `.chezmoiignore` platform logic tests validating file inclusion per OS (linux, windows, android)
+- added script dependency ordering tests verifying alphabetical sort matches execution requirements
+- added Go template syntax validator (`cmd/tmplcheck`) that parses all `.tmpl` files with sprig/chezmoi function stubs
+- added Makefile with `lint`, `test`, and `sast` targets following the pipelines repo pattern
+- added `replaceAllRegex` stub to Go template validator for chezmoi's regex replacement function
 - added `tmux` to Android dependencies for session multiplexing under a single process tree
 - added Termux performance documentation (Phantom Process Killer fix) to `README.md` and `CLAUDE.md`
 - added `UV_THREADPOOL_SIZE` and `MALLOC_ARENA_MAX` environment variables for Android performance tuning
@@ -26,6 +33,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 ### Changed
 
 - extended `termux.properties` modify script to set `terminal-transcript-rows`, `bell-character`, and `terminal-cursor-blink-rate` for better performance
+
+### Fixed
+
+- pinned yq (`v4.45.1`) and gitleaks (`v8.24.0`) to specific versions in CI workflow instead of fetching `releases/latest`
+- removed flawed cross-prefix comparison in script ordering test that compared `run_once_before` vs `run_after` filenames (chezmoi determines execution order by prefix type, not alphabetical sort)
+- made `sast` Makefile target self-contained instead of depending on external `common.mk` targets
 
 ## [0.2.1] - 2026-03-18
 

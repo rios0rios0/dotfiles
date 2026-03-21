@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared font-installation library included by platform-specific wrappers.
 
 NERD_FONTS_BASE_URL="https://github.com/ryanoasis/nerd-fonts/releases/download"

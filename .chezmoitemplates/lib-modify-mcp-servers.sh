@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Shared MCP server merge logic for modify_ scripts.
 # Receives current JSON on stdin, outputs merged JSON on stdout.
 
