@@ -33,9 +33,11 @@ fi
 
 # Set single-line key=value properties (replace if uncommented, append if absent)
 set_property() {
-  local key="$1" value="$2"
-  if echo "$result" | grep -q "^${key}[[:space:]]*="; then
-    result="$(echo "$result" | sed "s|^${key}[[:space:]]*=.*|${key} = ${value}|")"
+  local key="$1" value="$2" key_escaped
+  # Escape regex metacharacters in key for safe use in grep/sed patterns
+  key_escaped="$(printf '%s\n' "$key" | sed 's/[][\\.^$*+?{}()|]/\\&/g')"
+  if printf '%s\n' "$result" | grep -q "^${key_escaped}[[:space:]]*="; then
+    result="$(printf '%s\n' "$result" | sed "s|^${key_escaped}[[:space:]]*=.*|${key} = ${value}|")"
   else
     result="$(printf '%s\n%s' "$result" "${key} = ${value}")"
   fi
