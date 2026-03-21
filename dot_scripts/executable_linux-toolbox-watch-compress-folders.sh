@@ -51,6 +51,7 @@ rotate_logs() {
   fi
 
   # Keep only lines newer than cutoff time
+  # shellcheck disable=SC2015
   awk -v cutoff="$cutoff_time" '$0 >= cutoff || !/^[0-9]{4}-[0-9]{2}-[0-9]{2}/' "$LOG_FILE" > "$temp_file" 2>/dev/null && mv "$temp_file" "$LOG_FILE" || true
 }
 

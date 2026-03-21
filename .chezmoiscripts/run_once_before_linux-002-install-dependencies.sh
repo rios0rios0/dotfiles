@@ -62,7 +62,7 @@ install_oh_my_zsh() {
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    sudo rm -rf /home/$USER/.gvm
+    sudo rm -rf "/home/$USER/.gvm"
     bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
 
     # Source GVM to make it available in the current shell
@@ -148,7 +148,7 @@ install_nvm() {
 
 # https://github.com/pyenv/pyenv
 install_pyenv() {
-    sudo rm -rf /home/$USER/.pyenv
+    sudo rm -rf "/home/$USER/.pyenv"
     curl https://pyenv.run | bash
 
     # Source pyenv to make it available in the current shell

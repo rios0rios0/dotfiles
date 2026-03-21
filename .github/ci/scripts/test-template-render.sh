@@ -40,8 +40,10 @@ for tmpl in "${!TEMPLATE_CHECKS[@]}"; do
         continue
     fi
 
-    output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$file" 2>/dev/null) || {
+    err_file="$TMPDIR/err-$(echo "$tmpl" | tr '/' '-')"
+    output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$file" 2>"$err_file") || {
         echo "[test-template-render] FAIL: $tmpl (template execution failed)" >&2
+        grep -v '^\[' "$err_file" >&2 || true
         EXIT_CODE=1
         continue
     }
@@ -60,7 +62,8 @@ done
 # Test docker config template (must be valid JSON)
 docker_tmpl="$REPO_ROOT/dot_docker/config.json.tmpl"
 if [ -f "$docker_tmpl" ]; then
-    if output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$docker_tmpl" 2>/dev/null); then
+    err_file="$TMPDIR/err-docker"
+    if output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$docker_tmpl" 2>"$err_file"); then
         if [ -n "$output" ] && ! echo "$output" | jq empty 2>/dev/null; then
             echo "[test-template-render] FAIL: dot_docker/config.json.tmpl (invalid JSON output)" >&2
             EXIT_CODE=1
@@ -69,6 +72,7 @@ if [ -f "$docker_tmpl" ]; then
         fi
     else
         echo "[test-template-render] FAIL: dot_docker/config.json.tmpl (execution failed)" >&2
+        grep -v '^\[' "$err_file" >&2 || true
         EXIT_CODE=1
     fi
 fi
