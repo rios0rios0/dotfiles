@@ -148,6 +148,12 @@ Android 12+ includes a **Phantom Process Killer** that enforces a system-wide li
 
 **Supplementary:** Run `termux-wake-lock` to prevent deep sleep. Use `tmux` instead of multiple Termux tabs to consolidate process trees.
 
+**Environment tuning** (set in `dot_zshenv.tmpl`, Android-only):
+- `UV_THREADPOOL_SIZE=16` — increases Node.js libuv thread pool from default 4, critical for Claude Code I/O
+- `MALLOC_ARENA_MAX=2` — reduces glibc memory arena fragmentation on mobile
+
+**Manual Android settings:** Exclude Termux from battery optimization (`Unrestricted`), set animation scales to `0.5x`, enable RAM Plus if available.
+
 ## Encryption Setup
 
 - Private key: `~/.ssh/chezmoi`

@@ -20,6 +20,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 - added `tmux` to Android dependencies for session multiplexing under a single process tree
 - added Termux performance documentation (Phantom Process Killer fix) to `README.md` and `CLAUDE.md`
+- added `UV_THREADPOOL_SIZE` and `MALLOC_ARENA_MAX` environment variables for Android performance tuning
+- added Android OS-level optimization guide (battery, animations, RAM Plus, Termux:Boot) to `README.md`
 
 ### Changed
 

@@ -15,6 +15,15 @@ if [[ -n "$PREFIX" && -d "$PREFIX/tmp" ]]; then
     export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
 fi
 
+###### Android Performance Tuning ######################################################################################
+# These environment variables optimize Node.js and memory allocation for heavy workloads on Termux.
+if [[ -n "$PREFIX" ]]; then
+    # Node.js libuv thread pool: default is 4, bottleneck for I/O-heavy tools like Claude Code
+    export UV_THREADPOOL_SIZE=16
+    # Reduce glibc memory arena count to limit fragmentation on mobile
+    export MALLOC_ARENA_MAX=2
+fi
+
 ###### Essential PATH Setup ##############################################################################################
 # Local bin directory
 if [[ -d "$HOME/.local/bin" ]]; then

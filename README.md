@@ -196,6 +196,12 @@ Platform-specific scripts are prefixed: `linux-*`, `windows-*`, `android-*`. Exc
    - Run `termux-wake-lock` to prevent Android from deep-sleeping Termux
    - Use `tmux` instead of multiple Termux tabs — it consolidates all sessions under a single process tree, reducing the visible child process count to Android
 
+   **Additional Android OS settings (no root required):**
+   - **Battery optimization:** `Settings > Apps > Termux > Battery > Unrestricted` — prevents Doze mode from throttling Termux
+   - **Animation scales:** In Developer Options, set Window/Transition/Animator duration scales to `0.5x` — reduces UI overhead
+   - **RAM Plus / Extended RAM:** If available (Samsung: `Settings > Battery and device care > RAM Plus`), enable 4-8GB of virtual RAM
+   - **Termux:Boot:** Install from [F-Droid](https://f-droid.org/en/packages/com.termux.boot/), create `~/.termux/boot/start.sh` with `termux-wake-lock` to auto-acquire wake lock on boot
+
 ## References
 
 - [chezmoi documentation](https://www.chezmoi.io/user-guide/command-overview/)
