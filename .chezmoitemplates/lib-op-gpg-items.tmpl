@@ -1,0 +1,33 @@
+{{- define "op-gpg-gitconfig-aliases" -}}
+{{- $deviceName := .deviceName -}}
+{{- warnf "[gitconfig] fetching Active GPGs..." -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active GPGs" "personal" "my").fields -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
+    {{- $notes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $notes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
+    {{- warnf "[gitconfig] checking GPG \"%s\"" $title -}}
+    {{- if eq $device $deviceName -}}
+      {{- warnf "[gitconfig] matched \"%s\" for GPG alias" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $gpgAlias := index $f "gpg alias" -}}
+      {{- $gpgUsername := index $f "gpg username" -}}
+      {{- $gpgEmail := index $f "gpg email" -}}
+      {{- $gpgFingerprint := index $f "fingerprint" }}
+    gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}

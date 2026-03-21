@@ -1,6 +1,6 @@
 {{- /* TODO: when the Windows username is different than WSL username, the 1Password path is different breaking the commit signing */ -}}
 {{- $deviceName := .deviceName -}}
-{{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
+{{- $username := include "username.tmpl" . | trim }}
 
 {{- /* OS-dependent paths and executables */ -}}
 {{- $windowsHome := printf "C:/Users/%s" $username -}}
@@ -90,60 +90,10 @@
     rollback = reset --soft HEAD~1
 
     # gpg signing
-{{- warnf "[gitconfig] fetching Active GPGs..." -}}
-{{- $gpgNotes := "" -}}
-{{- range (onepassword "Active GPGs" "personal" "my").fields -}}
-  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $gpgNotes = .value -}}
-  {{- end -}}
-{{- end -}}
-{{- range splitList "\n" $gpgNotes -}}
-  {{- $title := . | trim -}}
-  {{- if ne $title "" -}}
-    {{- $parts := split "@" $title -}}
-    {{- $device := index $parts "_0" -}}
-    {{- warnf "[gitconfig] checking GPG \"%s\"" $title -}}
-    {{- if eq $device $deviceName -}}
-      {{- warnf "[gitconfig] matched \"%s\" for GPG alias" $title -}}
-      {{- $item := onepassword $title "Private" "my" -}}
-      {{- $f := dict -}}
-      {{- range $item.fields -}}
-        {{- if hasKey . "value" -}}
-          {{- $_ := set $f .label .value -}}
-        {{- end -}}
-      {{- end -}}
-      {{- $gpgAlias := index $f "gpg alias" -}}
-      {{- $gpgUsername := index $f "gpg username" -}}
-      {{- $gpgEmail := index $f "gpg email" -}}
-      {{- $gpgFingerprint := index $f "fingerprint" }}
-    gpg{{ $gpgAlias }} = !(git config user.name '{{ $gpgUsername }}' && git config user.email '{{ $gpgEmail }}' && git config --replace-all user.signingkey {{ $gpgFingerprint }} && git config gpg.format openpgp)
-    {{- end -}}
-  {{- end -}}
-{{- end }}
+{{- template "op-gpg-gitconfig-aliases" . }}
 
     # ssh signing
-{{- range splitList "\n" $sshNotes -}}
-  {{- $title := . | trim -}}
-  {{- if ne $title "" -}}
-    {{- $parts := split "@" $title -}}
-    {{- $device := index $parts "_0" -}}
-    {{- if eq $device $deviceName -}}
-      {{- warnf "[gitconfig] matched \"%s\" for SSH alias" $title -}}
-      {{- $item := onepassword $title "Private" "my" -}}
-      {{- $f := dict -}}
-      {{- range $item.fields -}}
-        {{- if hasKey . "value" -}}
-          {{- $_ := set $f .label .value -}}
-        {{- end -}}
-      {{- end -}}
-      {{- $sshAlias := index $f "ssh alias" -}}
-      {{- $sshUsername := index $f "ssh username" -}}
-      {{- $sshEmail := index $f "ssh email" -}}
-      {{- $sshPublicKey := index $f "public key" }}
-    ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
-    {{- end -}}
-  {{- end -}}
-{{- end }}
+{{- template "op-ssh-gitconfig-aliases" . }}
 [core]
     autocrlf = input
     editor = vim

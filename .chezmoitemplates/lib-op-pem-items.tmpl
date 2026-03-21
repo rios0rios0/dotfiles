@@ -1,0 +1,83 @@
+{{- define "op-pem-config-hosts" -}}
+{{- $deviceName := .deviceName -}}
+{{- warnf "[ssh-config] fetching Active PEMs..." -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active PEMs" "personal" "my").fields -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
+    {{- $notes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $notes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
+    {{- warnf "[ssh-config] checking PEM \"%s\"" $title -}}
+    {{- if eq $device $deviceName -}}
+      {{- warnf "[ssh-config] matched \"%s\" for PEM hosts" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
+      {{- $pemName := $item.title | trim -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $alias := index $f "pem host alias" | trim -}}
+      {{- $host := index $f "pem host" | trim -}}
+      {{- $user := index $f "pem user" | trim -}}
+      {{- $pemIdentityFile := (print "~/.ssh/" $pemName ".pem") -}}
+
+Host {{ $alias }}
+  HostName {{ $host }}
+  User {{ $user }}
+  IdentityFile {{ $pemIdentityFile }}
+  IdentitiesOnly yes
+
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "op-pem-windows-keys" -}}
+{{- /* NOTE: The generated PowerShell code references $sshFolderPath, which must be defined
+     in the calling script before this template is invoked. */ -}}
+{{- $deviceName := .deviceName -}}
+{{- warnf "[windows-pem-keys] fetching Active PEMs..." -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active PEMs" "personal" "my").fields -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
+    {{- $notes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $notes }}
+{{-      $title := . | trim -}}
+{{-      if ne $title "" }}
+
+{{-        $parts := split "@" $title -}}
+{{-        $device := index $parts "_0" -}}
+
+{{-        if eq $device $deviceName }}
+{{-        $item := onepassword $title "Private" "my" -}}
+{{-        $pemName := $item.title | trim -}}
+{{-        warnf "[windows-pem-keys] creating PEM key for \"%s\"" $pemName -}}
+
+# read the PEM private key from 1Password
+$pemName = "{{ $pemName }}"
+{{- $f := dict -}}
+{{- range $item.fields -}}
+  {{- if hasKey . "value" -}}
+    {{- $_ := set $f .label .value -}}
+  {{- end -}}
+{{- end }}
+$pemPrivateKey = "{{ trimAll "`" (index $f "notesPlain") }}"
+
+# create the private key file
+$privateKeyFilePath = "$sshFolderPath\$pemName"
+Write-Output "Creating private key file: `"$privateKeyFilePath`"..."
+Set-Content -Path $privateKeyFilePath -Value $pemPrivateKey -Force
+
+{{-        end -}}
+{{-      end -}}
+{{- end }}
+{{- end -}}

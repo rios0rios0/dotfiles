@@ -1,0 +1,249 @@
+{{- define "op-ssh-config-hosts" -}}
+{{- $deviceName := .deviceName -}}
+{{- $isAndroid := eq .chezmoi.os "android" -}}
+{{- warnf "[ssh-config] fetching Active SSHs..." -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
+    {{- $notes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $notes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
+    {{- warnf "[ssh-config] checking \"%s\"" $title -}}
+    {{- if eq $device $deviceName -}}
+      {{- warnf "[ssh-config] matched \"%s\" for VCS hosts" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
+      {{- $sshName := $item.title | trim -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $sshAlias := index $f "ssh alias" | trim -}}
+      {{- $identityFile := "" -}}
+      {{- if $isAndroid -}}
+        {{- $identityFile = (print "~/.ssh/" $sshName) -}}
+      {{- else -}}
+        {{- $identityFile = (print "~/.ssh/" $sshName ".pub") -}}
+      {{- end }}
+
+Host github.com-{{ $sshAlias }}
+  HostName github.com
+  IdentityFile {{ $identityFile }}
+  IdentitiesOnly yes
+
+Host gitlab.com-{{ $sshAlias }}
+  HostName gitlab.com
+  IdentityFile {{ $identityFile }}
+  IdentitiesOnly yes
+
+# Azure DevOps
+Host dev.azure.com-{{ $sshAlias }}
+  HostName ssh.dev.azure.com
+  IdentityFile {{ $identityFile }}
+  IdentitiesOnly yes
+
+Host visualstudio.com-{{ $sshAlias }}
+  HostName vs-ssh.visualstudio.com
+  IdentityFile {{ $identityFile }}
+  IdentitiesOnly yes
+
+# Atlassian
+Host bitbucket.org-{{ $sshAlias }}
+  HostName bitbucket.org
+  IdentityFile {{ $identityFile }}
+  IdentitiesOnly yes
+
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "op-ssh-allowed-signers" -}}
+{{- $deviceName := .deviceName -}}
+{{- warnf "[allowed-signers] fetching Active SSHs..." -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
+    {{- $notes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $notes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
+    {{- if eq $device $deviceName -}}
+      {{- warnf "[allowed-signers] matched \"%s\"" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
+      {{- end -}}
+      {{- printf "%s %s\n" (index $f "ssh email") (index $f "public key") -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "op-ssh-authorized-keys" -}}
+{{- $deviceName := .deviceName -}}
+{{- warnf "[authorized-keys] fetching Active SSHs..." -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
+    {{- $notes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $notes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
+    {{- if eq $device $deviceName -}}
+      {{- warnf "[authorized-keys] matched \"%s\"" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
+      {{- end -}}
+      {{- printf "%s\n" (index $f "public key") -}}
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "op-ssh-gitconfig-aliases" -}}
+{{- $deviceName := .deviceName -}}
+{{- warnf "[gitconfig] fetching Active SSHs for aliases..." -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
+    {{- $notes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $notes -}}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" -}}
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
+    {{- if eq $device $deviceName -}}
+      {{- warnf "[gitconfig] matched \"%s\" for SSH alias" $title -}}
+      {{- $item := onepassword $title "Private" "my" -}}
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $sshAlias := index $f "ssh alias" -}}
+      {{- $sshUsername := index $f "ssh username" -}}
+      {{- $sshEmail := index $f "ssh email" -}}
+      {{- $sshPublicKey := index $f "public key" }}
+    ssh{{ $sshAlias }} = !(git config user.name '{{ $sshUsername }}' && git config user.email '{{ $sshEmail }}' && git config --replace-all user.signingkey '{{ $sshPublicKey }}' && git config gpg.format ssh)
+    {{- end -}}
+  {{- end -}}
+{{- end -}}
+{{- end -}}
+
+{{- define "op-ssh-android-keys" -}}
+{{- /* NOTE: The generated bash code references $sshFolder, which must be defined
+     in the calling script before this template is invoked. */ -}}
+{{- $deviceName := .deviceName -}}
+{{- warnf "[android-ssh-keys] fetching Active SSHs..." -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
+    {{- $notes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $notes }}
+  {{- $title := . | trim -}}
+  {{- if ne $title "" }}
+
+    {{- $parts := split "@" $title -}}
+    {{- $device := index $parts "_0" -}}
+
+    {{- if eq $device $deviceName -}}
+      {{- $item := onepassword $title "Private" "my" -}}
+      {{- $sshName := $item.title | trim -}}
+      {{- warnf "[android-ssh-keys] creating keys for \"%s\"" $sshName -}}
+
+      {{- $f := dict -}}
+      {{- range $item.fields -}}
+        {{- if hasKey . "value" -}}
+          {{- $_ := set $f .label .value -}}
+        {{- end -}}
+      {{- end -}}
+      {{- $sshPrivateKey := index $f "private key" | trim }}
+      {{- $sshPublicKey := index $f "public key" | trim }}
+
+      sshKeyPath="$sshFolder/{{ $sshName }}"
+
+      echo "[android-ssh-keys] creating private key: $sshKeyPath" >&2
+      cat << 'EOF' > "$sshKeyPath"
+{{ $sshPrivateKey }}
+EOF
+      chmod 600 "$sshKeyPath"
+
+      echo "[android-ssh-keys] creating public key: $sshKeyPath.pub" >&2
+      cat << 'EOF' > "$sshKeyPath.pub"
+{{ $sshPublicKey }}
+EOF
+      chmod 644 "$sshKeyPath.pub"
+    {{- end -}}
+  {{- end -}}
+{{- end }}
+{{- end -}}
+
+{{- define "op-ssh-windows-public-keys" -}}
+{{- /* NOTE: The generated PowerShell code references $sshFolderPath, which must be defined
+     in the calling script before this template is invoked. */ -}}
+{{- $deviceName := .deviceName -}}
+{{- warnf "[windows-ssh-keys] fetching Active SSHs..." -}}
+{{- $notes := "" -}}
+{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
+    {{- $notes = .value -}}
+  {{- end -}}
+{{- end -}}
+{{- range splitList "\n" $notes }}
+{{-      $title := . | trim -}}
+{{-      if ne $title "" }}
+
+{{-        $parts := split "@" $title -}}
+{{-        $device := index $parts "_0" -}}
+
+{{-        if eq $device $deviceName }}
+{{-        $item := onepassword $title "Private" "my" -}}
+{{-        $sshName := $item.title | trim -}}
+{{-        warnf "[windows-ssh-keys] creating public key for \"%s\"" $sshName -}}
+
+# read the SSH public key from 1Password
+$sshName = "{{ $sshName }}"
+{{- $f := dict -}}
+{{- range $item.fields -}}
+  {{- if hasKey . "value" -}}
+    {{- $_ := set $f .label .value -}}
+  {{- end -}}
+{{- end }}
+$sshPublicKey = "{{ index $f "public key" }}"
+
+# create the public key file
+$publicKeyFilePath = "$sshFolderPath\$sshName.pub"
+Write-Output "Creating public key file: `"$publicKeyFilePath`"..."
+Set-Content -Path $publicKeyFilePath -Value $sshPublicKey -Force
+
+{{-        end -}}
+{{-      end -}}
+{{- end }}
+{{- end -}}

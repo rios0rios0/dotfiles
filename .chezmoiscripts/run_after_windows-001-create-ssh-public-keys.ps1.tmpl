@@ -6,42 +6,4 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
     New-Item -ItemType Directory -Path $sshFolderPath
 }
 
-{{- $deviceName := .deviceName -}}
-
-{{- warnf "[windows-ssh-keys] fetching Active SSHs..." -}}
-{{- $sshNotes := "" -}}
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
-  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $sshNotes = .value -}}
-  {{- end -}}
-{{- end -}}
-{{- range splitList "\n" $sshNotes }}
-{{-      $title := . | trim -}}
-{{-      if ne $title "" }}
-
-{{-        $parts := split "@" $title -}}
-{{-        $device := index $parts "_0" -}}
-
-{{-        if eq $device $deviceName }}
-{{-        $item := onepassword $title "Private" "my" -}}
-{{-        $sshName := $item.title | trim -}}
-{{-        warnf "[windows-ssh-keys] creating public key for \"%s\"" $sshName -}}
-
-# read the SSH public key from 1Password
-$sshName = "{{ $sshName }}"
-{{- $f := dict -}}
-{{- range $item.fields -}}
-  {{- if hasKey . "value" -}}
-    {{- $_ := set $f .label .value -}}
-  {{- end -}}
-{{- end }}
-$sshPublicKey = "{{ index $f "public key" }}"
-
-# create the public key file
-$publicKeyFilePath = "$sshFolderPath\$sshName.pub"
-Write-Output "Creating public key file: `"$publicKeyFilePath`"..."
-Set-Content -Path $publicKeyFilePath -Value $sshPublicKey -Force
-
-{{-        end -}}
-{{-      end -}}
-{{- end }}
+{{- template "op-ssh-windows-public-keys" . }}

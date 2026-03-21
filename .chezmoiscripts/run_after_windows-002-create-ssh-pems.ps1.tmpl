@@ -6,42 +6,4 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
     New-Item -ItemType Directory -Path $sshFolderPath
 }
 
-{{- $deviceName := .deviceName -}}
-
-{{- warnf "[windows-pem-keys] fetching Active PEMs..." -}}
-{{- $pemNotes := "" -}}
-{{- range (onepassword "Active PEMs" "personal" "my").fields -}}
-  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $pemNotes = .value -}}
-  {{- end -}}
-{{- end -}}
-{{- range splitList "\n" $pemNotes }}
-{{-      $title := . | trim -}}
-{{-      if ne $title "" }}
-
-{{-        $parts := split "@" $title -}}
-{{-        $device := index $parts "_0" -}}
-
-{{-        if eq $device $deviceName }}
-{{-        $item := onepassword $title "Private" "my" -}}
-{{-        $pemName := $item.title | trim -}}
-{{-        warnf "[windows-pem-keys] creating PEM key for \"%s\"" $pemName -}}
-
-# read the PEM private key from 1Password
-$pemName = "{{ $pemName }}"
-{{- $f := dict -}}
-{{- range $item.fields -}}
-  {{- if hasKey . "value" -}}
-    {{- $_ := set $f .label .value -}}
-  {{- end -}}
-{{- end }}
-$pemPrivateKey = "{{ trimAll "`" (index $f "notesPlain") }}"
-
-# create the private key file
-$privateKeyFilePath = "$sshFolderPath\$pemName"
-Write-Output "Creating private key file: `"$privateKeyFilePath`"..."
-Set-Content -Path $privateKeyFilePath -Value $pemPrivateKey -Force
-
-{{-        end -}}
-{{-      end -}}
-{{- end }}
+{{- template "op-pem-windows-keys" . }}
