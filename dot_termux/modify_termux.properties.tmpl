@@ -3,7 +3,7 @@
 # This modify_ script patches only managed keys in termux.properties,
 # preserving the rest of the file (comments, defaults, future Termux additions).
 
-echo "[termux-config] configuring extra keys layout" >&2
+echo "[termux-config] configuring termux properties" >&2
 
 export DESIRED
 DESIRED="$(cat <<'KEYS'
@@ -30,5 +30,19 @@ result="$(echo "$contents" | awk '
 if ! echo "$result" | grep -q "^extra-keys[[:space:]]*="; then
   result="$(printf '%s\n%s' "$result" "$DESIRED")"
 fi
+
+# Set single-line key=value properties (replace if uncommented, append if absent)
+set_property() {
+  local key="$1" value="$2"
+  if echo "$result" | grep -q "^${key}[[:space:]]*="; then
+    result="$(echo "$result" | sed "s|^${key}[[:space:]]*=.*|${key} = ${value}|")"
+  else
+    result="$(printf '%s\n%s' "$result" "${key} = ${value}")"
+  fi
+}
+
+set_property "terminal-transcript-rows" "5000"
+set_property "bell-character" "ignore"
+set_property "terminal-cursor-blink-rate" "0"
 
 printf '%s\n' "$result"

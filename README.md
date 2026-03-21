@@ -185,6 +185,17 @@ Platform-specific scripts are prefixed: `linux-*`, `windows-*`, `android-*`. Exc
 
 3. **Windows path length limit (256 chars)**: WSL interop calls to `.exe` files may fail with `Invalid argument` if the working directory path is too long.
 
+4. **Termux sessions killed with `[Process completed (signal 9)]` (Android 12+)**: Android's **Phantom Process Killer** enforces a system-wide limit of ~32 forked child processes. Heavy CLI tools like Claude Code spawn many Node.js children, quickly exceeding this limit — regardless of available RAM.
+
+   **Fix (Android 14+, no root required):**
+   1. Enable Developer Options: `Settings > About Phone > tap "Build Number" 7 times`
+   2. Go to `Settings > System > Developer Options`
+   3. Enable **"Disable child process restrictions"**
+
+   **Supplementary tips:**
+   - Run `termux-wake-lock` to prevent Android from deep-sleeping Termux
+   - Use `tmux` instead of multiple Termux tabs — it consolidates all sessions under a single process tree, reducing the visible child process count to Android
+
 ## References
 
 - [chezmoi documentation](https://www.chezmoi.io/user-guide/command-overview/)
