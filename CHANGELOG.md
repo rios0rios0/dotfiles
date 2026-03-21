@@ -16,6 +16,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-21
+
 ### Added
 
 - added `tmux` to Android dependencies for session multiplexing under a single process tree
