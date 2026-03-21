@@ -1,3 +1,4 @@
+# shellcheck shell=bash
 # Per-device shell credentials from 1Password.
 # Central item "Active Shell Credentials" (vault: personal) with titles in notesPlain.
 # Referenced items: title "<device-slug>@<ENV_VAR_NAME>", field "credential"/"password" = secret value.

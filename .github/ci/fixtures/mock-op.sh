@@ -7,6 +7,11 @@ FIXTURES_DIR="$(cd "$(dirname "$0")" && pwd)"
 # Debug: log all arguments received
 echo "[mock-op] called with: $*" >&2
 
+# Strip --session flag and its value (chezmoi passes this after signin)
+while [[ "${1:-}" == --session ]]; do
+    shift 2
+done
+
 # Parse the command
 CMD="$1"
 shift
@@ -17,7 +22,22 @@ case "$CMD" in
         shift
         case "$SUBCMD" in
             get)
-                ITEM_NAME="$1"
+                # Skip flags (--format, --vault, --account) to find the positional item name
+                ITEM_NAME=""
+                while [[ $# -gt 0 ]]; do
+                    case "$1" in
+                        --format|--vault|--account)
+                            shift
+                            [[ $# -gt 0 ]] && shift
+                            ;;
+                        *)
+                            if [[ -z "$ITEM_NAME" ]]; then
+                                ITEM_NAME="$1"
+                            fi
+                            shift
+                            ;;
+                    esac
+                done
                 case "$ITEM_NAME" in
                     "Active SSHs")
                         cat "$FIXTURES_DIR/active-sshs.json"
@@ -59,8 +79,11 @@ case "$CMD" in
     whoami)
         echo '{"email":"test@example.com","account_uuid":"test-uuid"}'
         ;;
+    signin)
+        echo "mock-session-token"
+        ;;
     account)
-        echo '[{"shorthand":"my","url":"https://my.1password.com"}]'
+        echo '[{"shorthand":"my","url":"https://my.1password.com","email":"test@example.com","user_uuid":"test-user-uuid","account_uuid":"test-account-uuid"}]'
         ;;
     *)
         echo "{}"
