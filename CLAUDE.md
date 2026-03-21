@@ -140,6 +140,20 @@ The wrapper scripts follow a strict execution order:
 
 The generic proot wrapper is the only exception — it exists as BOTH a bootstrap script (for timing) AND a chezmoi-managed file (`dot_local/bin/executable_wrapper`) to keep it updated on subsequent applies.
 
+## Android Performance (Termux)
+
+Android 12+ includes a **Phantom Process Killer** that enforces a system-wide limit of ~32 forked child processes. Claude Code spawns many Node.js children, so running 3+ sessions causes `[Process completed (signal 9)]` — this is SIGKILL from the phantom killer, not OOM.
+
+**Fix (Android 14+, no root required):** Enable `Settings > System > Developer Options > "Disable child process restrictions"`.
+
+**Supplementary:** Run `termux-wake-lock` to prevent deep sleep. Use `tmux` instead of multiple Termux tabs to consolidate process trees.
+
+**Environment tuning** (set in `dot_zshenv.tmpl`, Android-only):
+- `UV_THREADPOOL_SIZE=16` — increases Node.js libuv thread pool from default 4, critical for Claude Code I/O
+- `MALLOC_ARENA_MAX=2` — reduces glibc memory arena fragmentation on mobile
+
+**Manual Android settings:** Exclude Termux from battery optimization (`Unrestricted`), set animation scales to `0.5x`, enable RAM Plus if available.
+
 ## Encryption Setup
 
 - Private key: `~/.ssh/chezmoi`

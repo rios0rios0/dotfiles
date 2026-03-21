@@ -16,6 +16,17 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added `tmux` to Android dependencies for session multiplexing under a single process tree
+- added Termux performance documentation (Phantom Process Killer fix) to `README.md` and `CLAUDE.md`
+- added `UV_THREADPOOL_SIZE` and `MALLOC_ARENA_MAX` environment variables for Android performance tuning
+- added Android OS-level optimization guide (battery, animations, RAM Plus, Termux:Boot) to `README.md`
+
+### Changed
+
+- extended `termux.properties` modify script to set `terminal-transcript-rows`, `bell-character`, and `terminal-cursor-blink-rate` for better performance
+
 ## [0.2.1] - 2026-03-18
 
 ### Changed

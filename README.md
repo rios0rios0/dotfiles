@@ -185,6 +185,23 @@ Platform-specific scripts are prefixed: `linux-*`, `windows-*`, `android-*`. Exc
 
 3. **Windows path length limit (256 chars)**: WSL interop calls to `.exe` files may fail with `Invalid argument` if the working directory path is too long.
 
+4. **Termux sessions killed with `[Process completed (signal 9)]` (Android 12+)**: Android's **Phantom Process Killer** enforces a system-wide limit of ~32 forked child processes. Heavy CLI tools like Claude Code spawn many Node.js children, quickly exceeding this limit — regardless of available RAM.
+
+   **Fix (Android 14+, no root required):**
+   1. Enable Developer Options: `Settings > About Phone > tap "Build Number" 7 times`
+   2. Go to `Settings > System > Developer Options`
+   3. Enable **"Disable child process restrictions"**
+
+   **Supplementary tips:**
+   - Run `termux-wake-lock` to prevent Android from deep-sleeping Termux
+   - Use `tmux` instead of multiple Termux tabs — it consolidates all sessions under a single process tree, reducing the visible child process count to Android
+
+   **Additional Android OS settings (no root required):**
+   - **Battery optimization:** `Settings > Apps > Termux > Battery > Unrestricted` — prevents Doze mode from throttling Termux
+   - **Animation scales:** In Developer Options, set Window/Transition/Animator duration scales to `0.5x` — reduces UI overhead
+   - **RAM Plus / Extended RAM:** If available (Samsung: `Settings > Battery and device care > RAM Plus`), enable 4-8GB of virtual RAM
+   - **Termux:Boot:** Install from [F-Droid](https://f-droid.org/en/packages/com.termux.boot/), create `~/.termux/boot/start.sh` with `termux-wake-lock` to auto-acquire wake lock on boot
+
 ## References
 
 - [chezmoi documentation](https://www.chezmoi.io/user-guide/command-overview/)
