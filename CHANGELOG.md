@@ -16,6 +16,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.3.0] - 2026-03-22
+
 ### Added
 
 - added `git-clone-repos` function that discovers remote repos from GitHub or Azure DevOps, clones missing ones using SSH aliases, and prompts to delete local repos no longer found on the remote
@@ -38,8 +40,11 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 ### Fixed
 
 - pinned yq (`v4.45.1`) and gitleaks (`v8.24.0`) to specific versions in CI workflow instead of fetching `releases/latest`
-- removed flawed cross-prefix comparison in script ordering test that compared `run_once_before` vs `run_after` filenames (chezmoi determines execution order by prefix type, not alphabetical sort)
 - made `sast` Makefile target self-contained instead of depending on external `common.mk` targets
+
+### Removed
+
+- removed flawed cross-prefix comparison in script ordering test that compared `run_once_before` vs `run_after` filenames (chezmoi determines execution order by prefix type, not alphabetical sort)
 
 ## [0.2.1] - 2026-03-18
 
