@@ -32,9 +32,17 @@ _gcr_extract_owner() {
     local provider="$2"
     # /home/user/Development/github.com/rios0rios0 -> rios0rios0
     # /home/user/Development/dev.azure.com/MyOrg -> MyOrg
+    if [[ "$root" != *"/$provider/"* ]]; then
+        _gcr_log "ERROR: could not extract owner from '$root' for provider '$provider' (expected .../$provider/<owner>/...)"
+        return 1
+    fi
     local after="${root##*/$provider/}"
     # strip trailing slashes and take only the first segment
     after="${after%%/*}"
+    if [[ -z "$after" ]]; then
+        _gcr_log "ERROR: empty owner extracted from '$root' for provider '$provider' (expected .../$provider/<owner>/...)"
+        return 1
+    fi
     echo "$after"
 }
 
@@ -149,17 +157,20 @@ _gcr_scan_local() {
     if [[ "$depth" -eq 1 ]]; then
         # GitHub: root/repo/.git (include hidden dirs like .github)
         for d in "$root"/*(N/) "$root"/.*(N/); do
-            [[ -d "${d}/.git" ]] || continue
             name="${d##*/}"
+            [[ "$name" == "." || "$name" == ".." ]] && continue
+            [[ -d "${d}/.git" ]] || continue
             results+=("$name")
         done
     elif [[ "$depth" -eq 2 ]]; then
         # Azure DevOps: root/project/repo/.git
         for pd in "$root"/*(N/) "$root"/.*(N/); do
             project="${pd##*/}"
+            [[ "$project" == "." || "$project" == ".." ]] && continue
             for rd in "$pd"/*(N/) "$pd"/.*(N/); do
-                [[ -d "${rd}/.git" ]] || continue
                 repo="${rd##*/}"
+                [[ "$repo" == "." || "$repo" == ".." ]] && continue
+                [[ -d "${rd}/.git" ]] || continue
                 results+=("$project/$repo")
             done
         done
@@ -314,10 +325,10 @@ git-clone-repos() {
 
             local tmp_dir
             tmp_dir=$(mktemp -d) || { _gcr_log "ERROR: could not create temp directory"; return 1; }
-            local _saved_int _saved_term
+            local _saved_int _saved_term _gcr_interrupted=0
             _saved_int=$(trap -p INT 2>/dev/null)
             _saved_term=$(trap -p TERM 2>/dev/null)
-            trap 'rm -rf "$tmp_dir"' INT TERM
+            trap '_gcr_interrupted=1; rm -rf "$tmp_dir"; if [[ -n "$_saved_int" ]]; then eval "$_saved_int"; else trap - INT; fi; if [[ -n "$_saved_term" ]]; then eval "$_saved_term"; else trap - TERM; fi; _gcr_log "interrupted, aborting clone"; return 130' INT TERM
 
             local i=1 batch_end repo_name clone_url target_dir j
             local pids=()
