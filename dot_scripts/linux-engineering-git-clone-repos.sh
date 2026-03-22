@@ -18,6 +18,7 @@ _gcr_log() { printf '[git-clone] %s\n' "$*" >&2; }
 _gcr_detect_provider() {
     local root="$1"
     local provider
+    # shellcheck disable=SC2296 -- zsh associative array key iteration
     for provider in "${(k)_GCR_PROVIDERS[@]}"; do
         if [[ "$root" == *"/$provider/"* || "$root" == *"/$provider" ]]; then
             echo "$provider"
@@ -234,6 +235,7 @@ git-clone-repos() {
     provider=$(_gcr_detect_provider "$root")
     if [[ -z "$provider" ]]; then
         _gcr_log "ERROR: could not detect provider from path: $root"
+        # shellcheck disable=SC2296 -- zsh associative array key iteration
         _gcr_log "supported providers: ${(k)_GCR_PROVIDERS[*]}"
         return 1
     fi
@@ -381,7 +383,7 @@ git-clone-repos() {
             else
                 printf '[git-clone] "%s" exists locally but not on remote. Delete? [y/N] ' "$r" >&2
                 if read -r answer </dev/tty 2>/dev/null && [[ "$answer" == "y" || "$answer" == "Y" ]]; then
-                    rm -rf "$root/$r"
+                    rm -rf "${root:?}/${r:?}"
                     printf "  %-50s DELETED\n" "$r"
                     deleted=$((deleted + 1))
                 else
