@@ -173,7 +173,6 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `dot_scripts/`: User scripts deployed to `~/.scripts/`:
   - `linux-engineering-version-manager.sh`: Auto-detects `go.mod`/`.nvmrc`/`pyproject.toml` and switches Go/Node/Python versions
   - `linux-engineering-detect-kube-config-files.sh`: Auto-loads kubeconfig files from `~/.kube/config-files/`
-  - `linux-engineering-docker-aliases.sh`: Docker aliases (`dip`, `dreset`)
   - `linux-engineering-workspace-information-template.sh.tmpl`: Workspace info template (re-processed on every apply)
   - `linux-toolbox-watch-compress-folders.sh`: Background script watching and compressing `~/.histdb`, `~/.john`, etc.
 
@@ -429,7 +428,7 @@ Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-key
    - kubectl, terraform, terragrunt available in PATH
    - Go (GVM), Node.js (NVM), Python (pyenv), Java (SDKMAN), Rust (Cargo) via version managers
    - Version managers auto-switch based on project files (`go.mod`, `.nvmrc`, `pyproject.toml`)
-   - Docker aliases and Kubernetes shortcuts configured
+   - Docker via devforge (`dev docker ips`, `dev docker reset`) and Kubernetes shortcuts configured
 
 4. **Security Setup**:
    - Age encryption working with private key at `~/.ssh/chezmoi`

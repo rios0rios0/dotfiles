@@ -232,11 +232,11 @@ source "$HOME/.scripts/linux-engineering-detect-kube-config-files.sh"
 
 {{- if ne .chezmoi.os "android" }}
 ###### Docker ######################################################################
-# only load docker completions and aliases if docker is available (avoids errors when Docker Desktop is not running)
+# only load docker completions if docker is available (avoids errors when Docker Desktop is not running)
 if command -v docker &>/dev/null; then
   zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
 fi
-source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
+# docker aliases (dip, dreset) migrated to devforge: `dev docker ips`, `dev docker reset`
 {{- end }}
 
 if [[ -o interactive ]]; then
@@ -254,7 +254,6 @@ if [[ -o interactive ]]; then
         if [[ -s "$gvmRoot/scripts/gvm" ]]; then
             source "$gvmRoot/scripts/gvm"
         fi
-        _vm_use_go
     fi
 
 ###### Java ########################################################################
@@ -287,7 +286,6 @@ if [[ -o interactive ]]; then
         if [ -s "$NVM_HOME/bash_completion" ]; then
             \. "$NVM_HOME/bash_completion"
         fi
-        _vm_use_node
         if [[ -n "$_saved_prefix" ]]; then
             export PREFIX="$_saved_prefix"
         fi
@@ -308,13 +306,7 @@ if [[ -o interactive ]]; then
         # Rehash happens lazily when needed instead of on every shell init
         eval "$(pyenv init - --no-rehash)"
 
-        # Define pyenv wrapper AFTER init to handle noclobber issues with rehash
-        # The wrapper is defined in the version manager script and handles:
-        # - Temporarily disabling noclobber (which causes "cannot overwrite" errors)
-        # - Cleaning up stale lock files before operations
-
-        # Detect and use Python version from pyproject.toml
-        _vm_use_python
+        # pyenv wrapper (noclobber + lock cleanup) is defined in version manager script
     fi
 
 ###### Rust ########################################################################
@@ -325,10 +317,11 @@ if [[ -o interactive ]]; then
             export PATH="$CARGO_ROOT/bin:$PATH"
         fi
     fi
-fi # -o interactive
 
-###### Git Sync ################################################################
-source "$HOME/.scripts/linux-engineering-git-sync-repos.sh"
+    # Auto-detect and switch to the required SDK version for the current directory
+    # Replaces _vm_use_go, _vm_use_node, _vm_use_python (migrated to devforge)
+    eval "$(dev project use . 2>/dev/null)"
+fi # -o interactive
 
 ###### Git Clone ###############################################################
 source "$HOME/.scripts/linux-engineering-git-clone-repos.sh"
