@@ -25,6 +25,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 - removed `linux-engineering-git-sync-repos.sh` — migrated to [devforge](https://github.com/rios0rios0/devforge) `dev repo sync`
 - removed `linux-engineering-docker-aliases.sh` (`dip`, `dreset`) — migrated to devforge `dev docker ips` and `dev docker reset`
+- updated Copilot instruction docs to stop listing `linux-engineering-docker-aliases.sh` as an available script
 - removed version detection functions (`_vm_detect_and_use`, `_vm_extract_*`, `_vm_use_*`) — migrated to devforge `dev project use`
 
 ## [0.3.0] - 2026-03-22

@@ -232,7 +232,7 @@ source "$HOME/.scripts/linux-engineering-detect-kube-config-files.sh"
 
 {{- if ne .chezmoi.os "android" }}
 ###### Docker ######################################################################
-# only load docker completions and aliases if docker is available (avoids errors when Docker Desktop is not running)
+# only load docker completions if docker is available (avoids errors when Docker Desktop is not running)
 if command -v docker &>/dev/null; then
   zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
 fi
