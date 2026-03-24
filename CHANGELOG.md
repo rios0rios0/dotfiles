@@ -16,10 +16,16 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- changed `linux-engineering-version-manager.sh` to only keep pyenv workarounds, added `dev-use` shell wrapper for `dev project use`
+- changed `.zshrc` to replace `_vm_use_go`, `_vm_use_node`, `_vm_use_python` calls with a single `dev-use` call after all version managers are sourced
+
 ### Removed
 
 - removed `linux-engineering-git-sync-repos.sh` — migrated to [devforge](https://github.com/rios0rios0/devforge) `dev repo sync`
 - removed `linux-engineering-docker-aliases.sh` (`dip`, `dreset`) — migrated to devforge `dev docker ips` and `dev docker reset`
+- removed version detection functions (`_vm_detect_and_use`, `_vm_extract_*`, `_vm_use_*`) — migrated to devforge `dev project use`
 
 ## [0.3.0] - 2026-03-22
 
