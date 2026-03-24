@@ -16,6 +16,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.3.1] - 2026-03-24
+
 ### Changed
 
 - changed `linux-engineering-version-manager.sh` to only keep pyenv workarounds, added `dev-use` shell wrapper for `dev project use`
