@@ -320,7 +320,7 @@ if [[ -o interactive ]]; then
 
     # Auto-detect and switch to the required SDK version for the current directory
     # Replaces _vm_use_go, _vm_use_node, _vm_use_python (migrated to devforge)
-    dev-use
+    eval "$(dev project use . 2>/dev/null)"
 fi # -o interactive
 
 ###### Git Clone ###############################################################

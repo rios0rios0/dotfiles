@@ -50,7 +50,3 @@ pyenv() {
     return $exit_code
 }
 
-# Shell wrapper for devforge version switching
-# Detects required SDK version from project files and switches to it
-# Usage: dev-use [path]
-dev-use() { eval "$(dev project use "${1:-.}" 2>/dev/null)"; }
