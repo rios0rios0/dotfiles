@@ -16,6 +16,11 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Removed
+
+- removed `linux-engineering-git-sync-repos.sh` — migrated to [devforge](https://github.com/rios0rios0/devforge) `dev repo sync`
+- removed `linux-engineering-docker-aliases.sh` (`dip`, `dreset`) — migrated to devforge `dev docker ips` and `dev docker reset`
+
 ## [0.3.0] - 2026-03-22
 
 ### Added

@@ -236,7 +236,7 @@ source "$HOME/.scripts/linux-engineering-detect-kube-config-files.sh"
 if command -v docker &>/dev/null; then
   zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
 fi
-source "$HOME/.scripts/linux-engineering-docker-aliases.sh"
+# docker aliases (dip, dreset) migrated to devforge: `dev docker ips`, `dev docker reset`
 {{- end }}
 
 if [[ -o interactive ]]; then
@@ -327,8 +327,7 @@ if [[ -o interactive ]]; then
     fi
 fi # -o interactive
 
-###### Git Sync ################################################################
-source "$HOME/.scripts/linux-engineering-git-sync-repos.sh"
+# git-sync-repos migrated to devforge: `dev repo sync`
 
 ###### Git Clone ###############################################################
 source "$HOME/.scripts/linux-engineering-git-clone-repos.sh"
