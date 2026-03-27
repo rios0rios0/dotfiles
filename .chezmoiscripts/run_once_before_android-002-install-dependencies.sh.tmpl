@@ -25,8 +25,7 @@ requirements=(
     "wget"              # required by 1Password CLI
     "zsh"               # preferred shell
     "ncurses-utils"     # needed for many packages (like GVM)
-    "proot"             # needed to run binaries with Termux DNS
-    "proot-distro"      # needed to control proot capabilities selecting a distro
+    "clang"             # required to build termux-etc-redirect
     "file"              # it's for determining file types
 )
 apt install --no-install-recommends --yes "${requirements[@]}"
@@ -97,21 +96,15 @@ install_gvm() {
     echo "GVM skipped on Android/Termux (standard Go builds crash due to seccomp; use Termux's native package)."
 }
 
-install_wrapper() {
-  distro="alpine"
-  profilePath="/etc/profile"
+install_termux_etc_redirect() {
+  sourcePath="$HOME/Development/github.com/rios0rios0/termux-etc-redirect"
+  if [ ! -d "$sourcePath" ]; then
+      git clone https://github.com/rios0rios0/termux-etc-redirect.git "$sourcePath"
+  fi
+  cd "$sourcePath" && git fetch --all && git pull --rebase
 
-  proot-distro install "$distro"
-
-  proot-distro login "$distro" -- sh -c "
-      if grep -Fq '\$HOME/.local/bin' \"$profilePath\" 2>/dev/null; then
-          echo 'proot PATH already patched.'
-      else
-          # append the literal $HOME form (keep $ unexpanded inside the file)
-          printf '%s\n' 'export PATH=\$PATH:\$HOME/.local/bin' >> \"$profilePath\"
-          echo 'proot PATH patched.'
-      fi
-  "
+  # Build, install, and create missing config files (resolv.conf, nsswitch.conf)
+  ./scripts/install.sh
 }
 
 # github.com/rios0rios0/terra
@@ -307,7 +300,7 @@ install_oh_my_zsh
 # TODO: building Go versions on Termux are breaking, since they don't recognize system critical path (like /etc/resolv.conf) leading to DNS errors
 install_gvm
 
-install_wrapper
+install_termux_etc_redirect
 install_terra
 install_kubectl
 install_sdkman
@@ -326,14 +319,8 @@ install_github_copilot
 install_azure_cli
 
 # =========================================================================================================
-# resolv.config
-configure_dns() {
-    rcfile="/data/data/com.termux/files/usr/etc/resolv.conf"
-
-    echo "nameserver 8.8.8.8" > "$rcfile"
-    echo "nameserver 8.8.4.4" >> "$rcfile"
-    echo "nameserver 1.1.1.1" >> "$rcfile"
-}
+# DNS configuration is handled by termux-etc-redirect's install.sh script,
+# which creates $PREFIX/etc/resolv.conf with public nameservers (8.8.8.8, 8.8.4.4, 1.1.1.1).
 
 # https://docs.astronvim.com/
 configure_neovim() {
@@ -352,6 +339,5 @@ configure_neovim() {
     fi
 }
 
-configure_dns
 configure_neovim
 # =========================================================================================================
