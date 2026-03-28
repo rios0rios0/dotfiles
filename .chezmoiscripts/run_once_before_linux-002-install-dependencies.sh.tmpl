@@ -55,10 +55,7 @@ utilities=(
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
 # =========================================================================================================
-# https://ohmyz.sh/#install
-install_oh_my_zsh() {
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-}
+{{ template "lib-install-deps.sh" }}
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
@@ -119,33 +116,6 @@ install_terragrunt() {
     sudo chmod +x /usr/local/bin/terragrunt
 }
 
-# https://sdkman.io/install/
-install_sdkman() {
-    curl -s "https://get.sdkman.io" | bash
-
-    # Source SDKMAN to make it available in the current shell
-    export SDKMAN_DIR="$HOME/.sdkman"
-    # shellcheck source=/dev/null
-    [[ -s "$SDKMAN_DIR/bin/sdkman-init.sh" ]] && source "$SDKMAN_DIR/bin/sdkman-init.sh"
-
-    sdk install java
-    sdk install gradle
-}
-
-# https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
-install_nvm() {
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
-
-    # Source NVM to make it available in the current shell
-    export NVM_DIR="$HOME/.nvm"
-    # shellcheck source=/dev/null
-    [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
-
-    nvm install --lts
-    npm install -g corepack
-    corepack enable
-}
-
 # https://github.com/pyenv/pyenv
 install_pyenv() {
     sudo rm -rf "/home/$USER/.pyenv"
@@ -171,16 +141,6 @@ install_pyenv() {
 # https://cursor.com/docs/cli/installation
 install_cursor_cli() {
     curl https://cursor.com/install -fsSL | bash
-}
-
-# https://github.com/anthropics/claude-code
-install_claude_cli() {
-    npm install -g @anthropic-ai/claude-code
-}
-
-# https://github.com/google-gemini/gemini-cli
-install_gemini_cli() {
-    npm install -g @google/gemini-cli
 }
 
 # https://cli.github.com/manual/installation
