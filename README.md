@@ -69,6 +69,12 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 ## Installation
 
+### Quick Start
+
+For a complete, step-by-step guide for setting up from an empty environment, see:
+- **[Quick Start Guide](.docs/QUICK_START_GUIDE.md)** - Fast track installation (30 min active time)
+- **[Installation Checklist](.docs/INSTALLATION_CHECKLIST.md)** - Comprehensive guide with all software details
+
 ### Prerequisites
 
 All platforms require:
