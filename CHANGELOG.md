@@ -31,6 +31,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - removed `configure_dns()` function (DNS configuration is now handled by `termux-etc-redirect`'s install script)
 - removed proot-specific environment variables (`PROOTNOCALL_VERIFY`, `PROOT_LINK2SYMLINK`, `PROOT_VERBOSE`)
 - removed proot bind mounts and workspace remapping from the generic wrapper
+- removed `linux-engineering-git-clone-repos.sh` — migrated to devforge `dev repo clone`
 
 ### Fixed
 
