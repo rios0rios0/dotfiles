@@ -220,9 +220,9 @@ alias play="PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema play"
 aws-prof() { export AWS_PROFILE=$1 }
 azm-subs() { az account set --subscription $1 }
 {{- if eq .chezmoi.os "android" }}
-alias terraw="wrapper terra"            # when called, the other 2 will be inside proot already
-alias terraformw="wrapper terraform"    # useful when needed to call alone (it might not be needed)
-alias terragruntw="wrapper terragrunt"  # useful when needed to call alone (it might not be needed)
+alias terraw="termux-etc-seccomp terra"            # runs terra with /etc/ redirect + SIGSYS suppression
+alias terraformw="termux-etc-seccomp terraform"    # useful when needed to call alone
+alias terragruntw="termux-etc-seccomp terragrunt"  # useful when needed to call alone
 {{- end }}
 
 ###### K8s #########################################################################

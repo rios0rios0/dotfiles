@@ -16,6 +16,26 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- replaced `proot-distro` Alpine wrapper with `termux-etc-seccomp` for running Go binaries (GitHub CLI, 1Password CLI, Terraform, Terragrunt, kubectl) natively on Termux
+- simplified `op` wrapper by removing `--env` flag forwarding (environment variables are inherited naturally without proot boundary)
+- simplified `gh` wrapper by removing GitHub token forwarding through proot (tokens are inherited naturally)
+- changed `terraw`, `terraformw`, `terragruntw` aliases to use `termux-etc-seccomp` directly instead of `wrapper`
+- added `clang` dependency (for building `termux-etc-redirect`) to Android requirements alongside existing `proot` and `proot-distro`
+- changed `install_wrapper()` to `install_termux_etc_redirect()` which clones and builds the `termux-etc-redirect` project
+
+### Removed
+
+- removed `proot-distro` Alpine distro setup (`install_wrapper` function with `/etc/profile` PATH patching)
+- removed `configure_dns()` function (DNS configuration is now handled by `termux-etc-redirect`'s install script)
+- removed proot-specific environment variables (`PROOTNOCALL_VERIFY`, `PROOT_LINK2SYMLINK`, `PROOT_VERBOSE`)
+- removed proot bind mounts and workspace remapping from the generic wrapper
+
+### Fixed
+
+- fixed 1Password CLI "not owned by the current user" error under `termux-etc-seccomp` by setting `$USER` in the `op` wrapper (Go's `user.Current()` in `GOOS=linux` static binaries requires `$USER` when `/etc/passwd` is missing)
+
 ## [0.3.1] - 2026-03-24
 
 ### Changed

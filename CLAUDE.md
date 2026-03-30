@@ -64,9 +64,9 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 |------------|------------------------------|-------------------------|----------------------------------|
 | Shell      | Zsh + Oh My Zsh + p10k       | PowerShell + Oh My Posh | Zsh + Oh My Zsh + p10k           |
 | Scripts    | `.sh`                        | `.ps1`                  | `.sh`                            |
-| Docker     | Native                       | N/A                     | Proot wrapper                    |
+| Docker     | Native                       | N/A                     | `termux-etc-seccomp` wrapper     |
 | MCP config | `dot_cursor/` (Docker-based) | N/A                     | `dot_config/mcphub/` (npx-based) |
-| 1Password  | Native `op` CLI              | Native `op` CLI         | Proot wrapper at `.local/bin/op` |
+| 1Password  | Native `op` CLI              | Native `op` CLI         | `termux-etc-seccomp` wrapper at `.local/bin/op` |
 
 ## Key Files
 
@@ -146,12 +146,12 @@ Dependency installation scripts (`.chezmoiscripts/run_once_before_*-install-depe
 On Android, tool wrappers (`op`, `gh`) **must be `run_once_before` scripts**, NOT chezmoi-managed files under `dot_local/bin/`. This is because `run_once_before` scripts execute before chezmoi applies managed files. The install-dependencies script (`run_once_before_android-002`) calls `op` and `gh` during installation — if these wrappers were chezmoi-managed files, they wouldn't exist yet when the install script runs, causing crashes.
 
 The wrapper scripts follow a strict execution order:
-1. `android-001-create-wrapper.sh` — generic proot wrapper (all tool wrappers depend on this)
+1. `android-001-create-wrapper.sh` — generic `termux-etc-seccomp` wrapper (all tool wrappers depend on this)
 2. `android-001a-create-op-wrapper.sh` — `op` wrapper (needed by chezmoi templates)
 3. `android-001b-create-gh-wrapper.sh` — `gh` wrapper (needed by install script for copilot)
 4. `android-002-install-dependencies.sh.tmpl` — installs binaries and extensions
 
-The generic proot wrapper is the only exception — it exists as BOTH a bootstrap script (for timing) AND a chezmoi-managed file (`dot_local/bin/executable_wrapper`) to keep it updated on subsequent applies.
+The generic `termux-etc-seccomp` wrapper is the only exception — it exists as BOTH a bootstrap script (for timing) AND a chezmoi-managed file (`dot_local/bin/executable_wrapper`) to keep it updated on subsequent applies.
 
 ## Android Performance (Termux)
 
