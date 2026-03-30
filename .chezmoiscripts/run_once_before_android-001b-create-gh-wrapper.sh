@@ -15,6 +15,13 @@ cat > "$HOME/.local/bin/gh" << 'GH_EOF'
 # Wraps GitHub CLI through termux-etc-seccomp for /etc/ path redirection
 # and SIGSYS suppression. GitHub tokens are inherited from the environment.
 
+# Ensure Termux bin is in PATH and GIT_EXEC_PATH is set so gh can find git.
+# termux-etc-seccomp doesn't remap PATH, and the static Go binary only searches
+# standard Linux paths (/usr/bin, /bin) unless these are explicitly set.
+# PATH must be set first so that `id` (used below) is always reachable.
+export PATH="/data/data/com.termux/files/usr/bin${PATH:+:$PATH}"
+export GIT_EXEC_PATH="/data/data/com.termux/files/usr/libexec/git-core"
+
 # Go's user.Current() in GOOS=linux static binaries requires $USER when
 # /etc/passwd is missing (Android).
 export USER="${USER:-$(id -un)}"
