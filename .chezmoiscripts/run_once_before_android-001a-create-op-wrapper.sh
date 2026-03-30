@@ -16,6 +16,11 @@ cat > "$HOME/.local/bin/op" << 'OP_EOF'
 # and SIGSYS suppression. Environment variables (OP_SESSION_*) are inherited
 # naturally since we run in the same Termux environment (no proot boundary).
 
+# Go's user.Current() in GOOS=linux static binaries reads /etc/passwd (missing on
+# Android) then falls back to $USER. Without $USER, op can't resolve the current
+# user and rejects directory ownership checks.
+export USER="${USER:-$(id -un)}"
+
 # check if the user is already signed in by running 'op whoami'
 # if it fails, check if accounts are configured and trigger the signin flow
 if ! termux-etc-seccomp ~/.local/bin/op_linux_arm64 whoami &>/dev/null; then

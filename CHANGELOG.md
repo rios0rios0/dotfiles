@@ -32,6 +32,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - removed proot-specific environment variables (`PROOTNOCALL_VERIFY`, `PROOT_LINK2SYMLINK`, `PROOT_VERBOSE`)
 - removed proot bind mounts and workspace remapping from the generic wrapper
 
+### Fixed
+
+- fixed 1Password CLI "not owned by the current user" error under `termux-etc-seccomp` by setting `$USER` in the `op` wrapper (Go's `user.Current()` in `GOOS=linux` static binaries requires `$USER` when `/etc/passwd` is missing)
+
 ## [0.3.1] - 2026-03-24
 
 ### Changed

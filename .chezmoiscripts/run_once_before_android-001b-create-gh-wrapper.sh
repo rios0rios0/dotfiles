@@ -15,6 +15,10 @@ cat > "$HOME/.local/bin/gh" << 'GH_EOF'
 # Wraps GitHub CLI through termux-etc-seccomp for /etc/ path redirection
 # and SIGSYS suppression. GitHub tokens are inherited from the environment.
 
+# Go's user.Current() in GOOS=linux static binaries requires $USER when
+# /etc/passwd is missing (Android).
+export USER="${USER:-$(id -un)}"
+
 exec termux-etc-seccomp ~/.local/bin/gh_linux_arm64 "$@"
 GH_EOF
 
