@@ -22,7 +22,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - simplified `op` wrapper by removing `--env` flag forwarding (environment variables are inherited naturally without proot boundary)
 - simplified `gh` wrapper by removing GitHub token forwarding through proot (tokens are inherited naturally)
 - changed `terraw`, `terraformw`, `terragruntw` aliases to use `termux-etc-seccomp` directly instead of `wrapper`
-- replaced `proot` and `proot-distro` dependencies with `clang` (for building `termux-etc-redirect`) in Android requirements
+- added `clang` dependency (for building `termux-etc-redirect`) to Android requirements alongside existing `proot` and `proot-distro`
 - changed `install_wrapper()` to `install_termux_etc_redirect()` which clones and builds the `termux-etc-redirect` project
 
 ### Removed
