@@ -98,13 +98,18 @@ install_gvm() {
 
 install_termux_etc_redirect() {
   sourcePath="$HOME/Development/github.com/rios0rios0/termux-etc-redirect"
+  mkdir -p "$(dirname "$sourcePath")"
   if [ ! -d "$sourcePath" ]; then
       git clone https://github.com/rios0rios0/termux-etc-redirect.git "$sourcePath"
   fi
-  cd "$sourcePath" && git fetch --all && git pull --rebase
 
-  # Build, install, and create missing config files (resolv.conf, nsswitch.conf)
-  ./scripts/install.sh
+  # Run in a subshell to avoid changing the script's working directory
+  (
+    cd "$sourcePath" && git fetch --all && git pull --rebase
+
+    # Build, install, and create missing config files (resolv.conf, nsswitch.conf)
+    ./scripts/install.sh
+  )
 }
 
 # github.com/rios0rios0/terra
@@ -320,7 +325,7 @@ install_azure_cli
 
 # =========================================================================================================
 # DNS configuration is handled by termux-etc-redirect's install.sh script,
-# which creates $PREFIX/etc/resolv.conf with public nameservers (8.8.8.8, 8.8.4.4, 1.1.1.1).
+# which creates $PREFIX/etc/resolv.conf with public nameservers if missing.
 
 # https://docs.astronvim.com/
 configure_neovim() {
