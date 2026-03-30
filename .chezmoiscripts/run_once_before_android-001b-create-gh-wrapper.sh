@@ -19,6 +19,12 @@ cat > "$HOME/.local/bin/gh" << 'GH_EOF'
 # /etc/passwd is missing (Android).
 export USER="${USER:-$(id -un)}"
 
+# Ensure Termux bin is in PATH and GIT_EXEC_PATH is set so gh can find git.
+# termux-etc-seccomp doesn't remap PATH, and the static Go binary only searches
+# standard Linux paths (/usr/bin, /bin) unless these are explicitly set.
+export PATH="/data/data/com.termux/files/usr/bin:$PATH"
+export GIT_EXEC_PATH="/data/data/com.termux/files/usr/libexec/git-core"
+
 exec termux-etc-seccomp ~/.local/bin/gh_linux_arm64 "$@"
 GH_EOF
 
