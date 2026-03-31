@@ -16,61 +16,63 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.4.0] - 2026-03-31
+
 ### Added
 
+- added `clang` dependency (for building `termux-etc-redirect`) to Android requirements alongside existing `proot` and `proot-distro`
 - added `golangci-lint` wrapper using `termux-etc-seccomp` for running on Android/Termux
 
 ### Changed
 
-- replaced `proot-distro` Alpine wrapper with `termux-etc-seccomp` for running Go binaries (GitHub CLI, 1Password CLI, Terraform, Terragrunt, kubectl) natively on Termux
-- simplified `op` wrapper by removing `--env` flag forwarding (environment variables are inherited naturally without proot boundary)
-- simplified `gh` wrapper by removing GitHub token forwarding through proot (tokens are inherited naturally)
-- changed `terraw`, `terraformw`, `terragruntw` aliases to use `termux-etc-seccomp` directly instead of `wrapper`
-- added `clang` dependency (for building `termux-etc-redirect`) to Android requirements alongside existing `proot` and `proot-distro`
 - changed `install_wrapper()` to `install_termux_etc_redirect()` which clones and builds the `termux-etc-redirect` project
-
-### Removed
-
-- removed `proot-distro` Alpine distro setup (`install_wrapper` function with `/etc/profile` PATH patching)
-- removed `configure_dns()` function (DNS configuration is now handled by `termux-etc-redirect`'s install script)
-- removed proot-specific environment variables (`PROOTNOCALL_VERIFY`, `PROOT_LINK2SYMLINK`, `PROOT_VERBOSE`)
-- removed proot bind mounts and workspace remapping from the generic wrapper
-- removed `linux-engineering-git-clone-repos.sh` — migrated to devforge `dev repo clone`
+- changed `terraw`, `terraformw`, `terragruntw` aliases to use `termux-etc-seccomp` directly instead of `wrapper`
+- replaced `proot-distro` Alpine wrapper with `termux-etc-seccomp` for running Go binaries (GitHub CLI, 1Password CLI, Terraform, Terragrunt, `kubectl`) natively on Termux
+- simplified `gh` wrapper by removing GitHub token forwarding through `proot` (tokens are inherited naturally)
+- simplified `op` wrapper by removing `--env` flag forwarding (environment variables are inherited naturally without `proot` boundary)
 
 ### Fixed
 
 - fixed 1Password CLI "not owned by the current user" error under `termux-etc-seccomp` by setting `$USER` in the `op` wrapper (Go's `user.Current()` in `GOOS=linux` static binaries requires `$USER` when `/etc/passwd` is missing)
 
+### Removed
+
+- removed `configure_dns()` function (DNS configuration is now handled by `termux-etc-redirect`'s install script)
+- removed `linux-engineering-git-clone-repos.sh` — migrated to devforge `dev repo clone`
+- removed `proot-distro` Alpine distro setup (`install_wrapper` function with `/etc/profile` PATH patching)
+- removed `proot` bind mounts and workspace remapping from the generic wrapper
+- removed `proot`-specific environment variables (`PROOTNOCALL_VERIFY`, `PROOT_LINK2SYMLINK`, `PROOT_VERBOSE`)
+
 ## [0.3.1] - 2026-03-24
 
 ### Changed
 
-- changed `linux-engineering-version-manager.sh` to only keep pyenv workarounds, added `dev-use` shell wrapper for `dev project use`
 - changed `.zshrc` to replace `_vm_use_go`, `_vm_use_node`, `_vm_use_python` calls with a single `dev-use` call after all version managers are sourced
+- changed `linux-engineering-version-manager.sh` to only keep pyenv workarounds, added `dev-use` shell wrapper for `dev project use`
 
 ### Removed
 
-- removed `linux-engineering-git-sync-repos.sh` — migrated to [devforge](https://github.com/rios0rios0/devforge) `dev repo sync`
 - removed `linux-engineering-docker-aliases.sh` (`dip`, `dreset`) — migrated to devforge `dev docker ips` and `dev docker reset`
-- updated Copilot instruction docs to stop listing `linux-engineering-docker-aliases.sh` as an available script
+- removed `linux-engineering-git-sync-repos.sh` — migrated to [devforge](https://github.com/rios0rios0/devforge) `dev repo sync`
 - removed version detection functions (`_vm_detect_and_use`, `_vm_extract_*`, `_vm_use_*`) — migrated to devforge `dev project use`
+- updated Copilot instruction docs to stop listing `linux-engineering-docker-aliases.sh` as an available script
 
 ## [0.3.0] - 2026-03-22
 
 ### Added
 
-- added `git-clone-repos` function that discovers remote repos from GitHub or Azure DevOps, clones missing ones using SSH aliases, and prompts to delete local repos no longer found on the remote
-- added CI/CD validation pipeline with GitHub Actions: shellcheck, Go template syntax validation, Python/PowerShell linting, YAML/JSON syntax checks, and gitleaks SAST
-- added template rendering tests with mock 1Password CLI returning deterministic fixtures
 - added `.chezmoiignore` platform logic tests validating file inclusion per OS (linux, windows, android)
-- added script dependency ordering tests verifying alphabetical sort matches execution requirements
-- added Go template syntax validator (`cmd/tmplcheck`) that parses all `.tmpl` files with sprig/chezmoi function stubs
-- added Makefile with `lint`, `test`, and `sast` targets following the pipelines repo pattern
+- added `git-clone-repos` function that discovers remote repos from GitHub or Azure DevOps, clones missing ones using SSH aliases, and prompts to delete local repos no longer found on the remote
 - added `replaceAllRegex` stub to Go template validator for chezmoi's regex replacement function
 - added `tmux` to Android dependencies for session multiplexing under a single process tree
-- added Termux performance documentation (Phantom Process Killer fix) to `README.md` and `CLAUDE.md`
 - added `UV_THREADPOOL_SIZE` and `MALLOC_ARENA_MAX` environment variables for Android performance tuning
 - added Android OS-level optimization guide (battery, animations, RAM Plus, Termux:Boot) to `README.md`
+- added CI/CD validation pipeline with GitHub Actions: shellcheck, Go template syntax validation, Python/PowerShell linting, YAML/JSON syntax checks, and gitleaks SAST
+- added Go template syntax validator (`cmd/tmplcheck`) that parses all `.tmpl` files with sprig/chezmoi function stubs
+- added Makefile with `lint`, `test`, and `sast` targets following the pipelines repo pattern
+- added script dependency ordering tests verifying alphabetical sort matches execution requirements
+- added template rendering tests with mock 1Password CLI returning deterministic fixtures
+- added Termux performance documentation (Phantom Process Killer fix) to `README.md` and `CLAUDE.md`
 
 ### Changed
 
@@ -78,8 +80,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Fixed
 
-- pinned yq (`v4.45.1`) and gitleaks (`v8.24.0`) to specific versions in CI workflow instead of fetching `releases/latest`
 - made `sast` Makefile target self-contained instead of depending on external `common.mk` targets
+- pinned yq (`v4.45.1`) and gitleaks (`v8.24.0`) to specific versions in CI workflow instead of fetching `releases/latest`
 
 ### Removed
 
@@ -95,8 +97,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Added
 
-- added GitHub Copilot CLI extension (`gh copilot`) installation to Android dependencies with best-effort authentication check
 - added `.local/share` proot bind for persistent gh extensions, fonts, and zinit plugin data
+- added GitHub Copilot CLI extension (`gh copilot`) installation to Android dependencies with best-effort authentication check
 
 ### Changed
 
@@ -107,45 +109,45 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Added
 
-- added `gh` CLI proot wrapper for Termux that forwards GitHub tokens (`GH_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`, `GITHUB_TOKEN`) through proot-distro Alpine
 - added 1Password integration for MCP server credentials and API keys
+- added `gh` CLI proot wrapper for Termux that forwards GitHub tokens (`GH_TOKEN`, `GITHUB_PERSONAL_ACCESS_TOKEN`, `GITHUB_TOKEN`) through proot-distro Alpine
+- added a new feature to compress and watch many folders instead of just one folder
 - added Android-compatible MCP configuration with npx alternatives to Docker-based servers
+- added feature to handle SSH, PEM and GPG keys seamlessly with 1Password
+- added feature to use 1Password and SSH keys to encrypt and decrypt files
 - added Linux WSL features to handle Git and SSH configuration with 1Password 
 - added Shell Script features to handle watching multiple files (and compressing them) for Kubernetes secrets
 - added Windows feature to copy configuration inside `AppData` folder
-- added a new feature to compress and watch many folders instead of just one folder
-- added feature to handle SSH, PEM and GPG keys seamlessly with 1Password
-- added feature to use 1Password and SSH keys to encrypt and decrypt files
 
 ### Changed
 
-- refactored shared proot `wrapper` to accept `--env` flags from tool wrappers instead of hardcoding tool-specific env var forwarding
-- moved `OP_SESSION_*` env var forwarding from shared `wrapper` into the `op` wrapper script
+- added `[prefix]` logging to previously silent scripts: `clone-tools`, `ssh-known-hosts`, `configure-deps`, `kube-config`, `termux-config`, `fonts`
+- added `set -euo pipefail` error handling to 5 scripts missing it: `linux-gpg-keys`, `extract-folders`, `clone-tools`, `configure-deps`, `export-key`
+- added `warnf` progress logging to all 1Password template operations (`gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`) showing item fetch, device match, and per-item progress
 - converted MCP configuration from static JSON to Chezmoi template for cross-platform compatibility and secure credential management
 - deduplicated MCP server merge scripts into a shared `lib-modify-mcp-servers.sh` chezmoi template
 - deduplicated shell credentials and workspace aliases into a shared `linux-engineering-op-loader.sh` loader with structured logging
+- documented 1Password template pattern (`onepassword` + `dict`/`set`) and logging convention in CLAUDE.md
 - enhanced Android SSH script to export both private and public keys from 1Password, renamed from `run_after_android-001-create-ssh-private-keys.sh.tmpl` to `run_after_android-001-create-ssh-keys.sh.tmpl`
 - improved logging across modify scripts with `[prefix]` tags for `mcp-servers`, `claude-trust`, `claude-settings`, `credentials`, `workspaces`, and `git-sync`
+- moved `OP_SESSION_*` env var forwarding from shared `wrapper` into the `op` wrapper script
+- moved script echo output from stdout to stderr in `android-ssh-keys`, `linux-gpg-keys`, `copy-appdata` to avoid mixing logs with generated content
+- refactored shared proot `wrapper` to accept `--env` flags from tool wrappers instead of hardcoding tool-specific env var forwarding
+- replaced `onepasswordRead` + `onepasswordItemFields` with single `onepassword` call per item across all templates, using `dict`/`set` to build local field maps — halves API calls per referenced item and fixes missing built-in fields (`public key`, `private key`)
 - segregated MCP configurations into platform-specific files: `.cursor/mcp.json` for Linux (Docker-based) and `.config/mcphub/servers.json` for Android (npx-based), eliminating cross-platform conditional logic
 - simplified 1Password calls by replacing list/join patterns with printf format for improved readability and consistency
-- suppressed proot warnings on Android using `PROOT_VERBOSE=-1` and `--no-arch-warning` flags
-- unified `deviceName` computation into `.chezmoi.yaml.tmpl` data section, removing duplication across 7 template files
-- replaced `onepasswordRead` + `onepasswordItemFields` with single `onepassword` call per item across all templates, using `dict`/`set` to build local field maps — halves API calls per referenced item and fixes missing built-in fields (`public key`, `private key`)
-- switched all "Active *" item lookups from REFERENCE field iteration to notes-based (`notesPlain`) filtering — reads item titles from notes, filters by device locally, and only fetches matching items by title (reduces API calls from N+1 to 2 per device-filtered loop)
-- updated `linux-engineering-op-loader.sh` to use notes-based filtering with `--vault private` for title-based lookups
-- standardized logging convention across 20 files with `[prefix]` format to stderr using `warnf` (templates), `echo >&2` (shell), and `Write-Host` (PowerShell)
-- added `warnf` progress logging to all 1Password template operations (`gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`) showing item fetch, device match, and per-item progress
-- added `[prefix]` logging to previously silent scripts: `clone-tools`, `ssh-known-hosts`, `configure-deps`, `kube-config`, `termux-config`, `fonts`
-- moved script echo output from stdout to stderr in `android-ssh-keys`, `linux-gpg-keys`, `copy-appdata` to avoid mixing logs with generated content
 - standardized bare `echo` messages with `[prefix]` format in `op-wrapper`, `extract-folders`, `export-key`
-- added `set -euo pipefail` error handling to 5 scripts missing it: `linux-gpg-keys`, `extract-folders`, `clone-tools`, `configure-deps`, `export-key`
-- documented 1Password template pattern (`onepassword` + `dict`/`set`) and logging convention in CLAUDE.md
+- standardized logging convention across 20 files with `[prefix]` format to stderr using `warnf` (templates), `echo >&2` (shell), and `Write-Host` (PowerShell)
+- suppressed proot warnings on Android using `PROOT_VERBOSE=-1` and `--no-arch-warning` flags
+- switched all "Active *" item lookups from REFERENCE field iteration to notes-based (`notesPlain`) filtering — reads item titles from notes, filters by device locally, and only fetches matching items by title (reduces API calls from N+1 to 2 per device-filtered loop)
+- unified `deviceName` computation into `.chezmoi.yaml.tmpl` data section, removing duplication across 7 template files
+- updated `linux-engineering-op-loader.sh` to use notes-based filtering with `--vault private` for title-based lookups
 
 ### Fixed
 
 - fixed `gh` CLI failing DNS lookups in Termux by routing it through proot-distro Alpine (Go reads `/etc/resolv.conf` which doesn't exist in Termux)
+- fixed `map has no entry for key "value"` crash in `dict`/`set` field loops by adding `hasKey` guard for 1Password fields without a value property
 - fixed `onepasswordItemFields` not returning built-in SSH Key fields (`public key`, `private key`) — these are top-level detail fields not accessible via `onepasswordItemFields` which only reads section-level fields
 - fixed `warnf` double newlines by removing explicit `\n` from format strings (chezmoi appends its own newline)
-- fixed `map has no entry for key "value"` crash in `dict`/`set` field loops by adding `hasKey` guard for 1Password fields without a value property
 - fixed Unicode curly quotes (U+201C/U+201D) inadvertently introduced in 3 template files
 
