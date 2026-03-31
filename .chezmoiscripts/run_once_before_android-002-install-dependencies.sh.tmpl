@@ -291,11 +291,21 @@ install_golangci_lint() {
     if [ ! -f "$golangciBin" ]; then
         GLC_VERSION="2.11.4"
         ARCH="linux-arm64"
-        wget "https://github.com/golangci/golangci-lint/releases/download/v${GLC_VERSION}/golangci-lint-${GLC_VERSION}-${ARCH}.tar.gz" -O golangci-lint.tar.gz
-        tar -xzf golangci-lint.tar.gz
-        mv "golangci-lint-${GLC_VERSION}-${ARCH}/golangci-lint" "$golangciBin"
-        chmod +x "$golangciBin"
-        rm -rf golangci-lint.tar.gz "golangci-lint-${GLC_VERSION}-${ARCH}"
+
+        (
+            tmpDir="$(mktemp -d)" || {
+                echo "[golangci-lint] ERROR: failed to create temporary directory" >&2
+                exit 1
+            }
+
+            trap 'rm -rf "$tmpDir"' EXIT
+            cd "$tmpDir"
+
+            wget "https://github.com/golangci/golangci-lint/releases/download/v${GLC_VERSION}/golangci-lint-${GLC_VERSION}-${ARCH}.tar.gz" -O golangci-lint.tar.gz
+            tar -xzf golangci-lint.tar.gz
+            mv "golangci-lint-${GLC_VERSION}-${ARCH}/golangci-lint" "$golangciBin"
+            chmod +x "$golangciBin"
+        )
     else
         echo "golangci-lint is already installed."
     fi

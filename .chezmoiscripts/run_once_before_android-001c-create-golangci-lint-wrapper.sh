@@ -21,7 +21,23 @@ export PATH="/data/data/com.termux/files/usr/bin${PATH:+:$PATH}"
 # /etc/passwd is missing (Android).
 export USER="${USER:-$(id -un)}"
 
-exec termux-etc-seccomp ~/.local/bin/golangci-lint_linux_arm64 "$@"
+GOLANGCI_LINT_BIN="${HOME}/.local/bin/golangci-lint_linux_arm64"
+
+# Ensure termux-etc-seccomp is available before exec.
+if ! command -v termux-etc-seccomp >/dev/null 2>&1; then
+  echo "[golangci-lint-wrapper] ERROR: termux-etc-seccomp is not installed or not in PATH." >&2
+  echo "[golangci-lint-wrapper] Re-run 'chezmoi apply' to install Android dependencies, then try again." >&2
+  exit 1
+fi
+
+# Ensure the underlying golangci-lint binary exists and is executable.
+if [ ! -x "${GOLANGCI_LINT_BIN}" ]; then
+  echo "[golangci-lint-wrapper] ERROR: ${GOLANGCI_LINT_BIN} is missing or not executable." >&2
+  echo "[golangci-lint-wrapper] Re-run 'chezmoi apply' so Android golangci-lint dependencies are installed." >&2
+  exit 1
+fi
+
+exec termux-etc-seccomp "${GOLANGCI_LINT_BIN}" "$@"
 GOLANGCI_EOF
 
 chmod +x "$HOME/.local/bin/golangci-lint"
