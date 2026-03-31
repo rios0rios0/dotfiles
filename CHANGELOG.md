@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added `golangci-lint` wrapper using `termux-etc-seccomp` for running on Android/Termux
+
 ### Changed
 
 - replaced `proot-distro` Alpine wrapper with `termux-etc-seccomp` for running Go binaries (GitHub CLI, 1Password CLI, Terraform, Terragrunt, kubectl) natively on Termux

@@ -283,6 +283,34 @@ install_github_copilot() {
     fi
 }
 
+# https://golangci-lint.run/welcome/install/
+install_golangci_lint() {
+    binPath="$HOME/.local/bin"
+    golangciBin="$binPath/golangci-lint_linux_arm64"
+
+    if [ ! -f "$golangciBin" ]; then
+        GLC_VERSION="2.11.4"
+        ARCH="linux-arm64"
+
+        (
+            tmpDir="$(mktemp -d)" || {
+                echo "[golangci-lint] ERROR: failed to create temporary directory" >&2
+                exit 1
+            }
+
+            trap 'rm -rf "$tmpDir"' EXIT
+            cd "$tmpDir" || exit
+
+            wget "https://github.com/golangci/golangci-lint/releases/download/v${GLC_VERSION}/golangci-lint-${GLC_VERSION}-${ARCH}.tar.gz" -O golangci-lint.tar.gz
+            tar -xzf golangci-lint.tar.gz
+            mv "golangci-lint-${GLC_VERSION}-${ARCH}/golangci-lint" "$golangciBin"
+            chmod +x "$golangciBin"
+        )
+    else
+        echo "golangci-lint is already installed."
+    fi
+}
+
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
     if ! command_exists pip; then
@@ -323,6 +351,7 @@ install_pyenv
 install_1password_cli
 install_github_cli
 install_github_copilot
+install_golangci_lint
 install_azure_cli
 
 # =========================================================================================================
