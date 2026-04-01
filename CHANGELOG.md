@@ -16,10 +16,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.5.0] - 2026-04-01
+
 ### Added
 
-- added mobile-friendly `tmux` configuration (`dot_tmux.conf`) with `Ctrl+a` prefix, mouse mode, and intuitive split keybindings optimized for Termux extra-keys
 - added beginner tmux tutorial for Termux (`docs/tmux-termux-tutorial.md`) covering sessions, windows, panes, and touchscreen-friendly workflows
+- added mobile-friendly `tmux` configuration (`dot_tmux.conf`) with `Ctrl+a` prefix, mouse mode, and intuitive split keybindings optimized for Termux extra-keys
 
 ## [0.4.0] - 2026-03-31
 
