@@ -9,6 +9,7 @@ CONTRIBUTING.md
 LICENSE
 Makefile
 README.md
+docs
 
 {{- /* Windows-specific files – these are only useful on Windows. When not on Windows, ignore them. */ -}}
 {{- if ne .chezmoi.os "windows" }}
