@@ -196,7 +196,7 @@ Platform-specific scripts are prefixed: `linux-*`, `windows-*`, `android-*`. Exc
 
    **Supplementary tips:**
    - Run `termux-wake-lock` to prevent Android from deep-sleeping Termux
-   - Use `tmux` instead of multiple Termux tabs — it consolidates all sessions under a single process tree, reducing the visible child process count to Android
+   - Use `tmux` instead of multiple Termux tabs — it consolidates all sessions under a single process tree, reducing the visible child process count to Android (see the [tmux on Termux tutorial](docs/tmux-termux-tutorial.md) for a beginner-friendly guide)
 
    **Additional Android OS settings (no root required):**
    - **Battery optimization:** `Settings > Apps > Termux > Battery > Unrestricted` — prevents Doze mode from throttling Termux
