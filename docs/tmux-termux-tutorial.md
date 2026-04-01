@@ -137,7 +137,7 @@ By default, you can't scroll up to see previous output. You need **copy mode**.
 | Next window | `prefix` + `n` | CTRL |
 | Previous window | `prefix` + `p` | CTRL |
 | Split horizontal | `prefix` + `-` | CTRL, `-` |
-| Split vertical | `prefix` + `\|` | CTRL |
+| Split vertical | `prefix` + `\|` | CTRL, SHIFT |
 | Navigate panes | `prefix` + arrows | CTRL, arrows |
 | Navigate panes (touch) | Tap the pane | — |
 | Zoom pane | `prefix` + `z` | CTRL |
@@ -163,7 +163,7 @@ By default, you can't scroll up to see previous output. You need **copy mode**.
 ```bash
 tmux new -s dev           # start a session
 # ... Claude Code runs here ...
-prefix + -                # split horizontally
+# prefix then - to split horizontally
 tail -f ~/.claude/logs/*  # watch logs in the bottom pane
 # tap the top pane to go back to Claude Code
 ```
