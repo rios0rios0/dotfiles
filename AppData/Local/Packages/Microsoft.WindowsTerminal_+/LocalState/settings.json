@@ -48,7 +48,7 @@
                 },
                 "guid": "{bd4ba1f0-e3a6-4711-a400-2a31076205f3}",
                 "hidden": false,
-                "icon": "https://www.kali.org/images/favicon-dark.png",
+                "icon": "ms-appdata:///local/kali-dragon-icon.png",
                 "name": "Kali",
                 "commandline": "wsl",
                 "startingDirectory": "~"
