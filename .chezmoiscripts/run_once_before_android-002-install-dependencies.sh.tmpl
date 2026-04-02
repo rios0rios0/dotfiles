@@ -72,20 +72,7 @@ languages=(
 apt install --no-install-recommends --yes "${languages[@]}"
 # =========================================================================================================
 # =========================================================================================================
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
-
-# https://ohmyz.sh/#install
-install_oh_my_zsh() {
-    omzPath="$HOME/.oh-my-zsh"
-
-    if [ ! -d "$omzPath" ]; then
-        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-    else
-        echo "Oh My ZSH is already installed."
-    fi
-}
+{{ template "lib-install-deps.sh" }}
 
 # GVM is intentionally SKIPPED on Android/Termux.
 # GVM installs standard linux/arm64 Go builds that use the faccessat2 syscall (439),
@@ -151,50 +138,6 @@ install_kubectl() {
     fi
 }
 
-# https://sdkman.io/install/
-install_sdkman() {
-    sdkPath="$HOME/.sdkman"
-
-    if [ ! -d "$sdkPath" ]; then
-        curl -s "https://get.sdkman.io" | bash
-
-        # shellcheck disable=SC1091
-        source "$sdkPath/bin/sdkman-init.sh"
-        sdk install java
-        sdk install gradle
-    else
-        echo "SDKMan is already installed."
-    fi
-}
-
-# https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
-install_nvm() {
-    if command_exists npm; then
-        echo "Node detected, means it was previously installed or native package installed..."
-
-        npm install -g corepack
-        corepack enable
-        return;
-    fi
-
-    nvmPath="$HOME/.nvm"
-
-    if [ ! -d "$nvmPath" ]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
-
-        unset PREFIX
-        # shellcheck disable=SC1091
-        source "$nvmPath/nvm.sh"
-        nvm install --lts
-
-        npm install -g npm@latest
-        npm install -g corepack
-        corepack enable
-    else
-        echo "NVM is already installed."
-    fi
-}
-
 # https://github.com/pyenv/pyenv
 install_pyenv() {
     if command_exists pip; then
@@ -216,16 +159,6 @@ install_pyenv() {
     else
         echo "Pyenv is already installed."
     fi
-}
-
-# https://github.com/google-gemini/gemini-cli
-install_gemini_cli() {
-    npm install -g @google/gemini-cli
-}
-
-# https://github.com/anthropics/claude-code
-install_claude_cli() {
-    npm install -g @anthropic-ai/claude-code
 }
 
 # https://1password.com/downloads/command-line/
