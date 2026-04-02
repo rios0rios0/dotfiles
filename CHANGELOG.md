@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added [devforge](https://github.com/rios0rios0/devforge) (`dev` CLI) installation to Linux/WSL and Android dependency scripts
+
 ## [0.5.0] - 2026-04-01
 
 ### Added

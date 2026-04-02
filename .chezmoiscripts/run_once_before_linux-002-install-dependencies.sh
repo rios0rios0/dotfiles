@@ -183,6 +183,11 @@ install_gemini_cli() {
     npm install -g @google/gemini-cli
 }
 
+# https://github.com/rios0rios0/devforge
+install_devforge() {
+    curl -fsSL https://raw.githubusercontent.com/rios0rios0/devforge/main/install.sh | bash
+}
+
 # https://cli.github.com/manual/installation
 install_github_cli() {
     sudo mkdir -p -m 755 /etc/apt/keyrings
@@ -227,6 +232,7 @@ install_pyenv
 install_cursor_cli
 install_claude_cli
 install_gemini_cli
+install_devforge
 
 install_github_cli
 install_azure_cli
