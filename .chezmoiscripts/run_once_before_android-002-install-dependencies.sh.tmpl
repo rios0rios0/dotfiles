@@ -228,6 +228,28 @@ install_claude_cli() {
     npm install -g @anthropic-ai/claude-code
 }
 
+# https://github.com/rios0rios0/devforge
+install_devforge() {
+    binPath="$HOME/.local/bin"
+    devBin="$binPath/dev"
+
+    if [ ! -f "$devBin" ]; then
+        local installer
+        installer="$(mktemp)"
+        if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/devforge/main/install.sh -o "$installer"; then
+            echo "[devforge] ERROR: failed to download installer" >&2
+            rm -f "$installer"
+            return 1
+        fi
+        bash "$installer"
+        local status=$?
+        rm -f "$installer"
+        if [ "$status" -ne 0 ]; then return "$status"; fi
+    else
+        echo "Devforge is already installed."
+    fi
+}
+
 # https://1password.com/downloads/command-line/
 install_1password_cli() {
     binPath="$HOME/.local/bin"
@@ -344,6 +366,7 @@ install_sdkman
 install_nvm
 install_gemini_cli
 install_claude_cli
+install_devforge
 
 # TODO: same of the line 261
 install_pyenv
