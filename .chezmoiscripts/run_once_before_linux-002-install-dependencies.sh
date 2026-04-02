@@ -185,7 +185,21 @@ install_gemini_cli() {
 
 # https://github.com/rios0rios0/devforge
 install_devforge() {
-    curl -fsSL https://raw.githubusercontent.com/rios0rios0/devforge/main/install.sh | bash
+    local installer
+    local status
+
+    installer="$(mktemp)"
+    if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/devforge/main/install.sh -o "$installer"; then
+        echo "[devforge] ERROR: failed to download installer" >&2
+        rm -f "$installer"
+        return 1
+    fi
+
+    bash "$installer"
+    status=$?
+    rm -f "$installer"
+
+    return "$status"
 }
 
 # https://cli.github.com/manual/installation
