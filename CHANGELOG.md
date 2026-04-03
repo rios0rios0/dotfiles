@@ -16,13 +16,16 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added `rclone` to Android/Termux dependencies for cloud storage sync (OneDrive, Google Drive, S3)
+- added rclone OneDrive setup guide (`.docs/rclone-onedrive-setup.md`)
+
 ## [0.6.0] - 2026-04-03
 
 ### Added
 
 - added [devforge](https://github.com/rios0rios0/devforge) (`dev` CLI) installation to Linux/WSL and Android dependency scripts
-- added `rclone` to Android/Termux dependencies for cloud storage sync (OneDrive, Google Drive, S3)
-- added rclone OneDrive setup guide (`.docs/rclone-onedrive-setup.md`)
 
 ## [0.5.0] - 2026-04-01
 
