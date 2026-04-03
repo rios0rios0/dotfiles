@@ -32,7 +32,7 @@ rclone config
 | `client_secret>` | Press Enter (leave blank) |
 | `region>` | `1` (Microsoft Cloud Global) |
 | `Edit advanced config?` | `n` |
-| `Use web browser to automatically authenticate?` | `n` (Termux has no browser) |
+| `Use web browser to automatically authenticate?` | `n` (Termux cannot auto-launch a browser; copy the URL and open it manually or use `termux-open-url <url>`) |
 
 ### 3. Authenticate via browser
 
