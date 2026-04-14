@@ -16,6 +16,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.7.0] - 2026-04-14
+
 ### Added
 
 - added `rclone` to Android/Termux dependencies for cloud storage sync (OneDrive, Google Drive, S3)
