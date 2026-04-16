@@ -26,7 +26,7 @@ fi
 
 echo "Detected distribution: $DISTRO"
 
-# update the package list
+# update the package list (once, upfront)
 sudo apt update
 
 # =========================================================================================================
@@ -47,6 +47,11 @@ sudo apt install --no-install-recommends --yes "${desktop_apps[@]}"
 # =========================================================================================================
 # Genymotion - Android emulator (https://www.genymotion.com/product-desktop/download/)
 install_genymotion() {
+    if [[ -d /opt/genymotion ]]; then
+        echo "[configure-deps] Genymotion is already installed, skipping"
+        return
+    fi
+
     echo "Installing Genymotion..."
     local TEMP_DIR
     TEMP_DIR="$(mktemp -d)"
@@ -60,6 +65,11 @@ install_genymotion() {
 
 # Reactotron - React/React Native debugging tool (https://github.com/infinitered/reactotron)
 install_reactotron() {
+    if dpkg -l reactotron-app &>/dev/null; then
+        echo "[configure-deps] Reactotron is already installed, skipping"
+        return
+    fi
+
     echo "Installing Reactotron..."
     local TEMP_DIR
     TEMP_DIR="$(mktemp -d)"
@@ -77,6 +87,11 @@ install_reactotron() {
 
 # R-Linux 5 - data recovery tool (https://www.r-studio.com/free-linux-recovery/)
 install_rlinux() {
+    if dpkg -l rlinux &>/dev/null; then
+        echo "[configure-deps] R-Linux is already installed, skipping"
+        return
+    fi
+
     echo "Installing R-Linux 5..."
     local TEMP_DIR
     TEMP_DIR="$(mktemp -d)"
@@ -88,6 +103,11 @@ install_rlinux() {
 
 # Slack - team communication (https://slack.com/downloads/linux)
 install_slack() {
+    if dpkg -l slack-desktop &>/dev/null; then
+        echo "[configure-deps] Slack is already installed, skipping"
+        return
+    fi
+
     echo "Installing Slack..."
     local TEMP_DIR
     TEMP_DIR="$(mktemp -d)"
@@ -101,6 +121,11 @@ install_slack() {
 
 # VirtualBox (https://www.virtualbox.org/wiki/Linux_Downloads)
 install_virtualbox() {
+    if dpkg -l virtualbox-7.1 &>/dev/null; then
+        echo "[configure-deps] VirtualBox is already installed, skipping"
+        return
+    fi
+
     echo "Installing VirtualBox..."
 
     # Add Oracle VirtualBox repository key
