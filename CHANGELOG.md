@@ -37,7 +37,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Fixed
 
-- fixed `binutils-is-llvm` install failure on Android/Termux by switching the requirement to `binutils` (GNU); `binutils-is-llvm` declares `Conflicts:`/`Breaks:` against `lld` and `llvm`, which are already pulled in by `clang`, so the whole `apt install` batch aborted
+- fixed `apt install` batch failure on Android/Termux by removing `binutils` / `binutils-is-llvm` from the Android requirements; both conflict with `lld`/`llvm` (pulled in by `clang`), and `clang` + `lld` + `llvm` already provide `ld.lld` / `llvm-ar` / `llvm-nm` / `llvm-strip`, which is everything native pip wheels need
 - fixed `dot_docker/config.json.tmpl` printing `%!s(<nil>)` when a Docker item lacks the `registry name` field; template now falls back to the 1Password item title
 - fixed `dot_docker/config.json.tmpl` emitting an `identitytoken`-only entry with no `auth` (Docker requires both); template now defaults username to the ACR identity-token UUID and always emits `auth` alongside `identitytoken`
 - fixed `linux-engineering-shell-credentials.sh` and `linux-engineering-workspace-aliases.sh` skipping the cache write when the env var or alias was already set, leaving `~/.cache/op-credentials.env` empty (deleted at end of script) and forcing every new shell to re-query 1Password; cache is now always written so subsequent shells short-circuit via the 24h TTL check

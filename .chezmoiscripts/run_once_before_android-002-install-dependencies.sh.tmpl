@@ -18,7 +18,10 @@ requirements=(
     "sqlite"            # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
     "vim"               # needed for some operations
     "neovim"            # preferred editor
-    "binutils"          # required by Azure CLI (ld/as/ar for native pip wheels); do NOT use binutils-is-llvm — it conflicts with lld/llvm
+    # NOTE: no `binutils` package on Termux. `clang` already pulls in `lld` (provides `ld.lld`)
+    # and `llvm` (provides `llvm-ar`/`llvm-nm`/`llvm-strip`). Termux's clang defaults to
+    # `-fuse-ld=lld`, so native pip wheels (Azure CLI's cryptography/cffi) build without GNU binutils.
+    # Do NOT add `binutils` or `binutils-is-llvm` — both conflict with the installed lld/llvm.
     "bison"             # needed for GVM
     "make"              # required for many things and GVM
     "wget"              # required by 1Password CLI
