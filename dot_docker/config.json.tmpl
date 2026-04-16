@@ -22,13 +22,22 @@
     {{-           $_ := set $f .label .value }}
     {{-         end }}
     {{-       end }}
-    {{-       $registryUsername := index $f "username" }}
-    {{-       $registryCredential := index $f "credential" }}
+    {{-       $registryUsername := "" }}
+    {{-       if hasKey $f "username" }}{{ $registryUsername = index $f "username" }}{{ end }}
+    {{-       $registryCredential := "" }}
+    {{-       if hasKey $f "credential" }}{{ $registryCredential = trim (index $f "credential") }}{{ end }}
     {{-       $registryName := index $f "registry name" }}
+    {{-       $identityToken := "" }}
+    {{-       if hasKey $f "identitytoken" }}
+    {{-         $identityToken = index $f "identitytoken" }}
+    {{-       end }}
     {{-       warnf "[docker-config] configuring registry \"%s\"" $registryName }}
     {{- if not $first }},{{ end }}
     "{{ $registryName }}": {
       "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
+    {{- if ne $identityToken "" }},
+      "identitytoken": "{{ $identityToken }}"
+    {{- end }}
     }
     {{-       $first = false }}
     {{-     end }}
