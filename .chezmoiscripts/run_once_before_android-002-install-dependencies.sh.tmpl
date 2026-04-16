@@ -18,7 +18,7 @@ requirements=(
     "sqlite"            # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
     "vim"               # needed for some operations
     "neovim"            # preferred editor
-    "binutils-is-llvm"  # required by Azure CLI (provides binutils via LLVM toolchain)
+    "binutils"          # required by Azure CLI (ld/as/ar for native pip wheels); do NOT use binutils-is-llvm — it conflicts with lld/llvm
     "bison"             # needed for GVM
     "make"              # required for many things and GVM
     "wget"              # required by 1Password CLI
