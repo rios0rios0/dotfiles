@@ -40,7 +40,6 @@ AppData
 .local/bin/ssh
 .local/bin/ssh-add
 .sqlmap
-.autobump.yaml
 .freterc
 .npmrc
 .npmrc.2
