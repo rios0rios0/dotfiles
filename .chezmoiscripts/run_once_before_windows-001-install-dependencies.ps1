@@ -133,4 +133,8 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";
 # =========================================================================================================
 # npm-based CLIs (requires NVM for Windows to be installed and a Node.js version active)
 # https://github.com/google-gemini/gemini-cli
-npm install -g @google/gemini-cli
+if (-not (Get-Command gemini -ErrorAction SilentlyContinue)) {
+    npm install -g @google/gemini-cli
+} else {
+    Write-Host "[install-deps] Gemini CLI is already installed, skipping"
+}

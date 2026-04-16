@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# update the package list
+# update the package list (once, upfront — all apt installs below reuse this cache)
 sudo apt update
 
 # =========================================================================================================
@@ -57,25 +57,43 @@ sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
+    if [[ -d "${ZSH:-$HOME/.oh-my-zsh}" ]]; then
+        echo "[configure-deps] oh-my-zsh is already installed, skipping" >&2
+        return
+    fi
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 }
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    sudo rm -rf "/home/$USER/.gvm"
-    bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    local go_version="go1.25.5"
+
+    if [[ ! -d "$HOME/.gvm" ]]; then
+        bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
+    else
+        echo "[configure-deps] GVM is already installed, skipping clone" >&2
+    fi
 
     # Source GVM to make it available in the current shell
     export GVM_ROOT="$HOME/.gvm"
     # shellcheck source=/dev/null
     [[ -s "$GVM_ROOT/scripts/gvm" ]] && source "$GVM_ROOT/scripts/gvm"
 
-    gvm install go1.25.5 -B
-    gvm use go1.25.5 --default
+    if [[ -d "$GVM_ROOT/gos/$go_version" ]]; then
+        echo "[configure-deps] $go_version is already installed, skipping" >&2
+    else
+        gvm install "$go_version" -B
+    fi
+    gvm use "$go_version" --default
 }
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 install_kubectl() {
+    if command -v kubectl &>/dev/null; then
+        echo "[configure-deps] kubectl is already installed, skipping" >&2
+        return
+    fi
+
     sudo mkdir -p -m 755 /etc/apt/keyrings
     curl -fsSL https://pkgs.k8s.io/core:/stable:/v1.32/deb/Release.key | sudo gpg --yes --dearmor -o /etc/apt/keyrings/kubernetes-apt-keyring.gpg
     sudo chmod 644 /etc/apt/keyrings/kubernetes-apt-keyring.gpg
@@ -88,15 +106,19 @@ install_kubectl() {
 
 # https://krew.sigs.k8s.io/docs/user-guide/setup/install/
 install_krew() {
-    (
-      set -x; cd "$(mktemp -d)" &&
-      OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
-      ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
-      KREW="krew-${OS}_${ARCH}" &&
-      curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
-      tar zxvf "${KREW}.tar.gz" &&
-      ./"${KREW}" install krew
-    )
+    if [[ -d "${KREW_ROOT:-$HOME/.krew}" ]] && command -v kubectl-krew &>/dev/null; then
+        echo "[configure-deps] krew is already installed, skipping download" >&2
+    else
+        (
+          set -x; cd "$(mktemp -d)" &&
+          OS="$(uname | tr '[:upper:]' '[:lower:]')" &&
+          ARCH="$(uname -m | sed -e 's/x86_64/amd64/' -e 's/\(arm\)\(64\)\?.*/\1\2/' -e 's/aarch64$/arm64/')" &&
+          KREW="krew-${OS}_${ARCH}" &&
+          curl -fsSLO "https://github.com/kubernetes-sigs/krew/releases/latest/download/${KREW}.tar.gz" &&
+          tar zxvf "${KREW}.tar.gz" &&
+          ./"${KREW}" install krew
+        )
+    fi
 
     # Add krew to PATH for current session
     export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
@@ -107,6 +129,11 @@ install_krew() {
 
 # https://developer.hashicorp.com/terraform/install
 install_terraform() {
+    if command -v terraform &>/dev/null; then
+        echo "[configure-deps] terraform is already installed, skipping" >&2
+        return
+    fi
+
     wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --yes --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
     echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com bullseye main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
     sudo apt update && sudo apt install terraform
@@ -114,14 +141,29 @@ install_terraform() {
 
 # https://terragrunt.gruntwork.io/docs/getting-started/install/
 install_terragrunt() {
-    curl -LO https://github.com/gruntwork-io/terragrunt/releases/download/v0.76.6/terragrunt_linux_amd64
+    local target_version="v0.76.6"
+
+    if command -v terragrunt &>/dev/null; then
+        local current_version
+        current_version="$(terragrunt --version 2>/dev/null | grep -oP 'v[\d.]+')" || true
+        if [[ "$current_version" == "$target_version" ]]; then
+            echo "[configure-deps] terragrunt $target_version is already installed, skipping" >&2
+            return
+        fi
+    fi
+
+    curl -LO "https://github.com/gruntwork-io/terragrunt/releases/download/${target_version}/terragrunt_linux_amd64"
     sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
     sudo chmod +x /usr/local/bin/terragrunt
 }
 
 # https://sdkman.io/install/
 install_sdkman() {
-    curl -s "https://get.sdkman.io" | bash
+    if [[ -d "$HOME/.sdkman" ]]; then
+        echo "[configure-deps] SDKMAN is already installed, skipping download" >&2
+    else
+        curl -s "https://get.sdkman.io" | bash
+    fi
 
     # Source SDKMAN to make it available in the current shell
     export SDKMAN_DIR="$HOME/.sdkman"
@@ -134,22 +176,41 @@ install_sdkman() {
 
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
-    curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+    if [[ ! -d "$HOME/.nvm" ]]; then
+        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+    else
+        echo "[configure-deps] NVM is already installed, skipping download" >&2
+    fi
 
     # Source NVM to make it available in the current shell
     export NVM_DIR="$HOME/.nvm"
     # shellcheck source=/dev/null
     [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
 
-    nvm install --lts
+    local lts_version
+    lts_version="$(nvm version-remote --lts 2>/dev/null)" || true
+    local current_version
+    current_version="$(nvm current 2>/dev/null)" || true
+
+    if [[ -n "$lts_version" && "$current_version" == "$lts_version" ]]; then
+        echo "[configure-deps] Node.js LTS $lts_version is already installed, skipping" >&2
+    else
+        nvm install --lts
+    fi
+
     npm install -g corepack
     corepack enable
 }
 
 # https://github.com/pyenv/pyenv
 install_pyenv() {
-    sudo rm -rf "/home/$USER/.pyenv"
-    curl https://pyenv.run | bash
+    local python_version="3.13.2"
+
+    if [[ ! -d "$HOME/.pyenv" ]]; then
+        curl https://pyenv.run | bash
+    else
+        echo "[configure-deps] pyenv is already installed, skipping clone" >&2
+    fi
 
     # Source pyenv to make it available in the current shell
     export PYENV_ROOT="$HOME/.pyenv"
@@ -161,8 +222,12 @@ install_pyenv() {
       libbz2-dev libreadline-dev libsqlite3-dev curl git \
       libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
 
-    pyenv install 3.13.2
-    pyenv global 3.13.2
+    if pyenv versions --bare 2>/dev/null | grep -qx "$python_version"; then
+        echo "[configure-deps] Python $python_version is already installed, skipping build" >&2
+    else
+        pyenv install "$python_version"
+    fi
+    pyenv global "$python_version"
 
     # Rehash to make pyenv/pip available
     eval "$(pyenv init -)"
@@ -170,21 +235,38 @@ install_pyenv() {
 
 # https://cursor.com/docs/cli/installation
 install_cursor_cli() {
+    if command -v agent &>/dev/null; then
+        echo "[configure-deps] Cursor CLI is already installed, skipping" >&2
+        return
+    fi
     curl https://cursor.com/install -fsSL | bash
 }
 
 # https://github.com/anthropics/claude-code
 install_claude_cli() {
+    if command -v claude &>/dev/null; then
+        echo "[configure-deps] Claude CLI is already installed, skipping" >&2
+        return
+    fi
     npm install -g @anthropic-ai/claude-code
 }
 
 # https://github.com/google-gemini/gemini-cli
 install_gemini_cli() {
+    if command -v gemini &>/dev/null; then
+        echo "[configure-deps] Gemini CLI is already installed, skipping" >&2
+        return
+    fi
     npm install -g @google/gemini-cli
 }
 
 # https://github.com/rios0rios0/devforge
 install_devforge() {
+    if command -v dev &>/dev/null; then
+        echo "[configure-deps] devforge is already installed, skipping" >&2
+        return
+    fi
+
     local installer
     local status
 
@@ -204,6 +286,11 @@ install_devforge() {
 
 # https://cli.github.com/manual/installation
 install_github_cli() {
+    if command -v gh &>/dev/null; then
+        echo "[configure-deps] GitHub CLI is already installed, skipping" >&2
+        return
+    fi
+
     sudo mkdir -p -m 755 /etc/apt/keyrings
     curl -fsSL https://cli.github.com/packages/githubcli-archive-keyring.gpg | sudo tee /etc/apt/keyrings/githubcli-archive-keyring.gpg > /dev/null
     sudo chmod go+r /etc/apt/keyrings/githubcli-archive-keyring.gpg
@@ -220,12 +307,22 @@ install_azure_cli() {
     export PATH="$PYENV_ROOT/bin:$PATH"
     eval "$(pyenv init -)"
 
+    if pip show azure-cli &>/dev/null; then
+        echo "[configure-deps] azure-cli is already installed, skipping" >&2
+        return
+    fi
+
     pip install --upgrade pip
     pip install azure-cli
 }
 
 # https://www.speedtest.net/apps/cli
 install_speedtest_cli() {
+    if command -v speedtest &>/dev/null; then
+        echo "[configure-deps] speedtest is already installed, skipping" >&2
+        return
+    fi
+
     curl -s https://packagecloud.io/install/repositories/ookla/speedtest-cli/script.deb.sh | sudo os=debian dist=bookworm bash
     sudo apt install --no-install-recommends --yes speedtest
 }
