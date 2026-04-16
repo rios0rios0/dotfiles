@@ -1,27 +1,27 @@
-{{- /* 
+{{- /*
 TODO: The IdentityFile logic is inverted on Android (uses private key), all other OSes use public key.
 This is because on Android (Termux) only private keys are usable, while other platforms require public keys for SSH config.
 */ -}}
 {{- $deviceName := .deviceName -}}
 {{- $isAndroid := eq .chezmoi.os "android" -}}
 
-###### VCS #######################################################################
-{{- warnf "[ssh-config] fetching Active SSHs..." -}}
-{{- $sshNotes := "" -}}
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- warnf "[ssh-config] fetching Device: %s..." $deviceName -}}
+{{- $deviceNotes := "" -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $sshNotes = .value -}}
+    {{- $deviceNotes = .value -}}
   {{- end -}}
 {{- end -}}
-{{- range splitList "\n" $sshNotes -}}
-  {{- $title := . | trim -}}
-  {{- if ne $title "" -}}
-    {{- $parts := split "@" $title -}}
-    {{- $device := index $parts "_0" -}}
-    {{- warnf "[ssh-config] checking \"%s\"" $title -}}
-    {{- if eq $device $deviceName -}}
-      {{- warnf "[ssh-config] matched \"%s\" for VCS hosts" $title -}}
-      {{- $item := onepassword $title "Private" "my" -}}
+
+###### VCS #######################################################################
+{{- range splitList "\n" $deviceNotes -}}
+  {{- $entry := . | trim -}}
+  {{- if ne $entry "" -}}
+    {{- $type := index (split ":" $entry) "_0" -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry -}}
+    {{- if eq $type "ssh" -}}
+      {{- warnf "[ssh-config] matched \"%s\" for VCS hosts" $name -}}
+      {{- $item := onepassword $name "Private" "my" -}}
       {{- $sshName := $item.title | trim -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
@@ -69,22 +69,14 @@ Host bitbucket.org-{{ $sshAlias }}
 {{- end }}
 
 ###### PEM #######################################################################
-{{- warnf "[ssh-config] fetching Active PEMs..." -}}
-{{- $pemNotes := "" -}}
-{{- range (onepassword "Active PEMs" "personal" "my").fields -}}
-  {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $pemNotes = .value -}}
-  {{- end -}}
-{{- end -}}
-{{- range splitList "\n" $pemNotes -}}
-  {{- $title := . | trim -}}
-  {{- if ne $title "" -}}
-    {{- $parts := split "@" $title -}}
-    {{- $device := index $parts "_0" -}}
-    {{- warnf "[ssh-config] checking PEM \"%s\"" $title -}}
-    {{- if eq $device $deviceName -}}
-      {{- warnf "[ssh-config] matched \"%s\" for PEM hosts" $title -}}
-      {{- $item := onepassword $title "Private" "my" -}}
+{{- range splitList "\n" $deviceNotes -}}
+  {{- $entry := . | trim -}}
+  {{- if ne $entry "" -}}
+    {{- $type := index (split ":" $entry) "_0" -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry -}}
+    {{- if eq $type "pem" -}}
+      {{- warnf "[ssh-config] matched \"%s\" for PEM hosts" $name -}}
+      {{- $item := onepassword $name "Private" "my" -}}
       {{- $pemName := $item.title | trim -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}

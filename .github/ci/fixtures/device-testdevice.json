@@ -1,0 +1,12 @@
+{
+  "id": "mock-device-testdevice-id",
+  "title": "Device: testdevice",
+  "fields": [
+    {
+      "id": "notesPlain",
+      "type": "STRING",
+      "label": "notesPlain",
+      "value": "ssh:Test SSH Key\ngpg:Test GPG Key\npem:Test PEM Key\ncred:TEST_CRED\nws:test-workspace"
+    }
+  ]
+}

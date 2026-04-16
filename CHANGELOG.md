@@ -16,6 +16,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- changed 1Password organization from type-centric "Active *" notes to device-centric "Device: \<name\>" notes
+- refactored `linux-engineering-op-loader.sh` to use device note with type filtering instead of per-type Active notes
+- updated CI test fixtures to match new device-centric 1Password structure
+
 ### Fixed
 
 - fixed `binutils` and `binutils-is-llvm` package conflict in Android dependencies by keeping only `binutils-is-llvm`

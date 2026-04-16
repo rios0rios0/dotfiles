@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Per-device workspace aliases from 1Password.
-# Central item "Active Workspaces" (vault: personal) with titles in notesPlain.
-# Referenced items: title "<device-slug>@<alias-name>", field "credential"/"password" = directory path.
+# Device note "Device: <slug>" (vault: personal) with "ws:<ITEM_NAME>" entries in notesPlain.
+# Referenced items: field "credential"/"password" = directory path.
 # Aliases are also cached to ~/.cache/op-workspaces.env (chmod 600, 24h TTL)
 # so that non-interactive shells and subsequent interactive shells can skip 1Password calls.
 
@@ -38,7 +38,7 @@ mkdir -p "$(dirname "$_ws_cache")"
 rm -f "$_ws_cache"
 install -m 600 /dev/null "$_ws_cache"
 
-_op_load_references "workspaces" "Active Workspaces" _on_workspace
+_op_load_references "workspaces" "ws" _on_workspace
 
 # remove empty cache (loader failed to populate)
 [[ -f "$_ws_cache" && ! -s "$_ws_cache" ]] && rm -f "$_ws_cache"

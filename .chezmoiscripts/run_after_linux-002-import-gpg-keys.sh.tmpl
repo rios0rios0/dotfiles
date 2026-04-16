@@ -8,19 +8,24 @@ gpgFolderPath="$HOME/.gpg"
 # ensure the ".gpg" folder exists
 mkdir -p "$gpgFolderPath"
 
-{{- warnf "[linux-gpg-keys] fetching Active GPGs..." -}}
-{{- $gpgNotes := "" -}}
-{{- range (onepassword "Active GPGs" "personal" "my").fields -}}
+{{- $deviceName := .deviceName -}}
+
+{{- warnf "[linux-gpg-keys] fetching Device: %s..." $deviceName -}}
+{{- $deviceNotes := "" -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $gpgNotes = .value -}}
+    {{- $deviceNotes = .value -}}
   {{- end -}}
 {{- end -}}
-{{- range splitList "\n" $gpgNotes }}
-{{-      $title := . | trim -}}
-{{-      if ne $title "" }}
+{{- range splitList "\n" $deviceNotes }}
+{{-      $entry := . | trim -}}
+{{-      if ne $entry "" }}
+{{-        $type := index (split ":" $entry) "_0" -}}
+{{-        $name := trimPrefix (printf "%s:" $type) $entry -}}
+{{-        if eq $type "gpg" }}
 
 # read the GPG name and private key from 1Password
-{{- $item := onepassword $title "Private" "my" -}}
+{{- $item := onepassword $name "Private" "my" -}}
 {{- warnf "[linux-gpg-keys] importing GPG key \"%s\"" $item.title -}}
 {{- $f := dict -}}
 {{- range $item.fields -}}
@@ -47,6 +52,7 @@ gpg --batch --passphrase "$gpgPassword" --import "$privateKeyFilePath"
 
 echo "[linux-gpg-keys] importing into GPG keyring..." >&2
 
+{{-        end -}}
 {{-      end -}}
 {{- end }}
 

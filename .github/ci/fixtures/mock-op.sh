@@ -39,20 +39,14 @@ case "$CMD" in
                     esac
                 done
                 case "$ITEM_NAME" in
-                    "Active SSHs")
-                        cat "$FIXTURES_DIR/active-sshs.json"
-                        ;;
-                    "Active GPGs")
-                        cat "$FIXTURES_DIR/active-gpgs.json"
-                        ;;
-                    "Active PEMs")
-                        cat "$FIXTURES_DIR/active-pems.json"
+                    "Device: testdevice")
+                        cat "$FIXTURES_DIR/device-testdevice.json"
                         ;;
                     "Active Docker Registries")
                         cat "$FIXTURES_DIR/active-docker-registries.json"
                         ;;
                     *)
-                        # Individual item lookup (e.g., "testdevice@My SSH Key")
+                        # Individual item lookup (e.g., "Test SSH Key")
                         cat "$FIXTURES_DIR/ssh-item-sample.json"
                         ;;
                 esac
