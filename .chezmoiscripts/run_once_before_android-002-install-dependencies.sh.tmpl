@@ -58,6 +58,7 @@ utilities=(
     "rclone"            # it's for syncing files with cloud storage (OneDrive, Google Drive, S3, etc.)
     "dnsutils"          # provides "nslookup" function
     "tmux"              # terminal multiplexer for managing multiple sessions under one process tree
+    "shellcheck"        # it's for static analysis of shell scripts (used by `make lint`)
 )
 apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================

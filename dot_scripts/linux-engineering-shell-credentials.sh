@@ -33,12 +33,16 @@ if [[ -s "$_cred_cache" ]]; then
 fi
 
 _on_credential() {
+  # Always write to cache — other shells (non-interactive, child) source it via
+  # .zshenv without calling 1Password. Skipping the write when the var is already
+  # set leaks across shells: the var is inherited, the cache stays empty, and
+  # the next shell has to re-fetch from 1Password.
+  printf 'export %s=%q\n' "$1" "$2" >> "$_cred_cache"
   if [[ -v $1 ]] && [[ -z "$_OP_FORCE_RELOAD" ]]; then
     printf '[credentials] SKIP: "%s" (already set)\n' "$1" >&2
   else
     printf '[credentials] exporting "%s"\n' "$1" >&2
     export "${1}=${2}"
-    printf 'export %s=%q\n' "$1" "$2" >> "$_cred_cache"
   fi
 }
 

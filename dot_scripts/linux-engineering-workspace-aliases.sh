@@ -23,13 +23,15 @@ fi
 
 # shellcheck disable=SC2317
 _on_workspace() {
+  # Always write to cache — keeps behavior consistent with shell-credentials.sh
+  # and guarantees the file is populated whether or not the alias exists.
+  printf 'alias %s=%q\n' "$1" "cd ${2}" >> "$_ws_cache"
   if alias "$1" &>/dev/null && [[ -z "$_OP_FORCE_RELOAD" ]]; then
     printf '[workspaces] SKIP: alias "%s" (already set)\n' "$1" >&2
   else
     printf '[workspaces] creating alias "%s"\n' "$1" >&2
     # shellcheck disable=SC2139
     alias "${1}=cd ${2}"
-    printf 'alias %s=%q\n' "$1" "cd ${2}" >> "$_ws_cache"
   fi
 }
 

@@ -26,24 +26,27 @@
     {{-       if hasKey $f "username" }}{{ $registryUsername = trim (index $f "username") }}{{ end }}
     {{-       $registryCredential := "" }}
     {{-       if hasKey $f "credential" }}{{ $registryCredential = trim (index $f "credential") }}{{ end }}
-    {{-       $registryName := index $f "registry name" }}
+    {{-       $registryName := "" }}
+    {{-       if hasKey $f "registry name" }}{{ $registryName = trim (index $f "registry name") }}{{ end }}
+    {{-       if eq $registryName "" }}{{ $registryName = $opItem.title }}{{ end }}
     {{-       $identityToken := "" }}
     {{-       if hasKey $f "identitytoken" }}
     {{-         $identityToken = trim (index $f "identitytoken") }}
     {{-       end }}
-    {{-       $hasAuth := and (ne $registryUsername "") (ne $registryCredential "") }}
     {{-       $hasIdentityToken := ne $identityToken "" }}
+    {{-       if and $hasIdentityToken (eq $registryUsername "") }}
+    {{-         $registryUsername = "00000000-0000-0000-0000-000000000000" }}
+    {{-       end }}
+    {{-       $hasAuth := and (ne $registryUsername "") (ne $registryCredential "") }}
     {{-       if or $hasAuth $hasIdentityToken }}
     {{-         warnf "[docker-config] configuring registry \"%s\"" $registryName }}
     {{- if not $first }},{{ end }}
     "{{ $registryName }}": {
-    {{- if $hasAuth }}
-      "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
-    {{- if $hasIdentityToken }},
+    {{- if $hasIdentityToken }}
+      "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}",
       "identitytoken": "{{ $identityToken }}"
-    {{- end }}
     {{- else }}
-      "identitytoken": "{{ $identityToken }}"
+      "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
     {{- end }}
     }
     {{-         $first = false }}

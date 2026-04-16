@@ -30,9 +30,17 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - moved Docker registries from standalone "Active Docker Registries" note to per-device `docker:` entries in device notes
 - updated CI test fixtures to match new device-centric 1Password structure
 
+- refreshed encrypted `encrypted_dot_npmrc.age` with current home `~/.npmrc`
+- added `kubectl krew upgrade` step to `install_krew` in `run_once_before_linux-002-install-dependencies.sh` so krew and its plugins auto-upgrade on every install run
+- added `shellcheck` to Linux (`apt`), Android/Termux (`apt`) and Windows (`winget koalaman.shellcheck`) dependency installers so `make lint` works out of the box
+- removed Azure Container Registry entries (`docker:Azure Container Registry (dev)` / `(prod)`) from device notes and archived the two backing 1Password items; ACR login now managed ad-hoc via `az acr login`
+
 ### Fixed
 
 - fixed `binutils` and `binutils-is-llvm` package conflict in Android dependencies by keeping only `binutils-is-llvm`
+- fixed `dot_docker/config.json.tmpl` printing `%!s(<nil>)` when a Docker item lacks the `registry name` field; template now falls back to the 1Password item title
+- fixed `dot_docker/config.json.tmpl` emitting an `identitytoken`-only entry with no `auth` (Docker requires both); template now defaults username to the ACR identity-token UUID and always emits `auth` alongside `identitytoken`
+- fixed `linux-engineering-shell-credentials.sh` and `linux-engineering-workspace-aliases.sh` skipping the cache write when the env var or alias was already set, leaving `~/.cache/op-credentials.env` empty (deleted at end of script) and forcing every new shell to re-query 1Password; cache is now always written so subsequent shells short-circuit via the 24h TTL check
 
 ## [0.7.0] - 2026-04-14
 
