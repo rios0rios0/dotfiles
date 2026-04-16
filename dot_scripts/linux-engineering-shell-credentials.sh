@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Per-device shell credentials from 1Password.
-# Device note "Device: <slug>" (vault: personal) with "cred:<ITEM_NAME>" entries in notesPlain.
-# Referenced items: field "credential"/"password" = secret value.
+# Device note "Device: <slug>" (vault: personal) stores credentials as fields
+# with "cred:<NAME>" labels. Values are read directly from the device note.
 # Credentials are also cached to ~/.cache/op-credentials.env (chmod 600, 24h TTL)
 # so that non-interactive shells (MCPs, IDE subshells) can source them from .zshenv.
 

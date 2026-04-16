@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Per-device workspace aliases from 1Password.
-# Device note "Device: <slug>" (vault: personal) with "ws:<ITEM_NAME>" entries in notesPlain.
-# Referenced items: field "credential"/"password" = directory path.
+# Device note "Device: <slug>" (vault: personal) stores workspace paths as fields
+# with "ws:<NAME>" labels. Values are read directly from the device note.
 # Aliases are also cached to ~/.cache/op-workspaces.env (chmod 600, 24h TTL)
 # so that non-interactive shells and subsequent interactive shells can skip 1Password calls.
 

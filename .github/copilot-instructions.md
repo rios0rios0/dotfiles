@@ -302,7 +302,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 ### Known Limitations and Workarounds
 1. **WSL SSH Issues**: Git may freeze with SSH against unknown hosts — Windows script pre-populates known_hosts to prevent this
 2. **Windows Path Limits**: 256 character limitation when using WSL interoperability
-3. **1Password Calls**: Each device has a single "Device: \<deviceName\>" note listing all its credentials with type prefixes (`ssh:`, `gpg:`, `pem:`, `cred:`, `ws:`). Templates fetch this one note (cached by chezmoi across all template files) and filter by type — only matching items are fetched from the `Private` vault
+3. **1Password Calls**: Each device has a single "Device: \<deviceName\>" note. The `notesPlain` field lists references to external items (`ssh:`, `gpg:`, `pem:`, `docker:`) fetched from the `Private` vault. Credentials (`cred:`) and workspaces (`ws:`) are stored as fields directly on the device note — no separate items needed. Templates fetch this one note (cached by chezmoi across all template files) and filter by type prefix
 4. **Internet Required**: All installations require internet access for downloads
 5. **Android NVM/Go**: Native Termux packages are used when GVM build fails due to DNS issues in Termux
 
@@ -352,9 +352,11 @@ chezmoi state delete-bucket --bucket=scriptStates
 - Test templates: `chezmoi execute-template < template-file`
 
 ### 1Password Template Pattern
-Each device has a single **"Device: \<deviceName\>"** Secure Note in the `personal` vault. The note's `notesPlain` field lists all credentials for that device, one per line, with a `type:Item Name` format. Templates fetch this note (cached by chezmoi) and filter by type prefix (`ssh`, `gpg`, `pem`). Runtime shell scripts use the same note with `cred` and `ws` prefixes via the `op` CLI.
+Each device has a single **"Device: \<deviceName\>"** Secure Note in the `personal` vault. The note combines two storage mechanisms:
+- **`notesPlain`**: references to external items (`ssh:`, `gpg:`, `pem:`, `docker:`) fetched from the `Private` vault
+- **Custom fields**: credential (`cred:NAME`, concealed) and workspace (`ws:NAME`, text) values stored directly on the note
 
-Docker registries are NOT device-specific — they use a separate `Active Docker Registries` note.
+Templates fetch this note (cached by chezmoi) and filter by type prefix. Runtime shell scripts use the `op-loader` to read `cred:` and `ws:` field values directly from the device note — no separate items in the `Private` vault are fetched for these types.
 
 **Device-note pattern with type filtering:**
 ```go

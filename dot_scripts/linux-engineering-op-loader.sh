@@ -1,7 +1,9 @@
 # shellcheck shell=bash
 # Shared 1Password device-note loader for per-device items.
-# Reads the "Device: <slug>" note from the personal vault, filters entries
-# by type prefix locally (no extra API call), then fetches only matching items.
+# Reads the "Device: <slug>" note from the personal vault, then extracts
+# field values whose labels match the requested type prefix (e.g. "cred:", "ws:").
+# Credentials and workspaces are stored as fields on the device note itself —
+# no separate items in the Private vault are fetched.
 #
 # Usage:
 #   source "$HOME/.scripts/linux-engineering-op-loader.sh"
@@ -67,57 +69,23 @@ _op_load_references() {
     return 0
   fi
 
-  local _ol_notes
-  _ol_notes=$(printf '%s' "$_ol_json" | jq -r '.fields[]? | select(.label == "notesPlain") | .value // empty' 2>/dev/null)
-  if [[ -z "$_ol_notes" ]]; then
-    _ol_log "WARN: no notesPlain field found in 'Device: $_ol_slug'"
-    unset -f _ol_log
-    return 0
-  fi
-
+  # cred/ws values are stored as fields on the device note itself (label = "type:name").
+  # ssh/gpg references stay in notesPlain and point to separate items in Private vault.
   local _ol_loaded=0
   local _ol_skipped=0
-  local _ol_entry _ol_entry_type _ol_entry_name _ol_value
+  local _ol_name _ol_value
 
-  while IFS= read -r _ol_entry <&3; do
-    # trim whitespace
-    _ol_entry="${_ol_entry#"${_ol_entry%%[![:space:]]*}"}"
-    _ol_entry="${_ol_entry%"${_ol_entry##*[![:space:]]}"}"
-    [[ -z "$_ol_entry" ]] && continue
-
-    if [[ "$_ol_entry" != *:* ]]; then
-      _ol_log "SKIP: entry '$_ol_entry' has no ':' separator"
-      _ol_skipped=$((_ol_skipped + 1))
-      continue
-    fi
-
-    # extract type prefix and item name
-    _ol_entry_type="${_ol_entry%%:*}"
-    _ol_entry_name="${_ol_entry#*:}"
-
-    # skip entries that don't match the requested type
-    if [[ "$_ol_entry_type" != "$_ol_type" ]]; then
-      _ol_skipped=$((_ol_skipped + 1))
-      continue
-    fi
-
-    local _ol_item_json
-    if ! _ol_item_json=$(op item get "$_ol_entry_name" --vault private --account my --format json 2>&1); then
-      _ol_log "WARN: failed to fetch item '$_ol_entry_name': $_ol_item_json"
-      _ol_skipped=$((_ol_skipped + 1))
-      continue
-    fi
-    [[ -z "$_ol_item_json" ]] && { _ol_skipped=$((_ol_skipped + 1)); continue; }
-
-    _ol_value=$(printf '%s' "$_ol_item_json" | jq -r '(.fields[]? | select(.id == "credential" or .id == "password") | .value) // empty' 2>/dev/null | head -1)
+  while IFS=$'\t' read -r _ol_name _ol_value <&3; do
+    [[ -z "$_ol_name" ]] && continue
     if [[ -n "$_ol_value" ]]; then
-      "$_ol_callback" "$_ol_entry_name" "$_ol_value"
+      "$_ol_callback" "$_ol_name" "$_ol_value"
       _ol_loaded=$((_ol_loaded + 1))
     else
-      _ol_log "WARN: no credential/password field in item '$_ol_entry_name'"
+      _ol_log "WARN: empty value for field '${_ol_type}:${_ol_name}'"
       _ol_skipped=$((_ol_skipped + 1))
     fi
-  done 3<<< "$_ol_notes"
+  done 3< <(printf '%s' "$_ol_json" | jq -r --arg pfx "${_ol_type}:" \
+    '.fields[]? | select(.label | startswith($pfx)) | [(.label | ltrimstr($pfx)), (.value // "")] | @tsv' 2>/dev/null)
 
   _ol_log "done: $_ol_loaded loaded, $_ol_skipped skipped"
   unset -f _ol_log

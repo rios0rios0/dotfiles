@@ -88,19 +88,23 @@ Commonly used chezmoi template variables in this repo:
 
 ## 1Password Template Pattern
 
-Each device has a single **"Device: \<deviceName\>"** Secure Note in the `personal` vault. The note's `notesPlain` field lists all credentials for that device, one per line, with a `type:Item Name` format. Templates fetch this note (cached by chezmoi across all template files) and filter by type prefix.
+Each device has a single **"Device: \<deviceName\>"** Secure Note in the `personal` vault. The note combines two storage mechanisms:
+
+- **`notesPlain`**: lists references to external items (SSH keys, GPG keys, PEM certs, Docker registries) in `type:Item Name` format, one per line
+- **Custom fields**: store credential and workspace values directly on the device note, with `type:name` labels (e.g., `cred:GH_TOKEN`, `ws:mine`)
+
+Templates fetch this note (cached by chezmoi across all template files) and filter by type prefix.
 
 **Type prefixes:**
 
-| Prefix | Meaning | Consumer |
+| Prefix | Storage | Consumer |
 |--------|---------|----------|
-| `ssh`  | SSH key (SSH Key item type in `Private` vault) | Chezmoi templates |
-| `gpg`  | GPG key (Secure Note in `Private` vault) | Chezmoi templates |
-| `pem`  | PEM certificate (Secure Note in `Private` vault) | Chezmoi templates |
-| `cred` | Shell credential (env var, in `Private` vault) | Runtime `op-loader` |
-| `ws`   | Workspace alias (directory path, in `Private` vault) | Runtime `op-loader` |
-
-Docker registries are NOT device-specific — they use a separate `Active Docker Registries` Secure Note in the `personal` vault (no type prefix, no device filtering).
+| `ssh`  | `notesPlain` entry referencing SSH Key item in `Private` vault | Chezmoi templates |
+| `gpg`  | `notesPlain` entry referencing Secure Note in `Private` vault | Chezmoi templates |
+| `pem`    | `notesPlain` entry referencing Secure Note in `Private` vault | Chezmoi templates |
+| `docker` | `notesPlain` entry referencing Docker registry item in `Private` vault | Chezmoi templates |
+| `cred`   | Field on device note (`cred:NAME` label, concealed value) | Runtime `op-loader` |
+| `ws`     | Field on device note (`ws:NAME` label, text value) | Runtime `op-loader` |
 
 **Device-note pattern with type filtering:**
 ```go

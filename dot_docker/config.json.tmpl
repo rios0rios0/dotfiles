@@ -1,33 +1,37 @@
+{{- $deviceName := .deviceName -}}
 {
   "auths": {
-    {{- warnf "[docker-config] fetching Active Docker Registries..." }}
-    {{- $dockerNotes := "" }}
-    {{- range (onepassword "Active Docker Registries" "personal" "my").fields }}
+    {{- warnf "[docker-config] fetching Device: %s..." $deviceName }}
+    {{- $deviceNotes := "" }}
+    {{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields }}
     {{-   if and (eq .label "notesPlain") (hasKey . "value") }}
-    {{-     $dockerNotes = .value }}
+    {{-     $deviceNotes = .value }}
     {{-   end }}
     {{- end }}
-    {{- $titles := splitList "\n" $dockerNotes }}
     {{- $first := true }}
-    {{- range $titles }}
-    {{-   $title := . | trim }}
-    {{-   if ne $title "" }}
-    {{-     $opItem := onepassword $title "Private" "my" }}
-    {{-     $f := dict }}
-    {{-     range $opItem.fields }}
-    {{-       if hasKey . "value" }}
-    {{-         $_ := set $f .label .value }}
+    {{- range splitList "\n" $deviceNotes }}
+    {{-   $entry := . | trim }}
+    {{-   if ne $entry "" }}
+    {{-     $type := index (split ":" $entry) "_0" }}
+    {{-     $name := trimPrefix (printf "%s:" $type) $entry }}
+    {{-     if eq $type "docker" }}
+    {{-       $opItem := onepassword $name "Private" "my" }}
+    {{-       $f := dict }}
+    {{-       range $opItem.fields }}
+    {{-         if hasKey . "value" }}
+    {{-           $_ := set $f .label .value }}
+    {{-         end }}
     {{-       end }}
-    {{-     end }}
-    {{-     $registryUsername := index $f "username" }}
-    {{-     $registryCredential := index $f "credential" }}
-    {{-     $registryName := index $f "registry name" }}
-    {{-     warnf "[docker-config] configuring registry \"%s\"" $registryName }}
+    {{-       $registryUsername := index $f "username" }}
+    {{-       $registryCredential := index $f "credential" }}
+    {{-       $registryName := index $f "registry name" }}
+    {{-       warnf "[docker-config] configuring registry \"%s\"" $registryName }}
     {{- if not $first }},{{ end }}
     "{{ $registryName }}": {
       "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
     }
-    {{-     $first = false }}
+    {{-       $first = false }}
+    {{-     end }}
     {{-   end }}
     {{- end }}
   }
