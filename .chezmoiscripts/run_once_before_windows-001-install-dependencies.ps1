@@ -113,7 +113,8 @@ $development = @(
     "BurntSushi.ripgrep.MSVC",
     "jqlang.jq",
     "MikeFarah.yq",
-    "sharkdp.bat"
+    "sharkdp.bat",
+    "koalaman.shellcheck"               # static analysis for shell scripts (used by `make lint`)
 )
 Install-PackageList $development
 # =========================================================================================================

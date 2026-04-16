@@ -51,6 +51,7 @@ utilities=(
     "ffmpeg"            # it's for media processing (used by conversion aliases in .zshrc)
     "rsync"             # it's for file synchronization
     "asciinema"         # it's for recording terminal sessions (https://asciinema.org/)
+    "shellcheck"        # it's for static analysis of shell scripts (used by `make lint`)
 )
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================

@@ -32,6 +32,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 - refreshed encrypted `dot_npmrc.age` with current home `~/.npmrc`
 - added `kubectl krew upgrade` step to `install_krew` in `run_once_before_linux-002-install-dependencies.sh` so krew and its plugins auto-upgrade on every install run
+- added `shellcheck` to Linux (`apt`), Android/Termux (`apt`) and Windows (`winget koalaman.shellcheck`) dependency installers so `make lint` works out of the box
 - removed Azure Container Registry entries (`docker:Azure Container Registry (dev)` / `(prod)`) from device notes and archived the two backing 1Password items; ACR login now managed ad-hoc via `az acr login`
 
 ### Fixed
