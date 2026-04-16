@@ -8,22 +8,22 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 
 {{- $deviceName := .deviceName -}}
 
-{{- warnf "[windows-ssh-keys] fetching Active SSHs..." -}}
-{{- $sshNotes := "" -}}
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- warnf "[windows-ssh-keys] fetching Device: %s..." $deviceName -}}
+{{- $deviceNotes := "" -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $sshNotes = .value -}}
+    {{- $deviceNotes = .value -}}
   {{- end -}}
 {{- end -}}
-{{- range splitList "\n" $sshNotes }}
-{{-      $title := . | trim -}}
-{{-      if ne $title "" }}
+{{- range splitList "\n" $deviceNotes }}
+{{-      $entry := . | trim -}}
+{{-      if ne $entry "" }}
 
-{{-        $parts := split "@" $title -}}
-{{-        $device := index $parts "_0" -}}
+{{-        $type := index (split ":" $entry) "_0" -}}
+{{-        $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
 
-{{-        if eq $device $deviceName }}
-{{-        $item := onepassword $title "Private" "my" -}}
+{{-        if eq $type "ssh" }}
+{{-        $item := onepassword $name "Private" "my" -}}
 {{-        $sshName := $item.title | trim -}}
 {{-        warnf "[windows-ssh-keys] creating public key for \"%s\"" $sshName -}}
 

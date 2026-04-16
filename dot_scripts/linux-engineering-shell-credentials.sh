@@ -1,7 +1,7 @@
 # shellcheck shell=bash
 # Per-device shell credentials from 1Password.
-# Central item "Active Shell Credentials" (vault: personal) with titles in notesPlain.
-# Referenced items: title "<device-slug>@<ENV_VAR_NAME>", field "credential"/"password" = secret value.
+# Device note "Device: <slug>" (vault: personal) stores credentials as fields
+# with "cred:<NAME>" labels. Values are read directly from the device note.
 # Credentials are also cached to ~/.cache/op-credentials.env (chmod 600, 24h TTL)
 # so that non-interactive shells (MCPs, IDE subshells) can source them from .zshenv.
 
@@ -47,7 +47,7 @@ mkdir -p "$(dirname "$_cred_cache")"
 rm -f "$_cred_cache"
 install -m 600 /dev/null "$_cred_cache"
 
-_op_load_references "credentials" "Active Shell Credentials" _on_credential
+_op_load_references "credentials" "cred" _on_credential
 
 # remove empty cache (loader failed to populate)
 [[ -f "$_cred_cache" && ! -s "$_cred_cache" ]] && rm -f "$_cred_cache"

@@ -1,20 +1,20 @@
 {{- $deviceName := .deviceName -}}
 
-{{- warnf "[authorized-keys] fetching Active SSHs..." -}}
-{{- $sshNotes := "" -}}
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- warnf "[authorized-keys] fetching Device: %s..." $deviceName -}}
+{{- $deviceNotes := "" -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $sshNotes = .value -}}
+    {{- $deviceNotes = .value -}}
   {{- end -}}
 {{- end -}}
-{{- range splitList "\n" $sshNotes -}}
-  {{- $title := . | trim -}}
-  {{- if ne $title "" -}}
-    {{- $parts := split "@" $title -}}
-    {{- $device := index $parts "_0" -}}
-    {{- if eq $device $deviceName -}}
-      {{- warnf "[authorized-keys] matched \"%s\"" $title -}}
-      {{- $item := onepassword $title "Private" "my" -}}
+{{- range splitList "\n" $deviceNotes -}}
+  {{- $entry := . | trim -}}
+  {{- if ne $entry "" -}}
+    {{- $type := index (split ":" $entry) "_0" -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
+    {{- if eq $type "ssh" -}}
+      {{- warnf "[authorized-keys] matched \"%s\"" $name -}}
+      {{- $item := onepassword $name "Private" "my" -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}

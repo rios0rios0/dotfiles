@@ -132,7 +132,7 @@ This repository uses a layered approach to secrets management:
 
 - **1Password CLI** fetches SSH keys, GPG keys, and credentials at template render time via `onepasswordRead` / `onepassword` template functions
 - **Age encryption** protects sensitive files at rest (AWS, Azure, Kubernetes configs, npmrc). Private key stored at `~/.ssh/chezmoi`, recipients at `~/.age_recipients`
-- **Per-device SSH/GPG signing** matches keys by hostname against 1Password items ("Active SSHs", "Active GPGs")
+- **Per-device SSH/GPG signing** matches keys by hostname against 1Password device notes ("Device: \<hostname\>")
 
 Encrypted files end in `.age` and are automatically decrypted during `chezmoi apply`.
 

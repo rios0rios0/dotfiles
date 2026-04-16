@@ -129,11 +129,11 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `run_once_after_linux-002-clone-pentesting-tools.sh` — clones pentesting tools (VHostScan, dirsearch, StegCracker, stegbrute) to `~/Development/Tools/`
 - `run_once_after_windows-001-create-ssh-known-hosts.ps1` — pre-populates `~/.ssh/known_hosts` for GitHub, GitLab, Azure DevOps, Bitbucket (avoids SSH freeze in WSL)
 - `run_after_linux-001-execute-chezmoi-templates.sh` — re-processes `~/.scripts/*-template.sh` files through `chezmoi execute-template`
-- `run_after_linux-002-import-gpg-keys.sh.tmpl` — imports GPG keys from 1Password ("Active GPGs" item)
-- `run_after_windows-001-create-ssh-public-keys.ps1.tmpl` — creates SSH public key files from 1Password ("Active SSHs" item)
-- `run_after_windows-002-create-ssh-pems.ps1.tmpl` — creates SSH PEM files on Windows
+- `run_after_linux-002-import-gpg-keys.sh.tmpl` — imports GPG keys from 1Password (device note, `gpg:` entries)
+- `run_after_windows-001-create-ssh-public-keys.ps1.tmpl` — creates SSH public key files from 1Password (device note, `ssh:` entries)
+- `run_after_windows-002-create-ssh-pems.ps1.tmpl` — creates SSH PEM files on Windows (device note, `pem:` entries)
 - `run_after_windows-003-copy-app-data-files.ps1.tmpl` — copies files from `AppData/` in the repo to `~\AppData\` on Windows (directory names use `+` as wildcard for version-specific paths)
-- `run_after_android-001-create-ssh-keys.sh.tmpl` — creates SSH private/public key files from 1Password ("Active SSHs" item)
+- `run_after_android-001-create-ssh-keys.sh.tmpl` — creates SSH private/public key files from 1Password (device note, `ssh:` entries)
 
 #### Manual Validation After Installation
 - Verify shell configuration: `zsh --version` (Linux/Android) or `pwsh --version` (Windows)
@@ -302,7 +302,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 ### Known Limitations and Workarounds
 1. **WSL SSH Issues**: Git may freeze with SSH against unknown hosts — Windows script pre-populates known_hosts to prevent this
 2. **Windows Path Limits**: 256 character limitation when using WSL interoperability
-3. **1Password Calls**: Templates fetch SSH keys, GPG keys, and credentials per device. API calls are minimized by filtering REFERENCE labels by device before fetching items, and chezmoi caches `onepassword` results across all template files
+3. **1Password Calls**: Each device has a single "Device: \<deviceName\>" note. The `notesPlain` field lists references to external items (`ssh:`, `gpg:`, `pem:`, `docker:`) fetched from the `Private` vault. Credentials (`cred:`) and workspaces (`ws:`) are stored as fields directly on the device note — no separate items needed. Templates fetch this one note (cached by chezmoi across all template files) and filter by type prefix
 4. **Internet Required**: All installations require internet access for downloads
 5. **Android NVM/Go**: Native Termux packages are used when GVM build fails due to DNS issues in Termux
 
@@ -352,23 +352,27 @@ chezmoi state delete-bucket --bucket=scriptStates
 - Test templates: `chezmoi execute-template < template-file`
 
 ### 1Password Template Pattern
-"Active *" items (e.g., "Active SSHs") are Secure Notes in the personal vault. Item titles are listed **one per line in the notes field** (`notesPlain`). Templates read notes, filter by device locally, and only fetch matching items by title — avoiding unnecessary API calls.
+Each device has a single **"Device: \<deviceName\>"** Secure Note in the `personal` vault. The note combines two storage mechanisms:
+- **`notesPlain`**: references to external items (`ssh:`, `gpg:`, `pem:`, `docker:`) fetched from the `Private` vault
+- **Custom fields**: credential (`cred:NAME`, concealed) and workspace (`ws:NAME`, text) values stored directly on the note
 
-**Notes-based pattern with device filtering:**
+Templates fetch this note (cached by chezmoi) and filter by type prefix. Runtime shell scripts use the `op-loader` to read `cred:` and `ws:` field values directly from the device note — no separate items in the `Private` vault are fetched for these types.
+
+**Device-note pattern with type filtering:**
 ```go
-{{- $notes := "" -}}
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- $deviceNotes := "" -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $notes = .value -}}
+    {{- $deviceNotes = .value -}}
   {{- end -}}
 {{- end -}}
-{{- range splitList "\n" $notes -}}
-  {{- $title := . | trim -}}
-  {{- if ne $title "" -}}
-    {{- $parts := split "@" $title -}}
-    {{- $device := index $parts "_0" -}}
-    {{- if eq $device $deviceName -}}
-      {{- $item := onepassword $title "Private" "my" -}}
+{{- range splitList "\n" $deviceNotes -}}
+  {{- $entry := . | trim -}}
+  {{- if ne $entry "" -}}
+    {{- $type := index (split ":" $entry) "_0" -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
+    {{- if eq $type "ssh" -}}
+      {{- $item := onepassword $name "Private" "my" -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}
@@ -405,7 +409,7 @@ Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-key
 - Age recipients file: `~/.age_recipients` (template: `dot_age_recipients.tmpl`)
 - 1Password integration: Uses `op` CLI; Linux/WSL wraps `op.exe` via `~/.local/bin/op`; Android wraps ARM64 binary via proot Alpine
 - SSH commit signing: 1Password `op-ssh-sign` — different binary per platform (`op-ssh-sign-wsl` on WSL, `op-ssh-sign.exe` on Windows, `ssh-keygen` on Android)
-- Git signing keys: Read per-device from 1Password "Active SSHs" and "Active GPGs" items (matched by device name `hostname@account` format)
+- Git signing keys: Read per-device from 1Password "Device: \<deviceName\>" note (`ssh:` and `gpg:` entries), matched by device hostname
 - **Never commit**: Raw sensitive files — always use encryption or 1Password references
 
 ### Expected Successful Operation

@@ -1,6 +1,6 @@
 {
   "id": "mock-ssh-item-id",
-  "title": "testdevice@Test SSH Key",
+  "title": "Test SSH Key",
   "fields": [
     {"id": "username", "label": "ssh username", "value": "testuser"},
     {"id": "email", "label": "ssh email", "value": "test@example.com"},

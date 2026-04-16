@@ -88,23 +88,39 @@ Commonly used chezmoi template variables in this repo:
 
 ## 1Password Template Pattern
 
-"Active *" items (e.g., "Active SSHs") are Secure Notes in the personal vault. Item titles are listed **one per line in the notes field** (`notesPlain`). Templates read notes, filter by device locally, and only fetch matching items by title — avoiding unnecessary API calls.
+Each device has a single **"Device: \<deviceName\>"** Secure Note in the `personal` vault. The note combines two storage mechanisms:
 
-**Notes-based pattern with device filtering:**
+- **`notesPlain`**: lists references to external items (SSH keys, GPG keys, PEM certs, Docker registries) in `type:Item Name` format, one per line
+- **Custom fields**: store credential and workspace values directly on the device note, with `type:name` labels (e.g., `cred:GH_TOKEN`, `ws:mine`)
+
+Templates fetch this note (cached by chezmoi across all template files) and filter by type prefix.
+
+**Type prefixes:**
+
+| Prefix | Storage | Consumer |
+|--------|---------|----------|
+| `ssh`  | `notesPlain` entry referencing SSH Key item in `Private` vault | Chezmoi templates |
+| `gpg`  | `notesPlain` entry referencing Secure Note in `Private` vault | Chezmoi templates |
+| `pem`    | `notesPlain` entry referencing Secure Note in `Private` vault | Chezmoi templates |
+| `docker` | `notesPlain` entry referencing Docker registry item in `Private` vault | Chezmoi templates |
+| `cred`   | Field on device note (`cred:NAME` label, concealed value) | Runtime `op-loader` |
+| `ws`     | Field on device note (`ws:NAME` label, text value) | Runtime `op-loader` |
+
+**Device-note pattern with type filtering:**
 ```go
-{{- $notes := "" -}}
-{{- range (onepassword "Active SSHs" "personal" "my").fields -}}
+{{- $deviceNotes := "" -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
-    {{- $notes = .value -}}
+    {{- $deviceNotes = .value -}}
   {{- end -}}
 {{- end -}}
-{{- range splitList "\n" $notes -}}
-  {{- $title := . | trim -}}
-  {{- if ne $title "" -}}
-    {{- $parts := split "@" $title -}}
-    {{- $device := index $parts "_0" -}}
-    {{- if eq $device $deviceName -}}
-      {{- $item := onepassword $title "Private" "my" -}}
+{{- range splitList "\n" $deviceNotes -}}
+  {{- $entry := . | trim -}}
+  {{- if ne $entry "" -}}
+    {{- $type := index (split ":" $entry) "_0" -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
+    {{- if eq $type "ssh" -}}
+      {{- $item := onepassword $name "Private" "my" -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}

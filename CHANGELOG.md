@@ -16,6 +16,13 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- changed 1Password organization from type-centric "Active *" notes to device-centric "Device: \<name\>" notes
+- refactored `linux-engineering-op-loader.sh` to read credentials and workspaces from device note fields instead of separate items in the Private vault
+- moved Docker registries from standalone "Active Docker Registries" note to per-device `docker:` entries in device notes
+- updated CI test fixtures to match new device-centric 1Password structure
+
 ### Fixed
 
 - fixed `binutils` and `binutils-is-llvm` package conflict in Android dependencies by keeping only `binutils-is-llvm`
