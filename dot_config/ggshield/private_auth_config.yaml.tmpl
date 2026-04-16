@@ -29,10 +29,10 @@ default_token_lifetime: null
 instances:
 - accounts:
   - expire_at: null
-    token: {{ $token }}
-    token_name: {{ $tokenName }}
+    token: "{{ $token }}"
+    token_name: "{{ $tokenName }}"
     type: personal_access_token
-    workspace_id: {{ $workspaceId }}
+    workspace_id: "{{ $workspaceId }}"
   default_token_lifetime: null
   name: null
   url: https://dashboard.gitguardian.com
