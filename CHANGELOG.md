@@ -22,6 +22,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - added global ggshield pre-commit hook on Linux via `core.hooksPath` in `dot_gitconfig.tmpl`, covering all existing and future repositories without per-repo setup
 - added `run_after_linux-004-install-ggshield-hook.sh` to (re)generate the shared ggshield hook script on every apply
 - added `dot_config/ggshield/auth_config.yaml.tmpl` rendering the ggshield auth config from 1Password item `Token: ggshield` (fields: `token`, `token name`, `workspace id`)
+- added PostgreSQL client (`psql`) to Linux (`postgresql-client`) and Android/Termux (`postgresql`, which bundles server + client since Termux doesn't split them) dependency installers
 
 ### Changed
 

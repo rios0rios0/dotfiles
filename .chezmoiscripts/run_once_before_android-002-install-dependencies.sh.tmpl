@@ -62,6 +62,7 @@ utilities=(
     "dnsutils"          # provides "nslookup" function
     "tmux"              # terminal multiplexer for managing multiple sessions under one process tree
     "shellcheck"        # it's for static analysis of shell scripts (used by `make lint`)
+    "postgresql"        # provides the `psql` client (Termux ships server + client in one package)
 )
 apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================

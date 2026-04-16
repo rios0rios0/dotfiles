@@ -52,6 +52,7 @@ utilities=(
     "rsync"             # it's for file synchronization
     "asciinema"         # it's for recording terminal sessions (https://asciinema.org/)
     "shellcheck"        # it's for static analysis of shell scripts (used by `make lint`)
+    "postgresql-client" # provides the `psql` client only (no server, unlike the `postgresql` package)
 )
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
