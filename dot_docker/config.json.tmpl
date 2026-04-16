@@ -23,23 +23,33 @@
     {{-         end }}
     {{-       end }}
     {{-       $registryUsername := "" }}
-    {{-       if hasKey $f "username" }}{{ $registryUsername = index $f "username" }}{{ end }}
+    {{-       if hasKey $f "username" }}{{ $registryUsername = trim (index $f "username") }}{{ end }}
     {{-       $registryCredential := "" }}
     {{-       if hasKey $f "credential" }}{{ $registryCredential = trim (index $f "credential") }}{{ end }}
     {{-       $registryName := index $f "registry name" }}
     {{-       $identityToken := "" }}
     {{-       if hasKey $f "identitytoken" }}
-    {{-         $identityToken = index $f "identitytoken" }}
+    {{-         $identityToken = trim (index $f "identitytoken") }}
     {{-       end }}
-    {{-       warnf "[docker-config] configuring registry \"%s\"" $registryName }}
+    {{-       $hasAuth := and (ne $registryUsername "") (ne $registryCredential "") }}
+    {{-       $hasIdentityToken := ne $identityToken "" }}
+    {{-       if or $hasAuth $hasIdentityToken }}
+    {{-         warnf "[docker-config] configuring registry \"%s\"" $registryName }}
     {{- if not $first }},{{ end }}
     "{{ $registryName }}": {
+    {{- if $hasAuth }}
       "auth": "{{ b64enc (list $registryUsername ":" $registryCredential | join "") }}"
-    {{- if ne $identityToken "" }},
+    {{- if $hasIdentityToken }},
+      "identitytoken": "{{ $identityToken }}"
+    {{- end }}
+    {{- else }}
       "identitytoken": "{{ $identityToken }}"
     {{- end }}
     }
-    {{-       $first = false }}
+    {{-         $first = false }}
+    {{-       else }}
+    {{-         warnf "[docker-config] WARN: skipping registry \"%s\" because neither valid auth nor identitytoken is available" $registryName }}
+    {{-       end }}
     {{-     end }}
     {{-   end }}
     {{- end }}
