@@ -316,6 +316,27 @@ install_azure_cli() {
     pip install azure-cli
 }
 
+# https://docs.gitguardian.com/ggshield-docs/getting-started
+install_ggshield() {
+    # Ensure pip is available from pyenv's Python (so pipx lives in the managed Python)
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init -)"
+
+    if ! command -v pipx &>/dev/null; then
+        pip install --upgrade pipx
+        pipx ensurepath
+    else
+        echo "[configure-deps] pipx is already installed, skipping" >&2
+    fi
+
+    if pipx list --short 2>/dev/null | grep -q '^ggshield '; then
+        echo "[configure-deps] ggshield is already installed, skipping" >&2
+    else
+        pipx install ggshield
+    fi
+}
+
 # https://www.speedtest.net/apps/cli
 install_speedtest_cli() {
     if command -v speedtest &>/dev/null; then
@@ -347,6 +368,8 @@ install_devforge
 
 install_github_cli
 install_azure_cli
+
+install_ggshield
 
 install_speedtest_cli
 # =========================================================================================================

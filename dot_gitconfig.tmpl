@@ -141,6 +141,9 @@
     editor = vim
     excludesfile = "{{ $excludesFile }}"
     sshCommand = "{{ $sshCommand }}"
+{{- if eq .chezmoi.os "linux" }}
+    hooksPath = "{{ .chezmoi.homeDir }}/.local/share/ggshield/git-hooks"
+{{- end }}
 [merge]
     commit = yes
     ff = yes
