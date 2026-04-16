@@ -42,9 +42,6 @@ case "$CMD" in
                     "Device: testdevice")
                         cat "$FIXTURES_DIR/device-testdevice.json"
                         ;;
-                    "Active Docker Registries")
-                        cat "$FIXTURES_DIR/active-docker-registries.json"
-                        ;;
                     *)
                         # Individual item lookup (e.g., "Test SSH Key")
                         cat "$FIXTURES_DIR/ssh-item-sample.json"

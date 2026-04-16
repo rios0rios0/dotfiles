@@ -370,7 +370,7 @@ Templates fetch this note (cached by chezmoi) and filter by type prefix. Runtime
   {{- $entry := . | trim -}}
   {{- if ne $entry "" -}}
     {{- $type := index (split ":" $entry) "_0" -}}
-    {{- $name := trimPrefix (printf "%s:" $type) $entry -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "ssh" -}}
       {{- $item := onepassword $name "Private" "my" -}}
       {{- $f := dict -}}

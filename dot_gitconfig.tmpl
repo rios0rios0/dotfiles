@@ -42,7 +42,7 @@
   {{- $entry := . | trim -}}
   {{- if ne $entry "" -}}
     {{- $type := index (split ":" $entry) "_0" -}}
-    {{- $name := trimPrefix (printf "%s:" $type) $entry -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "ssh" -}}
       {{- warnf "[gitconfig] matched \"%s\" for SSH defaults" $name -}}
       {{- $item := onepassword $name "Private" "my" -}}
@@ -94,7 +94,7 @@
   {{- $entry := . | trim -}}
   {{- if ne $entry "" -}}
     {{- $type := index (split ":" $entry) "_0" -}}
-    {{- $name := trimPrefix (printf "%s:" $type) $entry -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "gpg" -}}
       {{- warnf "[gitconfig] matched \"%s\" for GPG alias" $name -}}
       {{- $item := onepassword $name "Private" "my" -}}
@@ -118,7 +118,7 @@
   {{- $entry := . | trim -}}
   {{- if ne $entry "" -}}
     {{- $type := index (split ":" $entry) "_0" -}}
-    {{- $name := trimPrefix (printf "%s:" $type) $entry -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "ssh" -}}
       {{- warnf "[gitconfig] matched \"%s\" for SSH alias" $name -}}
       {{- $item := onepassword $name "Private" "my" -}}

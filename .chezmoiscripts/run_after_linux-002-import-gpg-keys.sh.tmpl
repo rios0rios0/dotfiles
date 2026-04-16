@@ -21,7 +21,7 @@ mkdir -p "$gpgFolderPath"
 {{-      $entry := . | trim -}}
 {{-      if ne $entry "" }}
 {{-        $type := index (split ":" $entry) "_0" -}}
-{{-        $name := trimPrefix (printf "%s:" $type) $entry -}}
+{{-        $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
 {{-        if eq $type "gpg" }}
 
 # read the GPG name and private key from 1Password

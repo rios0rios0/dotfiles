@@ -6,7 +6,17 @@
       "id": "notesPlain",
       "type": "STRING",
       "label": "notesPlain",
-      "value": "ssh:Test SSH Key\ngpg:Test GPG Key\npem:Test PEM Key\ncred:TEST_CRED\nws:test-workspace"
+      "value": "ssh:Test SSH Key\ngpg:Test GPG Key\npem:Test PEM Key\ndocker:Test Docker Registry"
+    },
+    {
+      "type": "CONCEALED",
+      "label": "cred:TEST_CRED",
+      "value": "mock-cred-value"
+    },
+    {
+      "type": "STRING",
+      "label": "ws:test-workspace",
+      "value": "$HOME/Development/test/"
     }
   ]
 }

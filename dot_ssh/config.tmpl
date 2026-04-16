@@ -18,7 +18,7 @@ This is because on Android (Termux) only private keys are usable, while other pl
   {{- $entry := . | trim -}}
   {{- if ne $entry "" -}}
     {{- $type := index (split ":" $entry) "_0" -}}
-    {{- $name := trimPrefix (printf "%s:" $type) $entry -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "ssh" -}}
       {{- warnf "[ssh-config] matched \"%s\" for VCS hosts" $name -}}
       {{- $item := onepassword $name "Private" "my" -}}
@@ -73,7 +73,7 @@ Host bitbucket.org-{{ $sshAlias }}
   {{- $entry := . | trim -}}
   {{- if ne $entry "" -}}
     {{- $type := index (split ":" $entry) "_0" -}}
-    {{- $name := trimPrefix (printf "%s:" $type) $entry -}}
+    {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "pem" -}}
       {{- warnf "[ssh-config] matched \"%s\" for PEM hosts" $name -}}
       {{- $item := onepassword $name "Private" "my" -}}
