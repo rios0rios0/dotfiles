@@ -33,6 +33,7 @@ AppData
 {{- /* Linux‑exclusive files – only for Linux. When not running Linux, ignore them. */ -}}
 {{- if ne .chezmoi.os "linux" }}
 .chezmoiscripts/linux-*.sh
+.config/ggshield
 .docker
 .histdb
 .john

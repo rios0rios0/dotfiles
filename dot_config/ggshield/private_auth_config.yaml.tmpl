@@ -1,0 +1,38 @@
+{{- /*
+  Renders ~/.config/ggshield/auth_config.yaml from a 1Password item so
+  ggshield works out of the box after `chezmoi apply` — no `ggshield auth
+  login` needed.
+
+  Required 1Password setup (once, per user — not per device):
+    Vault:  Private
+    Item:   "Token: ggshield"
+    Fields:
+      - token        (concealed) — the gg_pat_* personal access token
+      - token name   (text)      — display name shown by `ggshield auth list`
+      - workspace id (text)      — GitGuardian workspace id (e.g. 371781)
+
+  Rotate the token from https://dashboard.gitguardian.com/api/personal-access-tokens
+  and update the 1Password fields — the next `chezmoi apply` propagates it.
+*/ -}}
+{{- warnf "[ggshield-auth] fetching 1Password item Token: ggshield..." -}}
+{{- $item := onepassword "Token: ggshield" "Private" "my" -}}
+{{- $f := dict -}}
+{{- range $item.fields -}}
+  {{- if hasKey . "value" -}}
+    {{- $_ := set $f .label .value -}}
+  {{- end -}}
+{{- end -}}
+{{- $token := index $f "token" -}}
+{{- $tokenName := index $f "token name" -}}
+{{- $workspaceId := index $f "workspace id" -}}
+default_token_lifetime: null
+instances:
+- accounts:
+  - expire_at: null
+    token: "{{ $token }}"
+    token_name: "{{ $tokenName }}"
+    type: personal_access_token
+    workspace_id: "{{ $workspaceId }}"
+  default_token_lifetime: null
+  name: null
+  url: https://dashboard.gitguardian.com
