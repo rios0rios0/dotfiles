@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Fixed
+
+- fixed `binutils` and `binutils-is-llvm` package conflict in Android dependencies by keeping only `binutils-is-llvm`
+
 ## [0.7.0] - 2026-04-14
 
 ### Added
