@@ -323,17 +323,25 @@ install_ggshield() {
     export PATH="$PYENV_ROOT/bin:$PATH"
     eval "$(pyenv init -)"
 
-    if ! command -v pipx &>/dev/null; then
-        pip install --upgrade pipx
-        pipx ensurepath
+    # Use `python -m pipx` throughout to avoid pyenv shim timing issues:
+    # `pip install pipx` places the shim, but it only becomes callable after
+    # `pyenv rehash`, which isn't guaranteed in a non-interactive script context.
+    if ! python -m pip show pipx &>/dev/null; then
+        python -m pip install --upgrade pipx
+        python -m pipx ensurepath
     else
         echo "[configure-deps] pipx is already installed, skipping" >&2
     fi
 
-    if pipx list --short 2>/dev/null | grep -q '^ggshield '; then
+    if python -m pipx list --short 2>/dev/null | grep -q '^ggshield '; then
         echo "[configure-deps] ggshield is already installed, skipping" >&2
     else
-        pipx install ggshield
+        python -m pipx install ggshield
+    fi
+
+    if ! python -m pipx list --short 2>/dev/null | grep -q '^ggshield '; then
+        echo "[configure-deps] ERROR: ggshield installation failed" >&2
+        exit 1
     fi
 }
 
