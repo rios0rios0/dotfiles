@@ -58,7 +58,7 @@ sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
     if [[ -d "${ZSH:-$HOME/.oh-my-zsh}" ]]; then
-        echo "[configure-deps] oh-my-zsh is already installed, skipping"
+        echo "[configure-deps] oh-my-zsh is already installed, skipping" >&2
         return
     fi
     sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
@@ -71,7 +71,7 @@ install_gvm() {
     if [[ ! -d "$HOME/.gvm" ]]; then
         bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
     else
-        echo "[configure-deps] GVM is already installed, skipping clone"
+        echo "[configure-deps] GVM is already installed, skipping clone" >&2
     fi
 
     # Source GVM to make it available in the current shell
@@ -80,7 +80,7 @@ install_gvm() {
     [[ -s "$GVM_ROOT/scripts/gvm" ]] && source "$GVM_ROOT/scripts/gvm"
 
     if [[ -d "$GVM_ROOT/gos/$go_version" ]]; then
-        echo "[configure-deps] $go_version is already installed, skipping"
+        echo "[configure-deps] $go_version is already installed, skipping" >&2
     else
         gvm install "$go_version" -B
     fi
@@ -90,7 +90,7 @@ install_gvm() {
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
 install_kubectl() {
     if command -v kubectl &>/dev/null; then
-        echo "[configure-deps] kubectl is already installed, skipping"
+        echo "[configure-deps] kubectl is already installed, skipping" >&2
         return
     fi
 
@@ -107,7 +107,7 @@ install_kubectl() {
 # https://krew.sigs.k8s.io/docs/user-guide/setup/install/
 install_krew() {
     if [[ -d "${KREW_ROOT:-$HOME/.krew}" ]] && command -v kubectl-krew &>/dev/null; then
-        echo "[configure-deps] krew is already installed, skipping download"
+        echo "[configure-deps] krew is already installed, skipping download" >&2
     else
         (
           set -x; cd "$(mktemp -d)" &&
@@ -130,7 +130,7 @@ install_krew() {
 # https://developer.hashicorp.com/terraform/install
 install_terraform() {
     if command -v terraform &>/dev/null; then
-        echo "[configure-deps] terraform is already installed, skipping"
+        echo "[configure-deps] terraform is already installed, skipping" >&2
         return
     fi
 
@@ -147,7 +147,7 @@ install_terragrunt() {
         local current_version
         current_version="$(terragrunt --version 2>/dev/null | grep -oP 'v[\d.]+')" || true
         if [[ "$current_version" == "$target_version" ]]; then
-            echo "[configure-deps] terragrunt $target_version is already installed, skipping"
+            echo "[configure-deps] terragrunt $target_version is already installed, skipping" >&2
             return
         fi
     fi
@@ -160,7 +160,7 @@ install_terragrunt() {
 # https://sdkman.io/install/
 install_sdkman() {
     if [[ -d "$HOME/.sdkman" ]]; then
-        echo "[configure-deps] SDKMAN is already installed, skipping download"
+        echo "[configure-deps] SDKMAN is already installed, skipping download" >&2
     else
         curl -s "https://get.sdkman.io" | bash
     fi
@@ -179,7 +179,7 @@ install_nvm() {
     if [[ ! -d "$HOME/.nvm" ]]; then
         curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
     else
-        echo "[configure-deps] NVM is already installed, skipping download"
+        echo "[configure-deps] NVM is already installed, skipping download" >&2
     fi
 
     # Source NVM to make it available in the current shell
@@ -193,7 +193,7 @@ install_nvm() {
     current_version="$(nvm current 2>/dev/null)" || true
 
     if [[ -n "$lts_version" && "$current_version" == "$lts_version" ]]; then
-        echo "[configure-deps] Node.js LTS $lts_version is already installed, skipping"
+        echo "[configure-deps] Node.js LTS $lts_version is already installed, skipping" >&2
     else
         nvm install --lts
     fi
@@ -209,7 +209,7 @@ install_pyenv() {
     if [[ ! -d "$HOME/.pyenv" ]]; then
         curl https://pyenv.run | bash
     else
-        echo "[configure-deps] pyenv is already installed, skipping clone"
+        echo "[configure-deps] pyenv is already installed, skipping clone" >&2
     fi
 
     # Source pyenv to make it available in the current shell
@@ -223,7 +223,7 @@ install_pyenv() {
       libncursesw5-dev xz-utils tk-dev libxml2-dev libxmlsec1-dev libffi-dev liblzma-dev
 
     if pyenv versions --bare 2>/dev/null | grep -qx "$python_version"; then
-        echo "[configure-deps] Python $python_version is already installed, skipping build"
+        echo "[configure-deps] Python $python_version is already installed, skipping build" >&2
     else
         pyenv install "$python_version"
     fi
@@ -236,7 +236,7 @@ install_pyenv() {
 # https://cursor.com/docs/cli/installation
 install_cursor_cli() {
     if command -v agent &>/dev/null; then
-        echo "[configure-deps] Cursor CLI is already installed, skipping"
+        echo "[configure-deps] Cursor CLI is already installed, skipping" >&2
         return
     fi
     curl https://cursor.com/install -fsSL | bash
@@ -245,7 +245,7 @@ install_cursor_cli() {
 # https://github.com/anthropics/claude-code
 install_claude_cli() {
     if command -v claude &>/dev/null; then
-        echo "[configure-deps] Claude CLI is already installed, skipping"
+        echo "[configure-deps] Claude CLI is already installed, skipping" >&2
         return
     fi
     npm install -g @anthropic-ai/claude-code
@@ -254,7 +254,7 @@ install_claude_cli() {
 # https://github.com/google-gemini/gemini-cli
 install_gemini_cli() {
     if command -v gemini &>/dev/null; then
-        echo "[configure-deps] Gemini CLI is already installed, skipping"
+        echo "[configure-deps] Gemini CLI is already installed, skipping" >&2
         return
     fi
     npm install -g @google/gemini-cli
@@ -263,7 +263,7 @@ install_gemini_cli() {
 # https://github.com/rios0rios0/devforge
 install_devforge() {
     if command -v dev &>/dev/null; then
-        echo "[configure-deps] devforge is already installed, skipping"
+        echo "[configure-deps] devforge is already installed, skipping" >&2
         return
     fi
 
@@ -287,7 +287,7 @@ install_devforge() {
 # https://cli.github.com/manual/installation
 install_github_cli() {
     if command -v gh &>/dev/null; then
-        echo "[configure-deps] GitHub CLI is already installed, skipping"
+        echo "[configure-deps] GitHub CLI is already installed, skipping" >&2
         return
     fi
 
@@ -308,7 +308,7 @@ install_azure_cli() {
     eval "$(pyenv init -)"
 
     if pip show azure-cli &>/dev/null; then
-        echo "[configure-deps] azure-cli is already installed, skipping"
+        echo "[configure-deps] azure-cli is already installed, skipping" >&2
         return
     fi
 
@@ -319,7 +319,7 @@ install_azure_cli() {
 # https://www.speedtest.net/apps/cli
 install_speedtest_cli() {
     if command -v speedtest &>/dev/null; then
-        echo "[configure-deps] speedtest is already installed, skipping"
+        echo "[configure-deps] speedtest is already installed, skipping" >&2
         return
     fi
 

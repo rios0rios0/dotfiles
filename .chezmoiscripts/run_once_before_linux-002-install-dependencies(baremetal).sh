@@ -48,7 +48,7 @@ sudo apt install --no-install-recommends --yes "${desktop_apps[@]}"
 # Genymotion - Android emulator (https://www.genymotion.com/product-desktop/download/)
 install_genymotion() {
     if [[ -d /opt/genymotion ]]; then
-        echo "[configure-deps] Genymotion is already installed, skipping"
+        echo "[configure-deps] Genymotion is already installed, skipping" >&2
         return
     fi
 
@@ -66,7 +66,7 @@ install_genymotion() {
 # Reactotron - React/React Native debugging tool (https://github.com/infinitered/reactotron)
 install_reactotron() {
     if dpkg -l reactotron-app &>/dev/null; then
-        echo "[configure-deps] Reactotron is already installed, skipping"
+        echo "[configure-deps] Reactotron is already installed, skipping" >&2
         return
     fi
 
@@ -88,7 +88,7 @@ install_reactotron() {
 # R-Linux 5 - data recovery tool (https://www.r-studio.com/free-linux-recovery/)
 install_rlinux() {
     if dpkg -l rlinux &>/dev/null; then
-        echo "[configure-deps] R-Linux is already installed, skipping"
+        echo "[configure-deps] R-Linux is already installed, skipping" >&2
         return
     fi
 
@@ -104,7 +104,7 @@ install_rlinux() {
 # Slack - team communication (https://slack.com/downloads/linux)
 install_slack() {
     if dpkg -l slack-desktop &>/dev/null; then
-        echo "[configure-deps] Slack is already installed, skipping"
+        echo "[configure-deps] Slack is already installed, skipping" >&2
         return
     fi
 
@@ -122,7 +122,7 @@ install_slack() {
 # VirtualBox (https://www.virtualbox.org/wiki/Linux_Downloads)
 install_virtualbox() {
     if dpkg -l virtualbox-7.1 &>/dev/null; then
-        echo "[configure-deps] VirtualBox is already installed, skipping"
+        echo "[configure-deps] VirtualBox is already installed, skipping" >&2
         return
     fi
 

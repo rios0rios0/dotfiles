@@ -136,5 +136,5 @@ $env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";
 if (-not (Get-Command gemini -ErrorAction SilentlyContinue)) {
     npm install -g @google/gemini-cli
 } else {
-    Write-Host "Gemini CLI is already installed..."
+    Write-Host "[install-deps] Gemini CLI is already installed, skipping"
 }
