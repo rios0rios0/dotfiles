@@ -305,6 +305,44 @@ install_github_cli() {
     sudo apt update && sudo apt install --no-install-recommends --yes gh
 }
 
+# https://docs.aws.amazon.com/cli/latest/userguide/getting-started-install.html
+install_aws_cli() {
+    if command -v aws &>/dev/null && aws --version 2>&1 | grep -q "aws-cli/2\."; then
+        echo "[configure-deps] AWS CLI v2 is already installed, skipping" >&2
+        return
+    fi
+
+    local arch
+    case "$(uname -m)" in
+        x86_64)          arch="x86_64"  ;;
+        aarch64 | arm64) arch="aarch64" ;;
+        *)
+            echo "[aws-cli] ERROR: unsupported architecture: $(uname -m)" >&2
+            return 1
+            ;;
+    esac
+
+    (
+        tmpDir="$(mktemp -d)" || {
+            echo "[aws-cli] ERROR: failed to create temporary directory" >&2
+            exit 1
+        }
+
+        trap 'rm -rf "$tmpDir"' EXIT
+        cd "$tmpDir" || exit 1
+
+        curl -fsSL "https://awscli.amazonaws.com/awscli-exe-linux-${arch}.zip" -o awscliv2.zip
+        unzip -q awscliv2.zip
+
+        # Use --update when a previous install is present so the script is idempotent.
+        local args=()
+        if [ -d /usr/local/aws-cli ]; then
+            args=(--bin-dir /usr/local/bin --install-dir /usr/local/aws-cli --update)
+        fi
+        sudo ./aws/install "${args[@]}"
+    )
+}
+
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
     # Ensure pip is available from pyenv's Python
@@ -380,6 +418,7 @@ install_gemini_cli
 install_devforge
 
 install_github_cli
+install_aws_cli
 install_azure_cli
 
 install_ggshield

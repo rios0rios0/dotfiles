@@ -23,6 +23,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - added `run_after_linux-004-install-ggshield-hook.sh` to (re)generate the shared ggshield hook script on every apply
 - added `dot_config/ggshield/auth_config.yaml.tmpl` rendering the ggshield auth config from 1Password item `Token: ggshield` (fields: `token`, `token name`, `workspace id`)
 - added PostgreSQL client (`psql`) to Linux (`postgresql-client`) and Android/Termux (`postgresql`, which bundles server + client since Termux doesn't split them) dependency installers
+- added AWS CLI v2 installation to Linux (official `awscli-exe-linux-${arch}.zip` bundle, idempotent via `--update` when `/usr/local/aws-cli` exists) and Android/Termux (source build from the `v2` branch of `aws/aws-cli`, since Termux's bionic libc can't run the glibc-linked official bundle); added `cmake` to Android/Termux deps for `awscrt` C-extension compilation; temporary source/build directories are cleaned up after install
 
 ### Changed
 

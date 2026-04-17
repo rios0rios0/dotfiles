@@ -30,6 +30,7 @@ requirements=(
     "proot"             # needed to run binaries with Termux DNS
     "proot-distro"      # needed to control proot capabilities selecting a distro
     "clang"             # required to build termux-etc-redirect
+    "cmake"             # required to build AWS CLI's `awscrt` C extension from source
     "file"              # it's for determining file types
 )
 apt install --no-install-recommends --yes "${requirements[@]}"
@@ -338,6 +339,41 @@ install_golangci_lint() {
     fi
 }
 
+# https://github.com/aws/aws-cli/tree/v2
+# Termux can't use the official aws-cli aarch64 bundle (glibc-linked; Termux is bionic),
+# so we build from source. `cmake`, `rust`, `clang`, and `make` in the deps above provide
+# the toolchain needed to compile `awscrt`.
+install_aws_cli() {
+    if ! command_exists pip; then
+        echo "Install 'pip' first, it seems to be NOT installed..."
+
+        return;
+    fi
+
+    if command_exists aws && aws --version 2>&1 | grep -q "aws-cli/2\."; then
+        echo "AWS CLI v2 is already installed."
+        return
+    fi
+
+    echo "[aws-cli] building AWS CLI v2 from source (10-15 min on ARM64)..." >&2
+
+    (
+        tmpDir="$(mktemp -d)" || {
+            echo "[aws-cli] ERROR: failed to create temporary directory" >&2
+            exit 1
+        }
+
+        trap 'rm -rf "$tmpDir"' EXIT
+        cd "$tmpDir" || exit 1
+
+        git clone --depth 1 -b v2 https://github.com/aws/aws-cli.git
+        cd aws-cli || exit 1
+
+        pip install --upgrade pip
+        pip install .
+    )
+}
+
 # https://pypi.org/project/azure-cli/
 install_azure_cli() {
     if ! command_exists pip; then
@@ -382,6 +418,7 @@ install_1password_cli
 install_github_cli
 install_github_copilot
 install_golangci_lint
+install_aws_cli
 install_azure_cli
 
 # =========================================================================================================
