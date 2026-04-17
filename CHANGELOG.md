@@ -38,6 +38,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Fixed
 
+- fixed `install_azure_cli` on Android/Termux skipping installation forever when `~/.azure` existed but `azure-cli` wasn't installed (e.g., left over from a prior uninstall); guard now checks `pip show azure-cli`, matching the Linux installer
 - fixed `apt install` batch failure on Android/Termux by removing `binutils` / `binutils-is-llvm` from the Android requirements; both conflict with `lld`/`llvm` (pulled in by `clang`), and `clang` + `lld` + `llvm` already provide `ld.lld` / `llvm-ar` / `llvm-nm` / `llvm-strip`, which is everything native pip wheels need
 - fixed `dot_docker/config.json.tmpl` printing `%!s(<nil>)` when a Docker item lacks the `registry name` field; template now falls back to the 1Password item title
 - fixed `dot_docker/config.json.tmpl` emitting an `identitytoken`-only entry with no `auth` (Docker requires both); template now defaults username to the ACR identity-token UUID and always emits `auth` alongside `identitytoken`

@@ -346,15 +346,17 @@ install_azure_cli() {
         return;
     fi
 
-    azPath="$HOME/.azure"
-
-    if [ ! -d "$azPath" ]; then
-        # TODO: when installed via Pyenv it should be loaded first on the current shell
-        pip install azure-cli
-        az extension add --name azure-devops
-    else
+    # Check the actual package, not `~/.azure`: that directory is created by `az`
+    # at runtime for config/profile storage and can exist without azure-cli installed
+    # (e.g., left over from a prior uninstall), causing the install to be skipped forever.
+    if pip show azure-cli &>/dev/null; then
         echo "AZ is already installed."
+        return
     fi
+
+    # TODO: when installed via Pyenv it should be loaded first on the current shell
+    pip install azure-cli
+    az extension add --name azure-devops
 }
 
 install_oh_my_zsh
