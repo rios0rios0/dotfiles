@@ -16,6 +16,15 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- set `AWS_CRT_BUILD_USE_SYSTEM_LIBCRYPTO=1 PIP_NO_BINARY=awscrt` on the Android/Termux AWS CLI v2 build so `awscrt` links against Termux's OpenSSL 3.x instead of its bundled libcrypto that still references the removed `FIPS_mode` symbol (fixes `ImportError: cannot locate symbol "FIPS_mode"` when loading `_awscrt.abi3.so`)
+
+### Fixed
+
+- fixed `install_azure_cli` on Android/Termux failing with `platform android is not supported` when building `psutil`; the function now pre-installs a patched `psutil 7.2.2` (same `_common.py` one-liner used by `termux-packages` PR #28780 for the upcoming `python-psutil` port) so pip sees the constraint already satisfied when resolving the `azure-cli` dependency tree
+- fixed `install_azure_cli` on Android/Termux failing to build `PyNaCl` (bundled libsodium `make` errors on Android); the `pip install azure-cli` call now runs with `SODIUM_INSTALL=system` so `PyNaCl` links against Termux's `libsodium` apt package instead of its bundled copy
+
 ## [0.8.0] - 2026-04-17
 
 ### Added
