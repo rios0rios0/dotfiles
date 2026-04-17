@@ -16,34 +16,38 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.8.0] - 2026-04-17
+
 ### Added
 
-- added `ggshield` (GitGuardian CLI) installation to Linux dependencies via pipx
-- added global ggshield pre-commit hook on Linux via `core.hooksPath` in `dot_gitconfig.tmpl`, covering all existing and future repositories without per-repo setup
-- added `run_after_linux-004-install-ggshield-hook.sh` to (re)generate the shared ggshield hook script on every apply
 - added `dot_config/ggshield/auth_config.yaml.tmpl` rendering the ggshield auth config from 1Password item `Token: ggshield` (fields: `token`, `token name`, `workspace id`)
-- added PostgreSQL client (`psql`) to Linux (`postgresql-client`) and Android/Termux (`postgresql`, which bundles server + client since Termux doesn't split them) dependency installers
+- added `ggshield` (GitGuardian CLI) installation to Linux dependencies via pipx
+- added `kubectl krew upgrade` step to `install_krew` in `run_once_before_linux-002-install-dependencies.sh` so krew and its plugins auto-upgrade on every install run
+- added `run_after_linux-004-install-ggshield-hook.sh` to (re)generate the shared ggshield hook script on every apply
+- added `shellcheck` to Linux (`apt`), Android/Termux (`apt`) and Windows (`winget koalaman.shellcheck`) dependency installers so `make lint` works out of the box
 - added AWS CLI v2 installation to Linux (official `awscli-exe-linux-${arch}.zip` bundle, idempotent via `--update` when `/usr/local/aws-cli` exists) and Android/Termux (source build from the `v2` branch of `aws/aws-cli`, since Termux's bionic libc can't run the glibc-linked official bundle); added `cmake` to Android/Termux deps for `awscrt` C-extension compilation; temporary source/build directories are cleaned up after install
+- added global ggshield pre-commit hook on Linux via `core.hooksPath` in `dot_gitconfig.tmpl`, covering all existing and future repositories without per-repo setup
+- added PostgreSQL client (`psql`) to Linux (`postgresql-client`) and Android/Termux (`postgresql`, which bundles server + client since Termux doesn't split them) dependency installers
 
 ### Changed
 
 - changed 1Password organization from type-centric "Active *" notes to device-centric "Device: \<name\>" notes
-- refactored `linux-engineering-op-loader.sh` to read credentials and workspaces from device note fields instead of separate items in the Private vault
 - moved Docker registries from standalone "Active Docker Registries" note to per-device `docker:` entries in device notes
-- updated CI test fixtures to match new device-centric 1Password structure
-
+- refactored `linux-engineering-op-loader.sh` to read credentials and workspaces from device note fields instead of separate items in the Private vault
 - refreshed encrypted `encrypted_dot_npmrc.age` with current home `~/.npmrc`
-- added `kubectl krew upgrade` step to `install_krew` in `run_once_before_linux-002-install-dependencies.sh` so krew and its plugins auto-upgrade on every install run
-- added `shellcheck` to Linux (`apt`), Android/Termux (`apt`) and Windows (`winget koalaman.shellcheck`) dependency installers so `make lint` works out of the box
-- removed Azure Container Registry entries (`docker:Azure Container Registry (dev)` / `(prod)`) from device notes and archived the two backing 1Password items; ACR login now managed ad-hoc via `az acr login`
+- updated CI test fixtures to match new device-centric 1Password structure
 
 ### Fixed
 
-- fixed `install_azure_cli` on Android/Termux skipping installation forever when `~/.azure` existed but `azure-cli` wasn't installed (e.g., left over from a prior uninstall); guard now checks `pip show azure-cli`, matching the Linux installer
 - fixed `apt install` batch failure on Android/Termux by removing `binutils` / `binutils-is-llvm` from the Android requirements; both conflict with `lld`/`llvm` (pulled in by `clang`), and `clang` + `lld` + `llvm` already provide `ld.lld` / `llvm-ar` / `llvm-nm` / `llvm-strip`, which is everything native pip wheels need
-- fixed `dot_docker/config.json.tmpl` printing `%!s(<nil>)` when a Docker item lacks the `registry name` field; template now falls back to the 1Password item title
 - fixed `dot_docker/config.json.tmpl` emitting an `identitytoken`-only entry with no `auth` (Docker requires both); template now defaults username to the ACR identity-token UUID and always emits `auth` alongside `identitytoken`
+- fixed `dot_docker/config.json.tmpl` printing `%!s(<nil>)` when a Docker item lacks the `registry name` field; template now falls back to the 1Password item title
+- fixed `install_azure_cli` on Android/Termux skipping installation forever when `~/.azure` existed but `azure-cli` wasn't installed (e.g., left over from a prior uninstall); guard now checks `pip show azure-cli`, matching the Linux installer
 - fixed `linux-engineering-shell-credentials.sh` and `linux-engineering-workspace-aliases.sh` skipping the cache write when the env var or alias was already set, leaving `~/.cache/op-credentials.env` empty (deleted at end of script) and forcing every new shell to re-query 1Password; cache is now always written so subsequent shells short-circuit via the 24h TTL check
+
+### Removed
+
+- removed Azure Container Registry entries (`docker:Azure Container Registry (dev)` / `(prod)`) from device notes and archived the two backing 1Password items; ACR login now managed ad-hoc via `az acr login`
 
 ## [0.7.0] - 2026-04-14
 
