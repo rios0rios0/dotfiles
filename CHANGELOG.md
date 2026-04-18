@@ -18,7 +18,15 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Added
 
+- added `dot_gitmessage` (conventional-commits scaffold migrated from the legacy `WKSetup` repo) and wired `commit.template = ~/.gitmessage` in `dot_gitconfig.tmpl`
+- added staged JetBrains theme assets under `dot_local/share/jetbrains-themes/` (`Darcula Coder.icls`, `Dark Coder.icls`, `Coder.xml` code style, `Dark Coder.xml` Material Theme UI variant) migrated from the legacy `WKSetup` repo
+- added `run_after_linux-005-install-jetbrains-themes.sh` and `run_after_windows-004-install-jetbrains-themes.ps1` to fan the staged themes out into every detected JetBrains IDE config directory (`~/.config/JetBrains/*/` on Linux, `%APPDATA%\JetBrains\*\` on Windows) into `colors/`, `codestyles/`, and `materialCustomThemes/`
+- added `rec` alias for `asciinema rec` in `dot_zshrc.tmpl` (matches the shorthand from the legacy `WKSetup` repo)
 - set `AWS_CRT_BUILD_USE_SYSTEM_LIBCRYPTO=1 PIP_NO_BINARY=awscrt` on the Android/Termux AWS CLI v2 build so `awscrt` links against Termux's OpenSSL 3.x instead of its bundled libcrypto that still references the removed `FIPS_mode` symbol (fixes `ImportError: cannot locate symbol "FIPS_mode"` when loading `_awscrt.abi3.so`)
+
+### Changed
+
+- replaced the stale `PYTHONPATH=$TOOLS_DIR/asciinema python -m asciinema …` `record`/`play` aliases in `dot_zshrc.tmpl` with direct `asciinema rec` / `asciinema play` invocations (asciinema is now installed as a first-class dependency via `apt`/`pipx`)
 
 ### Fixed
 
