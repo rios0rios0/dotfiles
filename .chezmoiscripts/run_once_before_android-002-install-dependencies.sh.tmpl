@@ -370,7 +370,11 @@ install_aws_cli() {
         cd aws-cli || exit 1
 
         pip install --upgrade pip
-        pip install .
+
+        # `awscrt` bundles a libcrypto that still calls `FIPS_mode` — removed in OpenSSL 3.x,
+        # which is what Termux ships (3.6+). Link against the system libcrypto and force a
+        # source build so the wheel cached under the `android_*` platform tag is regenerated.
+        AWS_CRT_BUILD_USE_SYSTEM_LIBCRYPTO=1 PIP_NO_BINARY=awscrt pip install .
     )
 }
 
@@ -390,8 +394,46 @@ install_azure_cli() {
         return
     fi
 
+    # Python 3.13 on Termux reports `sys.platform == "android"`, which psutil's setup.py
+    # rejects with "platform android is not supported". Pre-install a patched copy (the
+    # same one-line _common.py fix from termux-packages PR #28780) so pip sees psutil>=5.9
+    # already satisfied when resolving `azure-cli` dependencies. Reinstall the patched
+    # version when psutil is missing or does not match the intended release, otherwise
+    # pip may still attempt to resolve/upgrade psutil and hit the same Android refusal.
+    local psutilVer="7.2.2"
+    local installedPsutilVer=""
+    if pip show psutil &>/dev/null; then
+        installedPsutilVer="$(pip show psutil 2>/dev/null | sed -n 's/^Version: //p' | head -n1)"
+    fi
+
+    if [ "$installedPsutilVer" != "$psutilVer" ]; then
+        (
+            psutilDir="$(mktemp -d)" || {
+                echo "[azure-cli] ERROR: failed to create psutil build dir" >&2
+                exit 1
+            }
+
+            trap 'rm -rf "$psutilDir"' EXIT
+            cd "$psutilDir" || exit 1
+
+            curl -fsSL "https://github.com/giampaolo/psutil/archive/refs/tags/release-${psutilVer}.tar.gz" -o psutil.tar.gz
+            tar -xzf psutil.tar.gz
+            cd "psutil-release-${psutilVer}" || exit 1
+
+            sed -i 's|sys.platform.startswith("linux")|sys.platform.startswith(("linux", "android"))|' psutil/_common.py
+            if ! grep -Fq 'sys.platform.startswith(("linux", "android"))' psutil/_common.py; then
+                echo "[azure-cli] ERROR: failed to patch psutil/_common.py for Android; upstream source no longer matches the expected linux-only platform check" >&2
+                exit 1
+            fi
+            pip install .
+        )
+    fi
+
+    # PyNaCl's bundled libsodium `make` invocation fails on Termux. Termux ships
+    # `libsodium` in apt (see deps above); SODIUM_INSTALL=system links against it
+    # instead, and pip propagates the env var into its build-isolation subprocess.
     # TODO: when installed via Pyenv it should be loaded first on the current shell
-    pip install azure-cli
+    SODIUM_INSTALL=system pip install azure-cli
     az extension add --name azure-devops
 }
 
