@@ -1,4 +1,4 @@
-# Fans out the staged JetBrains themes under %LOCALAPPDATA%\share\jetbrains-themes\ into
+# Fans out the staged JetBrains themes under $HOME\.local\share\jetbrains-themes\ into
 # every detected JetBrains IDE config directory at $env:APPDATA\JetBrains\<Product><Version>\.
 # Idempotent: safe to run on every chezmoi apply.
 
