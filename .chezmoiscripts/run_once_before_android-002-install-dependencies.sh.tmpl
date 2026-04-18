@@ -397,9 +397,16 @@ install_azure_cli() {
     # Python 3.13 on Termux reports `sys.platform == "android"`, which psutil's setup.py
     # rejects with "platform android is not supported". Pre-install a patched copy (the
     # same one-line _common.py fix from termux-packages PR #28780) so pip sees psutil>=5.9
-    # already satisfied when resolving `azure-cli` dependencies.
-    if ! pip show psutil &>/dev/null; then
-        local psutilVer="7.2.2"
+    # already satisfied when resolving `azure-cli` dependencies. Reinstall the patched
+    # version when psutil is missing or does not match the intended release, otherwise
+    # pip may still attempt to resolve/upgrade psutil and hit the same Android refusal.
+    local psutilVer="7.2.2"
+    local installedPsutilVer=""
+    if pip show psutil &>/dev/null; then
+        installedPsutilVer="$(pip show psutil 2>/dev/null | sed -n 's/^Version: //p' | head -n1)"
+    fi
+
+    if [ "$installedPsutilVer" != "$psutilVer" ]; then
         (
             psutilDir="$(mktemp -d)" || {
                 echo "[azure-cli] ERROR: failed to create psutil build dir" >&2
@@ -414,6 +421,10 @@ install_azure_cli() {
             cd "psutil-release-${psutilVer}" || exit 1
 
             sed -i 's|sys.platform.startswith("linux")|sys.platform.startswith(("linux", "android"))|' psutil/_common.py
+            if ! grep -Fq 'sys.platform.startswith(("linux", "android"))' psutil/_common.py; then
+                echo "[azure-cli] ERROR: failed to patch psutil/_common.py for Android; upstream source no longer matches the expected linux-only platform check" >&2
+                exit 1
+            fi
             pip install .
         )
     fi
