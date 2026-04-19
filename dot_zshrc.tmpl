@@ -187,13 +187,16 @@ send() {
     echo "[send] ERROR: rclone remote 'onedrive' is not configured (run: rclone config)" >&2
     return 1
   fi
-  local target base dest
+  local target trimmed base dest
   for target in "$@"; do
     if [ ! -e "$target" ]; then
       echo "[send] ERROR: not found: $target" >&2
       return 1
     fi
-    base="${target:t}"
+    # strip a trailing slash so `send mydir/` still yields a non-empty basename via ${:t}
+    trimmed="${target%/}"
+    [ -z "$trimmed" ] && trimmed="$target"
+    base="${trimmed:t}"
     if [ -d "$target" ]; then
       dest="onedrive:Downloads/$base/"
     else
