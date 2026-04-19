@@ -172,6 +172,44 @@ fi
 
 {{- if eq .chezmoi.os "android" }}
 alias top5size='du -hs * | sort -rh | head -5'
+
+# upload file(s)/dir(s) to the OneDrive "Downloads" folder via rclone (see .docs/rclone-onedrive-setup.md)
+send() {
+  if [ $# -eq 0 ]; then
+    echo "[send] ERROR: usage: send <file|dir> [file|dir ...]" >&2
+    return 1
+  fi
+  if ! command -v rclone >/dev/null 2>&1; then
+    echo "[send] ERROR: rclone is not installed" >&2
+    return 1
+  fi
+  if ! rclone listremotes 2>/dev/null | grep -q '^onedrive:$'; then
+    echo "[send] ERROR: rclone remote 'onedrive' is not configured (run: rclone config)" >&2
+    return 1
+  fi
+  local target trimmed base dest
+  for target in "$@"; do
+    if [ ! -e "$target" ]; then
+      echo "[send] ERROR: not found: $target" >&2
+      return 1
+    fi
+    # strip a trailing slash so `send mydir/` still yields a non-empty basename via ${:t}
+    trimmed="${target%/}"
+    [ -z "$trimmed" ] && trimmed="$target"
+    base="${trimmed:t}"
+    if [ -d "$target" ]; then
+      dest="onedrive:Downloads/$base/"
+    else
+      dest="onedrive:Downloads/"
+    fi
+    echo "[send] uploading: $target -> $dest" >&2
+    if ! rclone copy "$target" "$dest" --progress; then
+      echo "[send] ERROR: upload failed for $target" >&2
+      return 1
+    fi
+  done
+  echo "[send] done" >&2
+}
 {{- else }}
 alias top5size='sudo du -hs * | sort -rh | head -5'
 {{- end }}
