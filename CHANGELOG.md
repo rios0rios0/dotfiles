@@ -16,6 +16,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.10.0] - 2026-04-20
+
 ### Added
 
 - added `clang` to the Linux/WSL core requirements in `run_once_before_linux-002-install-dependencies.sh` so toolchains that prefer it over `gcc` (Go/Rust/C) have a compiler available
