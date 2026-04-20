@@ -16,6 +16,14 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added `clang` to the Linux/WSL core requirements in `run_once_before_linux-002-install-dependencies.sh` so toolchains that prefer it over `gcc` (Go/Rust/C) have a compiler available
+
+### Changed
+
+- changed `install_gvm` in `run_once_before_linux-002-install-dependencies.sh` to resolve the latest stable Go version from `https://go.dev/VERSION?m=text` on every run instead of hardcoding `go1.25.5`
+
 ## [0.9.0] - 2026-04-19
 
 ### Added

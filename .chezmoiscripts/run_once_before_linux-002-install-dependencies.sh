@@ -20,6 +20,7 @@ requirements=(
     "binutils"      # required by GVM (Go Version Manager)
     "bison"         # required by GVM (Go Version Manager)
     "gcc"           # required for many things and GVM
+    "clang"         # required by some Go/Rust/C toolchains as an alternative to gcc
     "make"          # required for many things and GVM
 )
 sudo apt install --no-install-recommends --yes "${requirements[@]}"
@@ -68,7 +69,15 @@ install_oh_my_zsh() {
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
-    local go_version="go1.25.5"
+    # Query the latest stable Go release from the official endpoint.
+    # https://go.dev/VERSION?m=text returns a body whose first line is "goX.Y.Z".
+    local go_version
+    go_version="$(curl -fsSL https://go.dev/VERSION?m=text 2>/dev/null | head -n1 | tr -d '[:space:]')" || true
+    if [[ -z "$go_version" || "$go_version" != go* ]]; then
+        echo "[configure-deps] ERROR: failed to resolve latest Go version from https://go.dev/VERSION?m=text" >&2
+        return 1
+    fi
+    echo "[configure-deps] latest Go version resolved: $go_version" >&2
 
     if [[ ! -d "$HOME/.gvm" ]]; then
         bash < <(curl -s -S -L https://raw.githubusercontent.com/moovweb/gvm/master/binscripts/gvm-installer)
