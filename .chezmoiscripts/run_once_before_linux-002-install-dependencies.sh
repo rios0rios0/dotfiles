@@ -412,7 +412,7 @@ install_oh_my_zsh
 # change the default shell to zsh so that new terminal sessions start in zsh
 # sudo usermod is used to avoid an interactive password prompt from chsh
 sudo usermod --shell "$(which zsh)" "$USER"
-install_gvm
+install_gvm || exit 1
 install_kubectl
 install_krew
 install_terraform
