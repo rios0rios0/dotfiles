@@ -16,13 +16,15 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.9.0] - 2026-04-19
+
 ### Added
 
 - added `dot_gitmessage` (conventional-commits scaffold migrated from the legacy `WKSetup` repo) and wired `commit.template = ~/.gitmessage` in `dot_gitconfig.tmpl`
-- added staged JetBrains theme assets under `dot_local/share/jetbrains-themes/` (`Darcula Coder.icls`, `Dark Coder.icls`, `Coder.xml` code style, `Dark Coder.xml` Material Theme UI variant) migrated from the legacy `WKSetup` repo
-- added `run_after_linux-005-install-jetbrains-themes.sh` and `run_after_windows-004-install-jetbrains-themes.ps1` to fan the staged themes out into every detected JetBrains IDE config directory (`~/.config/JetBrains/*/` on Linux, `%APPDATA%\JetBrains\*\` on Windows) into `colors/`, `codestyles/`, and `materialCustomThemes/`
 - added `rec` alias for `asciinema rec` in `dot_zshrc.tmpl` (matches the shorthand from the legacy `WKSetup` repo)
+- added `run_after_linux-005-install-jetbrains-themes.sh` and `run_after_windows-004-install-jetbrains-themes.ps1` to fan the staged themes out into every detected JetBrains IDE config directory (`~/.config/JetBrains/*/` on Linux, `%APPDATA%\JetBrains\*\` on Windows) into `colors/`, `codestyles/`, and `materialCustomThemes/`
 - added `send` zsh function in `dot_zshrc.tmpl` (Android/Termux-only) that uploads files and directories to the OneDrive `Downloads/` folder via rclone; directories preserve their basename in the destination, and the function guards against missing rclone or an unconfigured `onedrive:` remote
+- added staged JetBrains theme assets under `dot_local/share/jetbrains-themes/` (`Darcula Coder.icls`, `Dark Coder.icls`, `Coder.xml` code style, `Dark Coder.xml` Material Theme UI variant) migrated from the legacy `WKSetup` repo
 - set `AWS_CRT_BUILD_USE_SYSTEM_LIBCRYPTO=1 PIP_NO_BINARY=awscrt` on the Android/Termux AWS CLI v2 build so `awscrt` links against Termux's OpenSSL 3.x instead of its bundled libcrypto that still references the removed `FIPS_mode` symbol (fixes `ImportError: cannot locate symbol "FIPS_mode"` when loading `_awscrt.abi3.so`)
 
 ### Changed
@@ -31,8 +33,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Fixed
 
-- fixed `install_azure_cli` on Android/Termux failing with `platform android is not supported` when building `psutil`; the function now pre-installs a patched `psutil 7.2.2` (same `_common.py` one-liner used by `termux-packages` PR #28780 for the upcoming `python-psutil` port) so pip sees the constraint already satisfied when resolving the `azure-cli` dependency tree
 - fixed `install_azure_cli` on Android/Termux failing to build `PyNaCl` (bundled libsodium `make` errors on Android); the `pip install azure-cli` call now runs with `SODIUM_INSTALL=system` so `PyNaCl` links against Termux's `libsodium` apt package instead of its bundled copy
+- fixed `install_azure_cli` on Android/Termux failing with `platform android is not supported` when building `psutil`; the function now pre-installs a patched `psutil 7.2.2` (same `_common.py` one-liner used by `termux-packages` PR #28780 for the upcoming `python-psutil` port) so pip sees the constraint already satisfied when resolving the `azure-cli` dependency tree
 
 ## [0.8.0] - 2026-04-17
 
