@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Fixed
+
+- fixed `terragrunt hcl format` and any other `terragrunt`/`terraform` call from `terra`, scripts, or non-aliased shells crashing with `SIGSYS` on Android/Termux — Go's `os/exec.LookPath` issues `faccessat2` which hits Android's seccomp trap before `termux-etc-seccomp`'s ptrace layer can rewrite it to `-ENOSYS` when the binary is invoked bare (the `terragruntw`/`terraformw` aliases only cover interactive shell use, not `exec.Command`); new `run_after_android-003-wrap-terra-clis.sh` idempotently renames `~/.local/bin/{terragrunt,terraform}` to `*_raw` and replaces them with shell wrappers that `exec termux-etc-seccomp` against the raw binary, and re-runs on every `chezmoi apply` so `terra update` overwrites are re-wrapped automatically
+
 ## [0.10.0] - 2026-04-20
 
 ### Added
