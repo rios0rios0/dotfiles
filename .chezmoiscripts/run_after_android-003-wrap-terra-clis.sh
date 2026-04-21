@@ -12,9 +12,10 @@
 # every `chezmoi apply`. `terra update` periodically refreshes these binaries
 # and would otherwise clobber the wrapper script.
 
-set -eu
+set -euo pipefail
 
 BIN_DIR="$HOME/.local/bin"
+mkdir -p "$BIN_DIR"
 
 is_wrapper() {
     [ -f "$1" ] && grep -q 'termux-etc-seccomp' "$1" 2>/dev/null
