@@ -398,6 +398,9 @@ install_ggshield() {
 }
 
 # https://developer.atlassian.com/cloud/acli/guides/install-linux/
+# Atlassian only publishes a rolling `latest` endpoint (no versioned URLs, no checksums/signatures),
+# so pinning or cryptographic verification is not possible upstream; the install tracks the latest
+# stable channel officially recommended by Atlassian.
 install_acli() {
     if command -v acli &>/dev/null; then
         echo "[configure-deps] acli is already installed, skipping" >&2
@@ -424,7 +427,9 @@ install_acli() {
         cd "$tmpDir" || exit 1
 
         curl -fsSL "https://acli.atlassian.com/linux/latest/acli_linux_${arch}.tar.gz" -o acli.tar.gz
-        tar -xzf acli.tar.gz
+        # The archive nests the binary under `acli_<version>-stable_linux_<arch>/acli`,
+        # so strip the versioned top-level directory to extract the binary directly.
+        tar -xzf acli.tar.gz --strip-components=1
         sudo install -m 0755 acli /usr/local/bin/acli
     )
 }

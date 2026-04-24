@@ -340,6 +340,9 @@ install_golangci_lint() {
 }
 
 # https://developer.atlassian.com/cloud/acli/guides/install-linux/
+# Atlassian only publishes a rolling `latest` endpoint (no versioned URLs, no checksums/signatures),
+# so pinning or cryptographic verification is not possible upstream; the install tracks the latest
+# stable channel officially recommended by Atlassian.
 install_acli() {
     binPath="$HOME/.local/bin"
     acliBin="$binPath/acli_linux_arm64"
@@ -355,7 +358,9 @@ install_acli() {
             cd "$tmpDir" || exit 1
 
             wget "https://acli.atlassian.com/linux/latest/acli_linux_arm64.tar.gz" -O acli.tar.gz
-            tar -xzf acli.tar.gz
+            # The archive nests the binary under `acli_<version>-stable_linux_arm64/acli`,
+            # so strip the versioned top-level directory to extract the binary directly.
+            tar -xzf acli.tar.gz --strip-components=1
             mv acli "$acliBin"
             chmod +x "$acliBin"
         )
