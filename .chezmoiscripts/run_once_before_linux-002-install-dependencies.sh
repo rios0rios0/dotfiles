@@ -397,6 +397,43 @@ install_ggshield() {
     fi
 }
 
+# https://developer.atlassian.com/cloud/acli/guides/install-linux/
+# Atlassian only publishes a rolling `latest` endpoint (no versioned URLs, no checksums/signatures),
+# so pinning or cryptographic verification is not possible upstream; the install tracks the latest
+# stable channel officially recommended by Atlassian.
+install_acli() {
+    if command -v acli &>/dev/null; then
+        echo "[configure-deps] acli is already installed, skipping" >&2
+        return
+    fi
+
+    local arch
+    case "$(uname -m)" in
+        x86_64)          arch="amd64" ;;
+        aarch64 | arm64) arch="arm64" ;;
+        *)
+            echo "[acli] ERROR: unsupported architecture: $(uname -m)" >&2
+            return 1
+            ;;
+    esac
+
+    (
+        tmpDir="$(mktemp -d)" || {
+            echo "[acli] ERROR: failed to create temporary directory" >&2
+            exit 1
+        }
+
+        trap 'rm -rf "$tmpDir"' EXIT
+        cd "$tmpDir" || exit 1
+
+        curl -fsSL "https://acli.atlassian.com/linux/latest/acli_linux_${arch}.tar.gz" -o acli.tar.gz
+        # The archive nests the binary under `acli_<version>-stable_linux_<arch>/acli`,
+        # so strip the versioned top-level directory to extract the binary directly.
+        tar -xzf acli.tar.gz --strip-components=1
+        sudo install -m 0755 acli /usr/local/bin/acli
+    )
+}
+
 # https://www.speedtest.net/apps/cli
 install_speedtest_cli() {
     if command -v speedtest &>/dev/null; then
@@ -431,6 +468,8 @@ install_aws_cli
 install_azure_cli
 
 install_ggshield
+
+install_acli
 
 install_speedtest_cli
 # =========================================================================================================
