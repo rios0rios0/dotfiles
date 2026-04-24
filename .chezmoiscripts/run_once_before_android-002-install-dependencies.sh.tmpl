@@ -365,7 +365,7 @@ install_acli() {
             chmod +x "$acliBin"
         )
     else
-        echo "Atlassian CLI is already installed."
+        echo "[acli] acli is already installed, skipping" >&2
     fi
 }
 
