@@ -16,6 +16,11 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added `acli` (Atlassian CLI) install to Linux/WSL via `install_acli` in `run_once_before_linux-002-install-dependencies.sh` (downloads `acli_linux_amd64.tar.gz`/`acli_linux_arm64.tar.gz` from `acli.atlassian.com` and installs to `/usr/local/bin`)
+- added `acli` (Atlassian CLI) install to Android/Termux via `install_acli` in `run_once_before_android-002-install-dependencies.sh.tmpl` (downloads `acli_linux_arm64.tar.gz` into `~/.local/bin/acli_linux_arm64`) plus `run_once_before_android-001d-create-acli-wrapper.sh` that generates a `termux-etc-seccomp` wrapper at `~/.local/bin/acli` so the Go-compiled binary survives Android's seccomp policy
+
 ## [0.10.1] - 2026-04-21
 
 ### Fixed

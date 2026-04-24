@@ -339,6 +339,31 @@ install_golangci_lint() {
     fi
 }
 
+# https://developer.atlassian.com/cloud/acli/guides/install-linux/
+install_acli() {
+    binPath="$HOME/.local/bin"
+    acliBin="$binPath/acli_linux_arm64"
+
+    if [ ! -f "$acliBin" ]; then
+        (
+            tmpDir="$(mktemp -d)" || {
+                echo "[acli] ERROR: failed to create temporary directory" >&2
+                exit 1
+            }
+
+            trap 'rm -rf "$tmpDir"' EXIT
+            cd "$tmpDir" || exit 1
+
+            wget "https://acli.atlassian.com/linux/latest/acli_linux_arm64.tar.gz" -O acli.tar.gz
+            tar -xzf acli.tar.gz
+            mv acli "$acliBin"
+            chmod +x "$acliBin"
+        )
+    else
+        echo "Atlassian CLI is already installed."
+    fi
+}
+
 # https://github.com/aws/aws-cli/tree/v2
 # Termux can't use the official aws-cli aarch64 bundle (glibc-linked; Termux is bionic),
 # so we build from source. `cmake`, `rust`, `clang`, and `make` in the deps above provide
@@ -462,6 +487,7 @@ install_github_copilot
 install_golangci_lint
 install_aws_cli
 install_azure_cli
+install_acli
 
 # =========================================================================================================
 # DNS configuration is handled by termux-etc-redirect's install.sh script,
