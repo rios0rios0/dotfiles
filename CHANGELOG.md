@@ -16,10 +16,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.11.1] - 2026-04-27
+
 ### Changed
 
-- refreshed `CLAUDE.md` to fix `make sast` description (now includes semgrep), add `make test-modify-scripts` target, correct `dot_zshenv` → `dot_zshenv.tmpl`, and update logging prefix list
 - refreshed `.github/copilot-instructions.md` to fix stale GVM version claim, update post-apply scripts list, correct `dot_zshenv` → `dot_zshenv.tmpl`, update `dot_scripts/` listing, and sync logging prefix list
+- refreshed `CLAUDE.md` to fix `make sast` description (now includes semgrep), add `make test-modify-scripts` target, correct `dot_zshenv` → `dot_zshenv.tmpl`, and update logging prefix list
 
 ## [0.11.0] - 2026-04-24
 
