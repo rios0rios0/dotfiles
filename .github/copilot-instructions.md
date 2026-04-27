@@ -67,7 +67,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - Installs system packages: git, curl, zip/unzip, age, gpg, zsh, eza, sqlite3, gcc, make, etc.
 - Installs development tools via dedicated functions:
   - **Oh My Zsh** — default Zsh framework
-  - **GVM** — Go version manager (installs go1.25.5 by default)
+  - **GVM** — Go version manager (resolves and installs the latest stable Go version)
   - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)
   - **Terraform** (HashiCorp apt repository) + **Terragrunt** (v0.76.6)
   - **SDKMAN** — Java/Gradle ecosystem (installs latest Java and Gradle)
@@ -129,13 +129,17 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `run_once_after_linux-001-extract-compressed-folders.sh` — extracts `.tar.gz` archives for `~/.histdb`, `~/.john`, `~/.kube/config-files`, `~/.sqlmap`
 - `run_once_after_linux-002-clone-pentesting-tools.sh` — clones pentesting tools (VHostScan, dirsearch, StegCracker, stegbrute) to `~/Development/Tools/`
 - `run_once_after_windows-001-create-ssh-known-hosts.ps1` — pre-populates `~/.ssh/known_hosts` for GitHub, GitLab, Azure DevOps, Bitbucket (avoids SSH freeze in WSL)
-- `run_after_linux-001-execute-chezmoi-templates.sh` — re-processes `~/.scripts/*-template.sh` files through `chezmoi execute-template`
 - `run_after_linux-002-import-gpg-keys.sh.tmpl` — imports GPG keys from 1Password (device note, `gpg:` entries)
+- `run_after_linux-003-install-ai-rules.sh` — installs AI assistant rule files into project directories
 - `run_after_linux-004-install-ggshield-hook.sh` — (re)generates the ggshield global pre-commit hook script; idempotent
+- `run_after_linux-005-install-jetbrains-themes.sh` — fans staged JetBrains themes into detected IDE config directories
 - `run_after_windows-001-create-ssh-public-keys.ps1.tmpl` — creates SSH public key files from 1Password (device note, `ssh:` entries)
 - `run_after_windows-002-create-ssh-pems.ps1.tmpl` — creates SSH PEM files on Windows (device note, `pem:` entries)
 - `run_after_windows-003-copy-app-data-files.ps1.tmpl` — copies files from `AppData/` in the repo to `~\AppData\` on Windows (directory names use `+` as wildcard for version-specific paths)
 - `run_after_android-001-create-ssh-keys.sh.tmpl` — creates SSH private/public key files from 1Password (device note, `ssh:` entries)
+- `run_after_android-002-install-ai-rules.sh.tmpl` — installs AI assistant rule files (Android)
+- `run_after_android-003-wrap-terra-clis.sh` — wraps terraform/terragrunt binaries with `termux-etc-seccomp` to avoid SIGSYS on Android
+- `run_after_windows-004-install-jetbrains-themes.ps1` — fans staged JetBrains themes into detected IDE config directories (Windows)
 
 #### Manual Validation After Installation
 - Verify shell configuration: `zsh --version` (Linux/Android) or `pwsh --version` (Windows)
@@ -160,7 +164,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 
 ### Key Managed Files
 - `dot_zshrc.tmpl` → `~/.zshrc`: Zsh configuration with ZINIT plugins, version managers, aliases
-- `dot_zshenv` → `~/.zshenv`: PATH setup for all Zsh invocations (critical for IDE integration)
+- `dot_zshenv.tmpl` → `~/.zshenv`: PATH setup for all Zsh invocations (critical for IDE integration)
 - `dot_gitconfig.tmpl` → `~/.gitconfig`: Git config with 1Password SSH/GPG signing, per-device keys
 - `dot_p10k.zsh` → `~/.p10k.zsh`: Powerlevel10k theme configuration
 - `dot_oh-my-posh.json` → `~/.oh-my-posh.json`: Oh My Posh theme (Windows only)
@@ -173,9 +177,11 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 ### Scripts and Automation
 - `.chezmoiscripts/`: All automated setup scripts
 - `dot_scripts/`: User scripts deployed to `~/.scripts/`:
-  - `linux-engineering-version-manager.sh`: Auto-detects `go.mod`/`.nvmrc`/`pyproject.toml` and switches Go/Node/Python versions
+  - `linux-engineering-version-manager.sh`: Pyenv workarounds and `dev-use` shell wrapper for `dev project use`
   - `linux-engineering-detect-kube-config-files.sh`: Auto-loads kubeconfig files from `~/.kube/config-files/`
-  - `linux-engineering-workspace-information-template.sh.tmpl`: Workspace info template (re-processed on every apply)
+  - `linux-engineering-op-loader.sh`: Centralized 1Password credential and workspace loader with 24h TTL cache
+  - `linux-engineering-shell-credentials.sh`: Exports `cred:` fields from 1Password device note as env vars
+  - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note
   - `linux-toolbox-watch-compress-folders.sh`: Background script watching and compressing `~/.histdb`, `~/.john`, etc.
 
 ### Platform Matrix
@@ -404,7 +410,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `op-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `git-sync`, `ggshield-auth`, `ggshield-hook`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ai-rules`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `devforge`, `aws-cli`, `azure-cli`, `golangci-lint`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
