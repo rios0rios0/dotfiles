@@ -13,12 +13,13 @@ The "build" is `chezmoi apply`. A CI pipeline validates templates, scripts, and 
 ```bash
 make lint                           # shellcheck, Go template syntax, Python, PowerShell, YAML/JSON
 make test                           # template rendering (mock op), .chezmoiignore logic, script order
-make sast                           # gitleaks secret detection
+make sast                           # gitleaks + semgrep secret/code scanning
 make lint-shellcheck                # shell scripts only
 make lint-templates                 # Go template syntax only
 make test-template-render           # template rendering with mock 1Password
 make test-chezmoiignore             # platform file inclusion logic
 make test-script-order              # script dependency ordering
+make test-modify-scripts            # modify script (merge) behavior
 ```
 
 ## Essential Commands
@@ -73,9 +74,9 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 - **`.chezmoi.yaml.tmpl`** — Chezmoi config: 1Password and age encryption settings
 - **`dot_gitconfig.tmpl`** — Git config with 1Password SSH signing, per-device SSH keys, platform-specific paths
 - **`dot_zshrc.tmpl`** — Shell config: ZINIT plugins, version managers (GVM/NVM/Pyenv/SDKMAN/Cargo), Docker aliases, Kubernetes tools
-- **`dot_zshenv`** — PATH setup for version managers (critical for IDE integration)
+- **`dot_zshenv.tmpl`** — PATH setup for version managers (critical for IDE integration)
 - **`.chezmoiignore`** — Platform-conditional file exclusion rules
-- **`.chezmoitemplates/`** — Shared template fragments (font installer, username)
+- **`.chezmoitemplates/`** — Shared template fragments (font installer, MCP server merge logic, username)
 
 ## Template Variables
 
@@ -151,7 +152,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `git-sync`, `git-clone`, `ggshield-auth`, `ggshield-hook`, `acli`, `send`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ai-rules`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `devforge`, `aws-cli`, `azure-cli`, `golangci-lint`
 
 ## Important Timing Constraints
 
