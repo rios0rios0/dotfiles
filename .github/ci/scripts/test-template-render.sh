@@ -59,6 +59,34 @@ for tmpl in "${!TEMPLATE_CHECKS[@]}"; do
     echo "[test-template-render] PASS: $tmpl" >&2
 done
 
+# Extra regression checks for dot_ssh/config.tmpl — ensure gist aliases and the
+# port-443 SSH endpoint targets stay in the rendered output (CI runs on Linux,
+# so the github/gist/gitlab/bitbucket blocks render with ProxyCommand pointing
+# at ssh.github.com:443 / altssh.gitlab.com:443 / altssh.bitbucket.org:443).
+ssh_config_file="$REPO_ROOT/dot_ssh/config.tmpl"
+if [ -f "$ssh_config_file" ]; then
+    err_file="$TMPDIR/err-ssh-config-extra"
+    if ssh_output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$ssh_config_file" 2>"$err_file"); then
+        for pattern in \
+            "Host gist\.github\.com-" \
+            "ssh\.github\.com 443" \
+            "altssh\.gitlab\.com 443" \
+            "altssh\.bitbucket\.org 443"
+        do
+            if ! echo "$ssh_output" | grep -qE "$pattern"; then
+                echo "[test-template-render] FAIL: dot_ssh/config.tmpl (expected pattern '$pattern' not found)" >&2
+                EXIT_CODE=1
+            else
+                echo "[test-template-render] PASS: dot_ssh/config.tmpl pattern '$pattern'" >&2
+            fi
+        done
+    else
+        echo "[test-template-render] FAIL: dot_ssh/config.tmpl (extra check execution failed)" >&2
+        cat "$err_file" >&2 || true
+        EXIT_CODE=1
+    fi
+fi
+
 # Test docker config template (must be valid JSON)
 docker_tmpl="$REPO_ROOT/dot_docker/config.json.tmpl"
 if [ -f "$docker_tmpl" ]; then

@@ -12,9 +12,22 @@ New-Item $knownHostsPath -Type File -Force
 # use SSH with StrictHostKeyChecking=accept-new to automatically add host keys without prompting
 # the connection will fail authentication (no key loaded yet) but host keys will be saved to known_hosts
 # this avoids the freeze that occurs when ssh.exe is called via git from WSL and encounters an unknown host
-$gitHosts = @("github.com", "gitlab.com", "ssh.dev.azure.com", "bitbucket.org")
+$gitHosts = @("github.com", "gist.github.com", "gitlab.com", "ssh.dev.azure.com", "bitbucket.org")
 foreach ($gitHost in $gitHosts) {
     Write-Host "[ssh-known-hosts] scanning $gitHost..."
     ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10 -T "git@$gitHost" 2>&1 | Out-Null
 }
-Write-Host "[ssh-known-hosts] known_hosts populated with $($gitHosts.Count) hosts"
+
+# also scan port-443 SSH endpoints: Windows aliases route through these directly (no nc-based fallback like Linux/Android)
+# (ssh.github.com:443 for GitHub repos and gists, altssh.gitlab.com:443 for GitLab, altssh.bitbucket.org:443 for Bitbucket)
+$altGitHosts = @(
+    @{ Host = "ssh.github.com";        Port = 443 },
+    @{ Host = "altssh.gitlab.com";     Port = 443 },
+    @{ Host = "altssh.bitbucket.org";  Port = 443 }
+)
+foreach ($alt in $altGitHosts) {
+    Write-Host "[ssh-known-hosts] scanning $($alt.Host) on port $($alt.Port)..."
+    ssh -o StrictHostKeyChecking=accept-new -o BatchMode=yes -o ConnectTimeout=10 -p $alt.Port -T "git@$($alt.Host)" 2>&1 | Out-Null
+}
+
+Write-Host "[ssh-known-hosts] known_hosts populated with $($gitHosts.Count) hosts plus $($altGitHosts.Count) port-443 endpoints"

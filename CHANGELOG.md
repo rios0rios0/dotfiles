@@ -16,8 +16,15 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added `gist.github.com-{alias}` host blocks to `dot_ssh/config.tmpl` so Gist remotes work alongside GitHub aliases on every device — on Linux/Android the block uses gist's own `HostName gist.github.com` with a `ProxyCommand` (`nc -z -w 5`) that tries port 22 first and falls back to `ssh.github.com:443` when port 22 is blocked; on Windows (which lacks `nc` by default) it uses `HostName ssh.github.com` with `Port 443` directly
+- added `gist.github.com` to the Windows `known_hosts` scanner so direct gist hosts are pre-trusted
+
 ### Changed
 
+- changed `github.com-{alias}`, `gitlab.com-{alias}`, and `bitbucket.org-{alias}` blocks in `dot_ssh/config.tmpl` to the same dual-mode setup as gist: on Linux/Android, the natural `HostName` with a `ProxyCommand` (`nc -z -w 5`) that tries port 22 first and falls back to the provider's port-443 SSH endpoint (`ssh.github.com:443`, `altssh.gitlab.com:443`, `altssh.bitbucket.org:443`) only when port 22 is blocked; on Windows (which lacks `nc` by default), the alt-host with `Port 443` directly
+- changed `run_once_after_windows-001-create-ssh-known-hosts.ps1` to also scan `ssh.github.com`, `altssh.gitlab.com`, and `altssh.bitbucket.org` on port 443, populating the host keys used by the new fallbacks
 - refreshed `CLAUDE.md` to fix `make sast` description (now includes semgrep), add `make test-modify-scripts` target, correct `dot_zshenv` → `dot_zshenv.tmpl`, and update logging prefix list
 - refreshed `.github/copilot-instructions.md` to fix stale GVM version claim, update post-apply scripts list, correct `dot_zshenv` → `dot_zshenv.tmpl`, update `dot_scripts/` listing, and sync logging prefix list
 

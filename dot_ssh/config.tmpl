@@ -4,6 +4,7 @@ This is because on Android (Termux) only private keys are usable, while other pl
 */ -}}
 {{- $deviceName := .deviceName -}}
 {{- $isAndroid := eq .chezmoi.os "android" -}}
+{{- $isWindows := eq .chezmoi.os "windows" -}}
 
 {{- warnf "[ssh-config] fetching Device: %s..." $deviceName -}}
 {{- $deviceNotes := "" -}}
@@ -38,12 +39,35 @@ This is because on Android (Termux) only private keys are usable, while other pl
       {{- end }}
 
 Host github.com-{{ $sshAlias }}
+{{- if $isWindows }}
+  HostName ssh.github.com
+  Port 443
+{{- else }}
   HostName github.com
+  ProxyCommand sh -c 'nc -z -w 5 %h %p 2>/dev/null && exec nc %h %p || exec nc ssh.github.com 443'
+{{- end }}
+  IdentityFile {{ $identityFile }}
+  IdentitiesOnly yes
+
+Host gist.github.com-{{ $sshAlias }}
+{{- if $isWindows }}
+  HostName ssh.github.com
+  Port 443
+{{- else }}
+  HostName gist.github.com
+  ProxyCommand sh -c 'nc -z -w 5 %h %p 2>/dev/null && exec nc %h %p || exec nc ssh.github.com 443'
+{{- end }}
   IdentityFile {{ $identityFile }}
   IdentitiesOnly yes
 
 Host gitlab.com-{{ $sshAlias }}
+{{- if $isWindows }}
+  HostName altssh.gitlab.com
+  Port 443
+{{- else }}
   HostName gitlab.com
+  ProxyCommand sh -c 'nc -z -w 5 %h %p 2>/dev/null && exec nc %h %p || exec nc altssh.gitlab.com 443'
+{{- end }}
   IdentityFile {{ $identityFile }}
   IdentitiesOnly yes
 
@@ -60,7 +84,13 @@ Host visualstudio.com-{{ $sshAlias }}
 
 # Atlassian
 Host bitbucket.org-{{ $sshAlias }}
+{{- if $isWindows }}
+  HostName altssh.bitbucket.org
+  Port 443
+{{- else }}
   HostName bitbucket.org
+  ProxyCommand sh -c 'nc -z -w 5 %h %p 2>/dev/null && exec nc %h %p || exec nc altssh.bitbucket.org 443'
+{{- end }}
   IdentityFile {{ $identityFile }}
   IdentitiesOnly yes
 
