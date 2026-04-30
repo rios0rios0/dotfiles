@@ -79,6 +79,8 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** (via pip, installed into pyenv Python)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
+  - **ruff** (Python linter, via pipx) — used by `make lint-python` to lint embedded Python in `modify_*` templates
+  - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via `go install`) — syncs AI assistant rules/agents/skills into `~/.claude/`, `~/.cursor/`, etc.; replaces the legacy `run_after_*-install-ai-rules.*` scripts
   - **Speedtest CLI** (Ookla, via packagecloud)
 - Each tool installation can take 5-15 minutes individually
 - **Critical**: Script requires internet access for downloading tools
@@ -96,7 +98,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
 - Sets up proot/Alpine wrapper for running Linux binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
-- Installs: Claude CLI, Gemini CLI, 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip)
+- Installs: Claude CLI, Gemini CLI, 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via pipx), aisync (via `go install`)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 

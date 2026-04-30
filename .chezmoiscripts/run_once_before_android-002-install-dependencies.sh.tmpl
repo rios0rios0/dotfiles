@@ -490,6 +490,25 @@ install_ruff() {
     python -m pipx install ruff
 }
 
+# https://github.com/rios0rios0/aisync
+# `aisync` syncs AI assistant rules/agents/skills across `~/.claude/`, `~/.cursor/`, etc.
+# It replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl
+# `install-rules.sh` from `rios0rios0/guide` on every chezmoi apply.
+# Uses Termux's native `golang` apt package (GVM is intentionally skipped on Android).
+install_aisync() {
+    if command_exists aisync; then
+        echo "[configure-deps] aisync is already installed, skipping" >&2
+        return
+    fi
+
+    if ! command_exists go; then
+        echo "[configure-deps] ERROR: go is not available; the 'golang' Termux package must be installed first" >&2
+        return 1
+    fi
+
+    go install github.com/rios0rios0/aisync/cmd/aisync@latest
+}
+
 install_oh_my_zsh
 
 # TODO: building Go versions on Termux are breaking, since they don't recognize system critical path (like /etc/resolv.conf) leading to DNS errors
@@ -516,6 +535,7 @@ install_golangci_lint
 install_aws_cli
 install_azure_cli
 install_ruff
+install_aisync
 install_acli
 
 # =========================================================================================================

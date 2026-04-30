@@ -418,6 +418,29 @@ install_ruff() {
     python -m pipx install ruff
 }
 
+# https://github.com/rios0rios0/aisync
+# `aisync` syncs AI assistant rules/agents/skills across `~/.claude/`, `~/.cursor/`, etc.
+# It replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl
+# `install-rules.sh` from `rios0rios0/guide` on every chezmoi apply.
+install_aisync() {
+    if command -v aisync &>/dev/null; then
+        echo "[configure-deps] aisync is already installed, skipping" >&2
+        return
+    fi
+
+    # Source GVM so `go` resolves to the version installed by `install_gvm`.
+    export GVM_ROOT="$HOME/.gvm"
+    # shellcheck source=/dev/null
+    [[ -s "$GVM_ROOT/scripts/gvm" ]] && source "$GVM_ROOT/scripts/gvm"
+
+    if ! command -v go &>/dev/null; then
+        echo "[configure-deps] ERROR: go is not available; install_gvm must run before install_aisync" >&2
+        return 1
+    fi
+
+    go install github.com/rios0rios0/aisync/cmd/aisync@latest
+}
+
 # https://developer.atlassian.com/cloud/acli/guides/install-linux/
 # Atlassian only publishes a rolling `latest` endpoint (no versioned URLs, no checksums/signatures),
 # so pinning or cryptographic verification is not possible upstream; the install tracks the latest
@@ -490,6 +513,7 @@ install_azure_cli
 
 install_ggshield
 install_ruff
+install_aisync
 
 install_acli
 

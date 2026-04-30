@@ -19,6 +19,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 ### Added
 
 - added `install_ruff()` to Linux/WSL and Android dependency installers — provisions `ruff` via `pipx` so `make lint-python` works locally without a manual `pip install ruff` step (CI already installs `ruff` per the `validate.yaml` workflow)
+- added `install_aisync()` to Linux/WSL and Android dependency installers — `go install`s [`rios0rios0/aisync`](https://github.com/rios0rios0/aisync) so the `aisync` binary is available out of the box; this is the tool that took over from the removed `run_after_*-install-ai-rules.*` scripts and is run by the user (e.g., `aisync init`, `aisync source add guide …`, `aisync pull`) to sync AI assistant rules into `~/.claude/`, `~/.cursor/`, etc.
 
 ### Changed
 

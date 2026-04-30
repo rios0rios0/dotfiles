@@ -186,6 +186,12 @@ Android 12+ includes a **Phantom Process Killer** that enforces a system-wide li
 
 **Manual Android settings:** Exclude Termux from battery optimization (`Unrestricted`), set animation scales to `0.5x`, enable RAM Plus if available.
 
+## AI Rules Sync
+
+AI assistant rules (Claude Code, Cursor, Codex, Gemini, etc.) are **not** managed by chezmoi. Directories like `~/.claude/`, `~/.cursor/`, `~/.codex/` are listed in `.chezmoiignore` and synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply).
+
+After the dependency installer finishes, run `aisync init`, `aisync source add guide --source-repo rios0rios0/guide --branch generated`, and `aisync pull` to populate the rules. Subsequent `aisync pull` calls refresh them on demand.
+
 ## Encryption Setup
 
 - Private key: `~/.ssh/chezmoi`
