@@ -14,14 +14,14 @@
 # Update model:
 #   - check at most once per 24h (timestamp at $XDG_CACHE_HOME/claude-code/)
 #   - the check runs in the background; claude startup never blocks on it
-#   - new versions land in ~/.local/share/claude/versions/<X.Y.Z>/ and are
-#     used on the next launch — the running session keeps its current build
+#   - new versions land as executable files at ~/.local/share/claude/versions/<X.Y.Z>
+#     and are used on the next launch — the running session keeps its current build
 #   - the most recent KEEP_VERSIONS=3 builds are retained; older are pruned
 #
 # Override knobs (read by the emitted wrapper):
 #   CLAUDE_UPDATE_CHANNEL  channel suffix (default: stable; latest accepted)
 #   CLAUDE_NO_AUTO_UPDATE  set to "1" to skip the background update check
-#   CLAUDE_FORCE_VERSION   pin to a specific installed X.Y.Z directory
+#   CLAUDE_FORCE_VERSION   pin to a specific installed X.Y.Z file
 
 set -e
 
@@ -46,6 +46,10 @@ export HOME="${HOME:-/data/data/com.termux/files/home}"
 unset LD_PRELOAD
 
 # Point Node at Termux's CA bundle so TLS works without /etc/ssl/certs.
+# Default PREFIX so `set -u` doesn't trip when launched from a non-Termux
+# environment that didn't export it (e.g. a stripped systemd-style service).
+: "${PREFIX:=/data/data/com.termux/files/usr}"
+export PREFIX
 export NODE_EXTRA_CA_CERTS="$PREFIX/etc/tls/cert.pem"
 
 # Disable the in-binary auto-updater. It would replace this wrapper with
@@ -63,14 +67,15 @@ CHECK_INTERVAL_SECONDS=$((24 * 3600))
 KEEP_VERSIONS=3
 SEMVER_REGEX='^[0-9]+\.[0-9]+\.[0-9]+$'
 
-# Print the names of every entry in $VERSIONS_DIR that matches X.Y.Z, in
-# ascending semver order. Filtering happens via a bash regex on the basename
-# so non-semver entries (e.g. legacy ".patched-by-..." dirs) are ignored.
+# Print the names of every regular executable file in $VERSIONS_DIR whose
+# basename matches X.Y.Z, in ascending semver order. The `-f && -x` guard
+# prevents semver-named directories (or non-executable leftovers) from being
+# treated as installed versions and handed to `exec` later.
 list_installed_versions() {
     local entry name
     local versions=()
     for entry in "$VERSIONS_DIR"/*; do
-        [ -e "$entry" ] || continue
+        [ -f "$entry" ] && [ -x "$entry" ] || continue
         name=${entry##*/}
         [[ "$name" =~ $SEMVER_REGEX ]] || continue
         versions+=("$name")
@@ -94,12 +99,19 @@ run_update_check() {
     fi
 
     local latest tmp
-    latest=$(curl --max-time 10 -fsSL "$GCS_BASE/$CHANNEL" 2>/dev/null) || return 0
+    # Stderr is intentionally NOT suppressed here — the surrounding subshell
+    # already redirects stdout/stderr to $LOGFILE, so curl errors land there
+    # for troubleshooting instead of being silently dropped.
+    latest=$(curl --max-time 10 -fsSL "$GCS_BASE/$CHANNEL") || return 0
     [ -z "$latest" ] && return 0
     [[ "$latest" =~ $SEMVER_REGEX ]] || return 0
-    touch "$STAMP_FILE"
 
-    [ -x "$VERSIONS_DIR/$latest" ] && return 0
+    # Already on the latest published build — record the successful check
+    # and return without touching disk.
+    if [ -f "$VERSIONS_DIR/$latest" ] && [ -x "$VERSIONS_DIR/$latest" ]; then
+        touch "$STAMP_FILE"
+        return 0
+    fi
 
     mkdir -p "$VERSIONS_DIR" || return 0
     tmp=$(mktemp "$VERSIONS_DIR/.update-XXXXXX.tmp") || return 0
@@ -108,11 +120,16 @@ run_update_check() {
     fi
     chmod +x "$tmp"
 
-    if ! patchelf --set-interpreter "$MUSL_LOADER" --remove-rpath "$tmp" 2>/dev/null; then
+    # Stderr is intentionally not suppressed — see note on the manifest curl.
+    if ! patchelf --set-interpreter "$MUSL_LOADER" --remove-rpath "$tmp"; then
         rm -f "$tmp"; return 0
     fi
 
     mv "$tmp" "$VERSIONS_DIR/$latest"
+    # Stamp is written only after the install succeeds so that a failed
+    # download/patchelf retries on the next launch instead of silently
+    # waiting out the 24h interval with no new binary on disk.
+    touch "$STAMP_FILE"
     echo "[claude-wrapper] auto-updated to $latest (used on next launch)" >&2
 
     # Prune older versions, keeping the newest $KEEP_VERSIONS — non-semver
@@ -137,8 +154,11 @@ mkdir -p "$(dirname "$LOGFILE")" 2>/dev/null || true
 ( run_update_check ) >> "$LOGFILE" 2>&1 &
 disown 2>/dev/null || true
 
-# Pin or pick newest installed version.
-if [ -n "${CLAUDE_FORCE_VERSION:-}" ] && [ -x "$VERSIONS_DIR/$CLAUDE_FORCE_VERSION" ]; then
+# Pin or pick newest installed version. CLAUDE_FORCE_VERSION must point at a
+# regular executable file so a stray semver-named directory cannot satisfy it.
+if [ -n "${CLAUDE_FORCE_VERSION:-}" ] \
+        && [ -f "$VERSIONS_DIR/$CLAUDE_FORCE_VERSION" ] \
+        && [ -x "$VERSIONS_DIR/$CLAUDE_FORCE_VERSION" ]; then
     CLAUDE_BIN="$CLAUDE_FORCE_VERSION"
 else
     CLAUDE_BIN=$(list_installed_versions | tail -1)
@@ -148,6 +168,13 @@ if [ -z "${CLAUDE_BIN:-}" ]; then
     echo "[claude-wrapper] ERROR: no Claude Code version installed in $VERSIONS_DIR" >&2
     echo "[claude-wrapper]        bootstrap with examples/claude-code.md in" >&2
     echo "[claude-wrapper]        rios0rios0/termux-etc-redirect, then re-run claude" >&2
+    exit 1
+fi
+
+if ! command -v termux-etc-mount >/dev/null 2>&1; then
+    echo "[claude-wrapper] ERROR: termux-etc-mount not found in PATH" >&2
+    echo "[claude-wrapper]        install rios0rios0/termux-etc-redirect (provides" >&2
+    echo "[claude-wrapper]        termux-etc-mount used to redirect /etc/* to \$PREFIX/etc/*)" >&2
     exit 1
 fi
 
