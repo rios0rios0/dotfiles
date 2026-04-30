@@ -26,6 +26,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - changed log tags and inline comments in `dot_zshrc.tmpl`, `dot_scripts/linux-engineering-version-manager.sh`, `CLAUDE.md`, and `.github/copilot-instructions.md` to use the new project name
 - changed the chezmoi prefix listed in `CLAUDE.md` and `.github/copilot-instructions.md` from `devforge` to `dev-toolkit`
 
+### Removed
+
+- removed `run_after_linux-003-install-ai-rules.sh` and `run_after_android-002-install-ai-rules.sh.tmpl` since AI rules are now synced via `aisync` instead of being pulled from the guide repository at chezmoi-apply time
+
 ## [0.12.0] - 2026-04-28
 
 ### Added
