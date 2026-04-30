@@ -152,7 +152,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ai-rules`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`
 
 ## Important Timing Constraints
 
@@ -185,6 +185,12 @@ Android 12+ includes a **Phantom Process Killer** that enforces a system-wide li
 - `MALLOC_ARENA_MAX=2` — reduces glibc memory arena fragmentation on mobile
 
 **Manual Android settings:** Exclude Termux from battery optimization (`Unrestricted`), set animation scales to `0.5x`, enable RAM Plus if available.
+
+## AI Rules Sync
+
+AI assistant rules (Claude Code, Cursor, Codex, Gemini, etc.) are **not** managed by chezmoi. Directories like `~/.claude/`, `~/.cursor/`, `~/.codex/` are listed in `.chezmoiignore` and synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply).
+
+After the dependency installer finishes, run `aisync init`, `aisync source add guide --source-repo rios0rios0/guide --branch generated`, and `aisync pull` to populate the rules. Subsequent `aisync pull` calls refresh them on demand.
 
 ## Encryption Setup
 

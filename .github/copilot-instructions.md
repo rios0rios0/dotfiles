@@ -79,6 +79,8 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** (via pip, installed into pyenv Python)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
+  - **ruff** (Python linter, via pipx) — used by `make lint-python` to lint embedded Python in `modify_*` templates
+  - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via `go install`) — syncs AI assistant rules/agents/skills into `~/.claude/`, `~/.cursor/`, etc.; replaces the legacy `run_after_*-install-ai-rules.*` scripts
   - **Speedtest CLI** (Ookla, via packagecloud)
 - Each tool installation can take 5-15 minutes individually
 - **Critical**: Script requires internet access for downloading tools
@@ -96,7 +98,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
 - Sets up proot/Alpine wrapper for running Linux binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
-- Installs: Claude CLI, Gemini CLI, 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip)
+- Installs: Claude CLI, Gemini CLI, 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via pipx), aisync (via `go install`)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 
@@ -130,14 +132,12 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `run_once_after_linux-002-clone-pentesting-tools.sh` — clones pentesting tools (VHostScan, dirsearch, StegCracker, stegbrute) to `~/Development/Tools/`
 - `run_once_after_windows-001-create-ssh-known-hosts.ps1` — pre-populates `~/.ssh/known_hosts` for GitHub, GitLab, Azure DevOps, Bitbucket (avoids SSH freeze in WSL)
 - `run_after_linux-002-import-gpg-keys.sh.tmpl` — imports GPG keys from 1Password (device note, `gpg:` entries)
-- `run_after_linux-003-install-ai-rules.sh` — installs AI assistant rule files into project directories
 - `run_after_linux-004-install-ggshield-hook.sh` — (re)generates the ggshield global pre-commit hook script; idempotent
 - `run_after_linux-005-install-jetbrains-themes.sh` — fans staged JetBrains themes into detected IDE config directories
 - `run_after_windows-001-create-ssh-public-keys.ps1.tmpl` — creates SSH public key files from 1Password (device note, `ssh:` entries)
 - `run_after_windows-002-create-ssh-pems.ps1.tmpl` — creates SSH PEM files on Windows (device note, `pem:` entries)
 - `run_after_windows-003-copy-app-data-files.ps1.tmpl` — copies files from `AppData/` in the repo to `~\AppData\` on Windows (directory names use `+` as wildcard for version-specific paths)
 - `run_after_android-001-create-ssh-keys.sh.tmpl` — creates SSH private/public key files from 1Password (device note, `ssh:` entries)
-- `run_after_android-002-install-ai-rules.sh.tmpl` — installs AI assistant rule files (Android)
 - `run_after_android-003-wrap-terra-clis.sh` — wraps terraform/terragrunt binaries with `termux-etc-seccomp` to avoid SIGSYS on Android
 - `run_after_windows-004-install-jetbrains-themes.ps1` — fans staged JetBrains themes into detected IDE config directories (Windows)
 
@@ -410,7 +410,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ai-rules`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

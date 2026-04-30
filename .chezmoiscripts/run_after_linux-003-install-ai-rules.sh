@@ -1,6 +1,0 @@
-#!/bin/bash
-set -euo pipefail
-
-echo "[ai-rules] Installing AI rules from guide repository..."
-curl -fsSL https://raw.githubusercontent.com/rios0rios0/guide/generated/install-rules.sh | sh -s -- --force
-echo "[ai-rules] AI rules installed successfully."

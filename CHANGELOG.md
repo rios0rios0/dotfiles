@@ -19,12 +19,17 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 ### Added
 
 - added `install_ruff()` to Linux/WSL and Android dependency installers — provisions `ruff` via `pipx` so `make lint-python` works locally without a manual `pip install ruff` step (CI already installs `ruff` per the `validate.yaml` workflow)
+- added `install_aisync()` to Linux/WSL and Android dependency installers — `go install`s [`rios0rios0/aisync`](https://github.com/rios0rios0/aisync) so the `aisync` binary is available out of the box; this is the tool that took over from the removed `run_after_*-install-ai-rules.*` scripts and is run by the user (e.g., `aisync init`, `aisync source add guide …`, `aisync pull`) to sync AI assistant rules into `~/.claude/`, `~/.cursor/`, etc.
 
 ### Changed
 
 - changed `devforge` references to `dev-toolkit` to match the upstream rename — install scripts now define `install_dev_toolkit()` and download from `https://raw.githubusercontent.com/rios0rios0/dev-toolkit/main/install.sh` (GitHub auto-redirects the old URL, but new installs use the renamed repository)
 - changed log tags and inline comments in `dot_zshrc.tmpl`, `dot_scripts/linux-engineering-version-manager.sh`, `CLAUDE.md`, and `.github/copilot-instructions.md` to use the new project name
 - changed the chezmoi prefix listed in `CLAUDE.md` and `.github/copilot-instructions.md` from `devforge` to `dev-toolkit`
+
+### Removed
+
+- removed `run_after_linux-003-install-ai-rules.sh` and `run_after_android-002-install-ai-rules.sh.tmpl` since AI rules are now synced via `aisync` instead of being pulled from the guide repository at chezmoi-apply time
 
 ## [0.12.0] - 2026-04-28
 
