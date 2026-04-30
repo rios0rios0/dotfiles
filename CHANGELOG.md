@@ -20,6 +20,9 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 - added `install_ruff()` to Linux/WSL and Android dependency installers — provisions `ruff` via `pipx` so `make lint-python` works locally without a manual `pip install ruff` step (CI already installs `ruff` per the `validate.yaml` workflow)
 - added `install_aisync()` to Linux/WSL and Android dependency installers — `go install`s [`rios0rios0/aisync`](https://github.com/rios0rios0/aisync) so the `aisync` binary is available out of the box; this is the tool that took over from the removed `run_after_*-install-ai-rules.*` scripts and is run by the user (e.g., `aisync init`, `aisync source add guide …`, `aisync pull`) to sync AI assistant rules into `~/.claude/`, `~/.cursor/`, etc.
+- added `run_once_before_android-001e-create-claude-wrapper.sh` that generates `~/.local/bin/claude` for the Claude Code `linux-arm64-musl` build. The emitted wrapper exec's the newest installed version (an executable file named `~/.local/share/claude/versions/<X.Y.Z>`) through `termux-etc-mount`, drops the previously hand-edited hardcoded version pin, and fires a non-blocking, rate-limited (24h) background update check that downloads the latest `stable` build from Anthropic's GCS distribution, runs `patchelf --set-interpreter` against the local musl loader, atomically moves it into the versions dir, and prunes everything older than the newest three. The in-binary auto-updater stays disabled (`DISABLE_AUTOUPDATER=1`) because it cannot perform the `patchelf` step the kernel needs to resolve `PT_INTERP` on Termux. Knobs: `CLAUDE_UPDATE_CHANNEL`, `CLAUDE_NO_AUTO_UPDATE`, `CLAUDE_FORCE_VERSION`
+- added `patchelf` to the Android dependency list in `run_once_before_android-002-install-dependencies.sh.tmpl` so the new `claude` wrapper's auto-updater can `--set-interpreter` on freshly downloaded builds
+- added `export CLAUDE_UPDATE_CHANNEL="latest"` to the Android branch of `dot_zshrc.tmpl` so the wrapper's background updater tracks Anthropic's `latest` channel by default on Termux
 
 ### Changed
 
@@ -30,6 +33,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 ### Removed
 
 - removed `run_after_linux-003-install-ai-rules.sh` and `run_after_android-002-install-ai-rules.sh.tmpl` since AI rules are now synced via `aisync` instead of being pulled from the guide repository at chezmoi-apply time
+- removed the npm-based `install_claude_cli` from `run_once_before_android-002-install-dependencies.sh.tmpl` and its call site. The `@anthropic-ai/claude-code` npm package distributes the JavaScript build, but on Termux/Android the `linux-arm64-musl` binary is what runs through the new `claude` wrapper. First-time bootstrap (musl loader seed + initial `patchelf`) follows `examples/claude-code.md` in `rios0rios0/termux-etc-redirect`; subsequent updates flow through the wrapper's auto-updater
 
 ## [0.12.0] - 2026-04-28
 
