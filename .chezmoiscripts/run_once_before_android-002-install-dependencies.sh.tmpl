@@ -230,11 +230,6 @@ install_gemini_cli() {
     npm install -g @google/gemini-cli
 }
 
-# https://github.com/anthropics/claude-code
-install_claude_cli() {
-    npm install -g @anthropic-ai/claude-code
-}
-
 # https://github.com/rios0rios0/dev-toolkit
 install_dev_toolkit() {
     binPath="$HOME/.local/bin"
@@ -523,7 +518,11 @@ install_sdkman
 # TODO: same of the line 261
 install_nvm
 install_gemini_cli
-install_claude_cli
+# Claude Code's musl distribution is bootstrapped manually following
+# examples/claude-code.md in rios0rios0/termux-etc-redirect (musl loader
+# seed + initial patchelf). Subsequent updates are handled by the wrapper
+# in .chezmoiscripts/run_once_before_android-001e-create-claude-wrapper.sh,
+# which downloads and patchelfs newer versions in the background.
 install_dev_toolkit
 
 # TODO: same of the line 261

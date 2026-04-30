@@ -27,6 +27,12 @@ export CHEZMOI_DEVICE="$(getprop ro.product.model)"
 # This script patches cli.js to use process.env.TMPDIR and symlinks system ripgrep.
 # See: https://github.com/anthropics/claude-code/issues/15637
 source "$HOME/.scripts/android-patch-claude-code-tmpdir.sh"
+
+# Track Anthropic's `latest` channel so the wrapper's background updater
+# pulls the freshest builds. Read by ~/.local/bin/claude (created by
+# .chezmoiscripts/run_once_before_android-001e-create-claude-wrapper.sh);
+# falls back to "stable" when unset.
+export CLAUDE_UPDATE_CHANNEL="latest"
 {{- end }}
 
 ###### ZINIT CONFIGURATION ##############################################################################################
