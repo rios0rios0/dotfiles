@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added `install_ruff()` to Linux/WSL and Android dependency installers — provisions `ruff` via `pipx` so `make lint-python` works locally without a manual `pip install ruff` step (CI already installs `ruff` per the `validate.yaml` workflow)
+
 ### Changed
 
 - changed `devforge` references to `dev-toolkit` to match the upstream rename — install scripts now define `install_dev_toolkit()` and download from `https://raw.githubusercontent.com/rios0rios0/dev-toolkit/main/install.sh` (GitHub auto-redirects the old URL, but new installs use the renamed repository)

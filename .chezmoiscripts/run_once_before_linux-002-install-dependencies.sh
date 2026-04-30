@@ -397,6 +397,27 @@ install_ggshield() {
     fi
 }
 
+# https://docs.astral.sh/ruff/
+# Installed via pipx so it lives outside the active project's venv and is callable
+# from `make lint-python` regardless of the current pyenv/poetry shell context.
+install_ruff() {
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init -)"
+
+    if ! python -m pip show pipx &>/dev/null; then
+        python -m pip install --upgrade pipx
+        python -m pipx ensurepath
+    fi
+
+    if python -m pipx list --short 2>/dev/null | grep -q '^ruff '; then
+        echo "[configure-deps] ruff is already installed, skipping" >&2
+        return
+    fi
+
+    python -m pipx install ruff
+}
+
 # https://developer.atlassian.com/cloud/acli/guides/install-linux/
 # Atlassian only publishes a rolling `latest` endpoint (no versioned URLs, no checksums/signatures),
 # so pinning or cryptographic verification is not possible upstream; the install tracks the latest
@@ -468,6 +489,7 @@ install_aws_cli
 install_azure_cli
 
 install_ggshield
+install_ruff
 
 install_acli
 
