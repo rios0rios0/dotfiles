@@ -1,7 +1,7 @@
 #!/bin/bash
 #
 # Version Manager Utilities (pyenv workarounds only)
-# Version detection and switching migrated to devforge: `dev project use`
+# Version detection and switching migrated to dev-toolkit: `dev project use`
 #
 
 # Clean up stale pyenv shim locks (fixes rehash lock issues)

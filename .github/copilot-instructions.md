@@ -410,7 +410,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ai-rules`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `devforge`, `aws-cli`, `azure-cli`, `golangci-lint`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ai-rules`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
@@ -440,7 +440,7 @@ Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-key
    - kubectl, terraform, terragrunt available in PATH
    - Go (GVM), Node.js (NVM), Python (pyenv), Java (SDKMAN), Rust (Cargo) via version managers
    - Version managers auto-switch based on project files (`go.mod`, `.nvmrc`, `pyproject.toml`)
-   - Docker via devforge (`dev docker ips`, `dev docker reset`) and Kubernetes shortcuts configured
+   - Docker via dev-toolkit (`dev docker ips`, `dev docker reset`) and Kubernetes shortcuts configured
 
 4. **Security Setup**:
    - Age encryption working with private key at `~/.ssh/chezmoi`

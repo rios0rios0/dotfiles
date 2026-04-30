@@ -234,16 +234,16 @@ install_claude_cli() {
     npm install -g @anthropic-ai/claude-code
 }
 
-# https://github.com/rios0rios0/devforge
-install_devforge() {
+# https://github.com/rios0rios0/dev-toolkit
+install_dev_toolkit() {
     binPath="$HOME/.local/bin"
     devBin="$binPath/dev"
 
     if [ ! -f "$devBin" ]; then
         local installer
         installer="$(mktemp)"
-        if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/devforge/main/install.sh -o "$installer"; then
-            echo "[devforge] ERROR: failed to download installer" >&2
+        if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/dev-toolkit/main/install.sh -o "$installer"; then
+            echo "[dev-toolkit] ERROR: failed to download installer" >&2
             rm -f "$installer"
             return 1
         fi
@@ -252,7 +252,7 @@ install_devforge() {
         rm -f "$installer"
         if [ "$status" -ne 0 ]; then return "$status"; fi
     else
-        echo "Devforge is already installed."
+        echo "dev-toolkit is already installed."
     fi
 }
 
@@ -467,6 +467,29 @@ install_azure_cli() {
     az extension add --name azure-devops
 }
 
+# https://docs.astral.sh/ruff/
+# Installed via pipx so it lives outside the active project's venv and is callable
+# from `make lint-python` regardless of the current pyenv/poetry shell context.
+install_ruff() {
+    if ! command_exists pip; then
+        echo "Install 'pip' first, it seems to be NOT installed..."
+
+        return;
+    fi
+
+    if ! python -m pip show pipx &>/dev/null; then
+        python -m pip install --upgrade pipx
+        python -m pipx ensurepath
+    fi
+
+    if python -m pipx list --short 2>/dev/null | grep -q '^ruff '; then
+        echo "[configure-deps] ruff is already installed, skipping" >&2
+        return
+    fi
+
+    python -m pipx install ruff
+}
+
 install_oh_my_zsh
 
 # TODO: building Go versions on Termux are breaking, since they don't recognize system critical path (like /etc/resolv.conf) leading to DNS errors
@@ -481,7 +504,7 @@ install_sdkman
 install_nvm
 install_gemini_cli
 install_claude_cli
-install_devforge
+install_dev_toolkit
 
 # TODO: same of the line 261
 install_pyenv
@@ -492,6 +515,7 @@ install_github_copilot
 install_golangci_lint
 install_aws_cli
 install_azure_cli
+install_ruff
 install_acli
 
 # =========================================================================================================

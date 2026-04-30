@@ -275,7 +275,7 @@ source "$HOME/.scripts/linux-engineering-detect-kube-config-files.sh"
 if command -v docker &>/dev/null; then
   zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
 fi
-# docker aliases (dip, dreset) migrated to devforge: `dev docker ips`, `dev docker reset`
+# docker aliases (dip, dreset) migrated to dev-toolkit: `dev docker ips`, `dev docker reset`
 {{- end }}
 
 if [[ -o interactive ]]; then
@@ -358,7 +358,7 @@ if [[ -o interactive ]]; then
     fi
 
     # Auto-detect and switch to the required SDK version for the current directory
-    # Replaces _vm_use_go, _vm_use_node, _vm_use_python (migrated to devforge)
+    # Replaces _vm_use_go, _vm_use_node, _vm_use_python (migrated to dev-toolkit)
     eval "$(dev project use . 2>/dev/null)"
 fi # -o interactive
 
