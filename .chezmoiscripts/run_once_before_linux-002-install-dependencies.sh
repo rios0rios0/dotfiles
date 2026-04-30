@@ -274,10 +274,10 @@ install_gemini_cli() {
     npm install -g @google/gemini-cli
 }
 
-# https://github.com/rios0rios0/devforge
-install_devforge() {
+# https://github.com/rios0rios0/dev-toolkit
+install_dev_toolkit() {
     if command -v dev &>/dev/null; then
-        echo "[configure-deps] devforge is already installed, skipping" >&2
+        echo "[configure-deps] dev-toolkit is already installed, skipping" >&2
         return
     fi
 
@@ -285,8 +285,8 @@ install_devforge() {
     local status
 
     installer="$(mktemp)"
-    if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/devforge/main/install.sh -o "$installer"; then
-        echo "[devforge] ERROR: failed to download installer" >&2
+    if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/dev-toolkit/main/install.sh -o "$installer"; then
+        echo "[dev-toolkit] ERROR: failed to download installer" >&2
         rm -f "$installer"
         return 1
     fi
@@ -461,7 +461,7 @@ install_pyenv
 install_cursor_cli
 install_claude_cli
 install_gemini_cli
-install_devforge
+install_dev_toolkit
 
 install_github_cli
 install_aws_cli

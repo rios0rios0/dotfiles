@@ -16,6 +16,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- changed `devforge` references to `dev-toolkit` to match the upstream rename — install scripts now define `install_dev_toolkit()` and download from `https://raw.githubusercontent.com/rios0rios0/dev-toolkit/main/install.sh` (GitHub auto-redirects the old URL, but new installs use the renamed repository)
+- changed log tags and inline comments in `dot_zshrc.tmpl`, `dot_scripts/linux-engineering-version-manager.sh`, `CLAUDE.md`, and `.github/copilot-instructions.md` to use the new project name
+- changed the chezmoi prefix listed in `CLAUDE.md` and `.github/copilot-instructions.md` from `devforge` to `dev-toolkit`
+
 ## [0.12.0] - 2026-04-28
 
 ### Added

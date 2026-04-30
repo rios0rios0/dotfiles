@@ -234,16 +234,16 @@ install_claude_cli() {
     npm install -g @anthropic-ai/claude-code
 }
 
-# https://github.com/rios0rios0/devforge
-install_devforge() {
+# https://github.com/rios0rios0/dev-toolkit
+install_dev_toolkit() {
     binPath="$HOME/.local/bin"
     devBin="$binPath/dev"
 
     if [ ! -f "$devBin" ]; then
         local installer
         installer="$(mktemp)"
-        if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/devforge/main/install.sh -o "$installer"; then
-            echo "[devforge] ERROR: failed to download installer" >&2
+        if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/dev-toolkit/main/install.sh -o "$installer"; then
+            echo "[dev-toolkit] ERROR: failed to download installer" >&2
             rm -f "$installer"
             return 1
         fi
@@ -481,7 +481,7 @@ install_sdkman
 install_nvm
 install_gemini_cli
 install_claude_cli
-install_devforge
+install_dev_toolkit
 
 # TODO: same of the line 261
 install_pyenv
