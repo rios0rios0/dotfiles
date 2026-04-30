@@ -32,6 +32,7 @@ requirements=(
     "clang"             # required to build termux-etc-redirect
     "cmake"             # required to build AWS CLI's `awscrt` C extension from source
     "file"              # it's for determining file types
+    "patchelf"          # required by the claude wrapper to set PT_INTERP on auto-updated musl binaries
 )
 apt install --no-install-recommends --yes "${requirements[@]}"
 # =========================================================================================================
