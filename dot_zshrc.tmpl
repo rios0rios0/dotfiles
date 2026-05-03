@@ -107,8 +107,20 @@ for key in "$HOME/.ssh/$slug"*(.N); do
   fi
 done
 
-# feed them to the OMZ ssh-agent plugin
-zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
+# Drive the SSH agent with `keychain` instead of the OMZ `ssh-agent` plugin.
+# Why: OMZ's plugin spawns a *per-session* `ssh-agent` at a *random* socket
+# path. Any process launched from that zsh — Claude Code, tmux panes, IDE
+# integrations — inherits `SSH_AUTH_SOCK` at fork time and is left holding a
+# dead socket the moment the originating shell exits, which surfaces as
+# "Couldn't get agent socket?" / "Connection refused" on every signed commit
+# or `git push`. Keychain runs a single long-lived agent across sessions,
+# exposes a stable socket via `~/.keychain/<host>-sh`, detects dead agents
+# and restarts them, and re-loads the per-device identities listed in
+# `$sshIdentities`. `keychain` is provisioned by the Android dependency
+# installer (`run_once_before_android-002-install-dependencies.sh.tmpl`).
+if (( ${#sshIdentities[@]} > 0 )) && command -v keychain >/dev/null 2>&1; then
+  eval "$(keychain --eval --quiet --agents ssh "${sshIdentities[@]}")"
+fi
 ######################################################
 {{- end }}
 
@@ -142,8 +154,7 @@ plugins=(
   python pip pipenv virtualenv pep8
 )
 {{- if eq .chezmoi.os "android" }}
-# Android-only plugins
-plugins+=(ssh-agent)
+# Android-only plugins (none — `keychain` above replaces the OMZ `ssh-agent` plugin)
 {{- else }}
 # non-Android-only plugins
 plugins+=(command-not-found vim-interaction)
