@@ -113,13 +113,28 @@ done
 # integrations — inherits `SSH_AUTH_SOCK` at fork time and is left holding a
 # dead socket the moment the originating shell exits, which surfaces as
 # "Couldn't get agent socket?" / "Connection refused" on every signed commit
-# or `git push`. Keychain runs a single long-lived agent across sessions,
-# exposes a stable socket via `~/.keychain/<host>-sh`, detects dead agents
-# and restarts them, and re-loads the per-device identities listed in
-# `$sshIdentities`. `keychain` is provisioned by the Android dependency
+# or `git push`. Keychain runs a single long-lived agent across sessions and
+# exposes a stable socket via `~/.keychain/<host>-sh`, so newly-spawned shells
+# always inherit a live `SSH_AUTH_SOCK`. (Note: already-running child
+# processes keep whatever value they inherited at fork time; if keychain
+# does have to restart a dead agent, those long-lived children still need
+# to be restarted to pick up the new socket — the win is for shells started
+# *after* the restart.) `keychain` is provisioned by the Android dependency
 # installer (`run_once_before_android-002-install-dependencies.sh.tmpl`).
+#
+# Fallback: existing Termux installs that already ran `run_once_before_*`
+# before this change don't have `keychain` yet, and `run_once_before_*`
+# scripts don't rerun on subsequent `chezmoi apply`s. When `keychain` is
+# missing we fall back to the OMZ `ssh-agent` plugin so the user keeps a
+# working agent until they manually `apt install keychain` (or clear
+# chezmoi's `scriptState/` to rerun the installer). Once `keychain` shows
+# up on `$PATH`, the next zsh startup picks it up automatically.
+typeset useKeychain=0
 if (( ${#sshIdentities[@]} > 0 )) && command -v keychain >/dev/null 2>&1; then
+  useKeychain=1
   eval "$(keychain --eval --quiet --agents ssh "${sshIdentities[@]}")"
+else
+  zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
 fi
 ######################################################
 {{- end }}
@@ -154,7 +169,13 @@ plugins=(
   python pip pipenv virtualenv pep8
 )
 {{- if eq .chezmoi.os "android" }}
-# Android-only plugins (none — `keychain` above replaces the OMZ `ssh-agent` plugin)
+# Android-only plugins. `keychain` (set up above) replaces the OMZ `ssh-agent`
+# plugin when available; on existing installs that pre-date the keychain
+# switch, fall back to the plugin so the user keeps an agent until the
+# dependency installer reruns or they install `keychain` manually.
+if (( useKeychain == 0 )); then
+  plugins+=(ssh-agent)
+fi
 {{- else }}
 # non-Android-only plugins
 plugins+=(command-not-found vim-interaction)
