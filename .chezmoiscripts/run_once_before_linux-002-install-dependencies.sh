@@ -163,7 +163,7 @@ install_terra() {
 
         installer="$(mktemp)"
         if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/terra/main/install.sh -o "$installer"; then
-            echo "[terra] ERROR: failed to download installer" >&2
+            echo "[configure-deps] ERROR: failed to download terra installer" >&2
             rm -f "$installer"
             return 1
         fi
@@ -445,7 +445,7 @@ install_aisync() {
 
     installer="$(mktemp)"
     if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/aisync/main/install.sh -o "$installer"; then
-        echo "[aisync] ERROR: failed to download installer" >&2
+        echo "[configure-deps] ERROR: failed to download aisync installer" >&2
         rm -f "$installer"
         return 1
     fi
