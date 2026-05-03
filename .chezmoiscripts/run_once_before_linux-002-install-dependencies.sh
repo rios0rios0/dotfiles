@@ -404,24 +404,28 @@ install_ggshield() {
 }
 
 # https://docs.astral.sh/ruff/
-# Installed via pipx so it lives outside the active project's venv and is callable
-# from `make lint-python` regardless of the current pyenv/poetry shell context.
+#
+# `ruff` is a self-contained Rust binary distributed by Astral, so we install
+# it via the upstream `install.sh` (drops the binary into `~/.cargo/bin/ruff`
+# or `~/.local/bin/ruff` depending on the host). This replaces the previous
+# `pipx install ruff` route, which:
+#   1. Required a working Python + pipx toolchain.
+#   2. Was fragile across pipx versions — pre-`0.15` pipx writes metadata
+#      formats that newer pipx refuses to manage, leaving an unreachable
+#      venv on disk with no `~/.local/bin/ruff` shim.
+# Debian/Ubuntu apt repositories are not a viable alternative: only `sid` and
+# `plucky` ship a `ruff` package at all, and both pin `0.0.291+dfsg1-4` (Aug
+# 2023) — three years behind upstream. The `install.sh` route always pulls
+# the matching latest release.
 install_ruff() {
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)"
-
-    if ! python -m pip show pipx &>/dev/null; then
-        python -m pip install --upgrade pipx
-        python -m pipx ensurepath
-    fi
-
-    if python -m pipx list --short 2>/dev/null | grep -q '^ruff '; then
+    if command -v ruff &>/dev/null; then
         echo "[configure-deps] ruff is already installed, skipping" >&2
         return
     fi
 
-    python -m pipx install ruff
+    # Astral's installer is POSIX `sh`, supports `dash`, and writes to
+    # `~/.cargo/bin` or `~/.local/bin`. We pipe directly per Astral's docs.
+    curl -fsSL https://astral.sh/ruff/install.sh | sh
 }
 
 # https://github.com/rios0rios0/aisync
