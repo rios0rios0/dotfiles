@@ -168,7 +168,7 @@ install_terra() {
             return 1
         fi
 
-        sh "$installer"
+        bash "$installer"
         status=$?
         rm -f "$installer"
         if [ "$status" -ne 0 ]; then return "$status"; fi

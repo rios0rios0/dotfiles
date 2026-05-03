@@ -95,6 +95,20 @@ sync_repo_to_default() {
     (
         cd "$repoPath" || return 1
 
+        # Refuse to proceed if the directory exists but isn't actually a git
+        # working tree (e.g., a stale `~/Development/<owner>/<repo>` left over
+        # from a botched clone). Without this guard, `git fetch` below would
+        # fail, the WARN branch would treat it as a transient network issue,
+        # and the caller would happily run `make install` against a non-repo.
+        if ! git rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+            echo "[sync-repo] ERROR: $repoPath is not a git working tree" >&2
+            return 1
+        fi
+
+        # Network failures (offline Termux, captive portal, …) are non-fatal:
+        # we keep going against the local state so the caller can still build
+        # a previously-cloned tree. The non-git case above is the one that
+        # must hard-fail.
         if ! git fetch --all --prune; then
             echo "[sync-repo] WARN: git fetch failed in $repoPath; continuing with local state" >&2
             return 0
@@ -168,7 +182,10 @@ install_go_tool_from_source() {
     if [ ! -d "$sourcePath" ]; then
         git clone "$repoUrl" "$sourcePath"
     fi
-    sync_repo_to_default "$sourcePath"
+    if ! sync_repo_to_default "$sourcePath"; then
+        echo "[$binaryName] ERROR: failed to sync $sourcePath to its default branch; aborting build" >&2
+        return 1
+    fi
 
     (cd "$sourcePath" && make install)
 }

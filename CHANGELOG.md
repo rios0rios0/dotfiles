@@ -18,7 +18,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ### Added
 
-- added `netcat-openbsd` to the Android `requirements` list in `run_once_before_android-002-install-dependencies.sh.tmpl` so the SSH `ProxyCommand` blocks in `dot_ssh/config.tmpl` (`nc -z -w 5 …` fallback to `ssh.github.com:443`/`altssh.gitlab.com:443`/`altssh.bitbucket.org:443`) work out of the box on Termux, where `nc` is otherwise unavailable
+- added `netcat-openbsd` to the Android `utilities` array in `run_once_before_android-002-install-dependencies.sh.tmpl` so the SSH `ProxyCommand` blocks in `dot_ssh/config.tmpl` (`nc -z -w 5 …` fallback to `ssh.github.com:443`/`altssh.gitlab.com:443`/`altssh.bitbucket.org:443`) work out of the box on Termux, where `nc` is otherwise unavailable
 - added a shared `install_go_tool_from_source` helper in the Android dependency installer that clones a Go repo into `~/Development/<host>/<owner>/<repo>`, syncs to its default branch via `sync_repo_to_default`, and runs `make install`. Inline comment documents why source-build is mandatory on Android: pre-built `GOOS=linux` Go binaries open Linux-only paths (`/etc/resolv.conf`, `/etc/hosts`, `/etc/ssl/certs/...`, `/etc/passwd`) and use the `faccessat2(439)` syscall blocked by Android's seccomp policy, so they would otherwise need `termux-etc-seccomp` wrapping; building locally with the Termux `golang` apt package produces `GOOS=android` binaries that run unwrapped
 
 ### Changed
