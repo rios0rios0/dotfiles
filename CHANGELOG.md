@@ -16,6 +16,21 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added `netcat-openbsd` to the Android `requirements` list in `run_once_before_android-002-install-dependencies.sh.tmpl` so the SSH `ProxyCommand` blocks in `dot_ssh/config.tmpl` (`nc -z -w 5 …` fallback to `ssh.github.com:443`/`altssh.gitlab.com:443`/`altssh.bitbucket.org:443`) work out of the box on Termux, where `nc` is otherwise unavailable
+- added a shared `install_go_tool_from_source` helper in the Android dependency installer that clones a Go repo into `~/Development/<host>/<owner>/<repo>`, syncs to its default branch via `sync_repo_to_default`, and runs `make install`. Inline comment documents why source-build is mandatory on Android: pre-built `GOOS=linux` Go binaries open Linux-only paths (`/etc/resolv.conf`, `/etc/hosts`, `/etc/ssl/certs/...`, `/etc/passwd`) and use the `faccessat2(439)` syscall blocked by Android's seccomp policy, so they would otherwise need `termux-etc-seccomp` wrapping; building locally with the Termux `golang` apt package produces `GOOS=android` binaries that run unwrapped
+
+### Changed
+
+- changed Android `install_terra`, `install_dev_toolkit`, and `install_aisync` to all delegate to the new `install_go_tool_from_source` helper for one consistent source-build pattern. `install_terra` reverts to clone + `make install` (was briefly switched to `install.sh` in this same release cycle), `install_dev_toolkit` drops the `curl … install.sh | bash` fetch, and `install_aisync` drops `go install …@latest`
+- changed Linux/WSL `install_aisync` to fetch the upstream `https://raw.githubusercontent.com/rios0rios0/aisync/main/install.sh` (mirroring `install_dev_toolkit`) instead of `go install`-ing from source — pre-built `GOOS=linux` Go binaries run natively under glibc with no `/etc/*` redirection needed, and this drops the requirement for a working `go` toolchain on the install host
+- changed Linux/WSL to install `terra` (via the upstream `install.sh` from `rios0rios0/terra`) and let `terra update` provision `terraform`/`terragrunt`, replacing the standalone `install_terraform` (which added the HashiCorp apt repo + `apt install terraform`) and `install_terragrunt` (which `curl`-ed `terragrunt_linux_amd64` from a pinned Gruntwork release into `/usr/local/bin`). This brings Linux/WSL in line with Android (where `terra` has always been the only path) so per-project `terraform`/`terragrunt` versions are managed identically across platforms; on Linux the binaries `terra update` downloads run natively under glibc and need none of the `termux-etc-seccomp` wrapping that `run_after_android-003-wrap-terra-clis.sh` applies on Android
+
+### Fixed
+
+- fixed `install_termux_etc_redirect` in the Android dependency installer crashing with "There is no tracking information for the current branch" when the local clone was parked on a feature branch — extracted a `sync_repo_to_default` helper that fetches `origin`, resolves the upstream default branch via `refs/remotes/origin/HEAD` (with a `git remote set-head origin --auto` fallback and a final `main` fallback), checks it out, and rebases against `origin/<default>` before running the build/install step
+
 ## [0.13.0] - 2026-04-30
 
 ### Added

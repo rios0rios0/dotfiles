@@ -141,34 +141,40 @@ install_krew() {
     kubectl krew install ns
 }
 
-# https://developer.hashicorp.com/terraform/install
-install_terraform() {
-    if command -v terraform &>/dev/null; then
-        echo "[configure-deps] terraform is already installed, skipping" >&2
-        return
-    fi
-
-    wget -O - https://apt.releases.hashicorp.com/gpg | sudo gpg --yes --dearmor -o /usr/share/keyrings/hashicorp-archive-keyring.gpg
-    echo "deb [arch=$(dpkg --print-architecture) signed-by=/usr/share/keyrings/hashicorp-archive-keyring.gpg] https://apt.releases.hashicorp.com bullseye main" | sudo tee /etc/apt/sources.list.d/hashicorp.list
-    sudo apt update && sudo apt install terraform
-}
-
+# https://github.com/rios0rios0/terra
 # https://terragrunt.gruntwork.io/docs/getting-started/install/
-install_terragrunt() {
-    local target_version="v0.76.6"
+# https://developer.hashicorp.com/terraform/install
+#
+# `terra` is the cross-platform launcher that pins and fetches the matching
+# `terraform`/`terragrunt` versions per project. Letting it own the install
+# replaces the previous one-off `install_terraform` (HashiCorp apt repo) and
+# `install_terragrunt` (direct GitHub release download) functions and keeps
+# Linux/WSL aligned with Android, where this has always been the only path.
+# `terra update` itself downloads the matching `terraform`/`terragrunt`
+# binaries; on Linux they are vanilla `GOOS=linux` Go executables that run
+# natively under glibc, so no `termux-etc-seccomp`-style wrapping is needed
+# (that part is Android-only and lives in `run_after_android-003-wrap-terra-clis.sh`).
+install_terra() {
+    if command -v terra &>/dev/null; then
+        echo "[configure-deps] terra is already installed, skipping" >&2
+    else
+        local installer
+        local status
 
-    if command -v terragrunt &>/dev/null; then
-        local current_version
-        current_version="$(terragrunt --version 2>/dev/null | grep -oP 'v[\d.]+')" || true
-        if [[ "$current_version" == "$target_version" ]]; then
-            echo "[configure-deps] terragrunt $target_version is already installed, skipping" >&2
-            return
+        installer="$(mktemp)"
+        if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/terra/main/install.sh -o "$installer"; then
+            echo "[terra] ERROR: failed to download installer" >&2
+            rm -f "$installer"
+            return 1
         fi
+
+        sh "$installer"
+        status=$?
+        rm -f "$installer"
+        if [ "$status" -ne 0 ]; then return "$status"; fi
     fi
 
-    curl -LO "https://github.com/gruntwork-io/terragrunt/releases/download/${target_version}/terragrunt_linux_amd64"
-    sudo mv terragrunt_linux_amd64 /usr/local/bin/terragrunt
-    sudo chmod +x /usr/local/bin/terragrunt
+    terra update
 }
 
 # https://sdkman.io/install/
@@ -422,23 +428,33 @@ install_ruff() {
 # `aisync` syncs AI assistant rules/agents/skills across `~/.claude/`, `~/.cursor/`, etc.
 # It replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl
 # `install-rules.sh` from `rios0rios0/guide` on every chezmoi apply.
+#
+# On Linux/WSL we fetch the upstream `install.sh` (same shape as
+# `install_dev_toolkit` and what `terra` ships) instead of `go install`-ing from
+# source. The pre-built `linux-<arch>` Go binary runs natively under glibc — no
+# Termux-style `/etc/*` redirection or seccomp suppression is needed — and
+# avoids requiring a working `go` toolchain on this host.
 install_aisync() {
     if command -v aisync &>/dev/null; then
         echo "[configure-deps] aisync is already installed, skipping" >&2
         return
     fi
 
-    # Source GVM so `go` resolves to the version installed by `install_gvm`.
-    export GVM_ROOT="$HOME/.gvm"
-    # shellcheck source=/dev/null
-    [[ -s "$GVM_ROOT/scripts/gvm" ]] && source "$GVM_ROOT/scripts/gvm"
+    local installer
+    local status
 
-    if ! command -v go &>/dev/null; then
-        echo "[configure-deps] ERROR: go is not available; install_gvm must run before install_aisync" >&2
+    installer="$(mktemp)"
+    if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/aisync/main/install.sh -o "$installer"; then
+        echo "[aisync] ERROR: failed to download installer" >&2
+        rm -f "$installer"
         return 1
     fi
 
-    go install github.com/rios0rios0/aisync/cmd/aisync@latest
+    bash "$installer"
+    status=$?
+    rm -f "$installer"
+
+    return "$status"
 }
 
 # https://developer.atlassian.com/cloud/acli/guides/install-linux/
@@ -496,8 +512,7 @@ sudo usermod --shell "$(which zsh)" "$USER"
 install_gvm || exit 1
 install_kubectl
 install_krew
-install_terraform
-install_terragrunt
+install_terra
 install_sdkman
 install_nvm
 install_pyenv

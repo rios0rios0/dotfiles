@@ -58,6 +58,7 @@ utilities=(
     "which"             # it performs command lookups
     "mlocate"           # it performs file searches (locate and updatedb)
     "openssh"           # used to clone Git repositories and also authentication
+    "netcat-openbsd"    # provides `nc` (Termux ships no default), required by SSH `ProxyCommand` blocks in `dot_ssh/config.tmpl`
     "parallel"          # it runs many threads of a command at the same time
     "rsync"             # provides file sync function
     "rclone"            # it's for syncing files with cloud storage (OneDrive, Google Drive, S3, etc.)
@@ -81,6 +82,95 @@ apt install --no-install-recommends --yes "${languages[@]}"
 # =========================================================================================================
 command_exists() {
   command -v "$1" >/dev/null 2>&1
+}
+
+# Sync a clone to its origin's default branch.
+# `git pull --rebase` fails when the working branch has no upstream tracking
+# (e.g., the local clone is parked on a feature branch from previous work),
+# producing "There is no tracking information for the current branch".
+# Detect HEAD via `origin/HEAD`, check it out, then rebase against the remote.
+sync_repo_to_default() {
+    local repoPath="$1"
+
+    (
+        cd "$repoPath" || return 1
+
+        if ! git fetch --all --prune; then
+            echo "[sync-repo] WARN: git fetch failed in $repoPath; continuing with local state" >&2
+            return 0
+        fi
+
+        local defaultBranch
+        defaultBranch="$(git symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')"
+        if [ -z "$defaultBranch" ]; then
+            git remote set-head origin --auto >/dev/null 2>&1 || true
+            defaultBranch="$(git symbolic-ref --quiet refs/remotes/origin/HEAD 2>/dev/null | sed 's@^refs/remotes/origin/@@')"
+        fi
+        if [ -z "$defaultBranch" ]; then
+            defaultBranch="main"
+        fi
+
+        if ! git checkout "$defaultBranch"; then
+            echo "[sync-repo] WARN: failed to checkout $defaultBranch in $repoPath; skipping rebase" >&2
+            return 0
+        fi
+        git pull --rebase origin "$defaultBranch"
+    )
+}
+
+# Install a Go-based tool by cloning its repo and running `make install` with
+# Termux's native `golang` (apt) toolchain.
+#
+# Why source-build instead of fetching the upstream `install.sh` / release
+# tarball on Android: pre-built `linux-arm64` Go binaries are produced with
+# `GOOS=linux`, so at runtime they:
+#   1. Open Linux paths that don't exist under Termux's bionic layout —
+#      `/etc/resolv.conf`, `/etc/hosts`, `/etc/ssl/certs/...`, `/etc/passwd`
+#      (the last for `os/user.Current()`).
+#   2. Issue the `faccessat2(439)` syscall, which Android's seccomp policy
+#      blocks with `SIGSYS` ("bad system call").
+# Running them at all therefore requires wrapping every entrypoint with
+# `termux-etc-seccomp` (the LD_PRELOAD shim that redirects `/etc/*` to
+# `$PREFIX/etc/*` and suppresses `SIGSYS`). Building locally with the Termux
+# `golang` package produces `GOOS=android` binaries that already use bionic's
+# `getaddrinfo`, the Termux file paths, and avoid the blocked syscalls — so
+# they run unwrapped just like `aisync` always has. Same reasoning is encoded
+# in `install_gvm`'s comment block above.
+#
+# All three of our Go tools (`terra`, `dev-toolkit`, `aisync`) ship a `make
+# install` target, so a single helper covers them.
+#
+# Args:
+#   $1 — repository HTTPS URL (e.g. https://github.com/rios0rios0/terra.git)
+#   $2 — installed binary name (used both as the "already installed?" sentinel
+#        and as the friendly log prefix)
+install_go_tool_from_source() {
+    local repoUrl="$1"
+    local binaryName="$2"
+
+    if command_exists "$binaryName" || [ -x "$HOME/.local/bin/$binaryName" ]; then
+        echo "[$binaryName] already installed, skipping" >&2
+        return 0
+    fi
+
+    if ! command_exists go; then
+        echo "[$binaryName] ERROR: go is not available; the 'golang' Termux package must be installed first" >&2
+        return 1
+    fi
+
+    # Mirror the existing repo layout (e.g. ~/Development/github.com/owner/repo)
+    # so manual `cd` paths and earlier ad-hoc clones keep working.
+    local relPath
+    relPath="$(echo "$repoUrl" | sed -E 's@^https?://@@; s@\.git$@@')"
+    local sourcePath="$HOME/Development/$relPath"
+
+    mkdir -p "$(dirname "$sourcePath")"
+    if [ ! -d "$sourcePath" ]; then
+        git clone "$repoUrl" "$sourcePath"
+    fi
+    sync_repo_to_default "$sourcePath"
+
+    (cd "$sourcePath" && make install)
 }
 
 # https://ohmyz.sh/#install
@@ -112,9 +202,11 @@ install_termux_etc_redirect() {
       git clone https://github.com/rios0rios0/termux-etc-redirect.git "$sourcePath"
   fi
 
+  sync_repo_to_default "$sourcePath"
+
   # Run in a subshell to avoid changing the script's working directory
   (
-    cd "$sourcePath" && git fetch --all && git pull --rebase
+    cd "$sourcePath" || return 1
 
     # Build, install, and create missing config files (resolv.conf, nsswitch.conf)
     ./scripts/install.sh
@@ -124,23 +216,13 @@ install_termux_etc_redirect() {
 # github.com/rios0rios0/terra
 # https://terragrunt.gruntwork.io/docs/getting-started/install/
 # https://developer.hashicorp.com/terraform/install
+#
+# `terra update` itself fetches `terragrunt`/`terraform` as `GOOS=linux` blobs;
+# those *do* need wrapping and are handled by
+# `run_after_android-003-wrap-terra-clis.sh`. `terra` itself we build from
+# source so the launcher entrypoint stays unwrapped.
 install_terra() {
-    # TODO: can't avoid repetition?
-    binPath="$HOME/.local/bin"
-    terraBin="$binPath/terra"
-
-    if [ ! -f "$terraBin" ]; then
-        sourcePath="$HOME/Development/github.com/rios0rios0/terra"
-        if [ ! -d "$sourcePath" ]; then
-            git clone https://github.com/rios0rios0/terra.git "$sourcePath"
-        fi
-        cd "$sourcePath" && git fetch --all && git pull --rebase
-
-        make install
-    else
-        echo "Terra is already installed."
-    fi
-
+    install_go_tool_from_source https://github.com/rios0rios0/terra.git terra
     terra update
 }
 
@@ -232,24 +314,7 @@ install_gemini_cli() {
 
 # https://github.com/rios0rios0/dev-toolkit
 install_dev_toolkit() {
-    binPath="$HOME/.local/bin"
-    devBin="$binPath/dev"
-
-    if [ ! -f "$devBin" ]; then
-        local installer
-        installer="$(mktemp)"
-        if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/dev-toolkit/main/install.sh -o "$installer"; then
-            echo "[dev-toolkit] ERROR: failed to download installer" >&2
-            rm -f "$installer"
-            return 1
-        fi
-        bash "$installer"
-        local status=$?
-        rm -f "$installer"
-        if [ "$status" -ne 0 ]; then return "$status"; fi
-    else
-        echo "dev-toolkit is already installed."
-    fi
+    install_go_tool_from_source https://github.com/rios0rios0/dev-toolkit.git dev
 }
 
 # https://1password.com/downloads/command-line/
@@ -492,17 +557,7 @@ install_ruff() {
 # `install-rules.sh` from `rios0rios0/guide` on every chezmoi apply.
 # Uses Termux's native `golang` apt package (GVM is intentionally skipped on Android).
 install_aisync() {
-    if command_exists aisync; then
-        echo "[configure-deps] aisync is already installed, skipping" >&2
-        return
-    fi
-
-    if ! command_exists go; then
-        echo "[configure-deps] ERROR: go is not available; the 'golang' Termux package must be installed first" >&2
-        return 1
-    fi
-
-    go install github.com/rios0rios0/aisync/cmd/aisync@latest
+    install_go_tool_from_source https://github.com/rios0rios0/aisync.git aisync
 }
 
 install_oh_my_zsh
