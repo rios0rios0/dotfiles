@@ -67,6 +67,7 @@ utilities=(
     "tmux"              # terminal multiplexer for managing multiple sessions under one process tree
     "shellcheck"        # it's for static analysis of shell scripts (used by `make lint`)
     "postgresql"        # provides the `psql` client (Termux ships server + client in one package)
+    "ruff"              # https://docs.astral.sh/ruff/ — Termux ships the upstream Rust binary as a native `aarch64` apt package, so we use it directly instead of going through `pipx` (no Python venv, no pipx-metadata fragility, faster, Termux-maintained)
 )
 apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
@@ -546,29 +547,6 @@ install_azure_cli() {
     az extension add --name azure-devops
 }
 
-# https://docs.astral.sh/ruff/
-# Installed via pipx so it lives outside the active project's venv and is callable
-# from `make lint-python` regardless of the current pyenv/poetry shell context.
-install_ruff() {
-    if ! command_exists pip; then
-        echo "Install 'pip' first, it seems to be NOT installed..."
-
-        return;
-    fi
-
-    if ! python -m pip show pipx &>/dev/null; then
-        python -m pip install --upgrade pipx
-        python -m pipx ensurepath
-    fi
-
-    if python -m pipx list --short 2>/dev/null | grep -q '^ruff '; then
-        echo "[configure-deps] ruff is already installed, skipping" >&2
-        return
-    fi
-
-    python -m pipx install ruff
-}
-
 # https://github.com/rios0rios0/aisync
 # `aisync` syncs AI assistant rules/agents/skills across `~/.claude/`, `~/.cursor/`, etc.
 # It replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl
@@ -607,7 +585,6 @@ install_github_copilot
 install_golangci_lint
 install_aws_cli
 install_azure_cli
-install_ruff
 install_aisync
 install_acli
 
