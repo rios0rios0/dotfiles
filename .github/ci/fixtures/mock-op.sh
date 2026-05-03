@@ -1,6 +1,12 @@
-#!/bin/bash
+#!/bin/sh
 # Mock 1Password CLI for CI testing
 # Returns deterministic JSON fixtures based on the command and arguments
+#
+# POSIX `sh` (not `bash`): chezmoi fork/exec's this script during
+# `make test-template-render`, so the kernel reads the shebang directly.
+# Termux has `/bin/sh` (Android's mksh) and `/data/data/com.termux/files/usr/bin/bash`,
+# but no `/bin/bash` or `/usr/bin/env`. CI's Linux runner has `/bin/sh -> dash`.
+# Sticking to POSIX (`[ ]`, `=`, no arrays) keeps this fixture executable on both.
 
 FIXTURES_DIR="$(cd "$(dirname "$0")" && pwd)"
 
@@ -8,7 +14,7 @@ FIXTURES_DIR="$(cd "$(dirname "$0")" && pwd)"
 echo "[mock-op] called with: $*" >&2
 
 # Strip --session flag and its value (chezmoi passes this after signin)
-while [[ "${1:-}" == --session ]]; do
+while [ "${1:-}" = "--session" ]; do
     shift 2
 done
 
@@ -24,14 +30,14 @@ case "$CMD" in
             get)
                 # Skip flags (--format, --vault, --account) to find the positional item name
                 ITEM_NAME=""
-                while [[ $# -gt 0 ]]; do
+                while [ $# -gt 0 ]; do
                     case "$1" in
                         --format|--vault|--account)
                             shift
-                            [[ $# -gt 0 ]] && shift
+                            [ $# -gt 0 ] && shift
                             ;;
                         *)
-                            if [[ -z "$ITEM_NAME" ]]; then
+                            if [ -z "$ITEM_NAME" ]; then
                                 ITEM_NAME="$1"
                             fi
                             shift
