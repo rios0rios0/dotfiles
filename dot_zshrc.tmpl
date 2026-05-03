@@ -132,7 +132,7 @@ done
 typeset useKeychain=0
 if (( ${#sshIdentities[@]} > 0 )) && command -v keychain >/dev/null 2>&1; then
   useKeychain=1
-  eval "$(keychain --eval --quiet --agents ssh "${sshIdentities[@]}")"
+  eval "$(keychain --eval --quiet "${sshIdentities[@]}")"
 else
   zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
 fi
