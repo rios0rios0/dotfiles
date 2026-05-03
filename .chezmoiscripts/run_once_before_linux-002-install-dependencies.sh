@@ -418,14 +418,53 @@ install_ggshield() {
 # 2023) — three years behind upstream. The `install.sh` route always pulls
 # the matching latest release.
 install_ruff() {
-    if command -v ruff &>/dev/null; then
+    # Skip-check covers both "already on PATH" and "installed but PATH not yet
+    # refreshed" (Astral writes to `~/.local/bin/ruff` by default — that path
+    # is added to `PATH` by `dot_zshenv.tmpl`, but `run_once_before_*` runs
+    # before chezmoi applies files, so a fresh install in this same session
+    # may not be on PATH yet).
+    if command -v ruff &>/dev/null \
+        || [ -x "$HOME/.local/bin/ruff" ] \
+        || [ -x "$HOME/.cargo/bin/ruff" ]; then
         echo "[configure-deps] ruff is already installed, skipping" >&2
         return
     fi
 
-    # Astral's installer is POSIX `sh`, supports `dash`, and writes to
-    # `~/.cargo/bin` or `~/.local/bin`. We pipe directly per Astral's docs.
-    curl -fsSL https://astral.sh/ruff/install.sh | sh
+    # Mirror the `install_dev_toolkit`/`install_aisync` pattern: download to a
+    # temp file and check the exit status explicitly. `curl ... | sh` would
+    # mask download failures because this file doesn't enable `pipefail`, so
+    # a 4xx/5xx from `astral.sh` would silently leave nothing installed while
+    # the function reports success.
+    local installer
+    local status
+
+    installer="$(mktemp)"
+    if ! curl -fsSL https://astral.sh/ruff/install.sh -o "$installer"; then
+        echo "[configure-deps] ERROR: failed to download ruff installer" >&2
+        rm -f "$installer"
+        return 1
+    fi
+
+    # Astral's installer is POSIX `sh` (dash-tested per its shebang comment).
+    sh "$installer"
+    status=$?
+    rm -f "$installer"
+    if [ "$status" -ne 0 ]; then
+        echo "[configure-deps] ERROR: ruff installer exited with status $status" >&2
+        return "$status"
+    fi
+
+    # Belt-and-suspenders: verify the binary actually landed somewhere we can
+    # find it, in case the installer "succeeded" against a partial/corrupt
+    # download. Without this, future invocations of `make lint-python` would
+    # still fail with `ruff: command not found` even though this function
+    # returned cleanly.
+    if ! command -v ruff &>/dev/null \
+        && [ ! -x "$HOME/.local/bin/ruff" ] \
+        && [ ! -x "$HOME/.cargo/bin/ruff" ]; then
+        echo "[configure-deps] ERROR: ruff installer reported success but no binary found on PATH or in ~/.local/bin / ~/.cargo/bin" >&2
+        return 1
+    fi
 }
 
 # https://github.com/rios0rios0/aisync
