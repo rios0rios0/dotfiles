@@ -243,10 +243,11 @@ install_termux_etc_redirect() {
 install_terra() {
     install_go_tool_from_source https://github.com/rios0rios0/terra.git terra
     # On Android we build terra from source, so `terra self-update` is not
-    # appropriate — the source repo is the canonical version. `-a=y` keeps
-    # `terra update` non-interactive when newer terraform/terragrunt blobs
-    # are available.
-    terra -a=y update
+    # appropriate — the source repo is the canonical version. `terra update`
+    # exposes no auto-answer flag in the currently installed binary, so pipe
+    # `yes` to stdin to auto-confirm the y/N prompts when newer
+    # terraform/terragrunt blobs are detected.
+    yes y | terra update
 }
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/

@@ -199,9 +199,11 @@ install_terra() {
     # `--force` skips the interactive prompt.
     terra self-update --force || echo "[configure-deps] WARN: terra self-update failed; continuing" >&2
 
-    # `-a=y` auto-answers the y/N prompts when newer terraform/terragrunt
-    # versions are detected, so unattended `chezmoi apply` runs don't hang.
-    terra -a=y update
+    # `terra update` (alias of `install`) prompts y/N when newer
+    # terraform/terragrunt versions are detected and exposes no auto-answer
+    # flag in the currently installed binary. Pipe `yes` to stdin so the
+    # prompts auto-confirm during unattended `chezmoi apply` runs.
+    yes y | terra update
 }
 
 # https://sdkman.io/install/
