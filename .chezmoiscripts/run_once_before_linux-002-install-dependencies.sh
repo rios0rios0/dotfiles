@@ -116,6 +116,26 @@ install_kubectl() {
 }
 
 # https://krew.sigs.k8s.io/docs/user-guide/setup/install/
+#
+# `kubectl krew` fetches its plugin index from `kubernetes-sigs/krew-index` on
+# every operation. GitHub occasionally returns HTTP 500 for this repo, which
+# fails `update`/`upgrade`/`install`. We retry a few times and treat persistent
+# failures as non-fatal so a transient outage doesn't break `chezmoi apply`.
+krew_retry() {
+    local max_attempts=3
+    local attempt=1
+    while (( attempt <= max_attempts )); do
+        if kubectl krew "$@"; then
+            return 0
+        fi
+        echo "[configure-deps] WARN: 'kubectl krew $*' failed (attempt ${attempt}/${max_attempts})" >&2
+        attempt=$(( attempt + 1 ))
+        (( attempt <= max_attempts )) && sleep 5
+    done
+    echo "[configure-deps] WARN: 'kubectl krew $*' failed after ${max_attempts} attempts; continuing" >&2
+    return 0
+}
+
 install_krew() {
     if [[ -d "${KREW_ROOT:-$HOME/.krew}" ]] && command -v kubectl-krew &>/dev/null; then
         echo "[configure-deps] krew is already installed, skipping download" >&2
@@ -135,10 +155,10 @@ install_krew() {
     export PATH="${KREW_ROOT:-$HOME/.krew}/bin:$PATH"
 
     # Upgrade krew itself and all installed plugins to the latest release
-    kubectl krew upgrade
+    krew_retry upgrade
 
-    kubectl krew install ctx
-    kubectl krew install ns
+    krew_retry install ctx
+    krew_retry install ns
 }
 
 # https://github.com/rios0rios0/terra
@@ -174,7 +194,14 @@ install_terra() {
         if [ "$status" -ne 0 ]; then return "$status"; fi
     fi
 
-    terra update
+    # Keep terra itself up to date — `terra update` only refreshes
+    # terraform/terragrunt and emits a warning when a newer terra exists.
+    # `--force` skips the interactive prompt.
+    terra self-update --force || echo "[configure-deps] WARN: terra self-update failed; continuing" >&2
+
+    # `-a=y` auto-answers the y/N prompts when newer terraform/terragrunt
+    # versions are detected, so unattended `chezmoi apply` runs don't hang.
+    terra -a=y update
 }
 
 # https://sdkman.io/install/
@@ -189,6 +216,16 @@ install_sdkman() {
     export SDKMAN_DIR="$HOME/.sdkman"
     # shellcheck source=/dev/null
     [[ -s "$SDKMAN_DIR/bin/sdkman-init.sh" ]] && source "$SDKMAN_DIR/bin/sdkman-init.sh"
+
+    # SDKMAN writes download headers/post-install hooks to `$SDKMAN_DIR/tmp`
+    # before running curl. The directory occasionally goes missing (e.g. after
+    # a manual cleanup) and `sdk install` fails with
+    # "curl: Failed to open .../*.headers.tmp". Recreate it defensively.
+    mkdir -p "$SDKMAN_DIR/tmp"
+
+    # Keep SDKMAN itself up to date so candidate metadata (new Java/Gradle
+    # versions, broker URLs) refreshes on every apply.
+    sdk selfupdate force >/dev/null 2>&1 || echo "[configure-deps] WARN: sdk selfupdate failed; continuing" >&2
 
     sdk install java
     sdk install gradle
@@ -392,7 +429,10 @@ install_ggshield() {
     fi
 
     if python -m pipx list --short 2>/dev/null | grep -q '^ggshield '; then
-        echo "[configure-deps] ggshield is already installed, skipping" >&2
+        # ggshield prints "A new version of ggshield has been released" on
+        # every invocation when out of date. Auto-upgrade keeps it current.
+        echo "[configure-deps] ggshield is already installed, upgrading via pipx" >&2
+        python -m pipx upgrade ggshield || echo "[configure-deps] WARN: pipx upgrade ggshield failed; continuing" >&2
     else
         python -m pipx install ggshield
     fi

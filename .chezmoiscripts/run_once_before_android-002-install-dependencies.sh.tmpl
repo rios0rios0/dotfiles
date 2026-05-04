@@ -242,7 +242,11 @@ install_termux_etc_redirect() {
 # source so the launcher entrypoint stays unwrapped.
 install_terra() {
     install_go_tool_from_source https://github.com/rios0rios0/terra.git terra
-    terra update
+    # On Android we build terra from source, so `terra self-update` is not
+    # appropriate — the source repo is the canonical version. `-a=y` keeps
+    # `terra update` non-interactive when newer terraform/terragrunt blobs
+    # are available.
+    terra -a=y update
 }
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/
