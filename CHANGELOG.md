@@ -16,13 +16,15 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.14.1] - 2026-05-08
+
 ### Changed
 
-- hardened `install_krew` in `run_once_before_linux-002-install-dependencies.sh` with a new `krew_retry` helper that retries `kubectl krew upgrade`/`install` up to three times and treats persistent failures as non-fatal, so transient HTTP `500`s from the `kubernetes-sigs/krew-index` repository (e.g. `remote: Internal Server Error` during index fetch) no longer break `chezmoi apply`
 - changed `install_terra` in `run_once_before_linux-002-install-dependencies.sh` to call `terra self-update --force` followed by `yes y | terra update` so terra itself, `terraform`, and `terragrunt` upgrade non-interactively when newer versions are detected (previously `terra update` only refreshed `terraform`/`terragrunt` and printed `WARN: A new version of terra is available`, leaving terra itself stuck on the installed version, and the y/N prompts blocked unattended runs; `yes` is used because the currently installed `terra update` binary exposes no auto-answer flag)
-- updated `install_terra` in `run_once_before_android-002-install-dependencies.sh.tmpl` to pipe `yes y` into `terra update` so the y/N prompts for newer `terraform`/`terragrunt` blobs auto-answer on Android (terra itself is built from source, so `terra self-update` is intentionally not invoked)
+- hardened `install_krew` in `run_once_before_linux-002-install-dependencies.sh` with a new `krew_retry` helper that retries `kubectl krew upgrade`/`install` up to three times and treats persistent failures as non-fatal, so transient HTTP `500`s from the `kubernetes-sigs/krew-index` repository (e.g. `remote: Internal Server Error` during index fetch) no longer break `chezmoi apply`
 - hardened `install_sdkman` in `run_once_before_linux-002-install-dependencies.sh` to recreate `$SDKMAN_DIR/tmp` before `sdk install` (preventing `curl: Failed to open .../*.headers.tmp` when SDKMAN's tmp directory has been cleared) and to run `sdk selfupdate force` so candidate metadata stays current
 - updated `install_ggshield` in `run_once_before_linux-002-install-dependencies.sh` to run `python -m pipx upgrade ggshield` when ggshield is already present, so a new GitGuardian release no longer prints `A new version of ggshield (vX.Y.Z) has been released` on every commit hook invocation
+- updated `install_terra` in `run_once_before_android-002-install-dependencies.sh.tmpl` to pipe `yes y` into `terra update` so the y/N prompts for newer `terraform`/`terragrunt` blobs auto-answer on Android (terra itself is built from source, so `terra self-update` is intentionally not invoked)
 
 ## [0.14.0] - 2026-05-03
 
