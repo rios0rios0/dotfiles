@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- refreshed `.github/copilot-instructions.md` to replace stale proot/Alpine references with `termux-etc-seccomp`, update Linux terraform/terragrunt to `terra`-based management, correct ruff and aisync installation methods, add missing `claude-wrapper` logging prefix, and add `android-patch-claude-code-tmpdir.sh` to `dot_scripts/` listing
+
 ## [0.14.1] - 2026-05-08
 
 ### Changed
