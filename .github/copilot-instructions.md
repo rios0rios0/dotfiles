@@ -43,7 +43,7 @@ Always reference these instructions first and fallback to search or bash command
   apt install git chezmoi
   chezmoi init --apply rios0rios0
   ```
-- Android setup includes a proot/Alpine wrapper for running Linux binaries (1Password CLI, terraform, etc.) that cannot run natively on Termux.
+- Android setup includes a `termux-etc-seccomp` wrapper for running pre-compiled Go binaries (1Password CLI, terraform, etc.) that cannot run natively on Termux.
 
 ### Dependency Installation Scripts
 The repository includes comprehensive dependency installation scripts that run automatically during chezmoi application. Scripts are numbered to control execution order.
@@ -69,7 +69,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
   - **Oh My Zsh** — default Zsh framework
   - **GVM** — Go version manager (resolves and installs the latest stable Go version)
   - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)
-  - **Terraform** (HashiCorp apt repository) + **Terragrunt** (v0.76.6)
+  - **terra** (Terraform + Terragrunt version manager via upstream install script, same as Android)
   - **SDKMAN** — Java/Gradle ecosystem (installs latest Java and Gradle)
   - **NVM** (v0.40.2) — Node.js version manager (installs LTS + corepack)
   - **Pyenv** — Python version manager (installs Python 3.13.2)
@@ -79,8 +79,8 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** (via pip, installed into pyenv Python)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
-  - **ruff** (Python linter, via pipx) — used by `make lint-python` to lint embedded Python in `modify_*` templates
-  - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via `go install`) — syncs AI assistant rules/agents/skills into `~/.claude/`, `~/.cursor/`, etc.; replaces the legacy `run_after_*-install-ai-rules.*` scripts
+  - **ruff** (Python linter, via Astral install script) — used by `make lint-python` to lint embedded Python in `modify_*` templates
+  - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via upstream install script) — syncs AI assistant rules/agents/skills into `~/.claude/`, `~/.cursor/`, etc.; replaces the legacy `run_after_*-install-ai-rules.*` scripts
   - **Speedtest CLI** (Ookla, via packagecloud)
 - Each tool installation can take 5-15 minutes individually
 - **Critical**: Script requires internet access for downloading tools
@@ -96,9 +96,9 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 #### Android Dependencies (`.chezmoiscripts/run_once_before_android-002-install-dependencies.sh.tmpl`)
 - **TIMING**: Takes 45-90 minutes. NEVER CANCEL.
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
-- Sets up proot/Alpine wrapper for running Linux binaries natively
+- Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
-- Installs: Claude CLI, Gemini CLI, 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via pipx), aisync (via `go install`)
+- Installs: Claude CLI, Gemini CLI, 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 
@@ -183,6 +183,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
   - `linux-engineering-shell-credentials.sh`: Exports `cred:` fields from 1Password device note as env vars
   - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note
   - `linux-toolbox-watch-compress-folders.sh`: Background script watching and compressing `~/.histdb`, `~/.john`, etc.
+  - `android-patch-claude-code-tmpdir.sh`: Patches Claude Code for Termux compatibility (replaces hardcoded `/tmp` paths, symlinks system ripgrep)
 
 ### Platform Matrix
 
@@ -193,9 +194,9 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 | Script extension | `.sh`                                   | `.ps1`                              | `.sh`                                   |
 | Editor           | (any)                                   | Cursor / Visual Studio              | NeoVim (AstroVim, `~/.config/nvim/`)    |
 | MCP config       | `~/.cursor/mcp.json` (Docker-based)     | N/A                                 | `~/.config/mcphub/servers.json` (npx)   |
-| Terraform        | Native binaries                         | N/A                                 | proot/Alpine wrapper (`terra` command)  |
-| 1Password CLI    | `~/.local/bin/op` wrapper → `op.exe`    | Native `op.exe`                     | `~/.local/bin/op` → proot Alpine binary |
-| Docker           | Native                                  | Docker Desktop                      | N/A (uses proot)                        |
+| Terraform        | `terra` (same as Android)               | N/A                                 | `termux-etc-seccomp` wrapper (`terra`)  |
+| 1Password CLI    | `~/.local/bin/op` wrapper → `op.exe`    | Native `op.exe`                     | `~/.local/bin/op` → `termux-etc-seccomp` binary |
+| Docker           | Native                                  | Docker Desktop                      | N/A                                     |
 | SSH keys         | `~/.ssh/chezmoi` (age private key)      | `~\.ssh\chezmoi` (age private key)  | Retrieved via `op` wrapper              |
 
 ## Validation Scenarios
@@ -410,7 +411,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
