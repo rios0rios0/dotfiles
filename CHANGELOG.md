@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- refreshed `CLAUDE.md` and `.github/copilot-instructions.md` to add the missing `sync-repo` and `install-deps` logging prefixes to the documented prefix inventory
+
 ## [0.14.2] - 2026-05-19
 
 ### Changed
