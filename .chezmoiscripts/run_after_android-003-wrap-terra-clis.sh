@@ -18,7 +18,10 @@ BIN_DIR="$HOME/.local/bin"
 mkdir -p "$BIN_DIR"
 
 is_wrapper() {
-    [ -f "$1" ] && grep -q 'termux-etc-seccomp' "$1" 2>/dev/null
+    # Match only the current single-tool form. Old wrappers that chain
+    # `sigsys_launcher termux-etc-seccomp` also contain the string
+    # `termux-etc-seccomp`, but must be replaced by the simpler form.
+    [ -f "$1" ] && grep -q 'exec termux-etc-seccomp' "$1" 2>/dev/null
 }
 
 wrap_go_cli() {

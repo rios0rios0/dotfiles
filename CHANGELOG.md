@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Fixed
+
+- fixed `is_wrapper()` idempotency check in `run_after_android-003-wrap-terra-clis.sh` to match only the current single-tool form (`exec termux-etc-seccomp`), replacing old wrappers that chain `sigsys_launcher termux-etc-seccomp` — the old chain is no longer needed because `termux-etc-seccomp` now handles SIGSYS suppression internally via a race-free TRACEME+blocking `waitpid` design
+
 ## [0.14.0] - 2026-05-03
 
 ### Added
