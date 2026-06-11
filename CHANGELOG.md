@@ -20,6 +20,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 - refreshed `CLAUDE.md` and `.github/copilot-instructions.md` to add the missing `workspaces` logging prefix (used by `dot_scripts/linux-engineering-workspace-aliases.sh`) to the documented prefix inventory
 
+### Fixed
+
+- fixed `is_wrapper()` idempotency check in `run_after_android-003-wrap-terra-clis.sh` to match only the current single-tool form (`exec termux-etc-seccomp`), replacing old wrappers that chain `sigsys_launcher termux-etc-seccomp` — the old chain is no longer needed because `termux-etc-seccomp` now handles SIGSYS suppression internally via a race-free TRACEME+blocking `waitpid` design
+
 ## [0.14.3] - 2026-06-09
 
 ### Changed
@@ -41,7 +45,6 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - hardened `install_sdkman` in `run_once_before_linux-002-install-dependencies.sh` to recreate `$SDKMAN_DIR/tmp` before `sdk install` (preventing `curl: Failed to open .../*.headers.tmp` when SDKMAN's tmp directory has been cleared) and to run `sdk selfupdate force` so candidate metadata stays current
 - updated `install_ggshield` in `run_once_before_linux-002-install-dependencies.sh` to run `python -m pipx upgrade ggshield` when ggshield is already present, so a new GitGuardian release no longer prints `A new version of ggshield (vX.Y.Z) has been released` on every commit hook invocation
 - updated `install_terra` in `run_once_before_android-002-install-dependencies.sh.tmpl` to pipe `yes y` into `terra update` so the y/N prompts for newer `terraform`/`terragrunt` blobs auto-answer on Android (terra itself is built from source, so `terra self-update` is intentionally not invoked)
-
 ## [0.14.0] - 2026-05-03
 
 ### Added
