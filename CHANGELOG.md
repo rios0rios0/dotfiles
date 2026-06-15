@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- refreshed `CLAUDE.md` and `.github/copilot-instructions.md` to add the missing `workspaces` logging prefix (used by `dot_scripts/linux-engineering-workspace-aliases.sh`) to the documented prefix inventory
+
 ## [0.14.3] - 2026-06-09
 
 ### Changed
