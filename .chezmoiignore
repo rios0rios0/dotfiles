@@ -42,6 +42,7 @@ AppData
 .local/bin/ssh-add
 .sqlmap
 .freterc
+.hushlogin
 .npmrc
 .npmrc.2
 pyvenv.cfg
