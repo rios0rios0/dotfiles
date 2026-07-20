@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added [`ccswitch`](https://github.com/rios0rios0/ccswitch) integration: `install_ccswitch()` installs the CLI and `dot_zshrc.tmpl` starts its monitor daemon and wraps `claude` to rotate between backup Claude accounts when usage limits are exhausted (Linux/WSL, OAuth-based)
+
 ## [0.14.4] - 2026-06-18
 
 ### Changed

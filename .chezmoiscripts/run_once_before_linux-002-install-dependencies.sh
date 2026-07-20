@@ -542,6 +542,35 @@ install_aisync() {
     return "$status"
 }
 
+# https://github.com/rios0rios0/ccswitch
+# `ccswitch` monitors Claude Code usage and rotates between backup Claude accounts
+# when the active account's limits are exhausted. Installed like `aisync`: fetch the
+# upstream `install.sh`, which downloads the pre-built `linux-<arch>` binary into
+# ~/.local/bin. The shell integration (claude wrapper + daemon start) lives in
+# `dot_zshrc.tmpl`.
+install_ccswitch() {
+    if command -v ccswitch &>/dev/null; then
+        echo "[configure-deps] ccswitch is already installed, skipping" >&2
+        return
+    fi
+
+    local installer
+    local status
+
+    installer="$(mktemp)"
+    if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/ccswitch/main/install.sh -o "$installer"; then
+        echo "[configure-deps] ERROR: failed to download ccswitch installer" >&2
+        rm -f "$installer"
+        return 1
+    fi
+
+    bash "$installer"
+    status=$?
+    rm -f "$installer"
+
+    return "$status"
+}
+
 # https://developer.atlassian.com/cloud/acli/guides/install-linux/
 # Atlassian only publishes a rolling `latest` endpoint (no versioned URLs, no checksums/signatures),
 # so pinning or cryptographic verification is not possible upstream; the install tracks the latest
@@ -604,6 +633,7 @@ install_pyenv
 
 install_cursor_cli
 install_claude_cli
+install_ccswitch
 install_gemini_cli
 install_dev_toolkit
 

@@ -184,6 +184,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
   - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note
   - `linux-toolbox-watch-compress-folders.sh`: Background script watching and compressing `~/.histdb`, `~/.john`, etc.
   - `android-patch-claude-code-tmpdir.sh`: Patches Claude Code for Termux compatibility (replaces hardcoded `/tmp` paths, symlinks system ripgrep)
+- `dot_zshrc.tmpl` (Linux/WSL): starts the [`ccswitch`](https://github.com/rios0rios0/ccswitch) monitor daemon and wraps `claude` to rotate between backup Claude accounts when usage limits are exhausted; installed by `install_ccswitch()` in the Linux dependency script
 
 ### Platform Matrix
 
