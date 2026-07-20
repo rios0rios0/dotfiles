@@ -163,7 +163,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
 ### Key Managed Files
-- `dot_zshrc.tmpl` → `~/.zshrc`: Zsh configuration with ZINIT plugins, version managers, aliases
+- `dot_zshrc.tmpl` → `~/.zshrc`: Zsh configuration with ZINIT plugins, version managers, aliases; on Linux/WSL also keeps the [`ccswitch`](https://github.com/rios0rios0/ccswitch) monitor daemon alive and wraps `claude` to rotate between backup Claude accounts when usage limits are exhausted
 - `dot_zshenv.tmpl` → `~/.zshenv`: PATH setup for all Zsh invocations (critical for IDE integration)
 - `dot_gitconfig.tmpl` → `~/.gitconfig`: Git config with 1Password SSH/GPG signing, per-device keys
 - `dot_p10k.zsh` → `~/.p10k.zsh`: Powerlevel10k theme configuration

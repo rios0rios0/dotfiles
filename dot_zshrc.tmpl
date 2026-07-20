@@ -405,4 +405,26 @@ source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
 
 ###### Workspace Aliases ###########################################################
 source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
+{{- if eq .chezmoi.os "linux" }}
+
+###### Claude Account Rotation (ccswitch) ##########################################
+# Monitor Claude Code usage and rotate between backup accounts when limits run out.
+# See https://github.com/rios0rios0/ccswitch. Enroll each account once with
+# `ccswitch enroll`; afterwards rotation is automatic — no repeated `/login`.
+if command -v ccswitch >/dev/null 2>&1; then
+    # Keep the usage-monitoring daemon alive; it starts detached only if not running.
+    if [[ -o interactive ]]; then
+        ccswitch monitor --ensure-daemon 2>/dev/null
+    fi
+
+    # Wrap `claude` so every launch first ensures the current (healthy) account's
+    # credentials are on disk. `command` bypasses this function to run the real CLI.
+    # This is interactive-only: non-interactive shells (IDEs, MCP servers) source
+    # `.zshenv`, not `.zshrc`, so they never pick up this wrapper.
+    claude() {
+        ccswitch ensure --quiet 2>/dev/null
+        command claude "$@"
+    }
+fi
+{{- end }}
 
