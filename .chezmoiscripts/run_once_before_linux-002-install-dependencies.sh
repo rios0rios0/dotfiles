@@ -558,7 +558,7 @@ install_ccswitch() {
     local status
 
     installer="$(mktemp)"
-    if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/ccswitch/main/install.sh -o "$installer"; then
+    if ! curl --proto '=https' -fsSL https://raw.githubusercontent.com/rios0rios0/ccswitch/main/install.sh -o "$installer"; then
         echo "[configure-deps] ERROR: failed to download ccswitch installer" >&2
         rm -f "$installer"
         return 1
