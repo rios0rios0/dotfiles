@@ -191,7 +191,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 | Prompt theme     | Powerlevel10k (`~/.p10k.zsh`)           | Oh My Posh (`~/.oh-my-posh.json`)   | Powerlevel10k (`~/.p10k.zsh`)           |
 | Script extension | `.sh`                                   | `.ps1`                              | `.sh`                                   |
 | Editor           | (any)                                   | JetBrains Toolbox / Visual Studio   | NeoVim (AstroVim, `~/.config/nvim/`)    |
-| MCP config       | `~/.claude.json` (Docker-based)         | N/A                                 | `~/.config/mcphub/servers.json` (npx)   |
+| MCP config       | `~/.claude.json` (Docker-based)         | `~/.claude.json` (Docker-based)     | `~/.config/mcphub/servers.json` (npx)   |
 | Terraform        | `terra` (same as Android)               | N/A                                 | `termux-etc-seccomp` wrapper (`terra`)  |
 | 1Password CLI    | `~/.local/bin/op` wrapper → `op.exe`    | Native `op.exe`                     | `~/.local/bin/op` → `termux-etc-seccomp` binary |
 | Docker           | Native                                  | Docker Desktop                      | N/A                                     |

@@ -66,7 +66,7 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 | Shell      | Zsh + Oh My Zsh + p10k       | PowerShell + Oh My Posh | Zsh + Oh My Zsh + p10k           |
 | Scripts    | `.sh`                        | `.ps1`                  | `.sh`                            |
 | Docker     | Native                       | N/A                     | `termux-etc-seccomp` wrapper     |
-| MCP config | `modify_dot_claude.json.tmpl` (Docker-based) | N/A | `dot_config/mcphub/` (npx-based) |
+| MCP config | `modify_dot_claude.json.tmpl` (Docker-based) | `modify_dot_claude.json.tmpl` (Docker-based) | `dot_config/mcphub/` (npx-based) |
 | 1Password  | Native `op` CLI              | Native `op` CLI         | `termux-etc-seccomp` wrapper at `.local/bin/op` |
 
 ## Key Files

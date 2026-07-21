@@ -63,7 +63,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 | Scripts | `.sh` (bash) | `.ps1` (PowerShell) | `.sh` (bash) |
 | 1Password | `op` wrapper (calls `op.exe` from WSL) | Native `op.exe` | `op` wrapper (proot Alpine) |
 | Docker | Native | Docker Desktop | N/A (proot wrappers) |
-| MCP Config | `~/.claude.json` (Docker) | N/A | `~/.config/mcphub/servers.json` (npx) |
+| MCP Config | `~/.claude.json` (Docker) | `~/.claude.json` (Docker) | `~/.config/mcphub/servers.json` (npx) |
 | Editor | Any | JetBrains Toolbox, Visual Studio | Neovim (AstroVim) |
 
 ## Installation

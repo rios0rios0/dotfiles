@@ -343,6 +343,22 @@ install_copilot_cli() {
         return 0
     fi
 
+    # `install_nvm` returns early when npm already exists, so this may run under the
+    # Termux-provided Node. Check the major version explicitly rather than letting a
+    # doomed install download and fail (or install a package that breaks at runtime).
+    local nodeMajor
+    nodeMajor="$(node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
+    case "$nodeMajor" in
+        '' | *[!0-9]*)
+            echo "[copilot] WARN: could not determine the Node.js version, skipping" >&2
+            return 0
+            ;;
+    esac
+    if [ "$nodeMajor" -lt 22 ]; then
+        echo "[copilot] WARN: Node.js 22+ is required, found v$nodeMajor, skipping" >&2
+        return 0
+    fi
+
     npm install -g @github/copilot || {
         echo "[copilot] WARN: install failed, skipping" >&2
     }
