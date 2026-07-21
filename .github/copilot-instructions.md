@@ -74,7 +74,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
   - **NVM** (v0.40.2) — Node.js version manager (installs LTS + corepack)
   - **Pyenv** — Python version manager (installs Python 3.13.2)
   - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
-  - **GitHub Copilot CLI** (`@github/copilot` npm package, binary `copilot`; requires Node.js 22+)
+  - **GitHub Copilot CLI** (binary `copilot`, via upstream install script into `~/.local/bin`)
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** (via pip, installed into pyenv Python)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there

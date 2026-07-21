@@ -302,15 +302,36 @@ install_claude_cli() {
 }
 
 # https://github.com/github/copilot-cli
-# The agentic GitHub Copilot CLI (binary `copilot`). Requires Node.js 22+, so it
-# must run after `install_nvm`. This supersedes the deprecated `github/gh-copilot`
-# `gh` extension, which only provided `gh copilot suggest`/`explain`.
+# The agentic GitHub Copilot CLI (binary `copilot`). This supersedes the deprecated
+# `github/gh-copilot` `gh` extension, which only provided `gh copilot suggest`/`explain`.
+#
+# Installed from the upstream install script (same shape as `install_ccswitch` and
+# `install_aisync`) rather than `npm install -g @github/copilot`. The npm package
+# relies on a postinstall lifecycle script to fetch its platform-specific binary, so
+# it breaks under `ignore-scripts=true` and cannot be installed with
+# `--ignore-scripts`. The upstream installer verifies checksums and honours PREFIX,
+# defaulting to `$HOME/.local/bin` for non-root — already on PATH via `dot_zshenv`.
 install_copilot_cli() {
     if command -v copilot &>/dev/null; then
         echo "[configure-deps] GitHub Copilot CLI is already installed, skipping" >&2
         return
     fi
-    npm install -g @github/copilot
+
+    local installer
+    local status
+
+    installer="$(mktemp)"
+    if ! curl --proto '=https' -fsSL https://gh.io/copilot-install -o "$installer"; then
+        echo "[configure-deps] ERROR: failed to download GitHub Copilot CLI installer" >&2
+        rm -f "$installer"
+        return 1
+    fi
+
+    PREFIX="$HOME/.local" bash "$installer"
+    status=$?
+    rm -f "$installer"
+
+    return "$status"
 }
 
 # https://github.com/rios0rios0/dev-toolkit

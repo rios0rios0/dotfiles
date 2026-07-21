@@ -19,7 +19,7 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 ### Added
 
 - added [`ccswitch`](https://github.com/rios0rios0/ccswitch) integration: `install_ccswitch()` installs the CLI and `dot_zshrc.tmpl` starts its monitor daemon and wraps `claude` to rotate between backup Claude accounts when usage limits are exhausted (Linux/WSL, OAuth-based)
-- added the agentic [GitHub Copilot CLI](https://github.com/github/copilot-cli) on all three platforms: `install_copilot_cli()` installs the `@github/copilot` npm package on Linux/WSL and Android (both after `install_nvm`, since it requires Node.js `22+`), and Windows installs the `GitHub.Copilot` winget package
+- added the agentic [GitHub Copilot CLI](https://github.com/github/copilot-cli) on all three platforms: `install_copilot_cli()` installs it from the upstream install script into `~/.local/bin` on Linux/WSL and from the `@github/copilot` npm package on Android (best-effort, after `install_nvm`), and Windows installs the `GitHub.Copilot` winget package
 
 ### Removed
 
