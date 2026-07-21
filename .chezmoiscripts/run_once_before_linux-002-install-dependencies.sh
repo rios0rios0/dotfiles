@@ -292,15 +292,6 @@ install_pyenv() {
     eval "$(pyenv init -)"
 }
 
-# https://cursor.com/docs/cli/installation
-install_cursor_cli() {
-    if command -v agent &>/dev/null; then
-        echo "[configure-deps] Cursor CLI is already installed, skipping" >&2
-        return
-    fi
-    curl https://cursor.com/install -fsSL | bash
-}
-
 # https://github.com/anthropics/claude-code
 install_claude_cli() {
     if command -v claude &>/dev/null; then
@@ -310,13 +301,16 @@ install_claude_cli() {
     npm install -g @anthropic-ai/claude-code
 }
 
-# https://github.com/google-gemini/gemini-cli
-install_gemini_cli() {
-    if command -v gemini &>/dev/null; then
-        echo "[configure-deps] Gemini CLI is already installed, skipping" >&2
+# https://github.com/github/copilot-cli
+# The agentic GitHub Copilot CLI (binary `copilot`). Requires Node.js 22+, so it
+# must run after `install_nvm`. This supersedes the deprecated `github/gh-copilot`
+# `gh` extension, which only provided `gh copilot suggest`/`explain`.
+install_copilot_cli() {
+    if command -v copilot &>/dev/null; then
+        echo "[configure-deps] GitHub Copilot CLI is already installed, skipping" >&2
         return
     fi
-    npm install -g @google/gemini-cli
+    npm install -g @github/copilot
 }
 
 # https://github.com/rios0rios0/dev-toolkit
@@ -510,7 +504,8 @@ install_ruff() {
 }
 
 # https://github.com/rios0rios0/aisync
-# `aisync` syncs AI assistant rules/agents/skills across `~/.claude/`, `~/.cursor/`, etc.
+# `aisync` syncs AI assistant rules/agents/skills across AI assistant home
+# directories such as `~/.claude/`.
 # It replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl
 # `install-rules.sh` from `rios0rios0/guide` on every chezmoi apply.
 #
@@ -631,10 +626,9 @@ install_sdkman
 install_nvm
 install_pyenv
 
-install_cursor_cli
 install_claude_cli
 install_ccswitch
-install_gemini_cli
+install_copilot_cli
 install_dev_toolkit
 
 install_github_cli

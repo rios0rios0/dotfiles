@@ -44,8 +44,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 ### Development Tools
 
-- **Cursor** (AI editor with Docker-based MCP servers on Linux)
-- **Claude Code** + **Gemini CLI** (AI coding assistants)
+- **Claude Code** + **GitHub Copilot CLI** (AI coding assistants)
 - **Neovim** with AstroVim (Android)
 
 ### Security and Pentesting
@@ -64,8 +63,8 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 | Scripts | `.sh` (bash) | `.ps1` (PowerShell) | `.sh` (bash) |
 | 1Password | `op` wrapper (calls `op.exe` from WSL) | Native `op.exe` | `op` wrapper (proot Alpine) |
 | Docker | Native | Docker Desktop | N/A (proot wrappers) |
-| MCP Config | `~/.cursor/mcp.json` (Docker) | N/A | `~/.config/mcphub/servers.json` (npx) |
-| Editor | Any | Cursor | Neovim (AstroVim) |
+| MCP Config | `~/.claude.json` (Docker) | N/A | `~/.config/mcphub/servers.json` (npx) |
+| Editor | Any | JetBrains Toolbox, Visual Studio | Neovim (AstroVim) |
 
 ## Installation
 
@@ -109,11 +108,10 @@ chezmoi init --apply rios0rios0
 ## Repository Structure
 
 ```
-.chezmoiscripts/         # 21 platform-specific setup scripts (run_once_before_*, run_after_*)
+.chezmoiscripts/         # 30 platform-specific setup scripts (run_once_before_*, run_after_*)
 .chezmoitemplates/       # Shared template fragments (font installer, MCP server logic, username)
 dot_claude/              # Claude Code config (settings, permissions, trust) -> ~/.claude/
 dot_config/              # XDG config (mcphub MCP servers for Android) -> ~/.config/
-dot_cursor/              # Cursor MCP config (Docker-based, Linux only) -> ~/.cursor/
 dot_docker/              # Docker daemon config -> ~/.docker/
 dot_scripts/             # Utility scripts (version manager, credential loader, git sync, etc.)
 dot_ssh/                 # SSH config, keys, signing (1Password-backed) -> ~/.ssh/

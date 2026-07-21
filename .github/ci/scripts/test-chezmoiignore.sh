@@ -71,7 +71,6 @@ check_platform "windows" \
 check_platform "android" \
     --ignore "windows-*.ps1" \
     --ignore "linux-*.sh" \
-    --ignore ".cursor" \
     --include ".termux" \
     --include ".config/mcphub"
 

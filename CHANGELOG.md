@@ -19,6 +19,13 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 ### Added
 
 - added [`ccswitch`](https://github.com/rios0rios0/ccswitch) integration: `install_ccswitch()` installs the CLI and `dot_zshrc.tmpl` starts its monitor daemon and wraps `claude` to rotate between backup Claude accounts when usage limits are exhausted (Linux/WSL, OAuth-based)
+- added the agentic [GitHub Copilot CLI](https://github.com/github/copilot-cli) on all three platforms: `install_copilot_cli()` installs the `@github/copilot` npm package on Linux/WSL and Android (both after `install_nvm`, since it requires Node.js `22+`), and Windows installs the `GitHub.Copilot` winget package
+
+### Removed
+
+- removed Gemini CLI (`@google/gemini-cli`) from the Linux/WSL, Windows, and Android dependency installers, together with the Windows npm section that existed only to install it and the orphaned **Gemini API Key** entry in `.docs/mcp-1password-setup.md`
+- removed Cursor: deleted `dot_cursor/` (the `~/.cursor/mcp.json` modify script), `install_cursor_cli()` on Linux/WSL, the `Anysphere.Cursor` winget package on Windows, and the `.cursor` entries in `.chezmoiignore`, `dot_gitignore`, and `test-chezmoiignore.sh`
+- removed the deprecated `github/gh-copilot` `gh` extension install (`install_github_copilot()`) from the Android dependency script, which GitHub deprecated in favor of the agentic GitHub Copilot CLI
 
 ## [0.14.4] - 2026-06-18
 

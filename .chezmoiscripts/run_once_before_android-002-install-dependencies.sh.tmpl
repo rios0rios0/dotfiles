@@ -331,9 +331,21 @@ install_pyenv() {
     fi
 }
 
-# https://github.com/google-gemini/gemini-cli
-install_gemini_cli() {
-    npm install -g @google/gemini-cli
+# https://github.com/github/copilot-cli
+# The agentic GitHub Copilot CLI (binary `copilot`), installed via npm so it must run
+# after `install_nvm`. Best-effort: the package ships platform-specific native
+# executables and Termux is bionic (not glibc/musl), so this may end up needing the
+# same wrapper treatment as Claude Code (see android-001e). A failure here must not
+# abort the remaining dependency installs.
+install_copilot_cli() {
+    if command_exists copilot; then
+        echo "[copilot] already installed, skipping" >&2
+        return 0
+    fi
+
+    npm install -g @github/copilot || {
+        echo "[copilot] WARN: install failed, skipping" >&2
+    }
 }
 
 # https://github.com/rios0rios0/dev-toolkit
@@ -373,26 +385,6 @@ install_github_cli() {
         rm -rf gh.tar.gz "gh_${GH_VERSION}_${ARCH}"
     else
         echo "GitHub CLI is already installed."
-    fi
-}
-
-# https://github.com/github/gh-copilot
-install_github_copilot() {
-    extensionsDir="$HOME/.local/share/gh/extensions"
-
-    if [ -d "$extensionsDir/gh-copilot" ]; then
-        echo "GitHub Copilot CLI is already installed."
-        return
-    fi
-
-    echo "[gh-copilot] installing GitHub Copilot extension (best-effort)..." >&2
-    # gh extension install requires authentication; skip gracefully if not authed
-    if ~/.local/bin/gh auth status &>/dev/null; then
-        ~/.local/bin/gh extension install github/gh-copilot || {
-            echo "[gh-copilot] WARN: extension install failed, skipping" >&2
-        }
-    else
-        echo "[gh-copilot] WARN: gh not authenticated, skipping copilot extension install" >&2
     fi
 }
 
@@ -553,7 +545,8 @@ install_azure_cli() {
 }
 
 # https://github.com/rios0rios0/aisync
-# `aisync` syncs AI assistant rules/agents/skills across `~/.claude/`, `~/.cursor/`, etc.
+# `aisync` syncs AI assistant rules/agents/skills across AI assistant home
+# directories such as `~/.claude/`.
 # It replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl
 # `install-rules.sh` from `rios0rios0/guide` on every chezmoi apply.
 # Uses Termux's native `golang` apt package (GVM is intentionally skipped on Android).
@@ -573,7 +566,7 @@ install_sdkman
 
 # TODO: same of the line 261
 install_nvm
-install_gemini_cli
+install_copilot_cli
 # Claude Code's musl distribution is bootstrapped manually following
 # examples/claude-code.md in rios0rios0/termux-etc-redirect (musl loader
 # seed + initial patchelf). Subsequent updates are handled by the wrapper
@@ -586,7 +579,6 @@ install_pyenv
 
 install_1password_cli
 install_github_cli
-install_github_copilot
 install_golangci_lint
 install_aws_cli
 install_azure_cli
