@@ -97,12 +97,12 @@ Install-PackageList $communication
 # =========================================================================================================
 # Development
 $development = @(
-    "Anysphere.Cursor",
     "Anthropic.ClaudeCode",
     "CoreyButler.NVMforWindows",
     "Docker.DockerDesktop",
     "ExpressVPN.ExpressVPN",
     "GitHub.cli",
+    "GitHub.Copilot",                   # agentic GitHub Copilot CLI (binary `copilot`)
     "GoLang.Go",
     "JetBrains.Toolbox",
     "Microsoft.AzureStorageExplorer",
@@ -129,13 +129,3 @@ $gaming = @(
 )
 Install-PackageList $gaming
 # =========================================================================================================
-# Refresh the PATH environment variable
-$env:Path = [System.Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [System.Environment]::GetEnvironmentVariable("Path", "User")
-# =========================================================================================================
-# npm-based CLIs (requires NVM for Windows to be installed and a Node.js version active)
-# https://github.com/google-gemini/gemini-cli
-if (-not (Get-Command gemini -ErrorAction SilentlyContinue)) {
-    npm install -g @google/gemini-cli
-} else {
-    Write-Host "[install-deps] Gemini CLI is already installed, skipping"
-}

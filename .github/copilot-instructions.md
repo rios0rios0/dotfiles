@@ -73,14 +73,13 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
   - **SDKMAN** — Java/Gradle ecosystem (installs latest Java and Gradle)
   - **NVM** (v0.40.2) — Node.js version manager (installs LTS + corepack)
   - **Pyenv** — Python version manager (installs Python 3.13.2)
-  - **Cursor CLI** — AI code editor CLI
   - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
-  - **Gemini CLI** (`@google/gemini-cli` npm package)
+  - **GitHub Copilot CLI** (binary `copilot`, via upstream install script into `~/.local/bin`)
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** (via pip, installed into pyenv Python)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
   - **ruff** (Python linter, via Astral install script) — used by `make lint-python` to lint embedded Python in `modify_*` templates
-  - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via upstream install script) — syncs AI assistant rules/agents/skills into `~/.claude/`, `~/.cursor/`, etc.; replaces the legacy `run_after_*-install-ai-rules.*` scripts
+  - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via upstream install script) — syncs AI assistant rules/agents/skills into `~/.claude/` and other AI assistant home directories; replaces the legacy `run_after_*-install-ai-rules.*` scripts
   - **Speedtest CLI** (Ookla, via packagecloud)
 - Each tool installation can take 5-15 minutes individually
 - **Critical**: Script requires internet access for downloading tools
@@ -98,7 +97,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
-- Installs: Claude CLI, Gemini CLI, 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
+- Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 
@@ -108,9 +107,8 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
 - Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, Brother drivers, PerformanceTest
 - Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify, VirtualBox, Grammarly, etc.
-- Installs development: Cursor, Claude Code, NVM for Windows, Docker Desktop, GitHub CLI, JetBrains Toolbox, Postman, ripgrep, jq, yq, bat, etc.
+- Installs development: Claude Code, GitHub Copilot CLI (`GitHub.Copilot`), NVM for Windows, Docker Desktop, GitHub CLI, JetBrains Toolbox, Postman, ripgrep, jq, yq, bat, etc.
 - Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy
-- Installs npm CLI tools: `@google/gemini-cli`
 
 #### Windows Configuration (`.chezmoiscripts/run_once_before_windows-002-configure-dependencies.ps1`)
 - Installs/updates Kali Linux WSL distro and sets it as default
@@ -169,7 +167,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `dot_p10k.zsh` → `~/.p10k.zsh`: Powerlevel10k theme configuration
 - `dot_oh-my-posh.json` → `~/.oh-my-posh.json`: Oh My Posh theme (Windows only)
 - `dot_age_recipients.tmpl` → `~/.age_recipients`: Age encryption recipients
-- `dot_cursor/mcp.json` → `~/.cursor/mcp.json`: MCP servers for Cursor (Linux, Docker-based)
+- `modify_dot_claude.json.tmpl` → `~/.claude.json`: MCP servers for Claude Code (Linux/Windows, Docker-based)
 - `dot_config/mcphub/servers.json.tmpl` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android, npx-based)
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
 - `dot_scripts/` → `~/.scripts/`: User utility scripts
@@ -192,8 +190,8 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 | Shell            | Zsh + Oh My Zsh + Powerlevel10k         | PowerShell + Oh My Posh             | Zsh + Oh My Zsh + Powerlevel10k         |
 | Prompt theme     | Powerlevel10k (`~/.p10k.zsh`)           | Oh My Posh (`~/.oh-my-posh.json`)   | Powerlevel10k (`~/.p10k.zsh`)           |
 | Script extension | `.sh`                                   | `.ps1`                              | `.sh`                                   |
-| Editor           | (any)                                   | Cursor / Visual Studio              | NeoVim (AstroVim, `~/.config/nvim/`)    |
-| MCP config       | `~/.cursor/mcp.json` (Docker-based)     | N/A                                 | `~/.config/mcphub/servers.json` (npx)   |
+| Editor           | (any)                                   | JetBrains Toolbox / Visual Studio   | NeoVim (AstroVim, `~/.config/nvim/`)    |
+| MCP config       | `~/.claude.json` (Docker-based)         | `~/.claude.json` (Docker-based)     | `~/.config/mcphub/servers.json` (npx)   |
 | Terraform        | `terra` (same as Android)               | N/A                                 | `termux-etc-seccomp` wrapper (`terra`)  |
 | 1Password CLI    | `~/.local/bin/op` wrapper → `op.exe`    | Native `op.exe`                     | `~/.local/bin/op` → `termux-etc-seccomp` binary |
 | Docker           | Native                                  | Docker Desktop                      | N/A                                     |
@@ -411,7 +409,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `gh-copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
@@ -435,7 +433,7 @@ Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-key
    - `~/.zshrc` (Linux/Android) or PowerShell profile (Windows) with custom settings
    - `~/.zshenv` (Linux/Android) for IDE-compatible PATH setup
    - `~/.gitconfig` with per-device SSH signing via 1Password
-   - `~/.cursor/mcp.json` (Linux) or `~/.config/mcphub/servers.json` (Android) with MCP servers
+   - `~/.claude.json` (Linux/Windows) or `~/.config/mcphub/servers.json` (Android) with MCP servers
 
 3. **Development Environment**:
    - kubectl, terraform, terragrunt available in PATH

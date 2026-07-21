@@ -11,7 +11,6 @@ The following items need to be created in the "Private" vault in 1Password:
 - **Anthropic API Key** - credential field containing Anthropic/Claude API key
 - **Browserbase API Key** - credential field containing Browserbase API key
 - **Browserbase Project ID** - credential field containing Browserbase project ID
-- **Gemini API Key** - credential field containing Google Gemini API key
 - **Smithery API Key** - credential field containing Smithery API key
 - **Smithery Profile** - credential field containing Smithery profile name
 - **EXA Search API Key** - credential field containing EXA Search API key
