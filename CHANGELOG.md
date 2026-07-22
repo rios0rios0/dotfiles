@@ -16,27 +16,28 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.15.0] - 2026-07-22
+
 ### Added
 
 - added [`ccswitch`](https://github.com/rios0rios0/ccswitch) integration: `install_ccswitch()` installs the CLI and `dot_zshrc.tmpl` starts its monitor daemon and wraps `claude` to rotate between backup Claude accounts when usage limits are exhausted (Linux/WSL, OAuth-based)
-- added the agentic [GitHub Copilot CLI](https://github.com/github/copilot-cli) on all three platforms: `install_copilot_cli()` installs it from the upstream install script into `~/.local/bin` on Linux/WSL and from the `@github/copilot` npm package on Android (best-effort, after `install_nvm`), and Windows installs the `GitHub.Copilot` winget package
-
-- added dependency tombstones so removing a tool from this repository also removes it from machines that already installed it: `run_onchange_after_*-remove-dependencies.*` scripts for Linux/WSL, Windows, and Android, backed by the shared strategy handlers in `.chezmoitemplates/lib-remove-dependencies.sh` (`apt`, `gh_extension`, `npm_global`, `path`, `pipx`, `winget`). Deleting an `install_*()` function only stops new machines from getting a tool — chezmoi has no concept of packages, so uninstallation has to be explicit
 - added `.chezmoiremove` to delete configuration directories orphaned by removed tools (`~/.cursor`, `~/.gemini`), which chezmoi cannot infer from a deleted `dot_*` source file because it has no history of the source state
-- added tombstones retiring Cursor, Gemini CLI, and the deprecated `github/gh-copilot` extension from existing machines, completing the removal started in `601cbeb`
 - added `.docs/dependency-lifecycle.md` documenting the add/remove workflow and recording why Nix/home-manager, Homebrew Bundle, and Ansible were not selected
 - added `make test-remove-dependencies` covering the removal library, including the `$HOME` safety rail that prevents `rm -rf` from escaping the home directory
 - added a repository-level `.gitignore` excluding `build/`, the report directory written by `make sast` and `make lint`
+- added dependency tombstones so removing a tool from this repository also removes it from machines that already installed it: `run_onchange_after_*-remove-dependencies.*` scripts for Linux/WSL, Windows, and Android, backed by the shared strategy handlers in `.chezmoitemplates/lib-remove-dependencies.sh` (`apt`, `gh_extension`, `npm_global`, `path`, `pipx`, `winget`). Deleting an `install_*()` function only stops new machines from getting a tool — chezmoi has no concept of packages, so uninstallation has to be explicit
+- added the agentic [GitHub Copilot CLI](https://github.com/github/copilot-cli) on all three platforms: `install_copilot_cli()` installs it from the upstream install script into `~/.local/bin` on Linux/WSL and from the `@github/copilot` npm package on Android (best-effort, after `install_nvm`), and Windows installs the `GitHub.Copilot` winget package
+- added tombstones retiring Cursor, Gemini CLI, and the deprecated `github/gh-copilot` extension from existing machines, completing the removal started in `601cbeb`
 
 ### Fixed
 
-- fixed `test-script-order.sh` sorting script names with the ambient locale instead of `LC_ALL=C`: under `en_US.UTF-8` the `-` separator is ignored, so `android-001a-create-op-wrapper` sorted before `android-001-create-wrapper` and the test failed even though chezmoi's own byte-order sorting was correct
 - fixed `make sast` failing on a false-positive **SSH private key** in `.github/ci/fixtures/ssh-item-sample.json` by suppressing it by fingerprint in a new `.gitleaksignore`: the GitLab-customised ruleset matches the OPENSSH header sentinel with no check on the body, and the fixture body is the literal string `stub-private-key-for-ci-testing`
+- fixed `test-script-order.sh` sorting script names with the ambient locale instead of `LC_ALL=C`: under `en_US.UTF-8` the `-` separator is ignored, so `android-001a-create-op-wrapper` sorted before `android-001-create-wrapper` and the test failed even though chezmoi's own byte-order sorting was correct
 
 ### Removed
 
-- removed Gemini CLI (`@google/gemini-cli`) from the Linux/WSL, Windows, and Android dependency installers, together with the Windows npm section that existed only to install it and the orphaned **Gemini API Key** entry in `.docs/mcp-1password-setup.md`
 - removed Cursor: deleted `dot_cursor/` (the `~/.cursor/mcp.json` modify script), `install_cursor_cli()` on Linux/WSL, the `Anysphere.Cursor` winget package on Windows, and the `.cursor` entries in `.chezmoiignore`, `dot_gitignore`, and `test-chezmoiignore.sh`
+- removed Gemini CLI (`@google/gemini-cli`) from the Linux/WSL, Windows, and Android dependency installers, together with the Windows npm section that existed only to install it and the orphaned **Gemini API Key** entry in `.docs/mcp-1password-setup.md`
 - removed the deprecated `github/gh-copilot` `gh` extension install (`install_github_copilot()`) from the Android dependency script, which GitHub deprecated in favor of the agentic GitHub Copilot CLI
 
 ## [0.14.4] - 2026-06-18
