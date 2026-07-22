@@ -1,0 +1,15 @@
+# Gitleaks false-positive suppressions.
+#
+# Entries MUST be full fingerprints in the form <commit>:<file>:<rule>:<line>.
+# Plain <file>:<line> shapes are silently ignored by gitleaks and suppress nothing.
+# Every entry needs a date and a justification for why the match is not a secret.
+
+# 2026-07-22 -- CI fixture for the mock 1Password CLI (`mock-op.sh`), which must
+# return an item shaped like a real `op item get --format json` response so the
+# template-rendering tests exercise the SSH key code path.
+#
+# The GitLab-customised ruleset matches the OPENSSH private key header sentinel
+# alone, with no check on the body. The body here is the literal string
+# `stub-private-key-for-ci-testing` -- there is no key material, and nothing ever
+# parses it. Introduced in a06b0bdc (2026-03-15) and unchanged since.
+a06b0bdc6be29afb768a2abd013f02e357e585f4:.github/ci/fixtures/ssh-item-sample.json:SSH private key:8

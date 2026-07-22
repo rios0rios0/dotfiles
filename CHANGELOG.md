@@ -26,10 +26,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - added tombstones retiring Cursor, Gemini CLI, and the deprecated `github/gh-copilot` extension from existing machines, completing the removal started in `601cbeb`
 - added `.docs/dependency-lifecycle.md` documenting the add/remove workflow and recording why Nix/home-manager, Homebrew Bundle, and Ansible were not selected
 - added `make test-remove-dependencies` covering the removal library, including the `$HOME` safety rail that prevents `rm -rf` from escaping the home directory
+- added a repository-level `.gitignore` excluding `build/`, the report directory written by `make sast` and `make lint`
 
 ### Fixed
 
 - fixed `test-script-order.sh` sorting script names with the ambient locale instead of `LC_ALL=C`: under `en_US.UTF-8` the `-` separator is ignored, so `android-001a-create-op-wrapper` sorted before `android-001-create-wrapper` and the test failed even though chezmoi's own byte-order sorting was correct
+- fixed `make sast` failing on a false-positive **SSH private key** in `.github/ci/fixtures/ssh-item-sample.json` by suppressing it by fingerprint in a new `.gitleaksignore`: the GitLab-customised ruleset matches the OPENSSH header sentinel with no check on the body, and the fixture body is the literal string `stub-private-key-for-ci-testing`
 
 ### Removed
 
