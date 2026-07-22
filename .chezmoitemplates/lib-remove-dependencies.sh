@@ -15,6 +15,12 @@ removed=0
 # =========================================================================================================
 # Removal strategies. Each handler takes the target as $1, returns 0 when the
 # target is already absent, and logs only when it actually removes something.
+#
+# Every mutating command is followed by `|| return 1` so a failed removal is
+# reported by `apply_tombstones` instead of being swallowed. `set -e` does NOT
+# help here: handlers are invoked from an `if !` condition, which disables
+# errexit for the whole call, so without the explicit guard a failing command
+# would fall through, still bump `removed`, and return success.
 
 # Uninstall a globally installed npm package.
 remove_npm_global() {
@@ -23,7 +29,7 @@ remove_npm_global() {
     npm ls -g --depth=0 "$package" &>/dev/null || return 0
 
     echo "[$prefix] removing npm global package: $package" >&2
-    npm uninstall -g "$package" >&2
+    npm uninstall -g "$package" >&2 || return 1
     removed=$((removed + 1))
 }
 
@@ -33,8 +39,10 @@ remove_path() {
     [[ -e "$target" || -L "$target" ]] || return 0
 
     # Safety rail: this runs unattended on every tombstone change, so it must
-    # never delete outside the home directory. The `?*` guard also rejects a
-    # bare "$HOME" and "$HOME/".
+    # never delete outside the home directory. Two independent checks are needed.
+    #
+    # 1. The target must sit under $HOME. The `?*` guard also rejects a bare
+    #    "$HOME" and "$HOME/".
     case "$target" in
         "$HOME"/?*) ;;
         *)
@@ -43,8 +51,19 @@ remove_path() {
             ;;
     esac
 
+    # 2. No `..` component, which would satisfy the prefix check above yet still
+    #    escape $HOME (e.g. "$HOME/../outside"). Wrapping the target in slashes
+    #    means a real component always shows up as "/../", so a legitimate name
+    #    like "foo..bar" is not caught.
+    case "/$target/" in
+        */../*)
+            echo "[$prefix] WARN: refusing to remove '$target' (contains a '..' component)" >&2
+            return 0
+            ;;
+    esac
+
     echo "[$prefix] removing path: $target" >&2
-    rm -rf -- "$target"
+    rm -rf -- "$target" || return 1
     removed=$((removed + 1))
 }
 
@@ -66,7 +85,7 @@ remove_gh_extension() {
     "$gh_bin" extension list 2>/dev/null | grep -qF "$extension" || return 0
 
     echo "[$prefix] removing gh extension: $extension" >&2
-    "$gh_bin" extension remove "$extension" >&2
+    "$gh_bin" extension remove "$extension" >&2 || return 1
     removed=$((removed + 1))
 }
 
@@ -77,7 +96,7 @@ remove_pipx() {
     pipx list --short 2>/dev/null | grep -qE "^${app} " || return 0
 
     echo "[$prefix] removing pipx application: $app" >&2
-    pipx uninstall "$app" >&2
+    pipx uninstall "$app" >&2 || return 1
     removed=$((removed + 1))
 }
 
@@ -107,7 +126,7 @@ remove_apt() {
     fi
 
     echo "[$prefix] removing apt package: $package" >&2
-    "${apt_cmd[@]}" remove -y "$package" >&2
+    "${apt_cmd[@]}" remove -y "$package" >&2 || return 1
     removed=$((removed + 1))
 }
 

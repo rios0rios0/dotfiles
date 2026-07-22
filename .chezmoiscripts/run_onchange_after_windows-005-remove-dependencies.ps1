@@ -30,7 +30,12 @@ function Remove-WingetPackage {
 
     if ($PSCmdlet.ShouldProcess($Target, "Uninstall winget package")) {
         Write-Host "[$prefix] removing winget package: $Target"
-        winget uninstall --id $Target --exact --accept-source-agreements | Out-Null
+        # --silent and --disable-interactivity keep an unattended `chezmoi apply`
+        # from stalling on a prompt. Note that --accept-package-agreements is an
+        # install-only flag; winget rejects it here with "Argument name was not
+        # recognized for the current command".
+        winget uninstall --id $Target --exact `
+            --accept-source-agreements --silent --disable-interactivity | Out-Null
         $script:removed++
     }
 }
