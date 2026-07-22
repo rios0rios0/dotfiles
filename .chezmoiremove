@@ -1,0 +1,17 @@
+# Targets removed from the home directory on every `chezmoi apply`.
+#
+# chezmoi only looks at the current state of the source directory -- it has no
+# history, so deleting a `dot_*` file here does NOT delete the file it already
+# deployed to existing machines. Listing the target here does.
+#
+# Entries are permanent while they are listed: anything matching is deleted on
+# every apply, so only list paths that must never exist on a managed machine.
+# The package half of the same problem lives in the
+# `run_onchange_after_*-remove-dependencies.*` scripts.
+# See `.docs/dependency-lifecycle.md`.
+
+# Cursor -- removed in 601cbeb (2026-07-21), previously managed as dot_cursor/
+.cursor
+
+# Gemini CLI -- removed in 601cbeb (2026-07-21)
+.gemini

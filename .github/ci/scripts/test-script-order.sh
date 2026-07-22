@@ -17,7 +17,10 @@ check_order() {
     local actual=()
     while IFS= read -r line; do
         actual+=("$(basename "$line")")
-    done < <(find "$SCRIPTS_DIR" -name "run_once_before_${platform}-*" -type f | sort)
+    # LC_ALL=C is required: chezmoi orders scripts by Go byte comparison, whereas
+    # a locale-aware sort (e.g. en_US.UTF-8) ignores the '-' separator and would
+    # place "001a-create-op-wrapper" before "001-create-wrapper".
+    done < <(find "$SCRIPTS_DIR" -name "run_once_before_${platform}-*" -type f | LC_ALL=C sort)
 
     # Verify each expected prefix appears in order
     local last_idx=-1

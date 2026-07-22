@@ -156,8 +156,9 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `encrypted_*.age`: Encrypted files using age encryption (format: "age encrypted file, ASCII armored")
 - `.chezmoi.yaml.tmpl`: Main chezmoi config — sets age encryption and platform-specific `op` command path
 - `.chezmoiignore`: Platform-conditional file exclusion (uses Go templates with `.chezmoi.os`)
+- `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
-- `.chezmoitemplates/`: Shared template fragments (`lib-install-fonts.sh`, `username.tmpl`)
+- `.chezmoitemplates/`: Shared template fragments (`lib-install-fonts.sh`, `lib-remove-dependencies.sh`, `username.tmpl`)
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
 ### Key Managed Files
@@ -294,6 +295,18 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 4. **Always verify**: Check file appears correctly in home directory
 5. Update `.chezmoiignore` if the file should be excluded on certain platforms
 
+### Removing a Dependency
+This repository is a sync, not a bootstrapper. Deleting an `install_*()` function only stops *new* machines from installing the tool — machines that already ran the installer keep it forever, because chezmoi has no concept of packages and no history of the source state.
+
+1. Delete the `install_*()` function (or package-list entry) from the platform's `run_once_before_*-install-dependencies.*` script
+2. Add a `"<strategy>:<target>"` tombstone to `.chezmoiscripts/run_onchange_after_<platform>-*-remove-dependencies.*` for **every** platform that installed it, commenting the removing commit
+3. Add any orphaned config directory to `.chezmoiremove`
+4. Run `make test-remove-dependencies`
+
+Strategies: `apt`, `gh_extension`, `npm_global`, `path`, `pipx` (Linux/Android, defined in `.chezmoitemplates/lib-remove-dependencies.sh`); `npm_global`, `path`, `winget` (Windows, inline). `remove_path` refuses targets outside `$HOME` — never widen that guard, these scripts run unattended.
+
+See `.docs/dependency-lifecycle.md` for the rationale and why Nix/home-manager was rejected.
+
 ### Working with Encrypted Files
 1. Use age encryption for sensitive files
 2. Add encrypted files with: `chezmoi add --encrypt ~/.sensitive-file`
@@ -409,7 +422,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

@@ -1,0 +1,24 @@
+#!/bin/bash
+
+# Removes dependencies that this repository used to install on Linux (baremetal/WSL)
+# but no longer declares in run_once_before_linux-002-install-dependencies.sh.
+#
+# This is a `run_onchange_` script: chezmoi re-runs it whenever the tombstone list
+# below changes, and every handler is idempotent, so it is a silent no-op once a
+# machine is clean. See `.docs/dependency-lifecycle.md` for why this exists.
+
+set -euo pipefail
+
+{{ template "lib-remove-dependencies.sh" }}
+
+# Format: "<strategy>:<target>" -- strategies are defined in the library above.
+# Add one group per removal, newest first, and reference the commit that dropped
+# the installer so the entry can be retired once every machine has converged.
+TOMBSTONES=(
+    # Gemini CLI and Cursor CLI -- removed in 601cbeb (2026-07-21)
+    "npm_global:@google/gemini-cli"
+    "path:$HOME/.local/bin/cursor-agent"
+    "path:$HOME/.local/share/cursor-agent"
+)
+
+apply_tombstones "${TOMBSTONES[@]}"
