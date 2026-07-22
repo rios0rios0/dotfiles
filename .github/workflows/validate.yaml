@@ -116,6 +116,14 @@ jobs:
       - name: Test modify scripts
         run: make test-modify-scripts
 
+  test-remove-dependencies:
+    name: Test (dependency removal)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test dependency removal library
+        run: make test-remove-dependencies
+
   sast:
     name: SAST
     runs-on: ubuntu-latest

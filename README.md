@@ -108,8 +108,9 @@ chezmoi init --apply rios0rios0
 ## Repository Structure
 
 ```
-.chezmoiscripts/         # 30 platform-specific setup scripts (run_once_before_*, run_after_*)
-.chezmoitemplates/       # Shared template fragments (font installer, MCP server logic, username)
+.chezmoiscripts/         # 33 platform-specific setup scripts (run_once_before_*, run_after_*, run_onchange_after_*)
+.chezmoiremove           # Target paths deleted from $HOME on every apply (see Dependency Lifecycle)
+.chezmoitemplates/       # Shared template fragments (font installer, dependency removal, MCP server logic, username)
 dot_claude/              # Claude Code config (settings, permissions, trust) -> ~/.claude/
 dot_config/              # XDG config (mcphub MCP servers for Android) -> ~/.config/
 dot_docker/              # Docker daemon config -> ~/.docker/
@@ -162,10 +163,32 @@ The global `~/.gitignore` (managed via `dot_gitignore`) ignores `.claude/` by de
 | `encrypted_*.age` | Age-encrypted file, decrypted on apply |
 | `run_once_before_*` | Script runs once before file application |
 | `run_after_*` | Script runs after every application |
+| `run_onchange_after_*` | Script runs after application, but only when its own content changes |
 | `private_` | File deployed with restricted permissions |
 | `modify_` | Script that merges changes into an existing file |
 
 Platform-specific scripts are prefixed: `linux-*`, `windows-*`, `android-*`. Exclusion rules in `.chezmoiignore` ensure only the correct platform's files are applied.
+
+## Dependency Lifecycle
+
+This repository is a **sync**, not a bootstrapper: removing something here removes it from every machine, not just from new ones.
+
+chezmoi has no history of the source state and no concept of packages, so neither half of a removal happens automatically. Both are explicit:
+
+| Half | Mechanism | Example |
+|------|-----------|---------|
+| Files left in `$HOME` | `.chezmoiremove` | `~/.cursor` after `dot_cursor/` was deleted |
+| Installed packages | `run_onchange_after_*-remove-dependencies.*` tombstones | `cursor-agent`, `@google/gemini-cli` |
+
+Removing a dependency therefore takes three steps, not one:
+
+1. Delete the `install_*()` function from the platform's dependency installer.
+2. Add a tombstone (`"<strategy>:<target>"`) to the matching removal script for **every** platform that installed it.
+3. Add any orphaned config directory to `.chezmoiremove`.
+
+Strategies (`apt`, `gh_extension`, `npm_global`, `path`, `pipx`, `winget`) live in `.chezmoitemplates/lib-remove-dependencies.sh` and are idempotent, so a clean machine produces no output.
+
+See **[.docs/dependency-lifecycle.md](.docs/dependency-lifecycle.md)** for the full workflow, the known limitations, and why Nix/home-manager, Homebrew Bundle, and Ansible were evaluated and not selected.
 
 ## Debugging
 

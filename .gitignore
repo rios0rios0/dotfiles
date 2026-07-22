@@ -1,0 +1,2 @@
+# SAST, lint, and test reports written by `make sast` / `make lint`
+build/
