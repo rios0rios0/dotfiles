@@ -16,6 +16,11 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Added
+
+- added `termux-change-repo` before `apt update` in the Android dependency installer, so a mirror is chosen on a fresh Termux install instead of letting every `apt` call fail against an unreachable or stale default mirror
+- added the `claudex` alias (`claude --dangerously-skip-permissions --effort max`) to `dot_zshrc.tmpl` for Linux/WSL and Android
+
 ## [0.15.0] - 2026-07-22
 
 ### Added

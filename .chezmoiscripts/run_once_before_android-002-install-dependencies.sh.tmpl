@@ -3,6 +3,10 @@
 # init storage capabilities
 termux-setup-storage
 
+# pick a package mirror before refreshing the lists — the default mirror is regularly
+# unreachable or stale, which makes every `apt` call below fail (interactive dialog)
+termux-change-repo
+
 # update the package list
 apt update
 

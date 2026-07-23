@@ -94,6 +94,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 
 #### Android Dependencies (`.chezmoiscripts/run_once_before_android-002-install-dependencies.sh.tmpl`)
 - **TIMING**: Takes 45-90 minutes. NEVER CANCEL.
+- Runs `termux-setup-storage` and `termux-change-repo` first (both interactive) so storage is available and a reachable package mirror is selected before any `apt` call
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
