@@ -10,6 +10,11 @@
 # `run_onchange_after_*-remove-dependencies.*` scripts.
 # See `.docs/dependency-lifecycle.md`.
 
+# `keychain` state directory -- orphaned when Android switched to a fixed agent
+# socket (`~/.ssh/agent.sock`) managed directly by `dot_zshrc.tmpl`. The stale
+# `<host>-sh` files here only advertise dead random-path sockets.
+.keychain
+
 # Cursor -- removed in 601cbeb (2026-07-21), previously managed as dot_cursor/
 .cursor
 

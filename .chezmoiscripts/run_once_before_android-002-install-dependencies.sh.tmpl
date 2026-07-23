@@ -63,7 +63,6 @@ utilities=(
     "mlocate"           # it performs file searches (locate and updatedb)
     "openssh"           # used to clone Git repositories and also authentication
     "netcat-openbsd"    # provides `nc` (Termux ships no default), required by SSH `ProxyCommand` blocks in `dot_ssh/config.tmpl`
-    "keychain"          # manages a single long-lived ssh-agent across sessions with a stable socket under `~/.keychain/<host>-sh`; replaces the per-session OMZ `ssh-agent` plugin so child processes (e.g. Claude Code) keep working after the spawning zsh session exits
     "parallel"          # it runs many threads of a command at the same time
     "rsync"             # provides file sync function
     "rclone"            # it's for syncing files with cloud storage (OneDrive, Google Drive, S3, etc.)

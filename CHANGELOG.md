@@ -21,6 +21,14 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 - added `termux-change-repo` before `apt update` in the Android dependency installer, so a mirror is chosen on a fresh Termux install instead of letting every `apt` call fail against an unreachable or stale default mirror
 - added the `claudex` alias (`claude --dangerously-skip-permissions --effort max`) to `dot_zshrc.tmpl` for Linux/WSL and Android
 
+### Fixed
+
+- fixed signed commits failing on Android with `Couldn't get agent socket?` even from a freshly-opened shell, by pinning the SSH agent to a fixed socket at `~/.ssh/agent.sock` in `dot_zshrc.tmpl` (`ssh-agent -a`) instead of delegating the agent lifecycle to `keychain`. Termux's `ssh-agent` binds a *random* socket path (`~/.ssh/agent/s.<rand>.agent.<rand>`) and `keychain` only records whichever path the agent picked, so every agent restart minted a new path and stranded already-running processes — Claude Code and everything it spawns, tmux servers, IDE helpers — on the dead one. Their environment is fixed at fork time, so opening a fresh zsh could never repair them, which is why the previously-documented "restart the child process" caveat was hit constantly: Android's Phantom Process Killer makes agent death routine. With the path pinned, a restarted agent reclaims the same socket and long-lived children recover on their own. `keychain` cannot do this — it ignores a pre-bound `SSH_AUTH_SOCK` and re-spawns at a random path regardless
+
+### Removed
+
+- removed `keychain` from the Android `utilities` array and stopped calling it in `dot_zshrc.tmpl`, together with the Oh My Zsh `ssh-agent` plugin fallback it guarded (the plugin would spawn a competing per-session agent at a random socket path). Added an `apt:keychain` tombstone and a `.keychain` entry in `.chezmoiremove` so existing machines drop the package and its stale state directory
+
 ## [0.15.0] - 2026-07-22
 
 ### Added

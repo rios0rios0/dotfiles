@@ -15,6 +15,12 @@ set -euo pipefail
 # Add one group per removal, newest first, and reference the commit that dropped
 # the installer so the entry can be retired once every machine has converged.
 TOMBSTONES=(
+    # `keychain` -- it cannot pin the agent socket path on Termux (it records
+    # whichever random path ssh-agent picked, and ignores a pre-bound
+    # SSH_AUTH_SOCK), so `dot_zshrc.tmpl` now binds the agent itself with
+    # `ssh-agent -a ~/.ssh/agent.sock` and no longer calls it
+    "apt:keychain"
+
     # Gemini CLI -- removed in 601cbeb (2026-07-21)
     "npm_global:@google/gemini-cli"
 

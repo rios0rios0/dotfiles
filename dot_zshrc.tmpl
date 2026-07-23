@@ -99,42 +99,55 @@ slug=$(printf '%s' "$CHEZMOI_DEVICE" \
         -e 's/[[:space:]]\+/-/g' \
   | tr '[:upper:]' '[:lower:]')
 
-# collect only non-.pub identities
+# collect only non-.pub identities (full paths — `ssh-add` does not resolve
+# bare names against ~/.ssh the way `keychain` did)
 typeset -a sshIdentities
 for key in "$HOME/.ssh/$slug"*(.N); do
   if [[ $key != *.pub ]]; then
-    sshIdentities+=${key:t}
+    sshIdentities+=$key
   fi
 done
 
-# Drive the SSH agent with `keychain` instead of the OMZ `ssh-agent` plugin.
-# Why: OMZ's plugin spawns a *per-session* `ssh-agent` at a *random* socket
-# path. Any process launched from that zsh — Claude Code, tmux panes, IDE
-# integrations — inherits `SSH_AUTH_SOCK` at fork time and is left holding a
-# dead socket the moment the originating shell exits, which surfaces as
-# "Couldn't get agent socket?" / "Connection refused" on every signed commit
-# or `git push`. Keychain runs a single long-lived agent across sessions and
-# exposes a stable socket via `~/.keychain/<host>-sh`, so newly-spawned shells
-# always inherit a live `SSH_AUTH_SOCK`. (Note: already-running child
-# processes keep whatever value they inherited at fork time; if keychain
-# does have to restart a dead agent, those long-lived children still need
-# to be restarted to pick up the new socket — the win is for shells started
-# *after* the restart.) `keychain` is provisioned by the Android dependency
-# installer (`run_once_before_android-002-install-dependencies.sh.tmpl`).
+# Pin the SSH agent to a FIXED socket path.
 #
-# Fallback: existing Termux installs that already ran `run_once_before_*`
-# before this change don't have `keychain` yet, and `run_once_before_*`
-# scripts don't rerun on subsequent `chezmoi apply`s. When `keychain` is
-# missing we fall back to the OMZ `ssh-agent` plugin so the user keeps a
-# working agent until they manually `apt install keychain` (or clear
-# chezmoi's `scriptState/` to rerun the installer). Once `keychain` shows
-# up on `$PATH`, the next zsh startup picks it up automatically.
-typeset useKeychain=0
-if (( ${#sshIdentities[@]} > 0 )) && command -v keychain >/dev/null 2>&1; then
-  useKeychain=1
-  eval "$(keychain --eval --quiet "${sshIdentities[@]}")"
-else
-  zstyle ':omz:plugins:ssh-agent' identities $sshIdentities
+# Termux's `ssh-agent` binds a *random* socket path
+# (`~/.ssh/agent/s.<rand>.agent.<rand>`), and nothing that merely *launches*
+# the agent can change that: both the OMZ `ssh-agent` plugin and `keychain`
+# only record whichever path the agent happened to pick. So every agent
+# restart mints a NEW path, and any already-running process that captured
+# `SSH_AUTH_SOCK` at fork time — Claude Code and every command it spawns,
+# tmux servers, IDE helpers — is stranded on the dead one. It surfaces as
+# "Couldn't get agent socket?" / "Connection refused" on every signed commit,
+# and opening a fresh zsh cannot repair an already-running child, because that
+# child's environment was fixed when it forked. Android's Phantom Process
+# Killer makes agent death routine, so this is hit constantly.
+#
+# (`git push` is unaffected either way: `dot_ssh/config.tmpl` authenticates
+# with `IdentityFile` + `IdentitiesOnly yes`, which reads the key off disk and
+# never consults an agent. Only *signing* needs the agent, because
+# `user.signingkey` in `dot_gitconfig.tmpl` is a bare public key, which makes
+# git call `ssh-keygen -Y sign -U` and demand the private half from an agent.)
+#
+# Binding the agent ourselves with `ssh-agent -a <path>` makes restarts
+# transparent: the path never changes, so long-lived children recover the
+# moment a new agent claims the socket. `keychain` cannot do this — it ignores
+# a pre-bound `SSH_AUTH_SOCK` and re-spawns at a random path regardless.
+export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
+if (( ${#sshIdentities[@]} > 0 )); then
+  # `ssh-add -l` exit codes: 0 = agent up with keys, 1 = agent up but empty,
+  # 2 = cannot reach an agent.
+  ssh-add -l >/dev/null 2>&1
+  case $? in
+    2)
+      # Stale or absent socket: drop it and bind a fresh agent to the same path.
+      rm -f "$SSH_AUTH_SOCK"
+      ssh-agent -a "$SSH_AUTH_SOCK" >/dev/null 2>&1 &&
+        ssh-add "${sshIdentities[@]}" >/dev/null 2>&1
+      ;;
+    1)
+      ssh-add "${sshIdentities[@]}" >/dev/null 2>&1
+      ;;
+  esac
 fi
 ######################################################
 {{- end }}
@@ -169,13 +182,9 @@ plugins=(
   python pip pipenv virtualenv pep8
 )
 {{- if eq .chezmoi.os "android" }}
-# Android-only plugins. `keychain` (set up above) replaces the OMZ `ssh-agent`
-# plugin when available; on existing installs that pre-date the keychain
-# switch, fall back to the plugin so the user keeps an agent until the
-# dependency installer reruns or they install `keychain` manually.
-if (( useKeychain == 0 )); then
-  plugins+=(ssh-agent)
-fi
+# Android-only plugins. The OMZ `ssh-agent` plugin is deliberately NOT loaded:
+# the fixed-socket agent bootstrap above owns the agent lifecycle, and the
+# plugin would spawn a competing per-session agent at a random socket path.
 {{- else }}
 # non-Android-only plugins
 plugins+=(command-not-found vim-interaction)
