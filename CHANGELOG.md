@@ -16,6 +16,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.16.0] - 2026-07-23
+
 ### Added
 
 - added `termux-change-repo` before `apt update` in the Android dependency installer, so a mirror is chosen on a fresh Termux install instead of letting every `apt` call fail against an unreachable or stale default mirror
