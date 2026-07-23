@@ -104,7 +104,7 @@ slug=$(printf '%s' "$CHEZMOI_DEVICE" \
 typeset -a sshIdentities
 for key in "$HOME/.ssh/$slug"*(.N); do
   if [[ $key != *.pub ]]; then
-    sshIdentities+=$key
+    sshIdentities+=("$key")
   fi
 done
 
@@ -140,12 +140,19 @@ if (( ${#sshIdentities[@]} > 0 )); then
   case $? in
     2)
       # Stale or absent socket: drop it and bind a fresh agent to the same path.
+      # Only `ssh-agent`'s *stdout* is silenced — it emits shell code
+      # (`SSH_AUTH_SOCK=...; export ...`) that must not leak into the startup
+      # output. stderr stays visible on both commands so bind failures, key
+      # errors, and passphrase prompts still reach the user; `ssh-add` writes
+      # everything (including "Identity added") to stderr and nothing to stdout.
+      # This only runs when the agent was actually dead, so it is not per-shell
+      # noise.
       rm -f "$SSH_AUTH_SOCK"
-      ssh-agent -a "$SSH_AUTH_SOCK" >/dev/null 2>&1 &&
-        ssh-add "${sshIdentities[@]}" >/dev/null 2>&1
+      ssh-agent -a "$SSH_AUTH_SOCK" >/dev/null &&
+        ssh-add "${sshIdentities[@]}"
       ;;
     1)
-      ssh-add "${sshIdentities[@]}" >/dev/null 2>&1
+      ssh-add "${sshIdentities[@]}"
       ;;
   esac
 fi
