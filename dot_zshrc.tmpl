@@ -405,6 +405,10 @@ source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
 
 ###### Workspace Aliases ###########################################################
 source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
+
+###### Claude Code #################################################################
+# skips every permission prompt and runs at the highest reasoning effort
+alias claudex="claude --dangerously-skip-permissions --effort max"
 {{- if eq .chezmoi.os "linux" }}
 
 ###### Claude Account Rotation (ccswitch) ##########################################
