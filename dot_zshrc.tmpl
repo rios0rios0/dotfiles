@@ -423,8 +423,38 @@ source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
 source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
 
 ###### Claude Code #################################################################
-# skips every permission prompt and runs at the highest reasoning effort
-alias claudex="claude --dangerously-skip-permissions --effort max"
+# Shared pre-launch guard for every Claude Code entrypoint below: a no-network call
+# that puts the current (healthy) account's credentials on disk, so account
+# rotation applies no matter which entrypoint is used. It is a no-op when ccswitch
+# is absent, which keeps the entrypoints working on platforms that never install it.
+_claude_ensure_account() {
+    if command -v ccswitch >/dev/null 2>&1; then
+        ccswitch ensure --quiet 2>/dev/null
+    fi
+    return 0
+}
+
+# `claudex` skips every permission prompt and runs at the highest reasoning effort.
+#
+# It is a function rather than an alias because zsh refuses to define a function
+# whose name is already an alias -- `defining function based on alias` followed by
+# a parse error -- so an alias here would block `claudex` from ever gaining a body,
+# and because aliases are expanded only in interactive shells, which left `claudex`
+# undefined in scripts, `zsh -c`, and `sudo zsh -c`.
+#
+# The leading `unalias` keeps re-sourcing this file safe from that same error when
+# the running shell still carries the alias from an earlier version.
+#
+# It calls the guard directly and then `command claude`, rather than relying on the
+# `claude` wrapper below to supply the guard for it: that indirection worked only
+# because a bare `claude` resolves to the function before the binary, so rewriting
+# it to `command claude` -- the obvious-looking tidy-up -- would silently drop
+# rotation from the entrypoint used most.
+unalias claudex 2>/dev/null
+claudex() {
+    _claude_ensure_account
+    command claude --dangerously-skip-permissions --effort max "$@"
+}
 {{- if eq .chezmoi.os "linux" }}
 
 ###### Claude Account Rotation (ccswitch) ##########################################
@@ -438,11 +468,13 @@ if command -v ccswitch >/dev/null 2>&1; then
     fi
 
     # Wrap `claude` so every launch first ensures the current (healthy) account's
-    # credentials are on disk. `command` bypasses this function to run the real CLI.
-    # This is interactive-only: non-interactive shells (IDEs, MCP servers) source
-    # `.zshenv`, not `.zshrc`, so they never pick up this wrapper.
+    # credentials are on disk, using the same guard as `claudex`. `command`
+    # bypasses this function to run the real CLI. This is interactive-only:
+    # non-interactive shells (IDEs, MCP servers) source `.zshenv`, not `.zshrc`,
+    # so they never pick up this wrapper.
+    unalias claude 2>/dev/null
     claude() {
-        ccswitch ensure --quiet 2>/dev/null
+        _claude_ensure_account
         command claude "$@"
     }
 fi
