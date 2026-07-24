@@ -222,6 +222,8 @@ Claude Code subscription tokens live in `~/.claude/.credentials.json` (not chezm
 
 `dot_zshrc.tmpl` (Linux only) starts the `ccswitch monitor` daemon in interactive shells and wraps `claude` so each launch first runs `ccswitch ensure` — a no-network guard that installs the current account's credentials. Enroll each account once with `ccswitch enroll` after logging in via `claude` + `/login`; afterwards rotation is automatic, with no repeated `/login`. The `[ccswitch]` log prefix is emitted by the tool itself.
 
+`claudex` (`claude --dangerously-skip-permissions --effort max`) is a **function**, not an alias, and calls `claude` rather than `command claude` so it composes with that wrapper. Keep it a function: zsh refuses to define a function whose name is already an alias, and aliases are expanded only in interactive shells, so an aliased `claudex` does not exist in scripts, `zsh -c`, or `sudo zsh -c`.
+
 **Note:** if `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set, Claude Code ignores the rotated OAuth credentials; `ccswitch` warns when it detects this.
 
 ## Encryption Setup

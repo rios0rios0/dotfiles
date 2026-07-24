@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- changed `claudex` in `dot_zshrc.tmpl` from an alias to a function, so it coexists with the `ccswitch` `claude` wrapper instead of blocking it. zsh refuses to define a function whose name is already an alias — it aborts with `defining function based on alias` and a parse error — so as an alias `claudex` could never gain a body, and re-sourcing `.zshrc` in a shell that still carried the old alias hit the same error. Aliases are also expanded only in interactive shells, which left `claudex` reporting `command not found` in scripts, `zsh -c`, and `sudo zsh -c`; as a function it now resolves there too. It calls `claude` rather than `command claude`, so account rotation still applies, and an `unalias` guard keeps re-sourcing safe
+
 ## [0.16.0] - 2026-07-23
 
 ### Added

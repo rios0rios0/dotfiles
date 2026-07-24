@@ -423,8 +423,23 @@ source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
 source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
 
 ###### Claude Code #################################################################
-# skips every permission prompt and runs at the highest reasoning effort
-alias claudex="claude --dangerously-skip-permissions --effort max"
+# `claudex` skips every permission prompt and runs at the highest reasoning effort.
+#
+# It is a function rather than an alias because zsh refuses to define a function
+# whose name is already an alias -- `defining function based on alias` followed by
+# a parse error -- so an alias here would block `claudex` from ever gaining a body,
+# and because aliases are expanded only in interactive shells, which left `claudex`
+# undefined in scripts, `zsh -c`, and `sudo zsh -c`.
+#
+# The leading `unalias` keeps re-sourcing this file safe from that same error when
+# the running shell still carries the alias from an earlier version.
+#
+# It calls `claude`, not `command claude`, so it goes through the ccswitch wrapper
+# below when that wrapper exists and account rotation still applies.
+unalias claudex 2>/dev/null
+claudex() {
+    claude --dangerously-skip-permissions --effort max "$@"
+}
 {{- if eq .chezmoi.os "linux" }}
 
 ###### Claude Account Rotation (ccswitch) ##########################################
