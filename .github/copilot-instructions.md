@@ -227,7 +227,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 4. **Cross-platform Validation**:
    - Linux: Verify Zsh + Powerlevel10k configuration
    - Windows: Verify PowerShell profile and Oh My Posh theme
-   - Android: Verify NeoVim and proot wrapper work
+   - Android: Verify NeoVim and `termux-etc-seccomp` wrapper work
    - Test Windows Terminal settings on Windows
 
 5. **Development Tools Test** (after dependency installation):
@@ -428,7 +428,7 @@ Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-key
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
 - Age recipients file: `~/.age_recipients` (template: `dot_age_recipients.tmpl`)
-- 1Password integration: Uses `op` CLI; Linux/WSL wraps `op.exe` via `~/.local/bin/op`; Android wraps ARM64 binary via proot Alpine
+- 1Password integration: Uses `op` CLI; Linux/WSL wraps `op.exe` via `~/.local/bin/op`; Android wraps the ARM64 binary (`op_linux_arm64`) via `termux-etc-seccomp` running natively (no proot boundary)
 - SSH commit signing: 1Password `op-ssh-sign` — different binary per platform (`op-ssh-sign-wsl` on WSL, `op-ssh-sign.exe` on Windows, `ssh-keygen` on Android)
 - Git signing keys: Read per-device from 1Password "Device: \<deviceName\>" note (`ssh:` and `gpg:` entries), matched by device hostname
 - **Never commit**: Raw sensitive files — always use encryption or 1Password references
