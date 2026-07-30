@@ -22,6 +22,17 @@ if [[ -n "$PREFIX" ]]; then
     export UV_THREADPOOL_SIZE=16
     # Reduce glibc memory arena count to limit fragmentation on mobile
     export MALLOC_ARENA_MAX=2
+    # Block D-Bus session autolaunch. With this unset, tools run through termux-etc-seccomp
+    # (op, gh, acli, claude) start a `dbus-daemon --session --fork` that reparents to PID 1
+    # and is never reaped. They accumulate across days (19 observed from 3 days of use) and
+    # consume Android's ~32-process phantom limit; once it is reached the phantom process
+    # killer SIGKILLs Termux with no memory pressure at all. Every leaked daemon carried
+    # `_=termux-etc-seccomp`, and three appeared in the same second as an `op` invocation,
+    # so `op` is the likeliest source — but the guard is set for the whole Termux env
+    # because any wrapped tool can trigger it. `disabled:` is an unroutable address: both
+    # libdbus and Go's godbus return a connection error rather than falling back to
+    # autolaunch. Nothing here needs a session bus.
+    export DBUS_SESSION_BUS_ADDRESS=disabled:
 fi
 
 ###### Essential PATH Setup ##############################################################################################
