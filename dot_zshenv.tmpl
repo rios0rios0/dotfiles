@@ -15,25 +15,32 @@ if [[ -n "$PREFIX" && -d "$PREFIX/tmp" ]]; then
     export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
 fi
 
+{{- if eq .chezmoi.os "android" }}
+
 ###### Android Performance Tuning ######################################################################################
 # These environment variables optimize Node.js and memory allocation for heavy workloads on Termux.
-if [[ -n "$PREFIX" ]]; then
-    # Node.js libuv thread pool: default is 4, bottleneck for I/O-heavy tools like Claude Code
-    export UV_THREADPOOL_SIZE=16
-    # Reduce glibc memory arena count to limit fragmentation on mobile
-    export MALLOC_ARENA_MAX=2
-    # Block D-Bus session autolaunch. With this unset, tools run through termux-etc-seccomp
-    # (op, gh, acli, claude) start a `dbus-daemon --session --fork` that reparents to PID 1
-    # and is never reaped. They accumulate across days (19 observed from 3 days of use) and
-    # consume Android's ~32-process phantom limit; once it is reached the phantom process
-    # killer SIGKILLs Termux with no memory pressure at all. Every leaked daemon carried
-    # `_=termux-etc-seccomp`, and three appeared in the same second as an `op` invocation,
-    # so `op` is the likeliest source — but the guard is set for the whole Termux env
-    # because any wrapped tool can trigger it. `disabled:` is an unroutable address: both
-    # libdbus and Go's godbus return a connection error rather than falling back to
-    # autolaunch. Nothing here needs a session bus.
-    export DBUS_SESSION_BUS_ADDRESS=disabled:
-fi
+# Gated by a chezmoi template conditional rather than a runtime `$PREFIX` test: `PREFIX` is a
+# conventional autotools/make variable that users legitimately export on desktop Linux, and
+# `DBUS_SESSION_BUS_ADDRESS=disabled:` would break real session-bus clients (keyring, notifications)
+# in such a shell. A `-d "$PREFIX/tmp"` test only narrows that window — `PREFIX=/usr` still passes
+# wherever the legacy `/usr/tmp` symlink exists. chezmoi resolves the platform at render time, so on
+# non-Android machines this block is absent from `~/.zshenv` entirely and no runtime guard is needed.
+# Node.js libuv thread pool: default is 4, bottleneck for I/O-heavy tools like Claude Code
+export UV_THREADPOOL_SIZE=16
+# Reduce glibc memory arena count to limit fragmentation on mobile
+export MALLOC_ARENA_MAX=2
+# Block D-Bus session autolaunch. With this unset, tools run through termux-etc-seccomp
+# (op, gh, acli, claude) start a `dbus-daemon --session --fork` that reparents to PID 1
+# and is never reaped. They accumulate across days (19 observed from 3 days of use) and
+# consume Android's ~32-process phantom limit; once it is reached the phantom process
+# killer SIGKILLs Termux with no memory pressure at all. Every leaked daemon carried
+# `_=termux-etc-seccomp`, and three appeared in the same second as an `op` invocation,
+# so `op` is the likeliest source — but the guard is set for the whole Termux env
+# because any wrapped tool can trigger it. `disabled:` is an unroutable address: both
+# libdbus and Go's godbus return a connection error rather than falling back to
+# autolaunch. Nothing here needs a session bus.
+export DBUS_SESSION_BUS_ADDRESS=disabled:
+{{- end }}
 
 ###### Essential PATH Setup ##############################################################################################
 # Local bin directory
