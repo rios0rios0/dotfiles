@@ -16,6 +16,8 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.16.2] - 2026-08-01
+
 ### Fixed
 
 - fixed Termux being killed with signal 9 on Android by blocking D-Bus session autolaunch in `dot_zshenv.tmpl`. Tools invoked through `termux-etc-seccomp` were starting a `dbus-daemon --session --fork` that reparented to PID 1 and was never reaped, so the orphans accumulated across days (19 leaked daemons observed from 3 days of use, holding 30 of Android's ~32-process phantom limit). With the budget permanently saturated, any trivial new subprocess — a Claude Code worker, a git hook — crossed the limit and the phantom process killer SIGKILLed the app, which read as a crash out of nowhere despite 8.9 GB of free RAM. Every leaked daemon carried `_=termux-etc-seccomp` in its environment and three appeared in the same second as an `op` invocation, making `op` the likeliest source, though the guard is set for the whole Termux environment since any wrapped tool can trigger it. Setting `DBUS_SESSION_BUS_ADDRESS=disabled:` makes both `libdbus` and Go's `godbus` fail the connection instead of autolaunching; three consecutive `op` calls under the guard spawned zero daemons. The Android tuning block is now gated by a chezmoi `eq .chezmoi.os "android"` conditional instead of a runtime `$PREFIX` test, so it is absent from `~/.zshenv` on Linux and Windows entirely — `PREFIX` is a conventional autotools variable that desktop users legitimately export for builds, and disabling the session bus there would break keyring and notification clients
