@@ -21,6 +21,7 @@ make test-chezmoiignore             # platform file inclusion logic
 make test-script-order              # script dependency ordering
 make test-modify-scripts            # modify script (merge) behavior
 make test-remove-dependencies       # dependency removal library (tombstones, $HOME safety rail)
+make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
 ```
 
 ## Essential Commands
@@ -154,7 +155,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -212,6 +213,23 @@ Android 12+ includes a **Phantom Process Killer** that enforces a system-wide li
 **Diagnosing a phantom kill:** count forked children with `ps -A -o pid,ppid,cmd | grep com.termux | wc -l`. At ~30 you are saturated regardless of free RAM — check `free -m` to rule out real memory pressure, then look for orphans (`ppid == 1`) that should have been reaped.
 
 **Manual Android settings:** Exclude Termux from battery optimization (`Unrestricted`), set animation scales to `0.5x`, enable RAM Plus if available.
+
+### Never Let a Go Module Cache Land in `$TMPDIR`
+
+Termux clears `$TMPDIR` from `TermuxService.onDestroy()`. That routine collects one stack trace per entry it fails to delete and then stringifies the whole batch, so a directory full of undeletable files turns app shutdown into an `OutOfMemoryError` — the heap growth limit is 256 MB and ~16k failures produced a 98 MB string.
+
+Go module caches are exactly that kind of directory: entries are written as `0400` files inside `0500` directories, and unlinking a child needs its *parent* writable, so `rm -rf` fails with `EACCES` on every one. Anything cleaning `$TMPDIR` hits the same wall.
+
+They get there because Go derives `GOMODCACHE` from `GOPATH`, and the pipelines Go scripts set `GOPATH="$(pwd)/.go"` when it is unset. Run `make test` with a cwd under `$TMPDIR` — Claude Code scratchpads live at `$TMPDIR/claude-<pid>/...` — and the cache is created there.
+
+| Half | Mechanism |
+|------|-----------|
+| Prevention | `dot_zshenv.tmpl` exports `GOMODCACHE="$HOME/go/pkg/mod"`, so no `GOPATH` a script picks can move the cache |
+| Cleanup | `.chezmoiscripts/run_after_android-005-prune-tmp-modcache.sh` chmods and removes any `*/pkg/mod` still found under `$TMPDIR` |
+
+Both are needed: the pin cannot retroactively remove caches left by older revisions, nor reach a tool that exports its own `GOMODCACHE`. When deleting one by hand, always `chmod -R u+w` first.
+
+**Diagnosing it:** `find "$TMPDIR" ! -writable | wc -l`. Anything in the thousands will crash Termux on exit. A telltale sign in the crash report is an *identical* allocation size across separate crashes — the file set is unchanged, so the string is deterministic.
 
 ## AI Rules Sync
 
