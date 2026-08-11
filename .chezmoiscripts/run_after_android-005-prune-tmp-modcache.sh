@@ -35,8 +35,36 @@ tmpDir="${TMPDIR:-/data/data/com.termux/files/usr/tmp}"
 # by a symlink or a trailing slash.
 tmpDir="$(cd "$tmpDir" && pwd -P)"
 
+# Resolves a directory to its canonical form so path comparisons are not decided
+# by spelling. Falls back to stripping trailing slashes lexically when the path
+# does not exist, which is the best that can be done without a real directory to
+# resolve.
+canonical_dir() {
+    local path="$1"
+
+    if [ -z "$path" ]; then
+        return 0
+    fi
+
+    if [ -d "$path" ]; then
+        if (cd "$path" 2>/dev/null && pwd -P); then
+            return 0
+        fi
+    fi
+
+    while :; do
+        case "$path" in
+            ?*/) path="${path%/}" ;;
+            *) break ;;
+        esac
+    done
+
+    printf '%s\n' "$path"
+}
+
 prune_cache() {
     local cache="$1"
+    local live=""
 
     # Safety rail: this runs unattended on every apply, so it must never delete
     # outside $TMPDIR. The `?*` guard also rejects a bare "$tmpDir" itself.
@@ -58,10 +86,18 @@ prune_cache() {
             ;;
     esac
 
-    # Never touch the live module cache, however it was configured.
-    if [ -n "${GOMODCACHE:-}" ] && [ "$cache" = "$GOMODCACHE" ]; then
-        echo "[$prefix] WARN: skipping '$cache' (it is the active \$GOMODCACHE)" >&2
-        return 0
+    # Never touch the live module cache, however it was configured. The
+    # comparison is between canonical paths rather than raw strings: a trailing
+    # slash, a relative path or a symlinked component would all name the same
+    # directory while comparing unequal, and this rail failing open means
+    # deleting the one cache it exists to protect.
+    if [ -n "${GOMODCACHE:-}" ]; then
+        live="$(canonical_dir "$GOMODCACHE")"
+
+        if [ -n "$live" ] && [ "$(canonical_dir "$cache")" = "$live" ]; then
+            echo "[$prefix] WARN: skipping '$cache' (it is the active \$GOMODCACHE)" >&2
+            return 0
+        fi
     fi
 
     echo "[$prefix] removing Go module cache under \$TMPDIR: $cache" >&2

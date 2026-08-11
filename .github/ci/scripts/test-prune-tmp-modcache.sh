@@ -95,6 +95,28 @@ else
     fail "refuses to remove the active \$GOMODCACHE (script errored)"
 fi
 
+# The rail must key on the directory, not on how it was spelled. Each of these
+# names the same cache as the one `find` reports, so a raw string comparison
+# would fail open and delete it.
+new_case
+make_cache "$CASE_TMP/live"
+GOMODCACHE="$CASE_TMP/live/pkg/mod/" TMPDIR="$CASE_TMP" bash "$SCRIPT" >/dev/null 2>&1 || true
+check "refuses when \$GOMODCACHE carries a trailing slash" \
+      "$([ -d "$CASE_TMP/live/pkg/mod" ] && echo true || echo false)"
+
+new_case
+make_cache "$CASE_TMP/live"
+ln -sfn "$CASE_TMP/live" "$CASE_TMP/live-link"
+GOMODCACHE="$CASE_TMP/live-link/pkg/mod" TMPDIR="$CASE_TMP" bash "$SCRIPT" >/dev/null 2>&1 || true
+check "refuses when \$GOMODCACHE reaches the cache through a symlink" \
+      "$([ -d "$CASE_TMP/live/pkg/mod" ] && echo true || echo false)"
+
+new_case
+make_cache "$CASE_TMP/live"
+GOMODCACHE="$CASE_TMP/live/pkg/mod/../mod" TMPDIR="$CASE_TMP" bash "$SCRIPT" >/dev/null 2>&1 || true
+check "refuses when \$GOMODCACHE contains a '..' component" \
+      "$([ -d "$CASE_TMP/live/pkg/mod" ] && echo true || echo false)"
+
 # --- does not escape $TMPDIR through a symlink -------------------------------
 new_case
 mkdir -p "$CASE_DIR/outside/pkg/mod"
