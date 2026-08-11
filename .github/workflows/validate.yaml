@@ -124,6 +124,14 @@ jobs:
       - name: Test dependency removal library
         run: make test-remove-dependencies
 
+  test-prune-tmp-modcache:
+    name: Test (TMPDIR module cache pruning)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Test TMPDIR module cache pruning
+        run: make test-prune-tmp-modcache
+
   sast:
     name: SAST
     runs-on: ubuntu-latest

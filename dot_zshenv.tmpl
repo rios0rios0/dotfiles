@@ -147,6 +147,30 @@ if [[ -z "$GOPATH" && -d "$HOME/go/bin" ]]; then
 fi
 {{- end }}
 
+# Pin the Go module cache to $HOME instead of letting Go derive it from
+# whatever GOPATH happens to be set.
+#
+# Go defaults GOMODCACHE to "$GOPATH/pkg/mod", so any script that repoints
+# GOPATH drags the module cache along with it. The pipelines Go scripts do
+# exactly that -- `GOPATH="$(pwd)/.go"` when GOPATH is unset -- which puts the
+# cache wherever the caller happened to be standing. Run one from a directory
+# inside $TMPDIR (Claude Code scratchpads live at $TMPDIR/claude-<pid>/...) and
+# the cache is created there.
+#
+# That is fatal on Android. Go writes module entries as 0400 files inside 0500
+# directories, and unlinking a child needs its *parent* writable, so nothing can
+# delete them without a chmod first. Termux's TermuxService.onDestroy() calls
+# clearTermuxTMPDIR(), which collects one stack trace per entry it fails to
+# remove and then stringifies the batch -- ~16k undeletable entries produced a
+# 98 MB string against a 256 MB heap limit and Termux died with an
+# OutOfMemoryError every time it was closed.
+#
+# Pinning is safe: the module cache is content-addressed and immutable, so
+# sharing one across GOPATHs and GVM pkgsets is the intended arrangement (it is
+# why GOMODCACHE was split out of GOPATH in Go 1.15). Pkgset isolation still
+# applies to bin/, which is what it is actually for.
+export GOMODCACHE="$HOME/go/pkg/mod"
+
 # Pyenv - Python version manager
 pyenvRoot="$HOME/.pyenv"
 if [[ -d "$pyenvRoot" ]]; then
