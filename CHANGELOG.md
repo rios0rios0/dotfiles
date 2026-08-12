@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Fixed
+
+- fixed `chezmoi apply` aborting on every platform with `.chezmoiignore:7: /CLAUDE.md: invalid path` by dropping the leading slash from the `CLAUDE.md` ignore pattern. chezmoi matches ignore patterns against the target path *relative* to the destination directory, so a leading `/` makes the pattern an absolute path and is rejected. The entry was written as `/CLAUDE.md` in `0a21e6d` (2026-03-07) and older chezmoi releases tolerated it; the Termux package moved 2.70.5 → 2.71.1 → 2.72.0 between the last successful apply on 2026-07-22 and the next one on 2026-08-11, and the newer binary validates the pattern at parse time. Because `.chezmoiignore` is read before anything else, the failure aborted the whole run rather than skipping one file — the `chezmoi update` that shipped 0.16.3 pulled the commits but applied none of them, so the `$TMPDIR` module-cache guard from that release silently never reached the device it was written for. Removing the slash is behaviour-preserving: unlike `.gitignore`, a chezmoi pattern with no slash is already anchored to the destination root, so `CLAUDE.md` still matches `~/CLAUDE.md` and not `~/any/dir/CLAUDE.md`, which is exactly what the slash was there to express. Every neighbouring entry in the same block (`CHANGELOG.md`, `CONTRIBUTING.md`, `LICENSE`, `Makefile`, `README.md`) was already slash-free
+
 ## [0.16.3] - 2026-08-11
 
 ### Fixed
