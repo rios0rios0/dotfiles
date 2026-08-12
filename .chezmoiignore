@@ -4,7 +4,7 @@
 .github
 .shellcheckrc
 CHANGELOG.md
-/CLAUDE.md
+CLAUDE.md
 CONTRIBUTING.md
 LICENSE
 Makefile
