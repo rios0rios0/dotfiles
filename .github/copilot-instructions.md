@@ -179,9 +179,9 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `dot_scripts/`: User scripts deployed to `~/.scripts/`:
   - `linux-engineering-version-manager.sh`: Pyenv workarounds and `dev-use` shell wrapper for `dev project use`
   - `linux-engineering-detect-kube-config-files.sh`: Auto-loads kubeconfig files from `~/.kube/config-files/`
-  - `linux-engineering-op-loader.sh`: Centralized 1Password credential and workspace loader with 24h TTL cache
-  - `linux-engineering-shell-credentials.sh`: Exports `cred:` fields from 1Password device note as env vars
-  - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note
+  - `linux-engineering-op-loader.sh`: Centralized 1Password credential and workspace loader with 24h TTL cache, plus the prune helpers that remove entries deleted from the device note
+  - `linux-engineering-shell-credentials.sh`: Exports `cred:` fields from 1Password device note as env vars, and unsets ones the note no longer has
+  - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note, and removes ones the note no longer has
   - `linux-toolbox-watch-compress-folders.sh`: Background script watching and compressing `~/.histdb`, `~/.john`, etc.
   - `android-patch-claude-code-tmpdir.sh`: Patches Claude Code for Termux compatibility (replaces hardcoded `/tmp` paths, symlinks system ripgrep)
 

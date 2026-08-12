@@ -26,9 +26,9 @@ lint-syntax:
 
 # === Test targets ===
 
-.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache
+.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials
 
-test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache
+test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials
 
 test-template-render:
 	@bash $(CI_DIR)/scripts/test-template-render.sh
@@ -47,6 +47,9 @@ test-remove-dependencies:
 
 test-prune-tmp-modcache:
 	@bash $(CI_DIR)/scripts/test-prune-tmp-modcache.sh
+
+test-shell-credentials:
+	@bash $(CI_DIR)/scripts/test-shell-credentials.sh
 
 # === SAST targets ===
 

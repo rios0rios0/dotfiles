@@ -22,6 +22,7 @@ make test-script-order              # script dependency ordering
 make test-modify-scripts            # modify script (merge) behavior
 make test-remove-dependencies       # dependency removal library (tombstones, $HOME safety rail)
 make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
+make test-shell-credentials         # 1Password credential/workspace loading and removal
 ```
 
 ## Essential Commands
@@ -137,6 +138,27 @@ Templates fetch this note (cached by chezmoi across all template files) and filt
 **Always guard with `hasKey . "value"`** — some 1Password fields lack a `value` property; accessing it without a guard causes `map has no entry for key "value"`.
 
 **Do not use `onepasswordItemFields`** — it only returns section-level fields and misses built-in properties like `"public key"` and `"private key"` on SSH Key items. The `onepassword` + `dict`/`set` pattern accesses all fields and chezmoi caches the underlying `op item get` call across all template files automatically.
+
+## Runtime Credential Lifecycle (Removal Needs a Manifest)
+
+`cred:` and `ws:` fields are loaded at shell startup by `dot_scripts/linux-engineering-{shell-credentials,workspace-aliases}.sh` and cached in `~/.cache/op-{credentials,workspaces}.env` (mode `600`, 24h TTL). `reload-credentials` re-reads both.
+
+**A rewritten cache cannot remove anything.** Once `export GH_TOKEN` has run, the value lives in the environment, not in the file — so deleting the field from the device note drops it from the cache while the variable survives in that shell and in every shell forked from it (tmux panes, IDE terminals, MCP subshells inherit the environment, never the cache).
+
+Each successful load therefore writes the names it returned into `_OP_CRED_NAMES` / `_OP_WS_NAMES`, both in the cache file and in the environment:
+
+| Half | Mechanism |
+|------|-----------|
+| The shell that reloads | `_op_prune_removed` in the loader scripts diffs the inherited manifest (plus the names the on-disk cache still assigns) against the fresh load, and unsets the difference |
+| Shells that inherited the value | `dot_zshenv.tmpl` runs the same diff after sourcing the caches, which is what makes a newly opened terminal drop a credential deleted elsewhere |
+
+**When touching this code, keep three invariants:**
+
+1. **Never prune on a failed fetch.** A locked vault, a missing `op`/`jq`, and a deleted field all look identical — "not in the response". `_op_load_references` returns non-zero when it never reached 1Password, and callers must leave the environment alone; pruning there would wipe every credential during a brief outage.
+2. **Never delete the caches to force a reload.** `reload-credentials` sets `_OP_RELOAD=1` to bypass the TTL instead, because the fetch reads the outgoing cache to recognise credentials exported by revisions that wrote no manifest.
+3. **Keep the `.zshenv` prune off the hot path.** It runs on every shell, so it is guarded on a manifest that was both inherited *and* changed, and `_op_read_cache_names` returns through a global rather than command substitution — the Termux phantom-process budget makes avoidable forks expensive.
+
+`make test-shell-credentials` covers all of this against a mock `op`.
 
 ## Logging Convention
 

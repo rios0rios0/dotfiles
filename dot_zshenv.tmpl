@@ -215,6 +215,16 @@ fi
 ###### Cached 1Password Credentials & Workspaces ###############################################################
 # Written by shell-credentials.sh and workspace-aliases.sh in interactive shells, auto-deleted after 24h.
 # Provides env vars and aliases to non-interactive shells (MCPs, IDE subshells).
+#
+# Each cache also records which names 1Password returned, in $_OP_CRED_NAMES and
+# $_OP_WS_NAMES. Those manifests travel with the environment, so a credential
+# deleted from the vault — which merely stops appearing in the cache — can still
+# be recognised as stale here. Without this, an exported credential survives in
+# every shell forked from one that loaded it before the deletion (tmux panes, IDE
+# terminals, MCP subshells), and no new terminal ever drops it.
+_op_cred_inherited="${_OP_CRED_NAMES-}"
+_op_ws_inherited="${_OP_WS_NAMES-}"
+
 for _cache_file in "$HOME/.cache/op-credentials.env" "$HOME/.cache/op-workspaces.env"; do
     if [[ -f "$_cache_file" ]]; then
         _mtime=$(stat -c %Y "$_cache_file" 2>/dev/null)
@@ -228,3 +238,16 @@ for _cache_file in "$HOME/.cache/op-credentials.env" "$HOME/.cache/op-workspaces
     fi
 done
 unset _cache_file
+
+# Only a cache that was actually loaded can prove a name is gone, so an expired or
+# missing cache leaves the manifests untouched and prunes nothing. Guarding on a
+# changed manifest also keeps the common cases free: a terminal that inherits
+# nothing, and a subshell whose parent is already up to date, never load the helper.
+if [[ -n "$_op_cred_inherited$_op_ws_inherited" ]] \
+    && [[ "$_op_cred_inherited" != "${_OP_CRED_NAMES-}" || "$_op_ws_inherited" != "${_OP_WS_NAMES-}" ]] \
+    && [[ -r "$HOME/.scripts/linux-engineering-op-loader.sh" ]]; then
+    source "$HOME/.scripts/linux-engineering-op-loader.sh"
+    _op_prune_removed "credentials" "$_op_cred_inherited" "${_OP_CRED_NAMES-}" _op_forget_variable
+    _op_prune_removed "workspaces" "$_op_ws_inherited" "${_OP_WS_NAMES-}" _op_forget_alias
+fi
+unset _op_cred_inherited _op_ws_inherited

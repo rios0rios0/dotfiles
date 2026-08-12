@@ -11,6 +11,10 @@
 #   _op_load_references "credentials" "cred" _on_match
 #   unset -f _on_match
 
+# Returns 0 only when the device note was fetched. Callers must treat a non-zero
+# return as "1Password could not be reached" and leave the environment alone: an
+# entry missing from a failed fetch says nothing about whether it was deleted
+# from the vault, so it must never drive a prune.
 _op_load_references() {
   local _ol_prefix="$1"
   local _ol_type="$2"
@@ -21,12 +25,12 @@ _op_load_references() {
   if ! command -v op &>/dev/null; then
     _ol_log "SKIP: 'op' command not found"
     unset -f _ol_log
-    return 0
+    return 1
   fi
   if ! command -v jq &>/dev/null; then
     _ol_log "SKIP: 'jq' command not found"
     unset -f _ol_log
-    return 0
+    return 1
   fi
 
   # ensure 1Password is authenticated before making API calls
@@ -38,13 +42,13 @@ _op_load_references() {
       if ! _ol_signin_output=$(op signin --account my); then
         _ol_log "ERROR: could not sign in to 1Password (unlock the desktop app or run 'op signin --account my')"
         unset -f _ol_log
-        return 0
+        return 1
       fi
       eval "$_ol_signin_output"
     else
       _ol_log "ERROR: 1Password not authenticated (signin already attempted)"
       unset -f _ol_log
-      return 0
+      return 1
     fi
   fi
 
@@ -66,7 +70,7 @@ _op_load_references() {
   if ! _ol_json=$(op item get "Device: $_ol_slug" --vault personal --account my --format json 2>&1); then
     _ol_log "ERROR: failed to fetch 'Device: $_ol_slug': $_ol_json"
     unset -f _ol_log
-    return 0
+    return 1
   fi
 
   # cred/ws values are stored as fields on the device note itself (label = "type:name").
@@ -89,4 +93,87 @@ _op_load_references() {
 
   _ol_log "done: $_ol_loaded loaded, $_ol_skipped skipped"
   unset -f _ol_log
+  return 0
+}
+
+# Collects the names a generated cache file assigns into $_OP_CACHE_NAMES, as a
+# space-separated list. `$2` is the keyword the assignment lines start with:
+# "export" for credentials, "alias" for workspaces.
+#
+# The result is handed back through a global instead of stdout because command
+# substitution forks, and this runs on shell startup — on Termux every avoidable
+# fork counts against the phantom-process budget described in CLAUDE.md.
+_op_read_cache_names() {
+  local _cn_file="$1"
+  local _cn_keyword="$2"
+  local _cn_line _cn_name
+
+  _OP_CACHE_NAMES=""
+  [[ -r "$_cn_file" ]] || return 0
+
+  # `|| [[ -n "$_cn_line" ]]` keeps a final line without a trailing newline
+  while IFS= read -r _cn_line || [[ -n "$_cn_line" ]]; do
+    case "$_cn_line" in
+      "$_cn_keyword "*) ;;
+      *) continue ;;
+    esac
+    _cn_name="${_cn_line#* }"
+    _cn_name="${_cn_name%%=*}"
+    # _OP_* are the loader's own bookkeeping variables, not loaded entries
+    case "$_cn_name" in
+      "" | _OP_*) continue ;;
+    esac
+    _OP_CACHE_NAMES="${_OP_CACHE_NAMES:+$_OP_CACHE_NAMES }$_cn_name"
+  done < "$_cn_file"
+
+  return 0
+}
+
+# Drops everything this loader put into the shell earlier that 1Password no
+# longer returns. Without it a deleted credential lives on forever: the cache
+# stops listing it, but the variable is already exported, so it survives in this
+# shell and in every shell forked from it.
+#
+# Only call this after a load that actually reached 1Password (or after sourcing
+# a cache such a load produced) — pruning on a failed fetch would wipe a working
+# environment whenever the vault is briefly unreachable.
+#
+#   $1 log prefix, $2 previous names, $3 names still present, $4 callback
+_op_prune_removed() {
+  local _pr_prefix="$1"
+  local _pr_pending="$2"
+  local _pr_present=" $3 "
+  local _pr_callback="$4"
+  local _pr_done=" "
+  local _pr_name
+
+  while [[ -n "$_pr_pending" ]]; do
+    _pr_name="${_pr_pending%% *}"
+    case "$_pr_pending" in
+      *' '*) _pr_pending="${_pr_pending#* }" ;;
+      *) _pr_pending="" ;;
+    esac
+    [[ -n "$_pr_name" ]] || continue
+    # the previous list is a union of several sources, so it can repeat a name
+    case "$_pr_done" in
+      *" $_pr_name "*) continue ;;
+    esac
+    case "$_pr_present" in
+      *" $_pr_name "*) continue ;;
+    esac
+    _pr_done="$_pr_done$_pr_name "
+    printf '[%s] removing "%s" (no longer in 1Password)\n' "$_pr_prefix" "$_pr_name" >&2
+    "$_pr_callback" "$_pr_name"
+  done
+
+  return 0
+}
+
+# Prune callbacks, kept here so .zshenv can reuse them without redefining them.
+_op_forget_variable() {
+  unset "$1"
+}
+
+_op_forget_alias() {
+  unalias "$1" 2>/dev/null || true
 }
