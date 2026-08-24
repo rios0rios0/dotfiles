@@ -3,6 +3,18 @@ Cross-platform dotfiles repository managed with [chezmoi](https://www.chezmoi.io
 
 Always reference these instructions first and fallback to search or bash commands only when you encounter unexpected information that does not match the info here.
 
+## CI Validation Commands (`make`)
+
+The "build" is `chezmoi apply`; there is no compilation step. Repo *changes* (templates, scripts, platform logic) are validated by a `Makefile`, which `.github/workflows/validate.yaml` runs on every PR. Run these locally before proposing edits — they are fast and need no 1Password login (a mock `op` backs the tests):
+
+```bash
+make lint    # shellcheck, Go template syntax, Python (ruff), PowerShell, YAML/JSON
+make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, $TMPDIR modcache prune, shell credentials
+make sast    # gitleaks + semgrep secret/code scanning
+```
+
+Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-remove-dependencies`, `make test-shell-credentials`. See the `Makefile` for the full target list.
+
 ## Working Effectively
 
 ### Bootstrap and Apply Dotfiles Configuration
@@ -54,13 +66,15 @@ Scripts execute in this order per platform (numbers = execution priority):
 
 | Order | Linux (WSL)                                            | Windows                          | Android (Termux)                       |
 |-------|--------------------------------------------------------|----------------------------------|----------------------------------------|
-| 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-op-wrapper.sh`                 |
+| 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-wrapper.sh` → `001a-e` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`) |
 | 002   | `install-dependencies.sh` *(also baremetal variant)*   | `configure-dependencies.ps1`     | `install-dependencies.sh.tmpl`         |
 | 003   | `configure-dependencies.sh`                            | `install-fonts.ps1`              | `install-fonts.sh.tmpl`                |
 | 004   | `install-fonts.sh.tmpl`                                | `export-private-key.ps1`         | —                                      |
 | 005   | `export-private-key.sh`                                | —                                | —                                      |
 
-After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, then `run_after_*` scripts execute on every `chezmoi apply`.
+After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, then `run_after_*` scripts execute on every `chezmoi apply`. `run_onchange_after_*-remove-dependencies.*` scripts (Linux `006`, Windows `005`, Android `004`) re-run whenever their tombstone list changes.
+
+On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-managed files under `dot_local/bin/`): the install-dependencies script calls `op`/`gh` during setup, before chezmoi applies managed files. Order: `001-create-wrapper` (generic `termux-etc-seccomp` wrapper) → `001a` `op` → `001b` `gh` → `001c` `golangci-lint` → `001d` `acli` → `001e` `claude` → `002-install-dependencies`.
 
 #### Linux Dependencies (`.chezmoiscripts/run_once_before_linux-002-install-dependencies.sh`)
 - **TIMING**: Takes 45-90 minutes to complete. NEVER CANCEL - Set timeout to 120+ minutes.
@@ -80,6 +94,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
   - **ruff** (Python linter, via Astral install script) — used by `make lint-python` to lint embedded Python in `modify_*` templates
   - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via upstream install script) — syncs AI assistant rules/agents/skills into `~/.claude/` and other AI assistant home directories; replaces the legacy `run_after_*-install-ai-rules.*` scripts
+  - **ccswitch** ([`rios0rios0/ccswitch`](https://github.com/rios0rios0/ccswitch), Linux/WSL only) — monitors Claude Code usage and rotates between enrolled backup accounts when limits are exhausted; `dot_zshrc.tmpl` starts its monitor daemon and both `claude`/`claudex` run `ccswitch ensure` before launch
   - **Speedtest CLI** (Ookla, via packagecloud)
 - Each tool installation can take 5-15 minutes individually
 - **Critical**: Script requires internet access for downloading tools
@@ -138,6 +153,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `run_after_windows-003-copy-app-data-files.ps1.tmpl` — copies files from `AppData/` in the repo to `~\AppData\` on Windows (directory names use `+` as wildcard for version-specific paths)
 - `run_after_android-001-create-ssh-keys.sh.tmpl` — creates SSH private/public key files from 1Password (device note, `ssh:` entries)
 - `run_after_android-003-wrap-terra-clis.sh` — wraps terraform/terragrunt binaries with `termux-etc-seccomp` to avoid SIGSYS on Android
+- `run_after_android-005-prune-tmp-modcache.sh` — chmods and sweeps any Go module cache left under `$TMPDIR` (undeletable `0400`/`0500` entries there crash Termux with an `OutOfMemoryError` on exit; `dot_zshenv.tmpl` also pins `GOMODCACHE` to `$HOME/go/pkg/mod` to prevent it)
 - `run_after_windows-004-install-jetbrains-themes.ps1` — fans staged JetBrains themes into detected IDE config directories (Windows)
 
 #### Manual Validation After Installation
@@ -159,7 +175,7 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `.chezmoiignore`: Platform-conditional file exclusion (uses Go templates with `.chezmoi.os`)
 - `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
-- `.chezmoitemplates/`: Shared template fragments (`lib-install-fonts.sh`, `lib-remove-dependencies.sh`, `username.tmpl`)
+- `.chezmoitemplates/`: Shared template fragments (`lib-install-fonts.sh`, `lib-modify-mcp-servers.sh`, `lib-remove-dependencies.sh`, `username.tmpl`)
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
 ### Key Managed Files
@@ -179,9 +195,9 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 - `dot_scripts/`: User scripts deployed to `~/.scripts/`:
   - `linux-engineering-version-manager.sh`: Pyenv workarounds and `dev-use` shell wrapper for `dev project use`
   - `linux-engineering-detect-kube-config-files.sh`: Auto-loads kubeconfig files from `~/.kube/config-files/`
-  - `linux-engineering-op-loader.sh`: Centralized 1Password credential and workspace loader with 24h TTL cache, plus the prune helpers that remove entries deleted from the device note
-  - `linux-engineering-shell-credentials.sh`: Exports `cred:` fields from 1Password device note as env vars, and unsets ones the note no longer has
-  - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note, and removes ones the note no longer has
+  - `linux-engineering-op-loader.sh`: Centralized 1Password credential and workspace loader with 24h TTL cache, plus the prune helpers that remove entries deleted from the device note. **Invariants when editing:** (1) never prune on a failed fetch — a locked vault, missing `op`/`jq`, and a deleted field all look identical, so `_op_load_references` returns non-zero and callers must leave the environment untouched, or a brief outage would unset every credential; (2) `reload-credentials` bypasses the TTL with `_OP_RELOAD=1` rather than deleting the caches, because the fetch reads the outgoing cache to recognise credentials it exported; (3) the `dot_zshenv.tmpl` prune runs on every shell, so it stays guarded on a changed manifest (Termux's phantom-process budget makes forks costly). `make test-shell-credentials` covers all of this
+  - `linux-engineering-shell-credentials.sh`: Exports `cred:` fields from 1Password device note as env vars, records the names in the `_OP_CRED_NAMES` manifest, and unsets ones a later successful load no longer returns
+  - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note, records `_OP_WS_NAMES`, and removes ones a later successful load no longer returns
   - `linux-toolbox-watch-compress-folders.sh`: Background script watching and compressing `~/.histdb`, `~/.john`, etc.
   - `android-patch-claude-code-tmpdir.sh`: Patches Claude Code for Termux compatibility (replaces hardcoded `/tmp` paths, symlinks system ripgrep)
 
@@ -423,7 +439,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
