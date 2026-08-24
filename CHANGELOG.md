@@ -16,6 +16,10 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+### Changed
+
+- refreshed `.github/copilot-instructions.md` to match the current codebase: documented the `make lint`/`make test`/`make sast` CI validation commands, the Android tool-wrapper ordering (`001`–`001e`), the runtime credential-removal invariants in `linux-engineering-op-loader.sh`, `install_ccswitch`, the `run_after_android-005-prune-tmp-modcache.sh` sweep, `lib-modify-mcp-servers.sh`, and the `tmp-modcache` logging prefix
+
 ## [0.17.0] - 2026-08-12
 
 ### Added
