@@ -12,6 +12,7 @@ development practices, refer to the **[Development Guide](https://github.com/rio
 - [age](https://github.com/FiloSottile/age) (for encrypted file handling)
 - [1Password CLI](https://developer.1password.com/docs/cli/get-started) (for secrets management)
 - [Make](https://www.gnu.org/software/make/)
+- [Go](https://go.dev/dl/) (only needed to install chlog below)
 - [chlog](https://github.com/luizjhonata/chlog) (`go install github.com/luizjhonata/chlog@latest`)
 
 ## Development Workflow
