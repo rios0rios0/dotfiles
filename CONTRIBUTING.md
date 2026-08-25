@@ -12,6 +12,7 @@ development practices, refer to the **[Development Guide](https://github.com/rio
 - [age](https://github.com/FiloSottile/age) (for encrypted file handling)
 - [1Password CLI](https://developer.1password.com/docs/cli/get-started) (for secrets management)
 - [Make](https://www.gnu.org/software/make/)
+- [chlog](https://github.com/luizjhonata/chlog) (`go install github.com/luizjhonata/chlog@latest`)
 
 ## Development Workflow
 
@@ -44,7 +45,10 @@ development practices, refer to the **[Development Guide](https://github.com/rio
    chezmoi encrypt <file>
    ```
 9. If your change **removes** a dependency, declare the removal (see below)
-10. Update `CHANGELOG.md` under `[Unreleased]`
+10. Add a changelog fragment — never edit `CHANGELOG.md`, which is generated from them:
+    ```bash
+    chlog new --kind Added --body "added the thing that was not there before"
+    ```
 11. Commit following the [commit conventions](https://github.com/rios0rios0/guide/wiki/Life-Cycle/Git-Flow)
 12. Open a pull request against `main`
 
