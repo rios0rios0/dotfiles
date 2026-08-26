@@ -81,7 +81,11 @@ list changes and skips them otherwise.
    it was installed.
 3. **Add any leftover config directory** to `.chezmoiremove`.
 4. Reference the removing commit in a comment so the entry can be retired later.
-5. Update `CHANGELOG.md` under `[Unreleased] > Removed`.
+5. Add a changelog fragment — `CHANGELOG.md` is generated from them and never
+   edited by hand:
+   ```bash
+   chlog new --kind Removed --body "removed <dependency>"
+   ```
 
 Steps 2 and 3 are the ones that make the repository a sync. Skipping them leaves
 the tool installed forever on every existing machine.
