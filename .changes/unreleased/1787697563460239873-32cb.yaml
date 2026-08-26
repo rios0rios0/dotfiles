@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the `CONTRIBUTING.md` prerequisites, which told contributors to install chlog with `go install` without listing Go itself'
-time: '2026-08-25T22:39:23.460128037Z'
