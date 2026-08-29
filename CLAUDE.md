@@ -288,8 +288,11 @@ The failure message ends with "If WSLg is not available (for example WSL1), run 
 instead." **That is not a diagnosis** — it is the tail of case 3 and prints whether or not WSLg is present.
 Check for `sox` before concluding anything about WSLg.
 
-Because the installer is `run_once_before`, adding a package here does **not** reach machines that already ran
-it; those need a manual `sudo apt install --no-install-recommends --yes sox libsox-fmt-pulse`.
+`run_once_` keys its state on the SHA256 of the script's *contents*, so editing the `utilities` array changes the
+hash and `chezmoi apply` re-runs the **whole** installer on machines that already ran the previous version. That is
+how a newly added package reaches them — but budget for the 45-120 minute pass noted above, and do not cancel it
+(the `install_*()` guards and apt idempotency make most of it a no-op). To pull in just these two packages ahead of
+the next apply: `sudo apt install --no-install-recommends --yes sox libsox-fmt-pulse`.
 
 `dot_zshrc.tmpl` must **not** alias `rec` or `play` — both are SoX binaries (`/usr/bin/rec` and `/usr/bin/play`,
 from the `sox` package). asciinema previously took both names and shadowed SoX; it now uses the non-conflicting
