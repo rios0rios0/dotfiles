@@ -50,6 +50,8 @@ utilities=(
     "rename"            # it's for bulk file renaming
     "whois"             # it's for domain lookup
     "ffmpeg"            # it's for media processing (used by conversion aliases in .zshrc)
+    "sox"               # it's for audio recording ("rec"), required by Claude Code voice input
+    "libsox-fmt-pulse"  # it's the SoX PulseAudio backend, required to record via WSLg's PulseServer
     "rsync"             # it's for file synchronization
     "asciinema"         # it's for recording terminal sessions (https://asciinema.org/)
     "shellcheck"        # it's for static analysis of shell scripts (used by `make lint`)

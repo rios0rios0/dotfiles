@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `sox` and `libsox-fmt-pulse` to the Linux dependency installer so Claude Code voice input can record through WSLg''s PulseAudio server (the `arecord`/ALSA path cannot work on WSL, which exposes no `/dev/snd`)'
+time: '2026-08-29T03:35:19.448929581Z'

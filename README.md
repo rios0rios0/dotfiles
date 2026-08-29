@@ -53,7 +53,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 ### Utilities
 
-- eza (ls replacement), bat (syntax highlighting), ripgrep, jq/yq, ffmpeg, ImageMagick, pdftk, asciinema, Speedtest CLI, CycloneDX (SBOM), rclone (Android/Termux only; see the [OneDrive setup guide](.docs/rclone-onedrive-setup.md))
+- eza (ls replacement), bat (syntax highlighting), ripgrep, jq/yq, ffmpeg, SoX (audio recording, backs Claude Code voice input on WSL), ImageMagick, pdftk, asciinema, Speedtest CLI, CycloneDX (SBOM), rclone (Android/Termux only; see the [OneDrive setup guide](.docs/rclone-onedrive-setup.md))
 
 ## Platform Matrix
 
