@@ -22,6 +22,16 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.19.0] - 2026-08-29
+
+### Added
+
+- added `sox` and `libsox-fmt-pulse` to the Linux dependency installer so Claude Code voice input can record through WSLg's PulseAudio server (the `arecord`/ALSA path cannot work on WSL, which exposes no `/dev/snd`)
+
+### Changed
+
+- renamed the asciinema aliases from `rec`/`play` to `record`/`replay` so they no longer shadow SoX's `/usr/bin/rec` and `/usr/bin/play`
+
 ## [0.18.1] - 2026-08-28
 
 ### Changed
