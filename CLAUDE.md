@@ -271,6 +271,40 @@ Keep `claudex` a **function**, not an alias: zsh refuses to define a function wh
 
 **Note:** if `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set, Claude Code ignores the rotated OAuth credentials; `ccswitch` warns when it detects this.
 
+## Claude Code Voice Input (WSL)
+
+Voice input (push-to-talk on the spacebar) shells out to a recorder binary, probing three options in order:
+
+1. `arecord` (ALSA) — probed first, but WSL exposes no `/dev/snd`, so this path can never succeed here
+2. `sox` **and** `rec` — the working path on WSL
+3. neither → voice input is reported unavailable and pauses after repeated failures
+
+WSLg already provides the server half: it exports `PULSE_SERVER=unix:/mnt/wslg/PulseServer` and exposes a
+`PulseAudioRDPSource` for the microphone. Only the client half is missing, which is why `sox` **and**
+`libsox-fmt-pulse` both sit in the `utilities` array of the Linux dependency installer — plain `sox` cannot
+reach the WSLg socket without the PulseAudio format handler, and the `sox` package is what provides `rec`.
+
+The failure message ends with "If WSLg is not available (for example WSL1), run Claude Code in native Windows
+instead." **That is not a diagnosis** — it is the tail of case 3 and prints whether or not WSLg is present.
+Check for `sox` before concluding anything about WSLg.
+
+`run_once_` keys its state on the SHA256 of the script's *contents*, so editing the `utilities` array changes the
+hash and `chezmoi apply` re-runs the **whole** installer on machines that already ran the previous version. That is
+how a newly added package reaches them — but budget for the 45-120 minute pass noted above, and do not cancel it
+(the `install_*()` guards and apt idempotency make most of it a no-op). To pull in just these two packages ahead of
+the next apply: `sudo apt install --no-install-recommends --yes sox libsox-fmt-pulse`.
+
+`dot_zshrc.tmpl` must **not** alias `rec` or `play` — both are SoX binaries (`/usr/bin/rec` and `/usr/bin/play`,
+from the `sox` package). asciinema previously took both names and shadowed SoX; it now uses the non-conflicting
+`record` / `replay` pair. Claude Code was never affected (it spawns via `PATH`, not through an interactive
+shell), but the aliases broke testing capture by hand:
+
+```bash
+rec -c 1 -r 16000 /tmp/mic-test.wav trim 0 3 && play /tmp/mic-test.wav
+```
+
+If SoX picks the wrong driver, force it with `AUDIODRIVER=pulse`.
+
 ## Encryption Setup
 
 - Private key: `~/.ssh/chezmoi`
