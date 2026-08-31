@@ -96,6 +96,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via upstream install script) — syncs AI assistant rules/agents/skills into `~/.claude/` and other AI assistant home directories; replaces the legacy `run_after_*-install-ai-rules.*` scripts
   - **ccswitch** ([`rios0rios0/ccswitch`](https://github.com/rios0rios0/ccswitch), Linux/WSL only) — monitors Claude Code usage and rotates between enrolled backup accounts when limits are exhausted; `dot_zshrc.tmpl` starts its monitor daemon and both `claude`/`claudex` run `ccswitch ensure` before launch
   - **Speedtest CLI** (Ookla, via packagecloud)
+  - **SoX** (`sox` + `libsox-fmt-pulse`) — provides `rec`/`play` so Claude Code voice input (push-to-talk) can record through WSLg's PulseAudio server; the ALSA/`arecord` path can never work on WSL, which exposes no `/dev/snd`, and `sox` needs `libsox-fmt-pulse` to reach the WSLg socket. Do **not** alias `rec`/`play` in `dot_zshrc.tmpl` — both are SoX binaries; asciinema uses the non-conflicting `record`/`replay` pair to avoid shadowing them
 - Each tool installation can take 5-15 minutes individually
 - **Critical**: Script requires internet access for downloading tools
 
