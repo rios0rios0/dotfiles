@@ -22,6 +22,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.19.1] - 2026-09-01
+
+### Changed
+
+- refreshed `.github/copilot-instructions.md` to document the `sox`/`libsox-fmt-pulse` voice-input dependency and the `rec`/`play` alias trap in `dot_zshrc.tmpl`, matching the SoX voice-input section already in `CLAUDE.md`
+
 ## [0.19.0] - 2026-08-29
 
 ### Added
