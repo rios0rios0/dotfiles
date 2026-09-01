@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'refreshed `.github/copilot-instructions.md` to document the `sox`/`libsox-fmt-pulse` voice-input dependency and the `rec`/`play` alias trap in `dot_zshrc.tmpl`, matching the SoX voice-input section already in `CLAUDE.md`'
+time: '2026-09-01T16:54:28.929039257Z'
