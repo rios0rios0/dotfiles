@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'changed the `common-aliases` `rm`, `cp` and `mv` guards into functions that keep `-i` only when stdin is a terminal, and relaxed zsh''s `nomatch` for non-interactive shells in `dot_zshenv.tmpl`. Claude Code''s Bash tool snapshots the interactive shell''s aliases into its runs, where `-i` reads EOF from a closed stdin and skips the copy with exit 0, and a glob that matches nothing aborted whole command lines that a script would have run'
+time: '2026-09-03T18:32:46.016816521Z'
