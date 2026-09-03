@@ -42,7 +42,18 @@ set -u
 export USER="${USER:-$(id -un)}"
 export HOME="${HOME:-/data/data/com.termux/files/home}"
 
-# Termux's bionic LD_PRELOAD shim cannot load into musl processes.
+# Termux's bionic LD_PRELOAD shims (termux-exec, termux-etc-redirect's Tier 1)
+# cannot load into a musl process: the loader fails to relocate them and exits
+# before main(). But the bionic shells behind Claude's tool calls need them
+# back, or every `#!/usr/bin/env` script they run -- each pipelines `make`
+# target -- fails with exit 127. So the value is parked in TERMUX_ETC_LD_PRELOAD
+# rather than dropped, and ~/.zshenv restores it in every shell Claude spawns.
+# A termux-etc-mount that knows the contract parks it under the same name, and
+# either side alone is enough, so a wrapper and a redirector of different
+# vintages still agree.
+if [ -n "${LD_PRELOAD:-}" ]; then
+    export TERMUX_ETC_LD_PRELOAD="$LD_PRELOAD"
+fi
 unset LD_PRELOAD
 
 # Point Node at Termux's CA bundle so TLS works without /etc/ssl/certs.
@@ -176,6 +187,16 @@ if ! command -v termux-etc-mount >/dev/null 2>&1; then
     echo "[claude-wrapper]        install rios0rios0/termux-etc-redirect (provides" >&2
     echo "[claude-wrapper]        termux-etc-mount used to redirect /etc/* to \$PREFIX/etc/*)" >&2
     exit 1
+fi
+
+# Take Termux's wake lock before handing off to Claude. Once the screen is
+# off Android pauses the CPU of a backgrounded app, which mid-task looks like
+# a hang and, past a grace period, a kill. Note the lock is NOT scoped to this
+# session: the `exec` below leaves no process to release it, so it persists
+# until `termux-wake-unlock` is run by hand. It is idempotent, and it comes
+# from termux-tools, so its absence is not an error.
+if command -v termux-wake-lock >/dev/null 2>&1; then
+    termux-wake-lock 2>/dev/null || true
 fi
 
 exec termux-etc-mount "$VERSIONS_DIR/$CLAUDE_BIN" "$@"

@@ -205,6 +205,17 @@ fi
 # for a full list of active aliases, run `alias`
 source $ZSH/oh-my-zsh.sh
 
+# `common-aliases` guards rm/cp/mv with `-i`, which is right at a prompt and wrong everywhere
+# else. Claude Code's Bash tool snapshots this shell's aliases and functions into its
+# non-interactive runs, where `-i` reads EOF from a closed stdin and skips the operation with
+# exit 0 -- a `cp` that never happened, reported as success. A function can tell the two apart
+# at run time: the guard stays when stdin is a terminal and goes when it is not.
+for _guarded in rm cp mv; do
+  unalias "$_guarded" 2>/dev/null
+  eval "$_guarded() { if [[ -t 0 ]]; then command $_guarded -i \"\$@\"; else command $_guarded \"\$@\"; fi; }"
+done
+unset _guarded
+
 ###### Toolbox ##########################################################################################################
 ###### General #####################################################################
 export TOOLS_DIR="$HOME/Development/Tools"

@@ -225,6 +225,8 @@ See **[.docs/dependency-lifecycle.md](.docs/dependency-lifecycle.md)** for the f
    - **RAM Plus / Extended RAM:** If available (Samsung: `Settings > Battery and device care > RAM Plus`), enable 4-8GB of virtual RAM
    - **Termux:Boot:** Install from [F-Droid](https://f-droid.org/en/packages/com.termux.boot/), create `~/.termux/boot/start.sh` with `termux-wake-lock` to auto-acquire wake lock on boot
 
+5. **`make` targets and `#!/usr/bin/env` scripts fail with exit 127 inside Claude Code tool calls (Termux)**: the `claude` wrapper must launch the musl binary without `LD_PRELOAD` (the musl loader cannot relocate Termux's bionic shims), and an unset variable is inherited by every bionic process Claude spawns — so `termux-exec` stops rewriting shebangs for the shells behind tool calls. The wrapper now parks the value in `TERMUX_ETC_LD_PRELOAD` and `~/.zshenv` restores it in every shell Claude starts. If a tool call still reports `/usr/bin/env: No such file or directory`, re-run `chezmoi apply` so the regenerated wrapper and `.zshenv` are in place, and start a fresh `claude` session.
+
 ## References
 
 - [chezmoi documentation](https://www.chezmoi.io/user-guide/command-overview/)

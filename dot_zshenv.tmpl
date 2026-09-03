@@ -7,6 +7,14 @@
 [[ "$__ZSHENV_SOURCED_PID" == "$$" ]] && return
 export __ZSHENV_SOURCED_PID="$$"
 
+###### Non-interactive Shell Defaults ####################################################################################
+# zsh aborts a whole command line when a glob matches nothing (`nomatch`), which is useful at a
+# prompt and hostile in scripts: `grep -n FOO $PREFIX/etc/profile.d/* ~/.zshrc` never runs the grep
+# at all when the directory is empty. The shells that hit it are the ones driven non-interactively
+# -- Claude Code's Bash tool, IDE terminals, `zsh -c` from scripts -- so the option is relaxed only
+# there, and an interactive shell keeps the prompt-time error.
+[[ -o interactive ]] || setopt NO_NOMATCH
+
 ###### Termux TMPDIR Fix #################################################################################################
 # On Termux/Android, /tmp is owned by shell:shell (0771) and not writable by app processes.
 # TMPDIR must be set before any tool (Node.js, Claude Code, etc.) calls os.tmpdir(),
@@ -40,6 +48,22 @@ export MALLOC_ARENA_MAX=2
 # libdbus and Go's godbus return a connection error rather than falling back to
 # autolaunch. Nothing here needs a session bus.
 export DBUS_SESSION_BUS_ADDRESS=disabled:
+
+# Restore the LD_PRELOAD shims parked by the Claude wrapper and termux-etc-mount. Termux
+# exports LD_PRELOAD so termux-exec can rewrite `#!/usr/bin/env` and `#!/bin/sh` shebangs on
+# execve, and it is how termux-etc-redirect's Tier 1 is enabled -- but a musl loader treats a
+# bionic entry it cannot relocate as fatal, so the value is moved to TERMUX_ETC_LD_PRELOAD
+# before the musl Claude binary starts. Claude never sources a shell rc file; every shell it
+# spawns for a tool call sources this one, which makes it the place that hands the shims back
+# to bionic descendants. Without them `make lint` and every `#!/usr/bin/env` pipelines script
+# fail with exit 127 under Claude while working from a plain Termux tab.
+if [[ -z "$LD_PRELOAD" && -n "$TERMUX_ETC_LD_PRELOAD" ]]; then
+    export LD_PRELOAD="$TERMUX_ETC_LD_PRELOAD"
+elif [[ -z "$LD_PRELOAD" && -r "$PREFIX/lib/libtermux-exec.so" ]]; then
+    # Nothing was parked either -- a wrapper that still unsets the variable, or an SSH login
+    # that never had it. termux-exec alone is what the shebang rewriting needs.
+    export LD_PRELOAD="$PREFIX/lib/libtermux-exec.so"
+fi
 {{- end }}
 
 ###### Essential PATH Setup ##############################################################################################

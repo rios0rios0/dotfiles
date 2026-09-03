@@ -214,7 +214,7 @@ The wrapper scripts follow a strict execution order:
 3. `android-001b-create-gh-wrapper.sh` — `gh` wrapper (backs the `gh_linux_arm64` binary installed in step 7)
 4. `android-001c-create-golangci-lint-wrapper.sh` — `golangci-lint` wrapper (backs the `golangci-lint_linux_arm64` binary installed in step 7)
 5. `android-001d-create-acli-wrapper.sh` — `acli` wrapper (backs the `acli_linux_arm64` binary installed in step 7)
-6. `android-001e-create-claude-wrapper.sh` — `claude` wrapper for Claude Code's `linux-arm64-musl` build (handles the background `patchelf`-aware auto-updater; first-time bootstrap is still manual via `examples/claude-code.md` in `rios0rios0/termux-etc-redirect`)
+6. `android-001e-create-claude-wrapper.sh` — `claude` wrapper for Claude Code's `linux-arm64-musl` build (handles the background `patchelf`-aware auto-updater; first-time bootstrap is still manual via `examples/claude-code.md` in `rios0rios0/termux-etc-redirect`) It parks `LD_PRELOAD` in `TERMUX_ETC_LD_PRELOAD` instead of dropping it (see below) and takes `termux-wake-lock` before the `exec`.
 7. `android-002-install-dependencies.sh.tmpl` — installs binaries and extensions
 
 The generic `termux-etc-seccomp` wrapper is the only exception — it exists as BOTH a bootstrap script (for timing) AND a chezmoi-managed file (`dot_local/bin/executable_wrapper`) to keep it updated on subsequent applies.
@@ -231,6 +231,8 @@ Android 12+ includes a **Phantom Process Killer** that enforces a system-wide li
 - `UV_THREADPOOL_SIZE=16` — increases Node.js libuv thread pool from default 4, critical for Claude Code I/O
 - `MALLOC_ARENA_MAX=2` — reduces glibc memory arena fragmentation on mobile
 - `DBUS_SESSION_BUS_ADDRESS=disabled:` — blocks D-Bus session autolaunch. Without it, tools run through `termux-etc-seccomp` (`op`, `gh`, `acli`, `claude`) leak a `dbus-daemon --session --fork` that reparents to PID 1 and is never reaped, silently consuming the ~32-process phantom budget until any new subprocess trips the killer. `op` is the likeliest source (leaked daemons appeared in the same second as its `op-daemon.pid`), but the guard covers every wrapped tool
+
+**`LD_PRELOAD` contract with `termux-etc-mount`:** the musl Claude binary cannot load Termux's bionic preload shims, so the wrapper and `termux-etc-mount` both move `LD_PRELOAD` to `TERMUX_ETC_LD_PRELOAD` before the `exec`, and the Android block of `dot_zshenv.tmpl` restores it in every shell Claude spawns (falling back to `termux-exec` alone when nothing was parked). That is what keeps `termux-exec`'s shebang rewriting — and with it every `#!/usr/bin/env` pipelines script and `make` target — working inside tool calls. Keep the variable name in step with `rios0rios0/termux-etc-redirect`.
 
 **Diagnosing a phantom kill:** count forked children with `ps -A -o pid,ppid,cmd | grep com.termux | wc -l`. At ~30 you are saturated regardless of free RAM — check `free -m` to rule out real memory pressure, then look for orphans (`ppid == 1`) that should have been reaped.
 
@@ -258,6 +260,13 @@ Both are needed: the pin cannot retroactively remove caches left by older revisi
 AI assistant rules (Claude Code, GitHub Copilot CLI, Codex, etc.) are **not** managed by chezmoi. Directories like `~/.claude/` and `~/.codex/` are excluded from chezmoi and synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply).
 
 After the dependency installer finishes, run `aisync init`, `aisync source add guide --source-repo rios0rios0/guide --branch generated`, and `aisync pull` to populate the rules. Subsequent `aisync pull` calls refresh them on demand.
+
+## Non-Interactive Shell Guards
+
+These ship to every platform, not only Android: both blocks sit outside the chezmoi platform conditionals, because the behaviour they guard against comes from Claude Code's Bash tool, which snapshots the interactive shell's aliases and functions into its non-interactive runs on Linux/WSL exactly as on Termux.
+
+- `dot_zshenv.tmpl` relaxes `nomatch` for non-interactive shells (`[[ -o interactive ]] || setopt NO_NOMATCH`), so a glob that matches nothing is passed through to the command instead of aborting the whole line. Interactive shells keep the prompt-time error.
+- `dot_zshrc.tmpl` replaces the `common-aliases` `rm`/`cp`/`mv -i` aliases with functions, defined right after oh-my-zsh loads, that keep `-i` only when stdin is a terminal. Against a closed stdin `-i` reads EOF and skips the operation with exit 0 — a `cp` that never happened, reported as success.
 
 ## Claude Account Rotation (ccswitch)
 

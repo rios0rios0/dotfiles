@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed `make` targets and every `#!/usr/bin/env` script failing with exit 127 inside Claude Code tool calls on Termux. The `claude` wrapper has to start the musl binary without `LD_PRELOAD` -- the musl loader cannot relocate Termux''s bionic shims and exits before `main()` -- but an unset variable is inherited by every bionic process Claude spawns, so `termux-exec` stopped rewriting shebangs for the shells behind tool calls. The wrapper now parks the value in `TERMUX_ETC_LD_PRELOAD` (the same contract `termux-etc-mount` implements) and the Android block of `dot_zshenv.tmpl` restores it in every shell Claude starts, falling back to `termux-exec` alone when nothing was parked'
+time: '2026-09-03T18:32:45.996256833Z'
