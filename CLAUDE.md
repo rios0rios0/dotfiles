@@ -234,8 +234,6 @@ Android 12+ includes a **Phantom Process Killer** that enforces a system-wide li
 
 **`LD_PRELOAD` contract with `termux-etc-mount`:** the musl Claude binary cannot load Termux's bionic preload shims, so the wrapper and `termux-etc-mount` both move `LD_PRELOAD` to `TERMUX_ETC_LD_PRELOAD` before the `exec`, and the Android block of `dot_zshenv.tmpl` restores it in every shell Claude spawns (falling back to `termux-exec` alone when nothing was parked). That is what keeps `termux-exec`'s shebang rewriting — and with it every `#!/usr/bin/env` pipelines script and `make` target — working inside tool calls. Keep the variable name in step with `rios0rios0/termux-etc-redirect`.
 
-**Non-interactive guards:** `dot_zshenv.tmpl` relaxes `nomatch` for non-interactive shells, and `dot_zshrc.tmpl` replaces the `common-aliases` `rm`/`cp`/`mv -i` aliases with functions that keep `-i` only when stdin is a terminal. Claude Code's Bash tool snapshots aliases and functions from this shell into its runs, and `-i` against a closed stdin skips the operation with exit 0.
-
 **Diagnosing a phantom kill:** count forked children with `ps -A -o pid,ppid,cmd | grep com.termux | wc -l`. At ~30 you are saturated regardless of free RAM — check `free -m` to rule out real memory pressure, then look for orphans (`ppid == 1`) that should have been reaped.
 
 **Manual Android settings:** Exclude Termux from battery optimization (`Unrestricted`), set animation scales to `0.5x`, enable RAM Plus if available.
@@ -262,6 +260,13 @@ Both are needed: the pin cannot retroactively remove caches left by older revisi
 AI assistant rules (Claude Code, GitHub Copilot CLI, Codex, etc.) are **not** managed by chezmoi. Directories like `~/.claude/` and `~/.codex/` are excluded from chezmoi and synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply).
 
 After the dependency installer finishes, run `aisync init`, `aisync source add guide --source-repo rios0rios0/guide --branch generated`, and `aisync pull` to populate the rules. Subsequent `aisync pull` calls refresh them on demand.
+
+## Non-Interactive Shell Guards
+
+These ship to every platform, not only Android: both blocks sit outside the chezmoi platform conditionals, because the behaviour they guard against comes from Claude Code's Bash tool, which snapshots the interactive shell's aliases and functions into its non-interactive runs on Linux/WSL exactly as on Termux.
+
+- `dot_zshenv.tmpl` relaxes `nomatch` for non-interactive shells (`[[ -o interactive ]] || setopt NO_NOMATCH`), so a glob that matches nothing is passed through to the command instead of aborting the whole line. Interactive shells keep the prompt-time error.
+- `dot_zshrc.tmpl` replaces the `common-aliases` `rm`/`cp`/`mv -i` aliases with functions, defined right after oh-my-zsh loads, that keep `-i` only when stdin is a terminal. Against a closed stdin `-i` reads EOF and skips the operation with exit 0 — a `cp` that never happened, reported as success.
 
 ## Claude Account Rotation (ccswitch)
 

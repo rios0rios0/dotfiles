@@ -189,11 +189,12 @@ if ! command -v termux-etc-mount >/dev/null 2>&1; then
     exit 1
 fi
 
-# Hold Termux's wake lock while Claude runs. Once the screen is off Android
-# pauses the CPU of a backgrounded app, which mid-task looks like a hang and,
-# past a grace period, a kill. The lock is a Termux-level toggle (visible in
-# its notification), idempotent, and released with `termux-wake-unlock`. It
-# comes from termux-tools, so its absence is not an error.
+# Take Termux's wake lock before handing off to Claude. Once the screen is
+# off Android pauses the CPU of a backgrounded app, which mid-task looks like
+# a hang and, past a grace period, a kill. Note the lock is NOT scoped to this
+# session: the `exec` below leaves no process to release it, so it persists
+# until `termux-wake-unlock` is run by hand. It is idempotent, and it comes
+# from termux-tools, so its absence is not an error.
 if command -v termux-wake-lock >/dev/null 2>&1; then
     termux-wake-lock 2>/dev/null || true
 fi

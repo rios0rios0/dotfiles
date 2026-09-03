@@ -211,8 +211,8 @@ source $ZSH/oh-my-zsh.sh
 # exit 0 -- a `cp` that never happened, reported as success. A function can tell the two apart
 # at run time: the guard stays when stdin is a terminal and goes when it is not.
 for _guarded in rm cp mv; do
-    unalias "$_guarded" 2>/dev/null
-    eval "$_guarded() { if [[ -t 0 ]]; then command $_guarded -i \"\$@\"; else command $_guarded \"\$@\"; fi; }"
+  unalias "$_guarded" 2>/dev/null
+  eval "$_guarded() { if [[ -t 0 ]]; then command $_guarded -i \"\$@\"; else command $_guarded \"\$@\"; fi; }"
 done
 unset _guarded
 
