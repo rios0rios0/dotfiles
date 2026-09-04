@@ -380,7 +380,7 @@ chezmoi edit ~/.zshrc
 chezmoi add ~/.new-config-file
 
 # Re-execute a run_once script (delete its hash to force re-run)
-chezmoi state delete-bucket --bucket=scriptStates
+chezmoi state delete-bucket --bucket=scriptState
 ```
 
 ### Template Processing
