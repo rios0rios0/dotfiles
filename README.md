@@ -39,7 +39,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 - **Kubernetes**: kubectl, krew (ctx/ns plugins), kubeconfig auto-detection
 - **Terraform** + Terragrunt
-- **AWS CLI**, **Azure CLI**, **Heroku CLI**, **GitHub CLI**
+- **AWS CLI**, **Azure CLI**, **GitHub CLI**, **Atlassian CLI**
 - **Docker** + Docker Compose
 
 ### Development Tools
@@ -53,7 +53,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 ### Utilities
 
-- eza (ls replacement), bat (syntax highlighting), ripgrep, jq/yq, ffmpeg, SoX (audio recording, backs Claude Code voice input on WSL), ImageMagick, pdftk, asciinema, Speedtest CLI, CycloneDX (SBOM), rclone (Android/Termux only; see the [OneDrive setup guide](.docs/rclone-onedrive-setup.md))
+- eza (ls replacement), bat (syntax highlighting), ripgrep, jq/yq, ffmpeg, SoX (audio recording, backs Claude Code voice input on WSL), pdftk (Windows and baremetal Linux only), asciinema, Speedtest CLI, rclone (Android/Termux only; see the [OneDrive setup guide](.docs/rclone-onedrive-setup.md))
 
 ## Platform Matrix
 
@@ -67,6 +67,8 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 | Editor | Any | JetBrains Toolbox, Visual Studio | Neovim (AstroVim) |
 
 ## Installation
+
+Setting up a machine from nothing? Follow the [fresh-machine setup runbook](.docs/fresh-machine-setup.md). It orders every step across Windows, WSL and Termux, names the script behind each automated item, and lists what stays manual. The blocks below are the short version for a machine that already has its prerequisites.
 
 ### Prerequisites
 
@@ -89,6 +91,7 @@ winget install Microsoft.PowerShell
 winget install Git.Git           # if ASLR is enabled, install from https://git-scm.com/download/win
 winget install FiloSottile.age   # add the age executable to PATH manually
 winget install 1password-cli
+winget install twpayne.chezmoi
 
 Set-ExecutionPolicy RemoteSigned -Scope Process
 chezmoi init --apply rios0rios0
