@@ -85,9 +85,7 @@ languages=(
 apt install --no-install-recommends --yes "${languages[@]}"
 # =========================================================================================================
 # =========================================================================================================
-command_exists() {
-  command -v "$1" >/dev/null 2>&1
-}
+{{ template "lib-install-deps.sh" }}
 
 # Sync a clone to its origin's default branch.
 # `git pull --rebase` fails when the working branch has no upstream tracking
@@ -195,17 +193,6 @@ install_go_tool_from_source() {
     (cd "$sourcePath" && make install)
 }
 
-# https://ohmyz.sh/#install
-install_oh_my_zsh() {
-    omzPath="$HOME/.oh-my-zsh"
-
-    if [ ! -d "$omzPath" ]; then
-        sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)"
-    else
-        echo "Oh My ZSH is already installed."
-    fi
-}
-
 # GVM is intentionally SKIPPED on Android/Termux.
 # GVM installs standard linux/arm64 Go builds that use the faccessat2 syscall (439),
 # which is blocked by Android's seccomp filter, causing "SIGSYS: bad system call".
@@ -264,50 +251,6 @@ install_kubectl() {
         chmod +x "$kubectlBin"
     else
         echo "Kubectl is already installed."
-    fi
-}
-
-# https://sdkman.io/install/
-install_sdkman() {
-    sdkPath="$HOME/.sdkman"
-
-    if [ ! -d "$sdkPath" ]; then
-        curl -s "https://get.sdkman.io" | bash
-
-        # shellcheck disable=SC1091
-        source "$sdkPath/bin/sdkman-init.sh"
-        sdk install java
-        sdk install gradle
-    else
-        echo "SDKMan is already installed."
-    fi
-}
-
-# https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
-install_nvm() {
-    if command_exists npm; then
-        echo "Node detected, means it was previously installed or native package installed..."
-
-        npm install -g corepack
-        corepack enable
-        return;
-    fi
-
-    nvmPath="$HOME/.nvm"
-
-    if [ ! -d "$nvmPath" ]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
-
-        unset PREFIX
-        # shellcheck disable=SC1091
-        source "$nvmPath/nvm.sh"
-        nvm install --lts
-
-        npm install -g npm@latest
-        npm install -g corepack
-        corepack enable
-    else
-        echo "NVM is already installed."
     fi
 }
 
@@ -573,7 +516,12 @@ install_aisync() {
     install_go_tool_from_source https://github.com/rios0rios0/aisync.git aisync
 }
 
-install_oh_my_zsh
+# change the login shell to zsh once Oh My Zsh is in place: the shared installer
+# runs Oh My Zsh's script with `--unattended`, which skips its `chsh` prompt, and
+# returns non-zero when the download failed, so a machine without ~/.oh-my-zsh
+# keeps its current shell. Termux's `chsh` is a script that symlinks
+# ~/.termux/shell and never prompts, so it is safe in an unattended run.
+install_oh_my_zsh && chsh -s zsh
 
 # TODO: building Go versions on Termux are breaking, since they don't recognize system critical path (like /etc/resolv.conf) leading to DNS errors
 install_gvm

@@ -60,14 +60,7 @@ utilities=(
 sudo apt install --no-install-recommends --yes "${utilities[@]}"
 # =========================================================================================================
 # =========================================================================================================
-# https://ohmyz.sh/#install
-install_oh_my_zsh() {
-    if [[ -d "${ZSH:-$HOME/.oh-my-zsh}" ]]; then
-        echo "[configure-deps] oh-my-zsh is already installed, skipping" >&2
-        return
-    fi
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
-}
+{{ template "lib-install-deps.sh" }}
 
 # https://github.com/moovweb/gvm?tab=readme-ov-file
 install_gvm() {
@@ -206,61 +199,6 @@ install_terra() {
     # flag in the currently installed binary. Pipe `yes` to stdin so the
     # prompts auto-confirm during unattended `chezmoi apply` runs.
     yes y | terra update
-}
-
-# https://sdkman.io/install/
-install_sdkman() {
-    if [[ -d "$HOME/.sdkman" ]]; then
-        echo "[configure-deps] SDKMAN is already installed, skipping download" >&2
-    else
-        curl -s "https://get.sdkman.io" | bash
-    fi
-
-    # Source SDKMAN to make it available in the current shell
-    export SDKMAN_DIR="$HOME/.sdkman"
-    # shellcheck source=/dev/null
-    [[ -s "$SDKMAN_DIR/bin/sdkman-init.sh" ]] && source "$SDKMAN_DIR/bin/sdkman-init.sh"
-
-    # SDKMAN writes download headers/post-install hooks to `$SDKMAN_DIR/tmp`
-    # before running curl. The directory occasionally goes missing (e.g. after
-    # a manual cleanup) and `sdk install` fails with
-    # "curl: Failed to open .../*.headers.tmp". Recreate it defensively.
-    mkdir -p "$SDKMAN_DIR/tmp"
-
-    # Keep SDKMAN itself up to date so candidate metadata (new Java/Gradle
-    # versions, broker URLs) refreshes on every apply.
-    sdk selfupdate force >/dev/null 2>&1 || echo "[configure-deps] WARN: sdk selfupdate failed; continuing" >&2
-
-    sdk install java
-    sdk install gradle
-}
-
-# https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
-install_nvm() {
-    if [[ ! -d "$HOME/.nvm" ]]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
-    else
-        echo "[configure-deps] NVM is already installed, skipping download" >&2
-    fi
-
-    # Source NVM to make it available in the current shell
-    export NVM_DIR="$HOME/.nvm"
-    # shellcheck source=/dev/null
-    [[ -s "$NVM_DIR/nvm.sh" ]] && source "$NVM_DIR/nvm.sh"
-
-    local lts_version
-    lts_version="$(nvm version-remote --lts 2>/dev/null)" || true
-    local current_version
-    current_version="$(nvm current 2>/dev/null)" || true
-
-    if [[ -n "$lts_version" && "$current_version" == "$lts_version" ]]; then
-        echo "[configure-deps] Node.js LTS $lts_version is already installed, skipping" >&2
-    else
-        nvm install --lts
-    fi
-
-    npm install -g corepack
-    corepack enable
 }
 
 # https://github.com/pyenv/pyenv
@@ -637,10 +575,11 @@ install_speedtest_cli() {
     sudo apt install --no-install-recommends --yes speedtest
 }
 
-install_oh_my_zsh
-# change the default shell to zsh so that new terminal sessions start in zsh
-# sudo usermod is used to avoid an interactive password prompt from chsh
-sudo usermod --shell "$(which zsh)" "$USER"
+# change the default shell to zsh once Oh My Zsh is in place, so that new terminal
+# sessions start in zsh; `install_oh_my_zsh` returns non-zero when the download
+# failed, which keeps the current shell. sudo usermod is used to avoid an
+# interactive password prompt from chsh
+install_oh_my_zsh && sudo usermod --shell "$(which zsh)" "$USER"
 install_gvm || exit 1
 install_kubectl
 install_krew

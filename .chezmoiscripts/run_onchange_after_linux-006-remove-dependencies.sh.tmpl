@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Removes dependencies that this repository used to install on Linux (baremetal/WSL)
-# but no longer declares in run_once_before_linux-002-install-dependencies.sh.
+# but no longer declares in run_once_before_linux-002-install-dependencies.sh.tmpl.
 #
 # This is a `run_onchange_` script: chezmoi re-runs it whenever the tombstone list
 # below changes, and every handler is idempotent, so it is a silent no-op once a
