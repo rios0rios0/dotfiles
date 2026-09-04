@@ -31,8 +31,10 @@ touching a machine, or the first `chezmoi init --apply` aborts halfway through r
 | `cred:NAME` and `ws:NAME` fields on the device note                                                                   | `personal` | `dot_scripts/linux-engineering-shell-credentials.sh` and `linux-engineering-workspace-aliases.sh` at shell startup                                                        |
 | The MCP server tokens                                                                                                 | `Private`  | `modify_dot_claude.json.tmpl`; see [mcp-1password-setup.md](mcp-1password-setup.md)                                                                                      |
 
-`deviceName` is the hostname, lowercased, with spaces replaced by dashes, unless `CHEZMOI_DEVICE`
-is set (`.chezmoi.yaml.tmpl`). On Windows and WSL the hostname is fine. On Termux the hostname is
+`deviceName` starts from `CHEZMOI_DEVICE` when that variable is set and from the hostname
+otherwise, and `.chezmoi.yaml.tmpl` then lowercases the value and replaces spaces with dashes in
+both cases. Name the note after that normalized form: a hostname or `CHEZMOI_DEVICE` of `My Laptop`
+means `Device: my-laptop`. On Windows and WSL the hostname is fine. On Termux the hostname is
 `localhost`, so `CHEZMOI_DEVICE` has to be exported before the first apply (Phase 5).
 
 The age identity is only needed where an encrypted file is applied: `.aws` and `.azure` on
