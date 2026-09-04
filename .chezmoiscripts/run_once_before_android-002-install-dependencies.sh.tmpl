@@ -506,21 +506,6 @@ install_azure_cli() {
     az extension add --name azure-devops
 }
 
-# https://fly.io/docs/flyctl/install/
-# `flyctl` is a static Go binary and the upstream installer picks the linux/arm64 release,
-# which runs natively on Termux -- no faccessat2 SIGSYS, unlike the terraform/terragrunt
-# blobs that android-003 has to wrap. `--non-interactive` without `--setup-path` keeps the
-# installer out of the shell rc files, which chezmoi owns: `dot_zshenv.tmpl` puts
-# `~/.fly/bin` on PATH itself.
-install_fly_cli() {
-    if [ -x "$HOME/.fly/bin/flyctl" ]; then
-        echo "Fly.io CLI is already installed."
-        return
-    fi
-
-    FLYCTL_INSTALL="$HOME/.fly" run_remote_installer "flyctl" https://fly.io/install.sh --non-interactive
-}
-
 # https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm
 # Installed with pip like the Azure CLI. The `oci` SDK pins `crc32c==2.8.0`, whose arm64
 # fast path is written for GCC (`#pragma GCC target ("+crc+crypto")`); Termux's clang ignores
@@ -530,13 +515,12 @@ install_fly_cli() {
 # Pre-building that one wheel lets `pip install oci-cli` find the pin already satisfied.
 install_oci_cli() {
     if ! command_exists pip; then
-        echo "Install 'pip' first, it seems to be NOT installed..."
-
-        return;
+        echo "[oci-cli] ERROR: pip is not installed, skipping the OCI CLI" >&2
+        return 1
     fi
 
     if pip show oci-cli &>/dev/null; then
-        echo "OCI CLI is already installed."
+        echo "[oci-cli] OCI CLI is already installed, skipping" >&2
         return
     fi
 

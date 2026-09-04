@@ -368,19 +368,6 @@ install_azure_cli() {
     pip install azure-cli
 }
 
-# https://fly.io/docs/flyctl/install/
-# The upstream installer drops the release binary under ~/.fly/bin. `--non-interactive`
-# without `--setup-path` keeps it out of the shell rc files, which chezmoi owns:
-# `dot_zshenv.tmpl` puts `~/.fly/bin` on PATH itself.
-install_fly_cli() {
-    if [ -x "$HOME/.fly/bin/flyctl" ]; then
-        echo "[configure-deps] flyctl is already installed, skipping" >&2
-        return
-    fi
-
-    FLYCTL_INSTALL="$HOME/.fly" run_remote_installer "flyctl" https://fly.io/install.sh --non-interactive
-}
-
 # https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm
 install_oci_cli() {
     # Same pyenv Python the Azure CLI lives in
