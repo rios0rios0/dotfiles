@@ -39,7 +39,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 - **Kubernetes**: kubectl, krew (ctx/ns plugins), kubeconfig auto-detection
 - **Terraform** + Terragrunt
-- **AWS CLI**, **Azure CLI**, **GitHub CLI**, **Atlassian CLI**
+- **AWS CLI**, **Azure CLI**, **Fly.io CLI**, **OCI CLI** (Oracle Cloud), **GitHub CLI**, **Atlassian CLI**
 - **Docker** + Docker Compose
 
 ### Development Tools

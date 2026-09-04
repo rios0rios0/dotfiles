@@ -72,6 +72,13 @@ if [[ -d "$HOME/.local/bin" ]]; then
     export PATH="$HOME/.local/bin:$PATH"
 fi
 
+# Fly.io CLI (`flyctl`, plus its `fly` alias): the upstream installer puts it under ~/.fly and
+# would otherwise append this export to the rc files chezmoi owns (`install_fly_cli` runs it
+# with `--non-interactive` and no `--setup-path` for that reason)
+if [[ -d "$HOME/.fly/bin" ]]; then
+    export PATH="$HOME/.fly/bin:$PATH"
+fi
+
 ###### Version Managers PATH Setup #######################################################################################
 # These only add paths - full initialization happens in .zshrc for interactive shells
 

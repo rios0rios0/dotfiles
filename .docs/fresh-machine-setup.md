@@ -212,6 +212,8 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | GitHub CLI                                       | `install_github_cli`                 | `[automated]` | apt repository.                                                                                                                 |
 | AWS CLI v2                                       | `install_aws_cli`                    | `[automated]` | Official zip installer.                                                                                                         |
 | Azure CLI                                        | `install_azure_cli`                  | `[automated]` | pip, inside the pyenv Python.                                                                                                   |
+| Fly.io CLI                                        | `install_fly_cli`                     | `[automated]`  | Upstream installer into `~/.fly/bin`; `dot_zshenv.tmpl` adds it to PATH.                                                         |
+| OCI CLI                                           | `install_oci_cli`                     | `[automated]`  | pip, inside the pyenv Python.                                                                                                    |
 | ggshield                                         | `install_ggshield`                   | `[automated]` | pipx; its auth config is rendered from 1Password by `dot_config/ggshield/private_auth_config.yaml.tmpl`.                         |
 | ruff                                             | `install_ruff`                       | `[automated]` | Astral install script.                                                                                                          |
 | aisync                                           | `install_aisync`                     | `[partial]`   | Installed here; the AI rules are pulled by hand (below).                                                                        |
@@ -246,7 +248,7 @@ gvm list && go version
 node --version && corepack --version
 pyenv version
 kubectl version --client && kubectl krew list
-command -v terra terraform terragrunt aws az gh copilot acli ruff ggshield aisync ccswitch
+command -v terra terraform terragrunt aws az gh copilot acli ruff ggshield aisync ccswitch flyctl oci
 fc-list | grep -i meslo
 git config --get core.hooksPath
 ```
@@ -312,6 +314,8 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 | 1Password CLI (ARM64 binary), GitHub CLI, golangci-lint, Atlassian CLI | `install_1password_cli`, `install_github_cli`, `install_golangci_lint`, `install_acli` | `[automated]` | Pinned release downloads into `~/.local/bin`, run through the wrappers.                                                                                                                  |
 | AWS CLI v2                                                        | `install_aws_cli`                                                                 | `[automated]` | Built from source with pip, 10-15 minutes.                                                                                                                                                         |
 | Azure CLI                                                         | `install_azure_cli`                                                               | `[automated]` | pip, with the psutil and PyNaCl workarounds Termux needs.                                                                                                                                          |
+| Fly.io CLI                                                         | `install_fly_cli`                                                                  | `[automated]`  | Static linux/arm64 Go binary from the upstream installer; runs natively, no wrapper needed.                                                                                                         |
+| OCI CLI                                                            | `install_oci_cli`                                                                  | `[automated]`  | pip, with the `crc32c` wheel pre-built with the CRC and AES target features forced (Termux's clang ignores the GCC pragma).                                                                         |
 | Neovim with AstroNvim                                             | `configure_neovim`                                                                | `[automated]` |                                                                                                                                                                                                    |
 
 ### After the apply `[manual]`
@@ -330,7 +334,7 @@ echo "$CHEZMOI_DEVICE"
 readlink ~/.termux/shell                   # .../usr/bin/zsh
 op whoami
 gh auth status
-command -v terra kubectl aws az acli golangci-lint aisync
+command -v terra kubectl aws az acli golangci-lint aisync flyctl oci
 claude --version
 ls ~/.termux/font.ttf
 ```

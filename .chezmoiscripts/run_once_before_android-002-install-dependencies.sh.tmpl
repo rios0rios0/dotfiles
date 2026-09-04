@@ -506,6 +506,45 @@ install_azure_cli() {
     az extension add --name azure-devops
 }
 
+# https://fly.io/docs/flyctl/install/
+# `flyctl` is a static Go binary and the upstream installer picks the linux/arm64 release,
+# which runs natively on Termux -- no faccessat2 SIGSYS, unlike the terraform/terragrunt
+# blobs that android-003 has to wrap. `--non-interactive` without `--setup-path` keeps the
+# installer out of the shell rc files, which chezmoi owns: `dot_zshenv.tmpl` puts
+# `~/.fly/bin` on PATH itself.
+install_fly_cli() {
+    if [ -x "$HOME/.fly/bin/flyctl" ]; then
+        echo "Fly.io CLI is already installed."
+        return
+    fi
+
+    FLYCTL_INSTALL="$HOME/.fly" run_remote_installer "flyctl" https://fly.io/install.sh --non-interactive
+}
+
+# https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm
+# Installed with pip like the Azure CLI. The `oci` SDK pins `crc32c==2.8.0`, whose arm64
+# fast path is written for GCC (`#pragma GCC target ("+crc+crypto")`); Termux's clang ignores
+# that pragma, so the build dies on `__crc32cd` and `vmull_p64` needing the `crc` and `aes`
+# target features. `-march=armv8-a+crc` does not help either -- Termux's clang configuration
+# overrides it -- so the features are forced at the cc1 level with `-Xclang -target-feature`.
+# Pre-building that one wheel lets `pip install oci-cli` find the pin already satisfied.
+install_oci_cli() {
+    if ! command_exists pip; then
+        echo "Install 'pip' first, it seems to be NOT installed..."
+
+        return;
+    fi
+
+    if pip show oci-cli &>/dev/null; then
+        echo "OCI CLI is already installed."
+        return
+    fi
+
+    CFLAGS="-Xclang -target-feature -Xclang +crc -Xclang -target-feature -Xclang +crypto -Xclang -target-feature -Xclang +aes -Xclang -target-feature -Xclang +sha2" \
+        pip install 'crc32c==2.8.0'
+    pip install oci-cli
+}
+
 # https://github.com/rios0rios0/aisync
 # `aisync` syncs AI assistant rules/agents/skills across AI assistant home
 # directories such as `~/.claude/`.
@@ -549,6 +588,8 @@ install_github_cli
 install_golangci_lint
 install_aws_cli
 install_azure_cli
+install_fly_cli
+install_oci_cli
 install_aisync
 install_acli
 
