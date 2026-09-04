@@ -110,7 +110,7 @@ chezmoi init --apply rios0rios0
 ```
 .chezmoiscripts/         # 33 platform-specific setup scripts (run_once_before_*, run_after_*, run_onchange_after_*)
 .chezmoiremove           # Target paths deleted from $HOME on every apply (see Dependency Lifecycle)
-.chezmoitemplates/       # Shared template fragments (font installer, dependency removal, MCP server logic, username)
+.chezmoitemplates/       # Shared template fragments (shared install functions, font installer, dependency removal, MCP server logic, username)
 dot_claude/              # Claude Code config (settings, permissions, trust) -> ~/.claude/
 dot_config/              # XDG config (mcphub MCP servers for Android) -> ~/.config/
 dot_docker/              # Docker daemon config -> ~/.docker/

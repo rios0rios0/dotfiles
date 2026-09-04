@@ -67,7 +67,7 @@ Scripts execute in this order per platform (numbers = execution priority):
 | Order | Linux (WSL)                                            | Windows                          | Android (Termux)                       |
 |-------|--------------------------------------------------------|----------------------------------|----------------------------------------|
 | 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-wrapper.sh` → `001a-e` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`) |
-| 002   | `install-dependencies.sh` *(also baremetal variant)*   | `configure-dependencies.ps1`     | `install-dependencies.sh.tmpl`         |
+| 002   | `install-dependencies.sh.tmpl` *(also baremetal variant)* | `configure-dependencies.ps1`     | `install-dependencies.sh.tmpl`         |
 | 003   | `configure-dependencies.sh`                            | `install-fonts.ps1`              | `install-fonts.sh.tmpl`                |
 | 004   | `install-fonts.sh.tmpl`                                | `export-private-key.ps1`         | —                                      |
 | 005   | `export-private-key.sh`                                | —                                | —                                      |
@@ -76,11 +76,12 @@ After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, 
 
 On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-managed files under `dot_local/bin/`): the install-dependencies script calls `op`/`gh` during setup, before chezmoi applies managed files. Order: `001-create-wrapper` (generic `termux-etc-seccomp` wrapper) → `001a` `op` → `001b` `gh` → `001c` `golangci-lint` → `001d` `acli` → `001e` `claude` → `002-install-dependencies`.
 
-#### Linux Dependencies (`.chezmoiscripts/run_once_before_linux-002-install-dependencies.sh`)
+#### Linux Dependencies (`.chezmoiscripts/run_once_before_linux-002-install-dependencies.sh.tmpl`)
 - **TIMING**: Takes 45-90 minutes to complete. NEVER CANCEL - Set timeout to 120+ minutes.
 - Installs system packages: git, curl, zip/unzip, age, gpg, zsh, eza, sqlite3, gcc, make, etc.
 - Installs development tools via dedicated functions:
-  - **Oh My Zsh** — default Zsh framework
+  - **Shared with Android** via `.chezmoitemplates/lib-install-deps.sh` (`command_exists`, Oh My Zsh, SDKMAN, NVM) — the `{{ template }}` include is the only reason this installer is a `.sh.tmpl`
+  - **Oh My Zsh** — default Zsh framework, installed `--unattended`; the login shell is switched with `usermod` right after
   - **GVM** — Go version manager (resolves and installs the latest stable Go version)
   - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)
   - **terra** (Terraform + Terragrunt version manager via upstream install script, same as Android)
@@ -114,6 +115,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
+- Oh My Zsh, SDKMAN and NVM come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh, and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
 - Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
@@ -176,7 +178,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `.chezmoiignore`: Platform-conditional file exclusion (uses Go templates with `.chezmoi.os`)
 - `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
-- `.chezmoitemplates/`: Shared template fragments (`lib-install-fonts.sh`, `lib-modify-mcp-servers.sh`, `lib-remove-dependencies.sh`, `username.tmpl`)
+- `.chezmoitemplates/`: Shared template fragments (`lib-install-deps.sh`, `lib-install-fonts.sh`, `lib-modify-mcp-servers.sh`, `lib-remove-dependencies.sh`, `username.tmpl`)
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
 ### Key Managed Files
