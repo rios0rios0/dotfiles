@@ -19,7 +19,9 @@
 
 # =========================================================================================================
 command_exists() {
-    command -v "$1" >/dev/null 2>&1
+    local name="$1"
+    command -v "$name" >/dev/null 2>&1 || return 1
+    return 0
 }
 
 # https://ohmyz.sh/#install
@@ -33,7 +35,8 @@ install_oh_my_zsh() {
     # `exec`-ing a login zsh in the middle of an unattended run. Each platform
     # installer switches the login shell itself right after this call
     # (`usermod` on Linux, Termux's `chsh -s zsh` on Android).
-    sh -c "$(curl -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    # `--proto '=https'` keeps a redirect from downgrading the download to plain HTTP.
+    sh -c "$(curl --proto '=https' -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
 }
 
 # https://sdkman.io/install/
@@ -72,7 +75,7 @@ install_nvm() {
     # Windows' `npm` through PATH interop, which must not disable NVM on Linux.
     if [[ -d /data/data/com.termux/files/usr ]] && command_exists npm; then
         echo "[install-deps] Termux native Node.js detected, skipping NVM" >&2
-        npm install -g corepack
+        npm install -g --ignore-scripts corepack
         corepack enable
         return
     fi
@@ -103,7 +106,9 @@ install_nvm() {
         nvm install --lts
     fi
 
-    npm install -g corepack
+    # corepack ships no lifecycle scripts, so `--ignore-scripts` costs nothing and
+    # keeps a compromised registry response from running code at install time.
+    npm install -g --ignore-scripts corepack
     corepack enable
 }
 # =========================================================================================================
