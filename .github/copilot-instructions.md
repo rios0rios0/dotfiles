@@ -81,7 +81,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Installs system packages: git, curl, zip/unzip, age, gpg, zsh, eza, sqlite3, gcc, make, etc.
 - Installs development tools via dedicated functions:
   - **Shared with Android** via `.chezmoitemplates/lib-install-deps.sh` (`command_exists`, Oh My Zsh, SDKMAN, NVM, and the `run_remote_installer` download-then-run helper) — the `{{ template }}` include is the only reason this installer is a `.sh.tmpl`
-  - **Oh My Zsh** — default Zsh framework, installed `--unattended`; the login shell is switched with `usermod` right after
+  - **Oh My Zsh** — default Zsh framework, installed `--unattended` through `run_remote_installer`; the login shell is switched with `usermod` right after, only when the install succeeded
   - **GVM** — Go version manager (resolves and installs the latest stable Go version)
   - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)
   - **terra** (Terraform + Terragrunt version manager via upstream install script, same as Android)
@@ -115,7 +115,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
-- Oh My Zsh, SDKMAN and NVM come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh, and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
+- Oh My Zsh, SDKMAN and NVM come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh (only when its install succeeded), and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
 - Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)

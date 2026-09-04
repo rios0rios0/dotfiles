@@ -516,11 +516,12 @@ install_aisync() {
     install_go_tool_from_source https://github.com/rios0rios0/aisync.git aisync
 }
 
-install_oh_my_zsh
-# change the login shell to zsh: the shared installer runs Oh My Zsh's script with
-# `--unattended`, which skips its `chsh` prompt. Termux's `chsh` is a script that
-# symlinks ~/.termux/shell and never prompts, so it is safe in an unattended run.
-chsh -s zsh
+# change the login shell to zsh once Oh My Zsh is in place: the shared installer
+# runs Oh My Zsh's script with `--unattended`, which skips its `chsh` prompt, and
+# returns non-zero when the download failed, so a machine without ~/.oh-my-zsh
+# keeps its current shell. Termux's `chsh` is a script that symlinks
+# ~/.termux/shell and never prompts, so it is safe in an unattended run.
+install_oh_my_zsh && chsh -s zsh
 
 # TODO: building Go versions on Termux are breaking, since they don't recognize system critical path (like /etc/resolv.conf) leading to DNS errors
 install_gvm

@@ -24,14 +24,16 @@ command_exists() {
     return 0
 }
 
-# Download an installer script over HTTPS and run it with bash. Piping curl
-# straight into bash would feed an HTTP error page (a 404, a captive portal)
-# to bash and hide the failure, because these installers do not enable
-# `pipefail`; downloading to a file first makes the download status explicit
-# and fails fast.
+# Download an installer script over HTTPS and run it with bash, forwarding any
+# further arguments to the script. Piping curl straight into bash, or running
+# `sh -c` on a command substitution, would hide a failed download: an HTTP
+# error page reaches the shell, or an empty string runs as a no-op that exits
+# 0, and these installers do not enable `pipefail`. Downloading to a file first
+# makes the download status explicit and fails fast.
 run_remote_installer() {
     local name="$1"
     local url="$2"
+    shift 2
     local installer
     local status
 
@@ -42,7 +44,7 @@ run_remote_installer() {
         return 1
     fi
 
-    bash "$installer"
+    bash "$installer" "$@"
     status=$?
     rm -f "$installer"
     if [[ "$status" -ne 0 ]]; then
@@ -60,10 +62,10 @@ install_oh_my_zsh() {
 
     # `--unattended` stops the installer from prompting for `chsh` and from
     # `exec`-ing a login zsh in the middle of an unattended run. Each platform
-    # installer switches the login shell itself right after this call
-    # (`usermod` on Linux, Termux's `chsh -s zsh` on Android).
-    # `--proto '=https'` keeps a redirect from downgrading the download to plain HTTP.
-    sh -c "$(curl --proto '=https' -fsSL https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh)" "" --unattended
+    # installer switches the login shell itself right after this call, and only
+    # when this call succeeded (`usermod` on Linux, Termux's `chsh -s zsh` on
+    # Android).
+    run_remote_installer "Oh My Zsh" "https://raw.githubusercontent.com/ohmyzsh/ohmyzsh/master/tools/install.sh" --unattended || return 1
 }
 
 # https://sdkman.io/install/

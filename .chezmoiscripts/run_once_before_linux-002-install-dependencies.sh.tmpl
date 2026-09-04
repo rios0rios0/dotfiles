@@ -575,10 +575,11 @@ install_speedtest_cli() {
     sudo apt install --no-install-recommends --yes speedtest
 }
 
-install_oh_my_zsh
-# change the default shell to zsh so that new terminal sessions start in zsh
-# sudo usermod is used to avoid an interactive password prompt from chsh
-sudo usermod --shell "$(which zsh)" "$USER"
+# change the default shell to zsh once Oh My Zsh is in place, so that new terminal
+# sessions start in zsh; `install_oh_my_zsh` returns non-zero when the download
+# failed, which keeps the current shell. sudo usermod is used to avoid an
+# interactive password prompt from chsh
+install_oh_my_zsh && sudo usermod --shell "$(which zsh)" "$USER"
 install_gvm || exit 1
 install_kubectl
 install_krew
