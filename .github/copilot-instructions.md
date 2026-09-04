@@ -80,7 +80,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - **TIMING**: Takes 45-90 minutes to complete. NEVER CANCEL - Set timeout to 120+ minutes.
 - Installs system packages: git, curl, zip/unzip, age, gpg, zsh, eza, sqlite3, gcc, make, etc.
 - Installs development tools via dedicated functions:
-  - **Shared with Android** via `.chezmoitemplates/lib-install-deps.sh` (`command_exists`, Oh My Zsh, SDKMAN, NVM) — the `{{ template }}` include is the only reason this installer is a `.sh.tmpl`
+  - **Shared with Android** via `.chezmoitemplates/lib-install-deps.sh` (`command_exists`, Oh My Zsh, SDKMAN, NVM, and the `run_remote_installer` download-then-run helper) — the `{{ template }}` include is the only reason this installer is a `.sh.tmpl`
   - **Oh My Zsh** — default Zsh framework, installed `--unattended`; the login shell is switched with `usermod` right after
   - **GVM** — Go version manager (resolves and installs the latest stable Go version)
   - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)

@@ -24,6 +24,33 @@ command_exists() {
     return 0
 }
 
+# Download an installer script over HTTPS and run it with bash. Piping curl
+# straight into bash would feed an HTTP error page (a 404, a captive portal)
+# to bash and hide the failure, because these installers do not enable
+# `pipefail`; downloading to a file first makes the download status explicit
+# and fails fast.
+run_remote_installer() {
+    local name="$1"
+    local url="$2"
+    local installer
+    local status
+
+    installer="$(mktemp)"
+    if ! curl --proto '=https' -fsSL "$url" -o "$installer"; then
+        echo "[install-deps] ERROR: failed to download the $name installer from $url" >&2
+        rm -f "$installer"
+        return 1
+    fi
+
+    bash "$installer"
+    status=$?
+    rm -f "$installer"
+    if [[ "$status" -ne 0 ]]; then
+        echo "[install-deps] ERROR: the $name installer exited with status $status" >&2
+    fi
+    return "$status"
+}
+
 # https://ohmyz.sh/#install
 install_oh_my_zsh() {
     if [[ -d "${ZSH:-$HOME/.oh-my-zsh}" ]]; then
@@ -44,7 +71,7 @@ install_sdkman() {
     if [[ -d "$HOME/.sdkman" ]]; then
         echo "[install-deps] SDKMAN is already installed, skipping download" >&2
     else
-        curl -s "https://get.sdkman.io" | bash
+        run_remote_installer "SDKMAN" "https://get.sdkman.io" || return 1
     fi
 
     # Source SDKMAN to make it available in the current shell
@@ -81,7 +108,7 @@ install_nvm() {
     fi
 
     if [[ ! -d "$HOME/.nvm" ]]; then
-        curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh | bash
+        run_remote_installer "NVM" "https://raw.githubusercontent.com/nvm-sh/nvm/v0.40.2/install.sh" || return 1
     else
         echo "[install-deps] NVM is already installed, skipping download" >&2
     fi
