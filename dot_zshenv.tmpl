@@ -72,12 +72,17 @@ if [[ -d "$HOME/.local/bin" ]]; then
     export PATH="$HOME/.local/bin:$PATH"
 fi
 
+{{- if ne .chezmoi.os "android" }}
 # Fly.io CLI (`flyctl`, plus its `fly` alias): the upstream installer puts it under ~/.fly and
 # would otherwise append this export to the rc files chezmoi owns (`install_fly_cli` runs it
-# with `--non-interactive` and no `--setup-path` for that reason)
+# with `--non-interactive` and no `--setup-path` for that reason). Deliberately NOT on Android:
+# there the static binary must be reached through the termux-etc-seccomp wrappers that
+# `run_after_android-003-wrap-terra-clis.sh` writes into ~/.local/bin, and ~/.fly/bin ahead of
+# them on PATH would hand every call to the unwrapped binary, which cannot resolve DNS.
 if [[ -d "$HOME/.fly/bin" ]]; then
     export PATH="$HOME/.fly/bin:$PATH"
 fi
+{{- end }}
 
 ###### Version Managers PATH Setup #######################################################################################
 # These only add paths - full initialization happens in .zshrc for interactive shells
