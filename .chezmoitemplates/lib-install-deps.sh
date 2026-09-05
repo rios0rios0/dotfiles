@@ -141,3 +141,21 @@ install_nvm() {
     corepack enable
 }
 # =========================================================================================================
+
+# =========================================================================================================
+# https://fly.io/docs/flyctl/install/
+# Same body on both platforms: the upstream installer drops the release binary under
+# ~/.fly/bin. `--non-interactive` without `--setup-path` keeps the installer out of the
+# shell rc files, which chezmoi owns. What differs per platform lives elsewhere: on Linux
+# `dot_zshenv.tmpl` puts ~/.fly/bin on PATH; on Termux the static linux/arm64 build starts
+# but resolves nothing (Go's resolver reads /etc/resolv.conf, which Android does not have,
+# and falls back to [::1]:53), so `run_after_android-003-wrap-terra-clis.sh` fronts it with
+# a termux-etc-seccomp wrapper in ~/.local/bin and ~/.fly/bin stays off PATH there.
+install_fly_cli() {
+    if [[ -x "$HOME/.fly/bin/flyctl" ]]; then
+        echo "[install-deps] flyctl is already installed, skipping" >&2
+        return
+    fi
+
+    FLYCTL_INSTALL="$HOME/.fly" run_remote_installer "flyctl" "https://fly.io/install.sh" --non-interactive || return 1
+}

@@ -368,6 +368,22 @@ install_azure_cli() {
     pip install azure-cli
 }
 
+# https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm
+install_oci_cli() {
+    # Same pyenv Python the Azure CLI lives in
+    export PYENV_ROOT="$HOME/.pyenv"
+    export PATH="$PYENV_ROOT/bin:$PATH"
+    eval "$(pyenv init -)"
+
+    if pip show oci-cli &>/dev/null; then
+        echo "[configure-deps] oci-cli is already installed, skipping" >&2
+        return
+    fi
+
+    pip install --upgrade pip
+    pip install oci-cli
+}
+
 # https://docs.gitguardian.com/ggshield-docs/getting-started
 install_ggshield() {
     # Ensure pip is available from pyenv's Python (so pipx lives in the managed Python)
@@ -596,6 +612,8 @@ install_dev_toolkit
 install_github_cli
 install_aws_cli
 install_azure_cli
+install_fly_cli
+install_oci_cli
 
 install_ggshield
 install_ruff
