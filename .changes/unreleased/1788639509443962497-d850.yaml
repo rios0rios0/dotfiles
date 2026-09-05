@@ -1,3 +1,3 @@
 kind: 'Security'
-body: 'enforced HTTPS-only redirects on the curl and wget downloads in the validate workflow, the baremetal Linux dependency installer, and the shared font-install library'
+body: 'enforced HTTPS-only redirects on the `curl` and `wget` downloads in the validate workflow, the baremetal Linux dependency installer, and the shared font-install library'
 time: '2026-09-05T20:18:29.443912809Z'
