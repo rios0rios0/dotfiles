@@ -1,0 +1,3 @@
+kind: 'Security'
+body: 'locked the ruff install in CI to a hash-verified binary wheel instead of resolving an unpinned package with setup scripts allowed'
+time: '2026-09-05T20:18:29.434181247Z'

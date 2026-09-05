@@ -13,7 +13,7 @@ MESLO_LGS_FILES=(
 # =========================================================================================================
 # Resolve the latest Nerd Fonts release tag (https://github.com/ryanoasis/nerd-fonts)
 resolve_nerd_fonts_version() {
-    curl -fsSL "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" | jq -r '.tag_name'
+    curl -fsSL --proto '=https' --proto-redir '=https' "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" | jq -r '.tag_name'
 }
 
 # Install a Nerd Font zip by name (e.g. "FiraCode", "Meslo")
@@ -27,7 +27,7 @@ install_nerd_font_zip() {
     local TEMP_DIR
     TEMP_DIR="$(mktemp -d)"
 
-    curl -fsSL -o "$TEMP_DIR/$NAME.zip" "$NERD_FONTS_BASE_URL/$VERSION/$NAME.zip"
+    curl -fsSL --proto '=https' --proto-redir '=https' -o "$TEMP_DIR/$NAME.zip" "$NERD_FONTS_BASE_URL/$VERSION/$NAME.zip"
     unzip -o "$TEMP_DIR/$NAME.zip" "*.ttf" -d "$TEMP_DIR/$NAME"
     find "$TEMP_DIR/$NAME" -name "*.ttf" -exec cp {} "$FONT_DIR/" \;
     rm -rf "$TEMP_DIR"
@@ -40,7 +40,7 @@ install_meslo_lgs_nf() {
     mkdir -p "$FONT_DIR"
 
     for file in "${MESLO_LGS_FILES[@]}"; do
-        curl -fsSL -o "$FONT_DIR/$(printf '%b' "${file//%/\\x}")" "$MESLO_BASE_URL/$file"
+        curl -fsSL --proto '=https' --proto-redir '=https' -o "$FONT_DIR/$(printf '%b' "${file//%/\\x}")" "$MESLO_BASE_URL/$file"
     done
 }
 

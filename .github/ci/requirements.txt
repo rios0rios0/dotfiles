@@ -1,0 +1,6 @@
+# Python tools installed by .github/workflows/validate.yaml (lint-python job).
+# Installed with `--only-binary :all: --require-hashes`, so every entry needs the
+# sha256 of the wheel pip selects on ubuntu-latest (x86_64, manylinux). When bumping
+# a version, take the new hash from https://pypi.org/project/<package>/#files.
+ruff==0.16.6 \
+    --hash=sha256:d72c591a96986ee4268860e2b7235082129ca5e4cb9cbba653a4b57c11893757

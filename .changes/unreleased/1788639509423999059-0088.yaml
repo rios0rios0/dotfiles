@@ -1,0 +1,3 @@
+kind: 'Security'
+body: 'replaced the piped get.chezmoi.io installer in CI with a pinned release archive that is verified against the checksums published with that release before it is installed'
+time: '2026-09-05T20:18:29.423943903Z'
