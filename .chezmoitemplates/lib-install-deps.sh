@@ -159,3 +159,58 @@ install_fly_cli() {
 
     FLYCTL_INSTALL="$HOME/.fly" run_remote_installer "flyctl" "https://fly.io/install.sh" --non-interactive || return 1
 }
+
+# =========================================================================================================
+# https://cli.sentry.dev/getting-started/
+# Sentry CLI (binary `sentry`, npm package `sentry`, from getsentry/cli -- not the classic
+# Rust `sentry-cli`). Same body on both platforms because the npm package is the CLI itself
+# as a plain JavaScript bundle: no platform-specific optional dependency, no lifecycle
+# script, `engines.node >= 20` (22.15+ uses the built-in `node:sqlite` for ~/.sentry/cli.db,
+# older Node falls back to a bundled WASM driver). The official install script
+# (`curl https://cli.sentry.dev/install | bash`) is deliberately NOT used: it downloads the
+# Bun-compiled `sentry-linux-<arch>` executable, a glibc binary -- the `-musl` variants
+# stopped shipping after 0.34.0 -- and on Termux the kernel cannot even start it
+# (`/lib/ld-linux-aarch64.so.1` does not exist under bionic), so it dies before
+# `sentry cli setup`. Under Termux's native Node the bundle needs no termux-etc-redirect
+# wrapper either: DNS and TLS go through bionic, which is what a `sentry cli upgrade --check`
+# round trip verified on a device. `sentry cli upgrade` recognises the npm layout from its
+# own path and upgrades through npm. Completions and agent skills are not part of an npm
+# install; `sentry cli setup --no-modify-path` adds them on demand (without the flag it
+# appends to ~/.zshrc, which chezmoi reverts on the next apply).
+install_sentry_cli() {
+    if command_exists sentry; then
+        echo "[install-deps] Sentry CLI is already installed, skipping" >&2
+        return
+    fi
+
+    if ! command_exists npm || ! command_exists node; then
+        echo "[install-deps] ERROR: npm is not available; install_nvm must run before install_sentry_cli" >&2
+        return 1
+    fi
+
+    # The package declares `engines.node >= 20`; refuse early instead of installing a
+    # launcher that fails on every run.
+    local nodeMajor
+    nodeMajor="$(node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
+    case "$nodeMajor" in
+        '' | *[!0-9]*)
+            echo "[install-deps] WARN: could not determine the Node.js version, skipping the Sentry CLI" >&2
+            return 1
+            ;;
+    esac
+    if [[ "$nodeMajor" -lt 20 ]]; then
+        echo "[install-deps] WARN: the Sentry CLI needs Node.js 20+, found v$nodeMajor; skipping" >&2
+        return 1
+    fi
+
+    # The package ships no lifecycle scripts, so `--ignore-scripts` costs nothing and keeps a
+    # compromised registry response from running code at install time (as for corepack).
+    if ! npm install -g --ignore-scripts sentry; then
+        echo "[install-deps] ERROR: npm install -g sentry failed" >&2
+        return 1
+    fi
+
+    if ! command_exists sentry; then
+        echo "[install-deps] WARN: the Sentry CLI was installed but 'sentry' is not on PATH; check 'npm prefix -g'" >&2
+    fi
+}

@@ -209,6 +209,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | ccswitch                                         | `install_ccswitch`                   | `[partial]`   | Installed here; every account still has to be enrolled once with `ccswitch enroll` after `claude` and `/login`.                 |
 | GitHub Copilot CLI                               | `install_copilot_cli`                | `[automated]` | Upstream installer into `~/.local/bin`.                                                                                          |
 | Codex CLI                                        | `install_codex_cli`                  | `[automated]` | npm package; its platform package bundles the bubblewrap the sandbox needs.                                                     |
+| Sentry CLI                                       | `install_sentry_cli`                 | `[automated]` | npm package (`sentry`, from getsentry/cli), shared with Android through `lib-install-deps.sh`.                                  |
 | dev-toolkit                                      | `install_dev_toolkit`                | `[automated]` | Upstream install script.                                                                                                        |
 | GitHub CLI                                       | `install_github_cli`                 | `[automated]` | apt repository.                                                                                                                 |
 | AWS CLI v2                                       | `install_aws_cli`                    | `[automated]` | Official zip installer.                                                                                                         |
@@ -235,6 +236,7 @@ aisync source add guide --source-repo rios0rios0/guide --branch generated
 aisync pull
 claude                                     # /login, then: ccswitch enroll
 codex login                                # browser flow; `codex login --device-auth` prints a code instead
+sentry auth login                          # device code entered at a URL; `--token <API token>` skips OAuth
 ```
 
 If `docker` should work inside Kali through Docker Desktop, enable its WSL integration for
@@ -250,7 +252,7 @@ gvm list && go version
 node --version && corepack --version
 pyenv version
 kubectl version --client && kubectl krew list
-command -v terra terraform terragrunt aws az gh copilot codex acli ruff ggshield aisync ccswitch flyctl oci
+command -v terra terraform terragrunt aws az gh copilot codex sentry acli ruff ggshield aisync ccswitch flyctl oci
 fc-list | grep -i meslo
 git config --get core.hooksPath
 ```
@@ -314,6 +316,7 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 | GitHub Copilot CLI                                                | `install_copilot_cli`                                                             | `[partial]`   | npm, best effort: skipped with a warning when Termux's Node.js is older than 22.                                                                                                                   |
 | Claude Code                                                       | none                                                                              | `[manual]`    | The musl build is bootstrapped by hand following `examples/claude-code.md` in [rios0rios0/termux-etc-redirect](https://github.com/rios0rios0/termux-etc-redirect); the `claude` wrapper from step 2 handles every later update. |
 | Codex CLI                                                         | `install_codex_cli`                                                               | `[automated]` | The `codex` wrapper from step 2 downloads the latest static musl release on its first launch and keeps it updated in the background; a global npm install is removed first, because npm cannot install the `linux-arm64` platform package on Termux. |
+| Sentry CLI                                                        | `install_sentry_cli`                                                              | `[automated]` | npm package under Termux's native Node, no wrapper: the bundle is plain JavaScript. The official install script cannot be used here, its Bun-compiled glibc binary does not start on bionic. |
 | 1Password CLI (ARM64 binary), GitHub CLI, golangci-lint, Atlassian CLI | `install_1password_cli`, `install_github_cli`, `install_golangci_lint`, `install_acli` | `[automated]` | Pinned release downloads into `~/.local/bin`, run through the wrappers.                                                                                                                  |
 | AWS CLI v2                                                        | `install_aws_cli`                                                                 | `[automated]` | Built from source with pip, 10-15 minutes.                                                                                                                                                         |
 | Azure CLI                                                         | `install_azure_cli`                                                               | `[automated]` | pip, with the psutil and PyNaCl workarounds Termux needs.                                                                                                                                          |
@@ -323,8 +326,8 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 
 ### After the apply `[manual]`
 
-Same `aisync` and `claude` steps as Phase 4, minus `ccswitch` (Linux only), and `codex login --device-auth`
-instead of `codex login`: it prints a code to enter in the phone's browser. Then the Android settings
+Same `aisync`, `claude` and `sentry auth login` steps as Phase 4, minus `ccswitch` (Linux only), and
+`codex login --device-auth` instead of `codex login`: it prints a code to enter in the phone's browser. Then the Android settings
 from the README's known issue on the Phantom Process Killer: **Developer Options > Disable child
 process restrictions**, Termux's battery usage set to Unrestricted, and optionally Termux:Boot with a
 `termux-wake-lock` start script. rclone for OneDrive has its own guide:
@@ -338,9 +341,10 @@ echo "$CHEZMOI_DEVICE"
 readlink ~/.termux/shell                   # .../usr/bin/zsh
 op whoami
 gh auth status
-command -v terra kubectl aws az acli golangci-lint aisync flyctl oci
+command -v terra kubectl aws az acli golangci-lint aisync flyctl oci sentry
 claude --version
 codex --version
+sentry --version
 ls ~/.termux/font.ttf
 ```
 

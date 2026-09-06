@@ -202,7 +202,7 @@ See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-ma
 
 ## Shared Install Library
 
-`.chezmoitemplates/lib-install-deps.sh` holds the install functions whose body is correct on both Linux/WSL and Android without a conditional: `command_exists`, `install_oh_my_zsh`, `install_sdkman`, `install_nvm`, plus the `run_remote_installer` helper they use to download an installer script to a temp file and run it (never pipe `curl` into `bash`; without `pipefail` an HTTP error page runs silently). Both dependency installers pull it in with `{{ template "lib-install-deps.sh" }}`, which is the only reason the Linux installer is a `.sh.tmpl`.
+`.chezmoitemplates/lib-install-deps.sh` holds the install functions whose body is correct on both Linux/WSL and Android without a conditional: `command_exists`, `install_oh_my_zsh`, `install_sdkman`, `install_nvm`, `install_fly_cli`, `install_sentry_cli`, plus the `run_remote_installer` helper they use to download an installer script to a temp file and run it (never pipe `curl` into `bash`; without `pipefail` an HTTP error page runs silently). Both dependency installers pull it in with `{{ template "lib-install-deps.sh" }}`, which is the only reason the Linux installer is a `.sh.tmpl`.
 
 Keep platform-specific provisioning in the platform installers: apt repositories versus binary downloads (`gh`, `kubectl`), upstream install scripts versus source builds (`terra`, `dev-toolkit`, `aisync`), pyenv versus Termux's native Python. A function moves into the library only when the same body is right on both platforms. The library is pure bash (no template directives), so `make lint-shellcheck` lints it as a plain `.sh` file, and its messages use the `[install-deps]` prefix.
 
@@ -278,6 +278,19 @@ The wrapper encodes four Termux facts, each verified on a device:
 | `codex update` refuses a manual install (`Could not detect the Codex installation method`) | The wrapper resolves the latest release from the `releases/latest` redirect, keeps builds under `~/.local/share/codex/versions/<X.Y.Z>/codex`, checks once per 24h in the background, retains three builds, and silences Codex's own startup update nag while its updater is active. `CODEX_WRAPPER_NO_AUTO_UPDATE=1` and `CODEX_WRAPPER_FORCE_VERSION=X.Y.Z` override this |
 
 Log in with `codex login --device-auth` on the phone: it prints a code to enter at the URL it shows, in any browser, while the default `codex login` expects to open a browser and receive a callback on `localhost:1455`. The `LD_PRELOAD` contract above applies unchanged: `termux-etc-mount` parks the value and `dot_zshenv.tmpl` restores it in the `zsh -lc` shells Codex spawns for tool calls.
+
+## Sentry CLI (npm, no wrapper)
+
+`sentry` is the new Sentry CLI from [`getsentry/cli`](https://github.com/getsentry/cli), not the classic Rust `sentry-cli`. The Linux/WSL and Android installers both install it through the shared `install_sentry_cli` in `lib-install-deps.sh` with `npm install -g sentry`, and there is deliberately **no** Termux wrapper (Windows does not get it):
+
+| Fact | Consequence |
+|------|-------------|
+| The official install script (`cli.sentry.dev/install`) downloads a Bun-compiled `sentry-linux-<arch>` executable linked against glibc; the `-musl` variants stopped shipping after `0.34.0` | On Termux the kernel cannot start it at all (`/lib/ld-linux-aarch64.so.1` does not exist under bionic), so the script dies with `No such file or directory` before `sentry cli setup` runs. Do not retry it there, and do not reach for `glibc-runner` or a musl loader: the npm route removes the need |
+| The npm package `sentry` is the same CLI as a plain JavaScript bundle: no platform package, no lifecycle script, `engines.node >= 20` | It runs under Termux's native `nodejs` (bionic) and under NVM on Linux/WSL with one shared function body. Node 22.15+ uses the built-in `node:sqlite` for `~/.sentry/cli.db`; older Node falls back to a bundled WASM driver |
+| Node resolves DNS through bionic and reads Termux's CA bundle | No `termux-etc-seccomp`/`termux-etc-mount`, no `SSL_CERT_FILE`, no `LD_PRELOAD` parking. Verified on a device: `sentry cli upgrade --check` reaches the network and reports `Method: npm` |
+| `sentry cli upgrade` detects the npm layout from its own path | Updates go through npm; nothing in the versions-directory style of the `claude` and `codex` wrappers is needed |
+
+Log in with `sentry auth login`: the OAuth flow is a device code entered at a URL, so it works on the phone as-is, and `--token` accepts an API token instead. npm installs skip shell completions and agent skills; `sentry cli setup --no-modify-path` adds them on demand. Without `--no-modify-path` it appends `PATH`/`fpath` lines to `~/.zshrc`, which chezmoi reverts on the next apply, and without `--no-agent-skills` it writes `~/.claude/skills/sentry-cli/SKILL.md` inside the tree that aisync syncs.
 
 ## AI Rules Sync
 

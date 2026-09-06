@@ -80,7 +80,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - **TIMING**: Takes 45-90 minutes to complete. NEVER CANCEL - Set timeout to 120+ minutes.
 - Installs system packages: git, curl, zip/unzip, age, gpg, zsh, eza, sqlite3, gcc, make, etc.
 - Installs development tools via dedicated functions:
-  - **Shared with Android** via `.chezmoitemplates/lib-install-deps.sh` (`command_exists`, Oh My Zsh, SDKMAN, NVM, and the `run_remote_installer` download-then-run helper) — the `{{ template }}` include is the only reason this installer is a `.sh.tmpl`
+  - **Shared with Android** via `.chezmoitemplates/lib-install-deps.sh` (`command_exists`, Oh My Zsh, SDKMAN, NVM, the Fly.io CLI, the Sentry CLI, and the `run_remote_installer` download-then-run helper) — the `{{ template }}` include is the only reason this installer is a `.sh.tmpl`
   - **Oh My Zsh** — default Zsh framework, installed `--unattended` through `run_remote_installer`; the login shell is switched with `usermod` right after, only when the install succeeded
   - **GVM** — Go version manager (resolves and installs the latest stable Go version)
   - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)
@@ -91,6 +91,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
   - **GitHub Copilot CLI** (binary `copilot`, via upstream install script into `~/.local/bin`)
   - **Codex CLI** (`@openai/codex` npm package; its platform package bundles the bubblewrap the sandbox needs, so nothing else is installed for it)
+  - **Sentry CLI** (`sentry` npm package from `getsentry/cli`, through the shared `install_sentry_cli`; the official `cli.sentry.dev/install` script is not used because its Bun-compiled glibc binary cannot run on Termux, and npm gives both platforms the same JavaScript bundle)
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** (via pip, installed into pyenv Python)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
@@ -117,7 +118,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
 - Oh My Zsh, SDKMAN and NVM come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh (only when its install succeeded), and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
-- Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), Codex CLI (static musl release, bootstrapped through the `codex` wrapper from `001f`; a global npm install is removed first because npm skips the `linux-arm64` platform package on Termux), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
+- Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), Codex CLI (static musl release, bootstrapped through the `codex` wrapper from `001f`; a global npm install is removed first because npm skips the `linux-arm64` platform package on Termux), Sentry CLI (`sentry` npm package through the shared `install_sentry_cli`; the plain JavaScript bundle needs no wrapper under Termux's native Node), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 
