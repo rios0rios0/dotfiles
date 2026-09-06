@@ -595,6 +595,9 @@ install_copilot_cli
 # seed + initial patchelf). Subsequent updates are handled by the wrapper
 # in .chezmoiscripts/run_once_before_android-001e-create-claude-wrapper.sh,
 # which downloads and patchelfs newer versions in the background.
+
+# Removes a broken global npm install and bootstraps ~/.local/bin/codex from
+# 001f. The release is static, so unlike Claude Code it needs no patchelf.
 install_codex_cli
 install_dev_toolkit
 
