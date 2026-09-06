@@ -72,7 +72,7 @@ Scripts execute in this order per platform (numbers = execution priority):
 | 004   | `install-fonts.sh.tmpl`                                | `export-private-key.ps1`         | —                                      |
 | 005   | `export-private-key.sh`                                | —                                | —                                      |
 
-After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, then `run_after_*` scripts execute on every `chezmoi apply`. `run_onchange_after_*-remove-dependencies.*` scripts (Linux `006`, Windows `005`, Android `004`) re-run whenever their tombstone list changes.
+After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, then `run_after_*` scripts execute on every `chezmoi apply`. `run_onchange_after_*-remove-dependencies.*` scripts (Linux `006`, Windows `005`, Android `004`) re-run whenever their tombstone list changes. `run_onchange_after_linux-007-setup-sentry-cli.sh` and `run_onchange_after_android-006-setup-sentry-cli.sh` run `sentry cli setup --no-modify-path` (zsh completion into `~/.local/share/zsh/site-functions`, agent skill into `~/.claude/skills/sentry-cli/`) after the managed files, so the CLI finds the `fpath` line `dot_zshrc.tmpl` renders as an absolute path and does not append its own to `~/.zshrc`.
 
 On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-managed files under `dot_local/bin/`): the install-dependencies script calls `op`/`gh` during setup, before chezmoi applies managed files. Order: `001-create-wrapper` (generic `termux-etc-seccomp` wrapper) → `001a` `op` → `001b` `gh` → `001c` `golangci-lint` → `001d` `acli` → `001e` `claude` → `001f` `codex` → `002-install-dependencies`. The `codex` wrapper runs the static musl release from GitHub through `termux-etc-mount` and updates it itself; see "Codex CLI on Termux" in `CLAUDE.md` for the four Termux facts it encodes.
 
@@ -80,7 +80,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - **TIMING**: Takes 45-90 minutes to complete. NEVER CANCEL - Set timeout to 120+ minutes.
 - Installs system packages: git, curl, zip/unzip, age, gpg, zsh, eza, sqlite3, gcc, make, etc.
 - Installs development tools via dedicated functions:
-  - **Shared with Android** via `.chezmoitemplates/lib-install-deps.sh` (`command_exists`, Oh My Zsh, SDKMAN, NVM, and the `run_remote_installer` download-then-run helper) — the `{{ template }}` include is the only reason this installer is a `.sh.tmpl`
+  - **Shared with Android** via `.chezmoitemplates/lib-install-deps.sh` (`command_exists`, Oh My Zsh, SDKMAN, NVM, the Fly.io CLI, the Sentry CLI, and the `run_remote_installer` download-then-run helper) — the `{{ template }}` include is the only reason this installer is a `.sh.tmpl`
   - **Oh My Zsh** — default Zsh framework, installed `--unattended` through `run_remote_installer`; the login shell is switched with `usermod` right after, only when the install succeeded
   - **GVM** — Go version manager (resolves and installs the latest stable Go version)
   - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)
@@ -91,6 +91,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
   - **GitHub Copilot CLI** (binary `copilot`, via upstream install script into `~/.local/bin`)
   - **Codex CLI** (`@openai/codex` npm package; its platform package bundles the bubblewrap the sandbox needs, so nothing else is installed for it)
+  - **Sentry CLI** (`sentry` npm package from `getsentry/cli`, through the shared `install_sentry_cli`; the official `cli.sentry.dev/install` script is not used because its Bun-compiled glibc binary cannot run on Termux, and npm gives both platforms the same JavaScript bundle; completions and the agent skill come from `run_onchange_after_linux-007-setup-sentry-cli.sh`)
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** (via pip, installed into pyenv Python)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
@@ -116,8 +117,8 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
-- Oh My Zsh, SDKMAN and NVM come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh (only when its install succeeded), and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
-- Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), Codex CLI (static musl release, bootstrapped through the `codex` wrapper from `001f`; a global npm install is removed first because npm skips the `linux-arm64` platform package on Termux), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
+- Oh My Zsh, SDKMAN, NVM, the Fly.io CLI and the Sentry CLI come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh (only when its install succeeded), and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
+- Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), Codex CLI (static musl release, bootstrapped through the `codex` wrapper from `001f`; a global npm install is removed first because npm skips the `linux-arm64` platform package on Termux), Sentry CLI (`sentry` npm package through the shared `install_sentry_cli`; the plain JavaScript bundle needs no wrapper under Termux's native Node), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 
@@ -443,7 +444,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

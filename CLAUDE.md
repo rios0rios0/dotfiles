@@ -177,7 +177,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -202,7 +202,7 @@ See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-ma
 
 ## Shared Install Library
 
-`.chezmoitemplates/lib-install-deps.sh` holds the install functions whose body is correct on both Linux/WSL and Android without a conditional: `command_exists`, `install_oh_my_zsh`, `install_sdkman`, `install_nvm`, plus the `run_remote_installer` helper they use to download an installer script to a temp file and run it (never pipe `curl` into `bash`; without `pipefail` an HTTP error page runs silently). Both dependency installers pull it in with `{{ template "lib-install-deps.sh" }}`, which is the only reason the Linux installer is a `.sh.tmpl`.
+`.chezmoitemplates/lib-install-deps.sh` holds the install functions whose body is correct on both Linux/WSL and Android without a conditional: `command_exists`, `install_oh_my_zsh`, `install_sdkman`, `install_nvm`, `install_fly_cli`, `install_sentry_cli`, plus the `run_remote_installer` helper they use to download an installer script to a temp file and run it (never pipe `curl` into `bash`; without `pipefail` an HTTP error page runs silently). Both dependency installers pull it in with `{{ template "lib-install-deps.sh" }}`, which is the only reason the Linux installer is a `.sh.tmpl`.
 
 Keep platform-specific provisioning in the platform installers: apt repositories versus binary downloads (`gh`, `kubectl`), upstream install scripts versus source builds (`terra`, `dev-toolkit`, `aisync`), pyenv versus Termux's native Python. A function moves into the library only when the same body is right on both platforms. The library is pure bash (no template directives), so `make lint-shellcheck` lints it as a plain `.sh` file, and its messages use the `[install-deps]` prefix.
 
@@ -278,6 +278,25 @@ The wrapper encodes four Termux facts, each verified on a device:
 | `codex update` refuses a manual install (`Could not detect the Codex installation method`) | The wrapper resolves the latest release from the `releases/latest` redirect, keeps builds under `~/.local/share/codex/versions/<X.Y.Z>/codex`, checks once per 24h in the background, retains three builds, and silences Codex's own startup update nag while its updater is active. `CODEX_WRAPPER_NO_AUTO_UPDATE=1` and `CODEX_WRAPPER_FORCE_VERSION=X.Y.Z` override this |
 
 Log in with `codex login --device-auth` on the phone: it prints a code to enter at the URL it shows, in any browser, while the default `codex login` expects to open a browser and receive a callback on `localhost:1455`. The `LD_PRELOAD` contract above applies unchanged: `termux-etc-mount` parks the value and `dot_zshenv.tmpl` restores it in the `zsh -lc` shells Codex spawns for tool calls.
+
+## Sentry CLI (npm, no wrapper)
+
+`sentry` is the new Sentry CLI from [`getsentry/cli`](https://github.com/getsentry/cli), not the classic Rust `sentry-cli`. The Linux/WSL and Android installers both install it through the shared `install_sentry_cli` in `lib-install-deps.sh` with `npm install -g --ignore-scripts sentry`, and there is deliberately **no** Termux wrapper (Windows does not get it):
+
+| Fact | Consequence |
+|------|-------------|
+| The official install script (`cli.sentry.dev/install`) downloads a Bun-compiled `sentry-linux-<arch>` executable linked against glibc; the `-musl` variants stopped shipping after `0.34.0` | On Termux the kernel cannot start it at all (`/lib/ld-linux-aarch64.so.1` does not exist under bionic), so the script dies with `No such file or directory` before `sentry cli setup` runs. Do not retry it there, and do not reach for `glibc-runner` or a musl loader: the npm route removes the need |
+| The npm package `sentry` is the same CLI as a plain JavaScript bundle: no platform package, no lifecycle script, `engines.node >= 20` | It runs under Termux's native `nodejs` (bionic) and under NVM on Linux/WSL with one shared function body. Node 22.15+ uses the built-in `node:sqlite` for `~/.sentry/cli.db`; older Node falls back to a bundled WASM driver |
+| Node resolves DNS through bionic and reads Termux's CA bundle | No `termux-etc-seccomp`/`termux-etc-mount`, no `SSL_CERT_FILE`, no `LD_PRELOAD` parking. Verified on a device: `sentry cli upgrade --check` reaches the network and reports `Method: npm` |
+| `sentry cli upgrade` detects the npm layout from its own path | Updates go through npm; nothing in the versions-directory style of the `claude` and `codex` wrappers is needed |
+
+Log in with `sentry auth login`: the OAuth flow is a device code entered at a URL, so it works on the phone as-is, and `--token` accepts an API token instead.
+
+npm installs ship neither shell completions nor the agent skill, so `run_onchange_after_linux-007-setup-sentry-cli.sh` and `run_onchange_after_android-006-setup-sentry-cli.sh` run `sentry cli setup --no-modify-path` after the managed files are applied, with `SHELL` pinned to zsh (the CLI installs completions for the shell `SHELL` names, and the first Linux apply runs under bash). Three things about that command are easy to get wrong:
+
+- **`--no-modify-path` only skips the PATH edit.** The zsh completion step still appends `fpath=("<dir>" $fpath)` to `~/.zshrc` unless the file already contains the completion directory as a quoted absolute path. `dot_zshrc.tmpl` therefore renders `"{{ .chezmoi.homeDir }}/.local/share/zsh/site-functions"` into its own `fpath` line before Oh My Zsh runs compinit. A `$HOME`-based line would not satisfy the check, and the CLI's appended line is exactly what the next apply reverts (observed on a device: a manual run appended it, and `chezmoi diff` wanted it gone).
+- **The setup runs after the files on purpose.** From `run_once_before` it would edit the previous `~/.zshrc` first, and the file application that follows would stop to ask about an externally modified target.
+- **The agent skill lands in `~/.claude/skills/sentry-cli/` only when `~/.claude` exists**: always on Android, where chezmoi manages it; on Linux after Claude Code's first run, added by the next `sentry cli upgrade`, which re-runs the same setup after every upgrade (that is why the scripts are `run_onchange_` and not `run_after_`). aisync leaves the skill alone: its deletion detection covers only files it synced itself, and it prompts before removing anything.
 
 ## AI Rules Sync
 

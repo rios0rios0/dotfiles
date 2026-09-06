@@ -599,6 +599,10 @@ install_copilot_cli
 # Removes a broken global npm install and bootstraps ~/.local/bin/codex from
 # 001f. The release is static, so unlike Claude Code it needs no patchelf.
 install_codex_cli
+# Sentry CLI from npm, shared with Linux/WSL (lib-install-deps.sh). Termux's native
+# Node runs the plain JavaScript bundle without any wrapper; the official install
+# script's Bun-compiled glibc binary cannot start on bionic at all.
+install_sentry_cli
 install_dev_toolkit
 
 # TODO: same of the line 261

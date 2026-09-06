@@ -202,6 +202,16 @@ if command -v docker &>/dev/null; then
 fi
 {{- end }}
 
+# Completions that tools drop into the XDG data directory (`sentry cli setup` writes `_sentry`
+# here, from run_onchange_after_*-setup-sentry-cli.sh). This has to come before Oh My Zsh loads
+# below, where compinit runs. The directory is rendered as an absolute path on purpose: the
+# Sentry CLI looks for that quoted absolute path in ~/.zshrc and, when it is missing, appends an
+# `fpath` line of its own -- which the next `chezmoi apply` would then revert. A `$HOME`-based
+# line would not satisfy the check.
+if [[ -d "{{ .chezmoi.homeDir }}/.local/share/zsh/site-functions" ]]; then
+    fpath=("{{ .chezmoi.homeDir }}/.local/share/zsh/site-functions" $fpath)
+fi
+
 # for a full list of active aliases, run `alias`
 source $ZSH/oh-my-zsh.sh
 
