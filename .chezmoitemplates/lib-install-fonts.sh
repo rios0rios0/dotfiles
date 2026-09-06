@@ -10,10 +10,16 @@ MESLO_LGS_FILES=(
     "MesloLGS%20NF%20Bold%20Italic.ttf"
 )
 
+# Download helper: follows redirects but refuses any hop that leaves HTTPS, so a hijacked
+# redirect cannot downgrade the transfer to plain HTTP.
+download_https_only() {
+    curl -fsSL --proto '=https' --proto-redir '=https' "$@"
+}
+
 # =========================================================================================================
 # Resolve the latest Nerd Fonts release tag (https://github.com/ryanoasis/nerd-fonts)
 resolve_nerd_fonts_version() {
-    curl -fsSL "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" | jq -r '.tag_name'
+    download_https_only "https://api.github.com/repos/ryanoasis/nerd-fonts/releases/latest" | jq -r '.tag_name'
 }
 
 # Install a Nerd Font zip by name (e.g. "FiraCode", "Meslo")
@@ -27,7 +33,7 @@ install_nerd_font_zip() {
     local TEMP_DIR
     TEMP_DIR="$(mktemp -d)"
 
-    curl -fsSL -o "$TEMP_DIR/$NAME.zip" "$NERD_FONTS_BASE_URL/$VERSION/$NAME.zip"
+    download_https_only -o "$TEMP_DIR/$NAME.zip" "$NERD_FONTS_BASE_URL/$VERSION/$NAME.zip"
     unzip -o "$TEMP_DIR/$NAME.zip" "*.ttf" -d "$TEMP_DIR/$NAME"
     find "$TEMP_DIR/$NAME" -name "*.ttf" -exec cp {} "$FONT_DIR/" \;
     rm -rf "$TEMP_DIR"
@@ -40,7 +46,7 @@ install_meslo_lgs_nf() {
     mkdir -p "$FONT_DIR"
 
     for file in "${MESLO_LGS_FILES[@]}"; do
-        curl -fsSL -o "$FONT_DIR/$(printf '%b' "${file//%/\\x}")" "$MESLO_BASE_URL/$file"
+        download_https_only -o "$FONT_DIR/$(printf '%b' "${file//%/\\x}")" "$MESLO_BASE_URL/$file"
     done
 }
 

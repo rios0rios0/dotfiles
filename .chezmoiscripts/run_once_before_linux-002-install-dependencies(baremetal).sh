@@ -45,6 +45,14 @@ sudo apt install --no-install-recommends --yes "${desktop_apps[@]}"
 # =========================================================================================================
 
 # =========================================================================================================
+# Download helper: follows redirects but refuses any hop that leaves HTTPS, so a hijacked
+# redirect cannot downgrade the transfer to plain HTTP.
+download_https_only() {
+    curl -fsSL --proto '=https' --proto-redir '=https' "$@"
+}
+# =========================================================================================================
+
+# =========================================================================================================
 # Genymotion - Android emulator (https://www.genymotion.com/product-desktop/download/)
 install_genymotion() {
     if [[ -d /opt/genymotion ]]; then
@@ -56,7 +64,7 @@ install_genymotion() {
     local TEMP_DIR
     TEMP_DIR="$(mktemp -d)"
 
-    curl -fsSL -o "$TEMP_DIR/genymotion.bin" "https://dl.genymotion.com/releases/genymotion-3.8.0/genymotion-3.8.0-linux_x64.bin"
+    download_https_only -o "$TEMP_DIR/genymotion.bin" "https://dl.genymotion.com/releases/genymotion-3.8.0/genymotion-3.8.0-linux_x64.bin"
     chmod +x "$TEMP_DIR/genymotion.bin"
     sudo "$TEMP_DIR/genymotion.bin" -d /opt/genymotion -- -y
     sudo ln -sf /opt/genymotion/genymotion /usr/local/bin/genymotion
@@ -75,12 +83,12 @@ install_reactotron() {
     TEMP_DIR="$(mktemp -d)"
 
     local LATEST_TAG
-    LATEST_TAG="$(curl -fsSL "https://api.github.com/repos/infinitered/reactotron/releases/latest" | jq -r '.tag_name')"
+    LATEST_TAG="$(download_https_only "https://api.github.com/repos/infinitered/reactotron/releases/latest" | jq -r '.tag_name')"
     # The tag format is "reactotron-app@X.Y.Z", extract the version number
     local VERSION
     VERSION="${LATEST_TAG##*@}"
 
-    curl -fsSL -o "$TEMP_DIR/reactotron.deb" "https://github.com/infinitered/reactotron/releases/download/${LATEST_TAG}/reactotron-app_${VERSION}_amd64.deb"
+    download_https_only -o "$TEMP_DIR/reactotron.deb" "https://github.com/infinitered/reactotron/releases/download/${LATEST_TAG}/reactotron-app_${VERSION}_amd64.deb"
     sudo dpkg -i "$TEMP_DIR/reactotron.deb" || sudo apt install --fix-broken --yes
     rm -rf "$TEMP_DIR"
 }
@@ -96,7 +104,7 @@ install_rlinux() {
     local TEMP_DIR
     TEMP_DIR="$(mktemp -d)"
 
-    curl -fsSL -o "$TEMP_DIR/rlinux.deb" "https://www.r-studio.com/downloads/RLinux_amd64.deb"
+    download_https_only -o "$TEMP_DIR/rlinux.deb" "https://www.r-studio.com/downloads/RLinux_amd64.deb"
     sudo dpkg -i "$TEMP_DIR/rlinux.deb" || sudo apt install --fix-broken --yes
     rm -rf "$TEMP_DIR"
 }
@@ -113,8 +121,8 @@ install_slack() {
     TEMP_DIR="$(mktemp -d)"
 
     # Download the latest Slack .deb package
-    curl -fsSL -o "$TEMP_DIR/slack.deb" "https://packagemanager.rstudio.com/client/#/repos/2/packages/slack-desktop" 2>/dev/null \
-        || curl -fsSL -o "$TEMP_DIR/slack.deb" "https://downloads.slack-edge.com/desktop-releases/linux/x64/4.42.2/slack-desktop-4.42.2-amd64.deb"
+    download_https_only -o "$TEMP_DIR/slack.deb" "https://packagemanager.rstudio.com/client/#/repos/2/packages/slack-desktop" 2>/dev/null \
+        || download_https_only -o "$TEMP_DIR/slack.deb" "https://downloads.slack-edge.com/desktop-releases/linux/x64/4.42.2/slack-desktop-4.42.2-amd64.deb"
     sudo dpkg -i "$TEMP_DIR/slack.deb" || sudo apt install --fix-broken --yes
     rm -rf "$TEMP_DIR"
 }
@@ -129,7 +137,7 @@ install_virtualbox() {
     echo "Installing VirtualBox..."
 
     # Add Oracle VirtualBox repository key
-    curl -fsSL https://www.virtualbox.org/download/oracle_vbox_2016.asc | sudo gpg --yes --dearmor -o /usr/share/keyrings/oracle-virtualbox-2016.gpg
+    download_https_only https://www.virtualbox.org/download/oracle_vbox_2016.asc | sudo gpg --yes --dearmor -o /usr/share/keyrings/oracle-virtualbox-2016.gpg
 
     local CODENAME
     CODENAME="$(lsb_release -cs)"

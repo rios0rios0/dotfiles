@@ -1,0 +1,3 @@
+kind: 'Security'
+body: 'pinned the third-party GitHub Actions used by the validate workflow to full commit SHAs (`actions/checkout` v7.0.1, `actions/setup-go` v7.0.0)'
+time: '2026-09-05T20:18:29.413744059Z'
