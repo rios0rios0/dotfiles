@@ -281,7 +281,7 @@ Log in with `codex login --device-auth` on the phone: it prints a code to enter 
 
 ## Sentry CLI (npm, no wrapper)
 
-`sentry` is the new Sentry CLI from [`getsentry/cli`](https://github.com/getsentry/cli), not the classic Rust `sentry-cli`. The Linux/WSL and Android installers both install it through the shared `install_sentry_cli` in `lib-install-deps.sh` with `npm install -g sentry`, and there is deliberately **no** Termux wrapper (Windows does not get it):
+`sentry` is the new Sentry CLI from [`getsentry/cli`](https://github.com/getsentry/cli), not the classic Rust `sentry-cli`. The Linux/WSL and Android installers both install it through the shared `install_sentry_cli` in `lib-install-deps.sh` with `npm install -g --ignore-scripts sentry`, and there is deliberately **no** Termux wrapper (Windows does not get it):
 
 | Fact | Consequence |
 |------|-------------|

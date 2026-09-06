@@ -117,7 +117,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
-- Oh My Zsh, SDKMAN and NVM come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh (only when its install succeeded), and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
+- Oh My Zsh, SDKMAN, NVM, the Fly.io CLI and the Sentry CLI come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh (only when its install succeeded), and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
 - Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), Codex CLI (static musl release, bootstrapped through the `codex` wrapper from `001f`; a global npm install is removed first because npm skips the `linux-arm64` platform package on Termux), Sentry CLI (`sentry` npm package through the shared `install_sentry_cli`; the plain JavaScript bundle needs no wrapper under Termux's native Node), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)

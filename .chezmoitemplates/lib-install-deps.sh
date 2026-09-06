@@ -188,19 +188,19 @@ install_sentry_cli() {
         return 1
     fi
 
-    # The package declares `engines.node >= 20`; refuse early instead of installing a
-    # launcher that fails on every run.
-    local nodeMajor
-    nodeMajor="$(node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
-    case "$nodeMajor" in
-        '' | *[!0-9]*)
-            echo "[install-deps] WARN: could not determine the Node.js version, skipping the Sentry CLI" >&2
-            return 1
-            ;;
-    esac
-    if [[ "$nodeMajor" -lt 20 ]]; then
-        echo "[install-deps] WARN: the Sentry CLI needs Node.js 20+, found v$nodeMajor; skipping" >&2
-        return 1
+    # The package declares `engines.node >= 20`; skip early instead of installing a
+    # launcher that fails on every run. Both skips are deliberate best-effort outcomes,
+    # so they return success like the Android copilot install does -- only a failed
+    # install is reported as a failure.
+    local node_major
+    node_major="$(node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
+    if [[ ! "$node_major" =~ ^[0-9]+$ ]]; then
+        echo "[install-deps] WARN: could not determine the Node.js version, skipping the Sentry CLI" >&2
+        return 0
+    fi
+    if [[ "$node_major" -lt 20 ]]; then
+        echo "[install-deps] WARN: the Sentry CLI needs Node.js 20+, found v$node_major; skipping" >&2
+        return 0
     fi
 
     # The package ships no lifecycle scripts, so `--ignore-scripts` costs nothing and keeps a
