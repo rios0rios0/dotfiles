@@ -27,7 +27,7 @@
 #   shim come back if the binary is deleted; the work is skipped when it is already
 #   newer than its source, so a normal apply costs two stat() calls.
 
-set -e
+set -euo pipefail
 
 SHIM_SOURCE_DIR="$HOME/.local/share/claude-exec-shim"
 SHIM_SOURCE="$SHIM_SOURCE_DIR/claude-exec-shim.c"
