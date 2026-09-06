@@ -44,7 +44,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 ### Development Tools
 
-- **Claude Code** + **GitHub Copilot CLI** (AI coding assistants)
+- **Claude Code**, **Codex CLI** and **GitHub Copilot CLI** (AI coding assistants)
 - **Neovim** with AstroVim (Android)
 
 ### Security and Pentesting
@@ -111,7 +111,7 @@ chezmoi init --apply rios0rios0
 ## Repository Structure
 
 ```
-.chezmoiscripts/         # 33 platform-specific setup scripts (run_once_before_*, run_after_*, run_onchange_after_*)
+.chezmoiscripts/         # 35 platform-specific setup scripts (run_once_before_*, run_after_*, run_onchange_after_*)
 .chezmoiremove           # Target paths deleted from $HOME on every apply (see Dependency Lifecycle)
 .chezmoitemplates/       # Shared template fragments (shared install functions, font installer, dependency removal, MCP server logic, username)
 dot_claude/              # Claude Code config (settings, permissions, trust) -> ~/.claude/
@@ -229,6 +229,8 @@ See **[.docs/dependency-lifecycle.md](.docs/dependency-lifecycle.md)** for the f
    - **Termux:Boot:** Install from [F-Droid](https://f-droid.org/en/packages/com.termux.boot/), create `~/.termux/boot/start.sh` with `termux-wake-lock` to auto-acquire wake lock on boot
 
 5. **`make` targets and `#!/usr/bin/env` scripts fail with exit 127 inside Claude Code tool calls (Termux)**: the `claude` wrapper must launch the musl binary without `LD_PRELOAD` (the musl loader cannot relocate Termux's bionic shims), and an unset variable is inherited by every bionic process Claude spawns — so `termux-exec` stops rewriting shebangs for the shells behind tool calls. The wrapper now parks the value in `TERMUX_ETC_LD_PRELOAD` and `~/.zshenv` restores it in every shell Claude starts. If a tool call still reports `/usr/bin/env: No such file or directory`, re-run `chezmoi apply` so the regenerated wrapper and `.zshenv` are in place, and start a fresh `claude` session.
+
+6. **Codex CLI on Termux runs without a sandbox**: `npm install -g @openai/codex` cannot work there (npm skips the `linux-arm64` platform package because Termux's Node reports `android`), so the `codex` wrapper runs the static musl release from GitHub through `termux-etc-mount` with `SSL_CERT_FILE` pointed at Termux's CA bundle, and updates it itself. Its sandbox is bubblewrap, which needs user namespaces that Android's SELinux policy denies, so the wrapper defaults `sandbox_mode` to `danger-full-access`; approval prompts still apply. Log in with `codex login --device-auth`. See "Codex CLI on Termux" in `CLAUDE.md` for the details and the `CODEX_WRAPPER_*` knobs.
 
 ## References
 

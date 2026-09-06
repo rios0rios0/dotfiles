@@ -310,6 +310,39 @@ install_copilot_cli() {
     }
 }
 
+# https://github.com/openai/codex
+# Codex CLI (binary `codex`). `npm install -g @openai/codex` cannot work on Termux: the
+# package is a Node launcher whose binary comes from one optional dependency per
+# platform, and `@openai/codex-linux-arm64` declares `os: linux` in its package.json
+# while Termux's Node reports `android`, so npm skips it silently and the launcher
+# throws "Missing optional dependency". GitHub publishes the same binary as a static
+# `aarch64-unknown-linux-musl` executable, which the wrapper created by
+# run_once_before_android-001f-create-codex-wrapper.sh downloads on its first launch
+# and keeps updated in the background (`codex update` refuses manual installs). So this
+# function only removes a leftover npm install -- its `$PREFIX/bin/codex` shim would
+# shadow the wrapper in any shell whose PATH lacks ~/.local/bin -- and triggers the
+# wrapper's bootstrap. The wrapper execs through termux-etc-mount, so this must run
+# after install_termux_etc_redirect.
+install_codex_cli() {
+    local wrapper="$HOME/.local/bin/codex"
+
+    if command_exists npm && npm ls -g --depth=0 @openai/codex >/dev/null 2>&1; then
+        echo "[codex] removing the global npm package: its launcher cannot run on Termux" >&2
+        npm uninstall -g @openai/codex \
+            || echo "[codex] WARN: failed to remove the npm package; ~/.local/bin/codex still takes precedence in zsh" >&2
+    fi
+
+    if [ ! -x "$wrapper" ]; then
+        echo "[codex] ERROR: $wrapper is missing; run_once_before_android-001f-create-codex-wrapper.sh should have created it" >&2
+        return 1
+    fi
+
+    # The wrapper downloads the latest release when no version is installed yet and
+    # is a no-op afterwards, so this call doubles as the idempotency check.
+    "$wrapper" --version \
+        || echo "[codex] WARN: bootstrap failed; the wrapper retries on the next codex launch" >&2
+}
+
 # https://github.com/rios0rios0/dev-toolkit
 install_dev_toolkit() {
     install_go_tool_from_source https://github.com/rios0rios0/dev-toolkit.git dev
@@ -562,6 +595,10 @@ install_copilot_cli
 # seed + initial patchelf). Subsequent updates are handled by the wrapper
 # in .chezmoiscripts/run_once_before_android-001e-create-claude-wrapper.sh,
 # which downloads and patchelfs newer versions in the background.
+
+# Removes a broken global npm install and bootstraps ~/.local/bin/codex from
+# 001f. The release is static, so unlike Claude Code it needs no patchelf.
+install_codex_cli
 install_dev_toolkit
 
 # TODO: same of the line 261

@@ -274,6 +274,22 @@ install_copilot_cli() {
     return "$status"
 }
 
+# https://github.com/openai/codex
+# Codex CLI (binary `codex`), installed like Claude Code. The npm package is a Node
+# launcher whose platform binary comes from an optional dependency
+# (`@openai/codex-linux-<arch>`), and neither ships a lifecycle script, so it installs
+# under `ignore-scripts=true` without a postinstall workaround. The platform package
+# also bundles `codex-resources/bwrap`, which gives the sandbox its bubblewrap backend
+# on WSL2 without an apt package. Android cannot take this route at all -- see
+# `install_codex_cli` in the Android installer and the `codex` wrapper it relies on.
+install_codex_cli() {
+    if command -v codex &>/dev/null; then
+        echo "[configure-deps] Codex CLI is already installed, skipping" >&2
+        return
+    fi
+    npm install -g @openai/codex
+}
+
 # https://github.com/rios0rios0/dev-toolkit
 install_dev_toolkit() {
     if command -v dev &>/dev/null; then
@@ -607,6 +623,7 @@ install_pyenv
 install_claude_cli
 install_ccswitch
 install_copilot_cli
+install_codex_cli
 install_dev_toolkit
 
 install_github_cli
