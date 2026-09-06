@@ -1,0 +1,44 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Stage an image for Claude Code's Ctrl+V on Termux (see ~/.local/bin/xclip).
+#
+#   clipshot              stage the newest screenshot, whatever its age
+#   clipshot <file>       stage a specific image
+#   clipshot -c           clear the staged image and the consumed marker
+#   clipshot -s           show what Ctrl+V would attach right now
+set -u
+shopt -s nullglob nocaseglob
+CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/claude-clipboard"
+STAGED_FILE="$CACHE_DIR/staged"
+CONSUMED_FILE="$CACHE_DIR/consumed"
+WATCH_DIRS=("$HOME/storage/pictures/Screenshots" "$HOME/storage/dcim/Screenshots" "$HOME/storage/downloads")
+newest() {
+    local dir cands=() line
+    for dir in "${WATCH_DIRS[@]}"; do
+        [ -d "$dir" ] || continue
+        cands+=("$dir"/*.png "$dir"/*.jpg "$dir"/*.jpeg "$dir"/*.webp "$dir"/*.gif)
+    done
+    [ ${#cands[@]} -eq 0 ] && return 1
+    line=$(stat -c '%Y %n' -- "${cands[@]}" 2>/dev/null | sort -rn | head -1)
+    [ -z "$line" ] && return 1
+    printf '%s\n' "${line#* }"
+}
+mkdir -p "$CACHE_DIR"
+case "${1:-}" in
+    -c|--clear) rm -f -- "$STAGED_FILE" "$CONSUMED_FILE"; echo "[clipshot] cleared" >&2; exit 0 ;;
+    -s|--status)
+        [ -f "$STAGED_FILE" ] && echo "[clipshot] staged:   $(cat -- "$STAGED_FILE")" >&2
+        [ -f "$CONSUMED_FILE" ] && echo "[clipshot] consumed: $(cat -- "$CONSUMED_FILE")" >&2
+        echo "[clipshot] newest:   $(newest || echo none)" >&2
+        exit 0 ;;
+    -h|--help) sed -n '2,8p' "$0" >&2; exit 0 ;;
+esac
+if [ $# -ge 1 ]; then
+    target="$1"
+else
+    target=$(newest) || { echo "[clipshot] ERROR: no image found in ${WATCH_DIRS[*]}" >&2; exit 1; }
+fi
+[ -f "$target" ] || { echo "[clipshot] ERROR: not a file: $target" >&2; exit 1; }
+target=$(cd -- "$(dirname -- "$target")" && printf '%s/%s' "$(pwd)" "$(basename -- "$target")")
+printf '%s' "$target" >"$STAGED_FILE"
+rm -f -- "$CONSUMED_FILE"
+echo "[clipshot] staged for Ctrl+V: $target" >&2

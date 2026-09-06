@@ -63,6 +63,8 @@ pyvenv.cfg
 {{- if ne .chezmoi.os "android" }}
 .chezmoiscripts/android-*.sh
 .local/bin/wrapper
+.local/bin/xclip
+.local/bin/clipshot
 .config/nvim
 .config/mcphub
 .termux
