@@ -63,9 +63,12 @@ export DBUS_SESSION_BUS_ADDRESS=disabled:
 # needs the library mapped before zsh starts. For Claude Code that is ~/.local/bin/claude-zsh,
 # the CLAUDE_CODE_SHELL launcher the `claude` wrapper exports (both written by
 # run_once_before_android-001e), which restores the value and execs zsh; by the time this
-# block runs in such a shell LD_PRELOAD is already set and it does nothing. It stays for
-# everything else that parks the variable: Codex's `zsh -lc` tool shells, a termux-etc-mount
-# run by hand, an older wrapper.
+# block runs in such a shell LD_PRELOAD is already set and it does nothing. Codex reaches its
+# tool shells a third way, which never touches this file: they are `bash -lc` (it resolves the
+# shell from the password database, never from $SHELL), so the `codex` wrapper puts the value
+# straight into their environment with `-c shell_environment_policy.set.LD_PRELOAD=...`. This
+# block stays for everything else that parks the variable: a termux-etc-mount run by hand, an
+# SSH login, an older wrapper.
 if [[ -z "$LD_PRELOAD" && -n "$TERMUX_ETC_LD_PRELOAD" ]]; then
     export LD_PRELOAD="$TERMUX_ETC_LD_PRELOAD"
 elif [[ -z "$LD_PRELOAD" && -r "$PREFIX/lib/libtermux-exec.so" ]]; then

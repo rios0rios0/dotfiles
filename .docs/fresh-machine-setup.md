@@ -352,6 +352,7 @@ sentry --version
 ls ~/.local/share/zsh/site-functions/_sentry ~/.claude/skills/sentry-cli/SKILL.md
 ls ~/.local/bin/claude-exec-shim       # built by run_after_android-007
 ls ~/.local/bin/claude-zsh             # written by run_once_before_android-001e
+grep -q 'shell_environment_policy.set.LD_PRELOAD' ~/.local/bin/codex && echo ok   # LD_PRELOAD reaches Codex's tool shells (001f)
 ls ~/.termux/font.ttf
 ```
 

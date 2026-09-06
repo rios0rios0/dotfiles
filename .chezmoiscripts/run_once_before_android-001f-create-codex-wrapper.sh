@@ -30,6 +30,21 @@
 #     The wrapper defaults `sandbox_mode` to `danger-full-access` -- the only
 #     mode that works -- unless CODEX_WRAPPER_KEEP_SANDBOX=1. Approval prompts
 #     are unaffected. Claude Code has no sandbox on Termux either.
+#   - Tool-call shells: termux-etc-mount removes LD_PRELOAD before the exec, and
+#     the shells codex spawns for tool calls therefore start without termux-exec,
+#     so anything they exec directly through a `#!/usr/bin/env` shebang -- every
+#     npm-installed CLI, `sentry` included -- dies with "bad interpreter". The
+#     ~/.zshenv restore cannot reach them: codex never consults $SHELL. It reads
+#     the password database (getpwuid_r), whose Termux entry is
+#     `$PREFIX/bin/login`; that names no shell it knows, so the Linux fallback
+#     order applies and `which bash` wins -- tool calls run
+#     `$PREFIX/bin/bash -lc "<cmd>"`, which never sources ~/.zshenv (verified on
+#     a device: `LD_PRELOAD=unset`, no termux-exec in /proc/self/maps). So the
+#     wrapper hands the parked value to codex's own shell environment policy
+#     instead (`-c shell_environment_policy.set.LD_PRELOAD=...`), which is
+#     applied to the environment tool commands are spawned with: the library is
+#     mapped before the shell's first exec, whichever shell codex picks. Set
+#     CODEX_WRAPPER_KEEP_LD_PRELOAD=1 to leave it alone.
 #   - Updates: `codex update` refuses a manual install ("Could not detect the
 #     Codex installation method"), so the wrapper handles them. Being static, the
 #     binary needs no musl loader and no patchelf step, unlike Claude Code.
@@ -48,6 +63,7 @@
 #                                 (this also hands the startup update nag back to codex)
 #   CODEX_WRAPPER_FORCE_VERSION   pin to a specific installed X.Y.Z
 #   CODEX_WRAPPER_KEEP_SANDBOX    set to "1" to leave sandbox_mode alone
+#   CODEX_WRAPPER_KEEP_LD_PRELOAD set to "1" to leave the tool shells' LD_PRELOAD alone
 
 set -e
 
@@ -74,8 +90,10 @@ export HOME="${HOME:-/data/data/com.termux/files/home}"
 # dropping them. The static codex binary ignores LD_PRELOAD either way, but
 # termux-etc-mount removes it before the exec, and the bionic shells behind
 # codex's tool calls need it back or every `#!/usr/bin/env` script they run
-# fails with exit 127 -- ~/.zshenv restores it from the parked copy. Parking
-# here as well keeps a wrapper and a redirector of different vintages agreeing.
+# fails with "bad interpreter". The parked value is what the OVERRIDES block
+# below hands to those shells; parking it here as well keeps a wrapper and a
+# redirector of different vintages agreeing, and still feeds the ~/.zshenv
+# restore in any zsh that inherits the variable.
 if [ -n "${LD_PRELOAD:-}" ]; then
     export TERMUX_ETC_LD_PRELOAD="$LD_PRELOAD"
 fi
@@ -267,16 +285,40 @@ fi
 
 # The sandbox cannot work on Termux (see the generating script), so default
 # sandbox_mode to the only mode that runs. `-c` is a global option that every
-# subcommand accepts, and a later `-c sandbox_mode=...` or `--sandbox` on the
-# command line still wins. Codex's own startup update check is silenced only
-# while this wrapper's updater is active: codex reports "install method:
-# other" and would only ever suggest a manual download.
+# subcommand accepts, and `--sandbox` on the command line still wins. Note that
+# `-c` is per parse level: a `-c` given AFTER the subcommand replaces this whole
+# list rather than merging with it, so pass overrides of your own before the
+# subcommand (`codex -c key=value exec ...`) to keep these defaults. Codex's own
+# startup update check is silenced only while this wrapper's updater is active:
+# codex reports "install method: other" and would only ever suggest a manual
+# download.
 OVERRIDES=()
 if [ "${CODEX_WRAPPER_KEEP_SANDBOX:-0}" != "1" ]; then
     OVERRIDES+=(-c 'sandbox_mode="danger-full-access"')
 fi
 if [ "${CODEX_WRAPPER_NO_AUTO_UPDATE:-0}" != "1" ]; then
     OVERRIDES+=(-c 'check_for_update_on_startup=false')
+fi
+
+# Give the shells behind codex's tool calls the LD_PRELOAD shims back. They are
+# spawned by codex itself, not by a login shell, so ~/.zshenv never runs for
+# them: codex ignores $SHELL and resolves the shell from the password database,
+# whose Termux entry ($PREFIX/bin/login) names none it knows, so it falls back to
+# `which bash` and runs `bash -lc "<cmd>"`. An rc file could not fix this anyway
+# -- an export from inside a running shell reaches only its children, while a
+# `#!/usr/bin/env` script exec'd straight from a tool call needs termux-exec
+# mapped before the shell starts. `shell_environment_policy.set` is exactly that:
+# codex applies it to the environment it spawns tool commands with, so the shims
+# are in place at exec time for whichever shell it picks. The value is the parked
+# one, with the same termux-exec fallback ~/.zshenv uses when nothing was parked.
+if [ "${CODEX_WRAPPER_KEEP_LD_PRELOAD:-0}" != "1" ]; then
+    TOOL_SHELL_LD_PRELOAD="${TERMUX_ETC_LD_PRELOAD:-}"
+    if [ -z "$TOOL_SHELL_LD_PRELOAD" ] && [ -r "$PREFIX/lib/libtermux-exec.so" ]; then
+        TOOL_SHELL_LD_PRELOAD="$PREFIX/lib/libtermux-exec.so"
+    fi
+    if [ -n "$TOOL_SHELL_LD_PRELOAD" ]; then
+        OVERRIDES+=(-c "shell_environment_policy.set.LD_PRELOAD=\"$TOOL_SHELL_LD_PRELOAD\"")
+    fi
 fi
 
 exec termux-etc-mount "$CODEX_BIN" ${OVERRIDES[@]+"${OVERRIDES[@]}"} "$@"
