@@ -66,7 +66,7 @@ Scripts execute in this order per platform (numbers = execution priority):
 
 | Order | Linux (WSL)                                            | Windows                          | Android (Termux)                       |
 |-------|--------------------------------------------------------|----------------------------------|----------------------------------------|
-| 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-wrapper.sh` → `001a-e` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`) |
+| 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-wrapper.sh` → `001a-f` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`, `codex`) |
 | 002   | `install-dependencies.sh.tmpl` *(also baremetal variant)* | `configure-dependencies.ps1`     | `install-dependencies.sh.tmpl`         |
 | 003   | `configure-dependencies.sh`                            | `install-fonts.ps1`              | `install-fonts.sh.tmpl`                |
 | 004   | `install-fonts.sh.tmpl`                                | `export-private-key.ps1`         | —                                      |
@@ -74,7 +74,7 @@ Scripts execute in this order per platform (numbers = execution priority):
 
 After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, then `run_after_*` scripts execute on every `chezmoi apply`. `run_onchange_after_*-remove-dependencies.*` scripts (Linux `006`, Windows `005`, Android `004`) re-run whenever their tombstone list changes.
 
-On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-managed files under `dot_local/bin/`): the install-dependencies script calls `op`/`gh` during setup, before chezmoi applies managed files. Order: `001-create-wrapper` (generic `termux-etc-seccomp` wrapper) → `001a` `op` → `001b` `gh` → `001c` `golangci-lint` → `001d` `acli` → `001e` `claude` → `002-install-dependencies`.
+On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-managed files under `dot_local/bin/`): the install-dependencies script calls `op`/`gh` during setup, before chezmoi applies managed files. Order: `001-create-wrapper` (generic `termux-etc-seccomp` wrapper) → `001a` `op` → `001b` `gh` → `001c` `golangci-lint` → `001d` `acli` → `001e` `claude` → `001f` `codex` → `002-install-dependencies`. The `codex` wrapper runs the static musl release from GitHub through `termux-etc-mount` and updates it itself; see "Codex CLI on Termux" in `CLAUDE.md` for the four Termux facts it encodes.
 
 #### Linux Dependencies (`.chezmoiscripts/run_once_before_linux-002-install-dependencies.sh.tmpl`)
 - **TIMING**: Takes 45-90 minutes to complete. NEVER CANCEL - Set timeout to 120+ minutes.
@@ -90,6 +90,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **Pyenv** — Python version manager (installs Python 3.13.2)
   - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
   - **GitHub Copilot CLI** (binary `copilot`, via upstream install script into `~/.local/bin`)
+  - **Codex CLI** (`@openai/codex` npm package; its platform package bundles the bubblewrap the sandbox needs, so nothing else is installed for it)
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** (via pip, installed into pyenv Python)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
@@ -116,7 +117,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
 - Oh My Zsh, SDKMAN and NVM come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh (only when its install succeeded), and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
-- Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
+- Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), Codex CLI (static musl release, bootstrapped through the `codex` wrapper from `001f`; a global npm install is removed first because npm skips the `linux-arm64` platform package on Termux), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 
@@ -126,7 +127,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
 - Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, Brother drivers, PerformanceTest
 - Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify, VirtualBox, Grammarly, etc.
-- Installs development: Claude Code, GitHub Copilot CLI (`GitHub.Copilot`), NVM for Windows, Docker Desktop, GitHub CLI, JetBrains Toolbox, Postman, ripgrep, jq, yq, bat, etc.
+- Installs development: Claude Code, GitHub Copilot CLI (`GitHub.Copilot`), Codex CLI (`OpenAI.Codex`), NVM for Windows, Docker Desktop, GitHub CLI, JetBrains Toolbox, Postman, ripgrep, jq, yq, bat, etc.
 - Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy
 
 #### Windows Configuration (`.chezmoiscripts/run_once_before_windows-002-configure-dependencies.ps1`)
@@ -442,7 +443,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

@@ -177,7 +177,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `copilot`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -219,11 +219,12 @@ On Android, tool wrappers (`op`, `gh`) **must be `run_once_before` scripts**, NO
 The wrapper scripts follow a strict execution order:
 1. `android-001-create-wrapper.sh` — generic `termux-etc-seccomp` wrapper (all tool wrappers depend on this)
 2. `android-001a-create-op-wrapper.sh` — `op` wrapper (needed by chezmoi templates)
-3. `android-001b-create-gh-wrapper.sh` — `gh` wrapper (backs the `gh_linux_arm64` binary installed in step 7)
-4. `android-001c-create-golangci-lint-wrapper.sh` — `golangci-lint` wrapper (backs the `golangci-lint_linux_arm64` binary installed in step 7)
-5. `android-001d-create-acli-wrapper.sh` — `acli` wrapper (backs the `acli_linux_arm64` binary installed in step 7)
+3. `android-001b-create-gh-wrapper.sh` — `gh` wrapper (backs the `gh_linux_arm64` binary installed in step 8)
+4. `android-001c-create-golangci-lint-wrapper.sh` — `golangci-lint` wrapper (backs the `golangci-lint_linux_arm64` binary installed in step 8)
+5. `android-001d-create-acli-wrapper.sh` — `acli` wrapper (backs the `acli_linux_arm64` binary installed in step 8)
 6. `android-001e-create-claude-wrapper.sh` — `claude` wrapper for Claude Code's `linux-arm64-musl` build (handles the background `patchelf`-aware auto-updater; first-time bootstrap is still manual via `examples/claude-code.md` in `rios0rios0/termux-etc-redirect`) It parks `LD_PRELOAD` in `TERMUX_ETC_LD_PRELOAD` instead of dropping it (see below) and takes `termux-wake-lock` before the `exec`.
-7. `android-002-install-dependencies.sh.tmpl` — installs binaries and extensions
+7. `android-001f-create-codex-wrapper.sh` — `codex` wrapper for the Codex CLI's static `aarch64-unknown-linux-musl` release (see "Codex CLI on Termux" below). It parks `LD_PRELOAD` the same way, takes `termux-wake-lock`, and downloads the release itself: in the foreground on the first launch, which is how step 8 bootstraps it, and through a background check afterwards, because `codex update` refuses a manual install
+8. `android-002-install-dependencies.sh.tmpl` — installs binaries and extensions
 
 The generic `termux-etc-seccomp` wrapper is the only exception — it exists as BOTH a bootstrap script (for timing) AND a chezmoi-managed file (`dot_local/bin/executable_wrapper`) to keep it updated on subsequent applies.
 
@@ -262,6 +263,21 @@ They get there because Go derives `GOMODCACHE` from `GOPATH`, and the pipelines 
 Both are needed: the pin cannot retroactively remove caches left by older revisions, nor reach a tool that exports its own `GOMODCACHE`. When deleting one by hand, always `chmod -R u+w` first.
 
 **Diagnosing it:** `find "$TMPDIR" ! -writable | wc -l`. Anything in the thousands will crash Termux on exit. A telltale sign in the crash report is an *identical* allocation size across separate crashes — the file set is unchanged, so the string is deterministic.
+
+## Codex CLI on Termux
+
+`npm install -g @openai/codex` cannot work on Termux, so do not retry it there: the package is a Node launcher plus one optional dependency per platform, and `@openai/codex-linux-arm64` declares `os: linux` in its `package.json` while Termux's Node reports `android`. npm skips it silently and the launcher throws `Missing optional dependency`. The Android installer (`install_codex_cli`) removes such an install, and `run_once_before_android-001f-create-codex-wrapper.sh` provides `~/.local/bin/codex` instead, which runs the GitHub release's `codex-aarch64-unknown-linux-musl` binary — a **static** executable, so unlike Claude Code it needs no musl loader and no `patchelf`.
+
+The wrapper encodes four Termux facts, each verified on a device:
+
+| Fact | Consequence in the wrapper |
+|------|----------------------------|
+| musl resolves DNS by reading `/etc/resolv.conf` through direct syscalls, and Android has no such file | The binary runs through `termux-etc-mount` (Tier 3), like `claude`. Tier 2 (`termux-etc-seccomp`) is wrong here: its `SIGSYS -> ENOSYS` rewrite reaches every descendant, and Codex spawns Node for tool calls |
+| Codex (rustls) probes the usual CA bundle paths with `stat()`, which Tier 3 does not redirect (`openat` only), so every handshake fails with `invalid peer certificate: UnknownIssuer` | `SSL_CERT_FILE` defaults to `$PREFIX/etc/tls/cert.pem` |
+| The Linux sandbox is bubblewrap, which needs unprivileged user namespaces; Android's SELinux policy denies them (`unshare(CLONE_NEWUSER)` returns `EINVAL`), so `read-only` and `workspace-write` panic before running any command | `-c 'sandbox_mode="danger-full-access"'` is prepended to every launch unless `CODEX_WRAPPER_KEEP_SANDBOX=1`. A later `-c` or `--sandbox` on the command line still wins, and approval prompts are unaffected |
+| `codex update` refuses a manual install (`Could not detect the Codex installation method`) | The wrapper resolves the latest release from the `releases/latest` redirect, keeps builds under `~/.local/share/codex/versions/<X.Y.Z>/codex`, checks once per 24h in the background, retains three builds, and silences Codex's own startup update nag while its updater is active. `CODEX_WRAPPER_NO_AUTO_UPDATE=1` and `CODEX_WRAPPER_FORCE_VERSION=X.Y.Z` override this |
+
+Log in with `codex login --device-auth` on the phone: it prints a code to enter at the URL it shows, in any browser, while the default `codex login` expects to open a browser and receive a callback on `localhost:1455`. The `LD_PRELOAD` contract above applies unchanged: `termux-etc-mount` parks the value and `dot_zshenv.tmpl` restores it in the `zsh -lc` shells Codex spawns for tool calls.
 
 ## AI Rules Sync
 

@@ -140,7 +140,7 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 - `$hardware`: `Brother.FullDriver`, `CPUID.CPU-Z.ROG`, `FinalWire.AIDA64.Extreme`, `Logitech.GHUB`, `PerformanceTest`
 - `$utilities`: `Adobe.Acrobat.Reader.64-bit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Google.ChromeRemoteDesktopHost`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.CCleaner`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `Spotify.Spotify`, `Oracle.VirtualBox`
 - `$communication`: `SlackTechnologies.Slack`, `Discord.Discord`, `Zoom.Zoom.EXE`
-- `$development`: `Anthropic.ClaudeCode`, `CoreyButler.NVMforWindows`, `Docker.DockerDesktop`, `ExpressVPN.ExpressVPN`, `GitHub.cli`, `GitHub.Copilot`, `GoLang.Go`, `JetBrains.Toolbox`, `Microsoft.AzureStorageExplorer`, `Microsoft.VisualStudio.2022.Community`, `Mirantis.Lens`, `OpenVPNTechnologies.OpenVPNConnect`, `Postman.Postman`, `BurntSushi.ripgrep.MSVC`, `jqlang.jq`, `MikeFarah.yq`, `sharkdp.bat`, `koalaman.shellcheck`
+- `$development`: `Anthropic.ClaudeCode`, `CoreyButler.NVMforWindows`, `Docker.DockerDesktop`, `ExpressVPN.ExpressVPN`, `GitHub.cli`, `GitHub.Copilot`, `GoLang.Go`, `JetBrains.Toolbox`, `Microsoft.AzureStorageExplorer`, `Microsoft.VisualStudio.2022.Community`, `Mirantis.Lens`, `OpenAI.Codex`, `OpenVPNTechnologies.OpenVPNConnect`, `Postman.Postman`, `BurntSushi.ripgrep.MSVC`, `jqlang.jq`, `MikeFarah.yq`, `sharkdp.bat`, `koalaman.shellcheck`
 - `$gaming`: `ElectronicArts.EADesktop`, `EpicGames.EpicGamesLauncher`, `GOG.Galaxy`, `Valve.Steam`
 
 Commented out in the script with the reason, so `[manual]`: `Asus.ArmouryCrate` (never detected as
@@ -208,6 +208,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | Claude Code                                      | `install_claude_cli`                 | `[automated]` | npm package.                                                                                                                    |
 | ccswitch                                         | `install_ccswitch`                   | `[partial]`   | Installed here; every account still has to be enrolled once with `ccswitch enroll` after `claude` and `/login`.                 |
 | GitHub Copilot CLI                               | `install_copilot_cli`                | `[automated]` | Upstream installer into `~/.local/bin`.                                                                                          |
+| Codex CLI                                        | `install_codex_cli`                  | `[automated]` | npm package; its platform package bundles the bubblewrap the sandbox needs.                                                     |
 | dev-toolkit                                      | `install_dev_toolkit`                | `[automated]` | Upstream install script.                                                                                                        |
 | GitHub CLI                                       | `install_github_cli`                 | `[automated]` | apt repository.                                                                                                                 |
 | AWS CLI v2                                       | `install_aws_cli`                    | `[automated]` | Official zip installer.                                                                                                         |
@@ -233,6 +234,7 @@ aisync init
 aisync source add guide --source-repo rios0rios0/guide --branch generated
 aisync pull
 claude                                     # /login, then: ccswitch enroll
+codex login                                # browser flow; `codex login --device-auth` prints a code instead
 ```
 
 If `docker` should work inside Kali through Docker Desktop, enable its WSL integration for
@@ -248,7 +250,7 @@ gvm list && go version
 node --version && corepack --version
 pyenv version
 kubectl version --client && kubectl krew list
-command -v terra terraform terragrunt aws az gh copilot acli ruff ggshield aisync ccswitch flyctl oci
+command -v terra terraform terragrunt aws az gh copilot codex acli ruff ggshield aisync ccswitch flyctl oci
 fc-list | grep -i meslo
 git config --get core.hooksPath
 ```
@@ -282,7 +284,7 @@ and then drop you into zsh: type `exit` to let the installer continue.
 | Step | Script                                                              | Marker        | What it does                                                                                                                                    |
 |------|---------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
 | 1    | `run_once_before_android-001-create-wrapper.sh`                     | `[automated]` | The generic `termux-etc-seccomp` wrapper every tool wrapper uses.                                                                               |
-| 2    | `run_once_before_android-001a` to `001e`                            | `[automated]` | The `op`, `gh`, `golangci-lint`, `acli` and `claude` wrappers. They must exist before the installer and the templates call the tools.           |
+| 2    | `run_once_before_android-001a` to `001f`                            | `[automated]` | The `op`, `gh`, `golangci-lint`, `acli`, `claude` and `codex` wrappers. They must exist before the installer and the templates call the tools.  |
 | 3    | `run_once_before_android-002-install-dependencies.sh.tmpl`          | `[partial]`   | Termux packages and the tools below. 45-120 minutes, with the prompts listed above.                                                             |
 | 4    | `run_once_before_android-003-install-fonts.sh.tmpl`                 | `[automated]` | The fonts into `~/.local/share/fonts` and `~/.termux/font*.ttf`.                                                                                |
 | 5    | Managed files                                                       | `[automated]` | `.zshrc`, `.zshenv`, `.p10k.zsh`, `.tmux.conf`, `.gitconfig`, `.ssh/*`, `.termux/termux.properties`, `.config/mcphub/servers.json`, the `.config/nvim` plugin specs, `.claude/*`, `.local/bin/wrapper`, `.scripts/*`. |
@@ -311,6 +313,7 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 | Python                                                            | `install_pyenv`                                                                   | `[automated]` | Keeps the native `python`; pyenv is not used.                                                                                                                                                      |
 | GitHub Copilot CLI                                                | `install_copilot_cli`                                                             | `[partial]`   | npm, best effort: skipped with a warning when Termux's Node.js is older than 22.                                                                                                                   |
 | Claude Code                                                       | none                                                                              | `[manual]`    | The musl build is bootstrapped by hand following `examples/claude-code.md` in [rios0rios0/termux-etc-redirect](https://github.com/rios0rios0/termux-etc-redirect); the `claude` wrapper from step 2 handles every later update. |
+| Codex CLI                                                         | `install_codex_cli`                                                               | `[automated]` | The `codex` wrapper from step 2 downloads the latest static musl release on its first launch and keeps it updated in the background; a global npm install is removed first, because npm cannot install the `linux-arm64` platform package on Termux. |
 | 1Password CLI (ARM64 binary), GitHub CLI, golangci-lint, Atlassian CLI | `install_1password_cli`, `install_github_cli`, `install_golangci_lint`, `install_acli` | `[automated]` | Pinned release downloads into `~/.local/bin`, run through the wrappers.                                                                                                                  |
 | AWS CLI v2                                                        | `install_aws_cli`                                                                 | `[automated]` | Built from source with pip, 10-15 minutes.                                                                                                                                                         |
 | Azure CLI                                                         | `install_azure_cli`                                                               | `[automated]` | pip, with the psutil and PyNaCl workarounds Termux needs.                                                                                                                                          |
@@ -320,7 +323,8 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 
 ### After the apply `[manual]`
 
-Same `aisync` and `claude` steps as Phase 4, minus `ccswitch` (Linux only). Then the Android settings
+Same `aisync` and `claude` steps as Phase 4, minus `ccswitch` (Linux only), and `codex login --device-auth`
+instead of `codex login`: it prints a code to enter in the phone's browser. Then the Android settings
 from the README's known issue on the Phantom Process Killer: **Developer Options > Disable child
 process restrictions**, Termux's battery usage set to Unrestricted, and optionally Termux:Boot with a
 `termux-wake-lock` start script. rclone for OneDrive has its own guide:
@@ -336,6 +340,7 @@ op whoami
 gh auth status
 command -v terra kubectl aws az acli golangci-lint aisync flyctl oci
 claude --version
+codex --version
 ls ~/.termux/font.ttf
 ```
 

@@ -108,6 +108,7 @@ $development = @(
     "Microsoft.AzureStorageExplorer",
     "Microsoft.VisualStudio.2022.Community",
     "Mirantis.Lens",
+    "OpenAI.Codex",                     # Codex CLI (binary `codex`); winget unpacks the portable release zip
     "OpenVPNTechnologies.OpenVPNConnect",
     "Postman.Postman",
     "BurntSushi.ripgrep.MSVC",
