@@ -112,7 +112,7 @@ chezmoi init --apply rios0rios0
 ## Repository Structure
 
 ```
-.chezmoiscripts/         # 35 platform-specific setup scripts (run_once_before_*, run_after_*, run_onchange_after_*)
+.chezmoiscripts/         # 37 platform-specific setup scripts (run_once_before_*, run_after_*, run_onchange_after_*)
 .chezmoiremove           # Target paths deleted from $HOME on every apply (see Dependency Lifecycle)
 .chezmoitemplates/       # Shared template fragments (shared install functions, font installer, dependency removal, MCP server logic, username)
 dot_claude/              # Claude Code config (settings, permissions, trust) -> ~/.claude/
@@ -233,7 +233,7 @@ See **[.docs/dependency-lifecycle.md](.docs/dependency-lifecycle.md)** for the f
 
 6. **Codex CLI on Termux runs without a sandbox**: `npm install -g @openai/codex` cannot work there (npm skips the `linux-arm64` platform package because Termux's Node reports `android`), so the `codex` wrapper runs the static musl release from GitHub through `termux-etc-mount` with `SSL_CERT_FILE` pointed at Termux's CA bundle, and updates it itself. Its sandbox is bubblewrap, which needs user namespaces that Android's SELinux policy denies, so the wrapper defaults `sandbox_mode` to `danger-full-access`; approval prompts still apply. Log in with `codex login --device-auth`. See "Codex CLI on Termux" in `CLAUDE.md` for the details and the `CODEX_WRAPPER_*` knobs.
 
-7. **The official Sentry CLI installer fails on Termux**: `curl -fsS https://cli.sentry.dev/install | bash` downloads a Bun-compiled glibc binary (`sentry-linux-arm64`; the musl variant stopped shipping after `0.34.0`) that bionic cannot start, so the script dies with `No such file or directory` before it can run `sentry cli setup`. The dependency installers use `npm install -g sentry` instead, on Linux/WSL as well as Android: the npm package is the same CLI as a plain JavaScript bundle, it runs under Termux's native Node without any wrapper, and `sentry cli upgrade` keeps it updated through npm. Log in with `sentry auth login` (a device code, so it works on the phone). See "Sentry CLI" in `CLAUDE.md`.
+7. **The official Sentry CLI installer fails on Termux**: `curl -fsS https://cli.sentry.dev/install | bash` downloads a Bun-compiled glibc binary (`sentry-linux-arm64`; the musl variant stopped shipping after `0.34.0`) that bionic cannot start, so the script dies with `No such file or directory` before it can run `sentry cli setup`. The dependency installers use `npm install -g sentry` instead, on Linux/WSL as well as Android: the npm package is the same CLI as a plain JavaScript bundle, it runs under Termux's native Node without any wrapper, and `sentry cli upgrade` keeps it updated through npm. Shell completions and the Claude Code skill come from `sentry cli setup --no-modify-path`, run by `run_onchange_after_*-setup-sentry-cli.sh` once the managed files are in place: even with that flag the command appends an `fpath` line to `~/.zshrc` unless the file already names the completion directory, so `.zshrc` carries that line itself and chezmoi never has to revert one. Log in with `sentry auth login` (a device code, so it works on the phone). See "Sentry CLI" in `CLAUDE.md`.
 
 ## References
 

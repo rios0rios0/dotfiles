@@ -174,9 +174,10 @@ install_fly_cli() {
 # `sentry cli setup`. Under Termux's native Node the bundle needs no termux-etc-redirect
 # wrapper either: DNS and TLS go through bionic, which is what a `sentry cli upgrade --check`
 # round trip verified on a device. `sentry cli upgrade` recognises the npm layout from its
-# own path and upgrades through npm. Completions and agent skills are not part of an npm
-# install; `sentry cli setup --no-modify-path` adds them on demand (without the flag it
-# appends to ~/.zshrc, which chezmoi reverts on the next apply).
+# own path and upgrades through npm. Completions and the agent skill are not part of an npm
+# install; `run_onchange_after_<platform>-*-setup-sentry-cli.sh` runs `sentry cli setup
+# --no-modify-path` for them once the managed files -- including the fpath line in ~/.zshrc
+# that command checks for -- are in place.
 install_sentry_cli() {
     if command_exists sentry; then
         echo "[install-deps] Sentry CLI is already installed, skipping" >&2

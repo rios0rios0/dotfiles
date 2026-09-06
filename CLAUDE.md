@@ -177,7 +177,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -290,7 +290,13 @@ Log in with `codex login --device-auth` on the phone: it prints a code to enter 
 | Node resolves DNS through bionic and reads Termux's CA bundle | No `termux-etc-seccomp`/`termux-etc-mount`, no `SSL_CERT_FILE`, no `LD_PRELOAD` parking. Verified on a device: `sentry cli upgrade --check` reaches the network and reports `Method: npm` |
 | `sentry cli upgrade` detects the npm layout from its own path | Updates go through npm; nothing in the versions-directory style of the `claude` and `codex` wrappers is needed |
 
-Log in with `sentry auth login`: the OAuth flow is a device code entered at a URL, so it works on the phone as-is, and `--token` accepts an API token instead. npm installs skip shell completions and agent skills; `sentry cli setup --no-modify-path` adds them on demand. Without `--no-modify-path` it appends `PATH`/`fpath` lines to `~/.zshrc`, which chezmoi reverts on the next apply, and without `--no-agent-skills` it writes `~/.claude/skills/sentry-cli/SKILL.md` inside the tree that aisync syncs.
+Log in with `sentry auth login`: the OAuth flow is a device code entered at a URL, so it works on the phone as-is, and `--token` accepts an API token instead.
+
+npm installs ship neither shell completions nor the agent skill, so `run_onchange_after_linux-007-setup-sentry-cli.sh` and `run_onchange_after_android-006-setup-sentry-cli.sh` run `sentry cli setup --no-modify-path` after the managed files are applied, with `SHELL` pinned to zsh (the CLI installs completions for the shell `SHELL` names, and the first Linux apply runs under bash). Three things about that command are easy to get wrong:
+
+- **`--no-modify-path` only skips the PATH edit.** The zsh completion step still appends `fpath=("<dir>" $fpath)` to `~/.zshrc` unless the file already contains the completion directory as a quoted absolute path. `dot_zshrc.tmpl` therefore renders `"{{ .chezmoi.homeDir }}/.local/share/zsh/site-functions"` into its own `fpath` line before Oh My Zsh runs compinit. A `$HOME`-based line would not satisfy the check, and the CLI's appended line is exactly what the next apply reverts (observed on a device: a manual run appended it, and `chezmoi diff` wanted it gone).
+- **The setup runs after the files on purpose.** From `run_once_before` it would edit the previous `~/.zshrc` first, and the file application that follows would stop to ask about an externally modified target.
+- **The agent skill lands in `~/.claude/skills/sentry-cli/` only when `~/.claude` exists**: always on Android, where chezmoi manages it; on Linux after Claude Code's first run, added by the next `sentry cli upgrade`, which re-runs the same setup after every upgrade (that is why the scripts are `run_onchange_` and not `run_after_`). aisync leaves the skill alone: its deletion detection covers only files it synced itself, and it prompts before removing anything.
 
 ## AI Rules Sync
 
