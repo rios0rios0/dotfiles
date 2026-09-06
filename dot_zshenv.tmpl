@@ -53,10 +53,22 @@ export DBUS_SESSION_BUS_ADDRESS=disabled:
 # exports LD_PRELOAD so termux-exec can rewrite `#!/usr/bin/env` and `#!/bin/sh` shebangs on
 # execve, and it is how termux-etc-redirect's Tier 1 is enabled -- but a musl loader treats a
 # bionic entry it cannot relocate as fatal, so the value is moved to TERMUX_ETC_LD_PRELOAD
-# before the musl Claude binary starts. Claude never sources a shell rc file; every shell it
-# spawns for a tool call sources this one, which makes it the place that hands the shims back
-# to bionic descendants. Without them `make lint` and every `#!/usr/bin/env` pipelines script
-# fail with exit 127 under Claude while working from a plain Termux tab.
+# before the musl Claude binary starts. Every shell spawned for a tool call sources this file,
+# which makes it the place that hands the shims back to bionic descendants: without them
+# `make lint` and every `#!/usr/bin/env` pipelines script fail with exit 127 under Claude
+# while working from a plain Termux tab.
+#
+# An export from inside a running shell reaches only its children, never the shell itself, so
+# a `#!/usr/bin/env node` script exec'd straight from a tool call -- any npm-installed CLI --
+# needs the library mapped before zsh starts. For Claude Code that is ~/.local/bin/claude-zsh,
+# the CLAUDE_CODE_SHELL launcher the `claude` wrapper exports (both written by
+# run_once_before_android-001e), which restores the value and execs zsh; by the time this
+# block runs in such a shell LD_PRELOAD is already set and it does nothing. Codex reaches its
+# tool shells a third way, which never touches this file: they are `bash -lc` (it resolves the
+# shell from the password database, never from $SHELL), so the `codex` wrapper puts the value
+# straight into their environment with `-c shell_environment_policy.set.LD_PRELOAD=...`. This
+# block stays for everything else that parks the variable: a termux-etc-mount run by hand, an
+# SSH login, an older wrapper.
 if [[ -z "$LD_PRELOAD" && -n "$TERMUX_ETC_LD_PRELOAD" ]]; then
     export LD_PRELOAD="$TERMUX_ETC_LD_PRELOAD"
 elif [[ -z "$LD_PRELOAD" && -r "$PREFIX/lib/libtermux-exec.so" ]]; then
@@ -65,18 +77,18 @@ elif [[ -z "$LD_PRELOAD" && -r "$PREFIX/lib/libtermux-exec.so" ]]; then
     export LD_PRELOAD="$PREFIX/lib/libtermux-exec.so"
 fi
 
-# Restoring LD_PRELOAD above re-breaks the one thing that runs the musl binary from inside
-# this shell. Claude Code appends its own `grep` and `find` functions to the shell snapshot
-# it sources into every tool call, and both run the Claude Code binary itself under another
-# argv[0] -- `ARGV0=ugrep "$CLAUDE_CODE_EXECPATH" ...`, `ARGV0=bfs ...` -- because that
-# binary is multi-call and dispatches on argv[0] alone. $CLAUDE_CODE_EXECPATH points at the
-# musl build, so with LD_PRELOAD back every grep and find in a tool call exits 127 with
-# eleven "symbol not found" lines from the loader. The functions are appended after this
-# file is sourced, so redefining grep/find here cannot win; the only lever left is the path
-# they exec, which is why $CLAUDE_CODE_EXECPATH is repointed at a shim that drops LD_PRELOAD
-# for that one exec and keeps argv[0] (a "#!" wrapper cannot -- the kernel replaces argv[0]
-# with the interpreter path -- hence the small C program built by
-# .chezmoiscripts/run_after_android-007-build-claude-exec-shim.sh).
+# Having LD_PRELOAD back -- from claude-zsh, or from the block above -- re-breaks the one
+# thing that runs the musl binary from inside this shell. Claude Code appends its own `grep`
+# and `find` functions to the shell snapshot it sources into every tool call, and both run
+# the Claude Code binary itself under another argv[0] -- `ARGV0=ugrep "$CLAUDE_CODE_EXECPATH"
+# ...`, `ARGV0=bfs ...` -- because that binary is multi-call and dispatches on argv[0] alone.
+# $CLAUDE_CODE_EXECPATH points at the musl build, so with LD_PRELOAD back every grep and find
+# in a tool call exits 127 with eleven "symbol not found" lines from the loader. The
+# functions are appended after this file is sourced, so redefining grep/find here cannot
+# win; the only lever left is the path they exec, which is why $CLAUDE_CODE_EXECPATH is
+# repointed at a shim that drops LD_PRELOAD for that one exec and keeps argv[0] (a "#!"
+# wrapper cannot -- the kernel replaces argv[0] with the interpreter path -- hence the small
+# C program built by .chezmoiscripts/run_after_android-007-build-claude-exec-shim.sh).
 #
 # The guards keep this idempotent: a shell nested under a tool call inherits the repointed
 # value and must not park the shim as its own target, and when Claude Code updates itself the
