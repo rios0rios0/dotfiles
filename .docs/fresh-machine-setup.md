@@ -296,7 +296,7 @@ and then drop you into zsh: type `exit` to let the installer continue.
 | 7    | `run_after_android-003-wrap-terra-clis.sh`                          | `[automated]` | Re-wraps `terraform`, `terragrunt` and `flyctl` (with its `fly` alias) on every apply, because `terra update` and `flyctl version upgrade` overwrite them.                                                   |
 | 8    | `run_onchange_after_android-004-remove-dependencies.sh.tmpl`        | `[automated]` | Tombstones.                                                                                                                                     |
 | 9    | `run_after_android-005-prune-tmp-modcache.sh`                       | `[automated]` | Deletes Go module caches left under `$TMPDIR`, which otherwise crash Termux on exit.                                                            |
-| 10   | `run_after_android-006-build-claude-exec-shim.sh`                   | `[automated]` | Compiles `~/.local/bin/claude-exec-shim` with `clang`, so Claude Code's `grep` and `find` can run its musl binary without `LD_PRELOAD`.          |
+| 10   | `run_after_android-007-build-claude-exec-shim.sh`                   | `[automated]` | Compiles `~/.local/bin/claude-exec-shim` with `clang`, so Claude Code's `grep` and `find` can run its musl binary without `LD_PRELOAD`.          |
 | 11   | `run_onchange_after_android-006-setup-sentry-cli.sh`                | `[automated]` | `sentry cli setup --no-modify-path`: the zsh completion and the Claude Code skill (`~/.claude` is managed here, so it already exists).                                                                    |
 
 ### What the dependency installer provides
@@ -350,7 +350,7 @@ claude --version
 codex --version
 sentry --version
 ls ~/.local/share/zsh/site-functions/_sentry ~/.claude/skills/sentry-cli/SKILL.md
-ls ~/.local/bin/claude-exec-shim       # built by run_after_android-006
+ls ~/.local/bin/claude-exec-shim       # built by run_after_android-007
 ls ~/.termux/font.ttf
 ```
 

@@ -159,7 +159,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `run_after_android-001-create-ssh-keys.sh.tmpl` — creates SSH private/public key files from 1Password (device note, `ssh:` entries)
 - `run_after_android-003-wrap-terra-clis.sh` — wraps terraform/terragrunt binaries with `termux-etc-seccomp` to avoid SIGSYS on Android
 - `run_after_android-005-prune-tmp-modcache.sh` — chmods and sweeps any Go module cache left under `$TMPDIR` (undeletable `0400`/`0500` entries there crash Termux with an `OutOfMemoryError` on exit; `dot_zshenv.tmpl` also pins `GOMODCACHE` to `$HOME/go/pkg/mod` to prevent it)
-- `run_after_android-006-build-claude-exec-shim.sh` — compiles `~/.local/bin/claude-exec-shim` with `clang`, the argv[0]-preserving launcher that `dot_zshenv.tmpl` points `$CLAUDE_CODE_EXECPATH` at so Claude Code's `grep`/`find` wrapper functions can run the musl binary without `LD_PRELOAD`. Skipped when the binary is already newer than its source; warns and exits 0 when no compiler is installed yet
+- `run_after_android-007-build-claude-exec-shim.sh` — compiles `~/.local/bin/claude-exec-shim` with `clang`, the argv[0]-preserving launcher that `dot_zshenv.tmpl` points `$CLAUDE_CODE_EXECPATH` at so Claude Code's `grep`/`find` wrapper functions can run the musl binary without `LD_PRELOAD`. Skipped when the binary is already newer than its source; warns and exits 0 when no compiler is installed yet
 - `run_after_windows-004-install-jetbrains-themes.ps1` — fans staged JetBrains themes into detected IDE config directories (Windows)
 
 #### Manual Validation After Installation

@@ -76,7 +76,7 @@ fi
 # they exec, which is why $CLAUDE_CODE_EXECPATH is repointed at a shim that drops LD_PRELOAD
 # for that one exec and keeps argv[0] (a "#!" wrapper cannot -- the kernel replaces argv[0]
 # with the interpreter path -- hence the small C program built by
-# .chezmoiscripts/run_after_android-006-build-claude-exec-shim.sh).
+# .chezmoiscripts/run_after_android-007-build-claude-exec-shim.sh).
 #
 # The guards keep this idempotent: a shell nested under a tool call inherits the repointed
 # value and must not park the shim as its own target, and when Claude Code updates itself the
