@@ -100,6 +100,12 @@ CHECK_INTERVAL_SECONDS=$((24 * 3600))
 KEEP_VERSIONS=3
 SEMVER_REGEX='^[0-9]+\.[0-9]+\.[0-9]+$'
 
+# HTTPS-only download, as the installer scripts do it: a redirect to plain
+# HTTP is refused instead of followed.
+download_https_only() {
+    curl -fsSL --proto '=https' --proto-redir '=https' "$@"
+}
+
 # Print every installed version -- a directory under $VERSIONS_DIR named X.Y.Z
 # that holds an executable `codex` -- in ascending semver order. Anything else
 # under the directory (an interrupted download, a stray file) is ignored.
@@ -118,11 +124,11 @@ list_installed_versions() {
 }
 
 # Resolve the newest release. GitHub answers /releases/latest with a redirect
-# to the tag page, so one HEAD request suffices without the rate-limited API.
-# Stable releases only: a pre-release never becomes "latest".
+# to the tag page, so one HEAD request that follows it suffices without the
+# rate-limited API. Stable releases only: a pre-release never becomes "latest".
 resolve_latest_version() {
     local location
-    location=$(curl --max-time 10 -fsSI -o /dev/null -w '%{redirect_url}' "$RELEASES_URL/latest") || return 1
+    location=$(download_https_only --max-time 10 -I -o /dev/null -w '%{url_effective}' "$RELEASES_URL/latest") || return 1
     location=${location##*/rust-v}
     [[ "$location" =~ $SEMVER_REGEX ]] || return 1
     printf '%s\n' "$location"
@@ -140,7 +146,7 @@ install_version() {
     mkdir -p "$VERSIONS_DIR" || return 1
     tmp=$(mktemp -d "$VERSIONS_DIR/.install-XXXXXX") || return 1
 
-    if ! curl --max-time 600 -fsSL -o "$tmp/$ASSET.tar.gz" \
+    if ! download_https_only --max-time 600 -o "$tmp/$ASSET.tar.gz" \
             "$RELEASES_URL/download/rust-v$version/$ASSET.tar.gz" \
         || ! tar -xzf "$tmp/$ASSET.tar.gz" -C "$tmp" "$ASSET" \
         || ! mv "$tmp/$ASSET" "$tmp/codex" \
