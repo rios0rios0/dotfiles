@@ -159,6 +159,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `run_after_android-001-create-ssh-keys.sh.tmpl` — creates SSH private/public key files from 1Password (device note, `ssh:` entries)
 - `run_after_android-003-wrap-terra-clis.sh` — wraps terraform/terragrunt binaries with `termux-etc-seccomp` to avoid SIGSYS on Android
 - `run_after_android-005-prune-tmp-modcache.sh` — chmods and sweeps any Go module cache left under `$TMPDIR` (undeletable `0400`/`0500` entries there crash Termux with an `OutOfMemoryError` on exit; `dot_zshenv.tmpl` also pins `GOMODCACHE` to `$HOME/go/pkg/mod` to prevent it)
+- `run_after_android-006-build-claude-exec-shim.sh` — compiles `~/.local/bin/claude-exec-shim` with `clang`, the argv[0]-preserving launcher that `dot_zshenv.tmpl` points `$CLAUDE_CODE_EXECPATH` at so Claude Code's `grep`/`find` wrapper functions can run the musl binary without `LD_PRELOAD`. Skipped when the binary is already newer than its source; warns and exits 0 when no compiler is installed yet
 - `run_after_windows-004-install-jetbrains-themes.ps1` — fans staged JetBrains themes into detected IDE config directories (Windows)
 
 #### Manual Validation After Installation
@@ -444,7 +445,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

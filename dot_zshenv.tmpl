@@ -64,6 +64,31 @@ elif [[ -z "$LD_PRELOAD" && -r "$PREFIX/lib/libtermux-exec.so" ]]; then
     # that never had it. termux-exec alone is what the shebang rewriting needs.
     export LD_PRELOAD="$PREFIX/lib/libtermux-exec.so"
 fi
+
+# Restoring LD_PRELOAD above re-breaks the one thing that runs the musl binary from inside
+# this shell. Claude Code appends its own `grep` and `find` functions to the shell snapshot
+# it sources into every tool call, and both run the Claude Code binary itself under another
+# argv[0] -- `ARGV0=ugrep "$CLAUDE_CODE_EXECPATH" ...`, `ARGV0=bfs ...` -- because that
+# binary is multi-call and dispatches on argv[0] alone. $CLAUDE_CODE_EXECPATH points at the
+# musl build, so with LD_PRELOAD back every grep and find in a tool call exits 127 with
+# eleven "symbol not found" lines from the loader. The functions are appended after this
+# file is sourced, so redefining grep/find here cannot win; the only lever left is the path
+# they exec, which is why $CLAUDE_CODE_EXECPATH is repointed at a shim that drops LD_PRELOAD
+# for that one exec and keeps argv[0] (a "#!" wrapper cannot -- the kernel replaces argv[0]
+# with the interpreter path -- hence the small C program built by
+# .chezmoiscripts/run_after_android-006-build-claude-exec-shim.sh).
+#
+# The guards keep this idempotent: a shell nested under a tool call inherits the repointed
+# value and must not park the shim as its own target, and when Claude Code updates itself the
+# parent exports the new version's path, so the next tool call repoints afresh. With the shim
+# missing (an apply that has not built it yet) nothing is repointed and the behaviour is
+# exactly what it was before it existed.
+_claudeExecShim="$HOME/.local/bin/claude-exec-shim"
+if [[ -x "$_claudeExecShim" && -x "$CLAUDE_CODE_EXECPATH" && "$CLAUDE_CODE_EXECPATH" != "$_claudeExecShim" ]]; then
+    export TERMUX_CLAUDE_EXEC_TARGET="$CLAUDE_CODE_EXECPATH"
+    export CLAUDE_CODE_EXECPATH="$_claudeExecShim"
+fi
+unset _claudeExecShim
 {{- end }}
 
 ###### Essential PATH Setup ##############################################################################################
