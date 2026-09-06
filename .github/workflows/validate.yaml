@@ -164,6 +164,14 @@ jobs:
       - name: Test credential loading and removal
         run: make test-shell-credentials
 
+  test-clipboard-shim:
+    name: Test (clipboard shim)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test the Claude Code clipboard shim
+        run: make test-clipboard-shim
+
   sast:
     name: SAST
     runs-on: ubuntu-latest

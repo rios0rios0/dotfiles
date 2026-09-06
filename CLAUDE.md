@@ -23,6 +23,7 @@ make test-modify-scripts            # modify script (merge) behavior
 make test-remove-dependencies       # dependency removal library (tombstones, $HOME safety rail)
 make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
 make test-shell-credentials         # 1Password credential/workspace loading and removal
+make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 ```
 
 ## Essential Commands
@@ -331,6 +332,18 @@ an arbitrary image for the same path. Both are Android-only via `.chezmoiignore`
 `clipshot` covers what the age window deliberately excludes: `clipshot` alone stages the newest
 image whatever its age, `clipshot <file>` stages a specific one, `-c` clears, `-s` shows what
 Ctrl+V would attach.
+
+**The watched folders are declared once**, in `dot_local/lib/claude-clipboard.sh`, which both
+scripts source at runtime. They must agree by construction rather than by discipline: the shim
+decides what Ctrl+V attaches and `clipshot -s` reports what the shim would pick, so a second copy
+of the list would let the two answer differently on the same device, and `-s` would stop being a
+diagnostic. Add a folder there, never in a consumer. The library returns the list through a global
+rather than stdout for the same fork-budget reason as `_op_read_cache_names`.
+
+`make test-clipboard-shim` drives the literal `xclip` command lines against a scratch
+`CLAUDE_CLIPBOARD_DIRS`, covering both directions of the freshness window, the consumed marker
+(including that `checkImage` must *not* consume, or the `saveImage` that always follows it would
+attach nothing), and the agreement between `clipshot -s` and the shim.
 
 **Do not "fix" this by installing an X server.** termux-x11 would give `xclip` a display, but that
 display's selection is not Android's clipboard, so a screenshot still would not appear in it.

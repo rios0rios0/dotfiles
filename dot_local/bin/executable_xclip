@@ -11,30 +11,28 @@
 # The "clipboard image" is resolved, in order, from:
 #   1. $CLAUDE_CLIPBOARD_IMAGE                (explicit override)
 #   2. a file staged by `clipshot <file>`     (any image, shared or downloaded)
-#   3. the newest screenshot/photo in the watched folders, if it is fresher
-#      than $CLAUDE_CLIPBOARD_MAX_AGE seconds (default 600)
+#   3. the newest image in the watched folders, if it is fresher than
+#      $CLAUDE_CLIPBOARD_MAX_AGE seconds (default 600)
 #
 # An image is reported once and then marked consumed, so a second Ctrl+V does
 # not re-attach it and text paste still works. Set CLAUDE_CLIPBOARD_REPEAT=1 to
 # keep re-offering the same image.
 #
 # Text targets fall through to termux-clipboard-get when Termux:API is present.
+#
+# See .docs/termux-clipboard-images.md for the discovery and design decisions.
 
 set -u
-shopt -s nullglob nocaseglob
 
-CACHE_DIR="${XDG_CACHE_HOME:-$HOME/.cache}/claude-clipboard"
-CONSUMED_FILE="$CACHE_DIR/consumed"
-STAGED_FILE="$CACHE_DIR/staged"
+CLIPBOARD_LIB="${CLAUDE_CLIPBOARD_LIB:-$HOME/.local/lib/claude-clipboard.sh}"
+if [ ! -r "$CLIPBOARD_LIB" ]; then
+    echo "[xclip] ERROR: missing $CLIPBOARD_LIB (run \`chezmoi apply\`)" >&2
+    exit 1
+fi
+# shellcheck source=/dev/null
+. "$CLIPBOARD_LIB"
+
 MAX_AGE="${CLAUDE_CLIPBOARD_MAX_AGE:-600}"
-
-WATCH_DIRS=(
-    "$HOME/storage/pictures/Screenshots"
-    "$HOME/storage/dcim/Screenshots"
-    "$HOME/storage/pictures/Screenshot"
-    "$HOME/storage/downloads"
-)
-[ -n "${CLAUDE_CLIPBOARD_DIRS:-}" ] && IFS=: read -r -a WATCH_DIRS <<<"$CLAUDE_CLIPBOARD_DIRS"
 
 mode="in"
 target=""
@@ -50,50 +48,39 @@ while [ $# -gt 0 ]; do
     shift
 done
 
-# Newest candidate image across the watched folders, as "<mtime> <path>".
-newest_watched() {
-    local dir cands=() line now mtime
-    for dir in "${WATCH_DIRS[@]}"; do
-        [ -d "$dir" ] || continue
-        cands+=("$dir"/*.png "$dir"/*.jpg "$dir"/*.jpeg "$dir"/*.webp "$dir"/*.gif)
-    done
-    [ ${#cands[@]} -eq 0 ] && return 1
-    line=$(stat -c '%Y %n' -- "${cands[@]}" 2>/dev/null | sort -rn | head -1)
-    [ -z "$line" ] && return 1
+# Echo "<mtime> <path>" for the image to serve, or return 1.
+resolve_image() {
+    local path line now mtime
+    if [ -n "${CLAUDE_CLIPBOARD_IMAGE:-}" ] && [ -f "$CLAUDE_CLIPBOARD_IMAGE" ]; then
+        printf '%s %s\n' "$(stat -c '%Y' -- "$CLAUDE_CLIPBOARD_IMAGE")" "$CLAUDE_CLIPBOARD_IMAGE"
+        return 0
+    fi
+    if [ -f "$CLAUDE_CLIPBOARD_STAGED_FILE" ]; then
+        path=$(cat -- "$CLAUDE_CLIPBOARD_STAGED_FILE")
+        if [ -n "$path" ] && [ -f "$path" ]; then
+            printf '%s %s\n' "$(stat -c '%Y' -- "$path")" "$path"
+            return 0
+        fi
+    fi
+    # Only the unstaged, automatic pick is age-bounded: an explicit override or
+    # a deliberate `clipshot` is a statement of intent, whatever the mtime.
+    line=$(clipboard_newest_image) || return 1
     mtime="${line%% *}"
     now=$(date +%s)
     [ $((now - mtime)) -gt "$MAX_AGE" ] && return 1
     printf '%s\n' "$line"
 }
 
-# Echo "<mtime> <path>" for the image to serve, or return 1.
-resolve_image() {
-    local path line
-    if [ -n "${CLAUDE_CLIPBOARD_IMAGE:-}" ] && [ -f "$CLAUDE_CLIPBOARD_IMAGE" ]; then
-        printf '%s %s\n' "$(stat -c '%Y' -- "$CLAUDE_CLIPBOARD_IMAGE")" "$CLAUDE_CLIPBOARD_IMAGE"
-        return 0
-    fi
-    if [ -f "$STAGED_FILE" ]; then
-        path=$(cat -- "$STAGED_FILE")
-        if [ -n "$path" ] && [ -f "$path" ]; then
-            printf '%s %s\n' "$(stat -c '%Y' -- "$path")" "$path"
-            return 0
-        fi
-    fi
-    line=$(newest_watched) || return 1
-    printf '%s\n' "$line"
-}
-
 is_consumed() {
     [ -n "${CLAUDE_CLIPBOARD_REPEAT:-}" ] && return 1
-    [ -f "$CONSUMED_FILE" ] || return 1
-    [ "$(cat -- "$CONSUMED_FILE" 2>/dev/null)" = "$1" ]
+    [ -f "$CLAUDE_CLIPBOARD_CONSUMED_FILE" ] || return 1
+    [ "$(cat -- "$CLAUDE_CLIPBOARD_CONSUMED_FILE" 2>/dev/null)" = "$1" ]
 }
 
 mark_consumed() {
-    mkdir -p "$CACHE_DIR" 2>/dev/null || return 0
-    printf '%s' "$1" >"$CONSUMED_FILE" 2>/dev/null || true
-    rm -f -- "$STAGED_FILE" 2>/dev/null || true
+    mkdir -p "$CLAUDE_CLIPBOARD_CACHE_DIR" 2>/dev/null || return 0
+    printf '%s' "$1" >"$CLAUDE_CLIPBOARD_CONSUMED_FILE" 2>/dev/null || true
+    rm -f -- "$CLAUDE_CLIPBOARD_STAGED_FILE" 2>/dev/null || true
 }
 
 emit_text() {

@@ -65,6 +65,7 @@ pyvenv.cfg
 .local/bin/wrapper
 .local/bin/xclip
 .local/bin/clipshot
+.local/lib/claude-clipboard.sh
 .config/nvim
 .config/mcphub
 .termux

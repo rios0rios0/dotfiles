@@ -28,7 +28,7 @@ lint-syntax:
 
 .PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials
 
-test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials
+test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials test-clipboard-shim
 
 test-template-render:
 	@bash $(CI_DIR)/scripts/test-template-render.sh
@@ -50,6 +50,9 @@ test-prune-tmp-modcache:
 
 test-shell-credentials:
 	@bash $(CI_DIR)/scripts/test-shell-credentials.sh
+
+test-clipboard-shim:
+	@bash $(CI_DIR)/scripts/test-clipboard-shim.sh
 
 # === SAST targets ===
 
