@@ -23,6 +23,7 @@ make test-modify-scripts            # modify script (merge) behavior
 make test-remove-dependencies       # dependency removal library (tombstones, $HOME safety rail)
 make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
 make test-shell-credentials         # 1Password credential/workspace loading and removal
+make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 ```
 
 ## Essential Commands
@@ -177,7 +178,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -299,6 +300,56 @@ The wrapper encodes five Termux facts, each verified on a device:
 | `codex update` refuses a manual install (`Could not detect the Codex installation method`) | The wrapper resolves the latest release from the `releases/latest` redirect, keeps builds under `~/.local/share/codex/versions/<X.Y.Z>/codex`, checks once per 24h in the background, retains three builds, and silences Codex's own startup update nag while its updater is active. `CODEX_WRAPPER_NO_AUTO_UPDATE=1` and `CODEX_WRAPPER_FORCE_VERSION=X.Y.Z` override this |
 
 Log in with `codex login --device-auth` on the phone: it prints a code to enter at the URL it shows, in any browser, while the default `codex login` expects to open a browser and receive a callback on `localhost:1455`. The `LD_PRELOAD` contract above applies with a third leg of its own: `termux-etc-mount` parks the value and the wrapper hands it to the tool-call shells through Codex's shell environment policy, because those shells are `bash -lc` spawned by Codex and never source `dot_zshenv.tmpl`.
+
+## Clipboard Images on Termux (Ctrl+V)
+
+Claude Code reads a clipboard image on Linux by shelling out, with `shell: true`, to exactly two
+commands — there is no native clipboard binding and no `DISPLAY` gate on the read path:
+
+```
+xclip -selection clipboard -t TARGETS   -o | grep -E "image/(png|jpeg|jpg|gif|webp|bmp)"
+xclip -selection clipboard -t image/png -o > $TMPDIR/claude_cli_latest_screenshot.png
+```
+
+Neither `xclip` nor `wl-paste` can ever work here: Termux has no X11 or Wayland display, and
+Android's clipboard cannot hand a bitmap across the app sandbox at all. Termux:API is not a way
+round it either — `termux-clipboard-get` returns text only. So Ctrl+V always reported
+"No image found in clipboard".
+
+Because the lookup is a plain `PATH` resolution inside `/bin/sh`, the fix is a **shim**, not a port:
+`dot_local/bin/executable_xclip` answers those two invocations and synthesises the clipboard from
+the filesystem, where Android screenshots actually land. `dot_local/bin/executable_clipshot` stages
+an arbitrary image for the same path. Both are Android-only via `.chezmoiignore`.
+
+| Behaviour | Why |
+|-----------|-----|
+| Serves the newest image in `~/storage/{pictures,dcim}/Screenshots` and `~/storage/downloads` | "Take a screenshot, then Ctrl+V" is the whole point; no app switch, no typing a path |
+| Only if it is younger than `CLAUDE_CLIPBOARD_MAX_AGE` (default 600s) | Without a window, a Ctrl+V days later silently attaches a stale screenshot |
+| Marks an image consumed once its bytes are read, so a second Ctrl+V reports empty | Makes it behave like a clipboard rather than a sticky file, and leaves Ctrl+V free to fall through to text. `CLAUDE_CLIPBOARD_REPEAT=1` opts out |
+| Passes the file's raw bytes even when the target says `image/png` | Claude Code sniffs magic bytes after reading and derives the media type from them, so the JPEG that Android actually writes needs no conversion step |
+| Text targets fall through to `termux-clipboard-get` | Gives Ctrl+V a working text path too, but only when the Termux:API package **and** app are installed |
+
+`clipshot` covers what the age window deliberately excludes: `clipshot` alone stages the newest
+image whatever its age, `clipshot <file>` stages a specific one, `-c` clears, `-s` shows what
+Ctrl+V would attach.
+
+**The watched folders are declared once**, in `dot_local/lib/claude-clipboard.sh`, which both
+scripts source at runtime. They must agree by construction rather than by discipline: the shim
+decides what Ctrl+V attaches and `clipshot -s` reports what the shim would pick, so a second copy
+of the list would let the two answer differently on the same device, and `-s` would stop being a
+diagnostic. Add a folder there, never in a consumer. The library returns the list through a global
+rather than stdout for the same fork-budget reason as `_op_read_cache_names`.
+
+`make test-clipboard-shim` drives the literal `xclip` command lines against a scratch
+`CLAUDE_CLIPBOARD_DIRS`, covering both directions of the freshness window, the consumed marker
+(including that `checkImage` must *not* consume, or the `saveImage` that always follows it would
+attach nothing), and the agreement between `clipshot -s` and the shim.
+
+**Do not "fix" this by installing an X server.** termux-x11 would give `xclip` a display, but that
+display's selection is not Android's clipboard, so a screenshot still would not appear in it.
+
+See `.docs/termux-clipboard-images.md` for how the contract was read out of the Claude Code
+binary, the verification commands, and why termux-x11 and Termux:API were both rejected.
 
 ## Sentry CLI (npm, no wrapper)
 

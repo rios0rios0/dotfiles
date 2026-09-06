@@ -1,0 +1,58 @@
+#!/data/data/com.termux/files/usr/bin/bash
+# Stage an image for Claude Code's Ctrl+V on Termux (see ~/.local/bin/xclip).
+#
+#   clipshot              stage the newest image, whatever its age
+#   clipshot <file>       stage a specific image
+#   clipshot -c           clear the staged image and the consumed marker
+#   clipshot -s           show what Ctrl+V would attach right now
+#
+# The watched folders come from ~/.local/lib/claude-clipboard.sh, shared with
+# the shim, so `-s` can never report a different pick than Ctrl+V would make.
+
+set -u
+
+CLIPBOARD_LIB="${CLAUDE_CLIPBOARD_LIB:-$HOME/.local/lib/claude-clipboard.sh}"
+if [ ! -r "$CLIPBOARD_LIB" ]; then
+    echo "[clipshot] ERROR: missing $CLIPBOARD_LIB (run \`chezmoi apply\`)" >&2
+    exit 1
+fi
+# shellcheck source=/dev/null
+. "$CLIPBOARD_LIB"
+
+newest_path() {
+    local line
+    line=$(clipboard_newest_image) || return 1
+    printf '%s\n' "${line#* }"
+}
+
+mkdir -p "$CLAUDE_CLIPBOARD_CACHE_DIR"
+
+case "${1:-}" in
+    -c|--clear)
+        rm -f -- "$CLAUDE_CLIPBOARD_STAGED_FILE" "$CLAUDE_CLIPBOARD_CONSUMED_FILE"
+        echo "[clipshot] cleared" >&2
+        exit 0 ;;
+    -s|--status)
+        [ -f "$CLAUDE_CLIPBOARD_STAGED_FILE" ] &&
+            echo "[clipshot] staged:   $(cat -- "$CLAUDE_CLIPBOARD_STAGED_FILE")" >&2
+        [ -f "$CLAUDE_CLIPBOARD_CONSUMED_FILE" ] &&
+            echo "[clipshot] consumed: $(cat -- "$CLAUDE_CLIPBOARD_CONSUMED_FILE")" >&2
+        echo "[clipshot] newest:   $(newest_path || echo none)" >&2
+        exit 0 ;;
+    -h|--help) sed -n '2,8p' "$0" >&2; exit 0 ;;
+esac
+
+if [ $# -ge 1 ]; then
+    target="$1"
+else
+    clipboard_set_watch_dirs
+    target=$(newest_path) || {
+        echo "[clipshot] ERROR: no image found in ${CLAUDE_CLIPBOARD_WATCH_DIRS[*]}" >&2
+        exit 1
+    }
+fi
+[ -f "$target" ] || { echo "[clipshot] ERROR: not a file: $target" >&2; exit 1; }
+target=$(cd -- "$(dirname -- "$target")" && printf '%s/%s' "$(pwd)" "$(basename -- "$target")")
+printf '%s' "$target" >"$CLAUDE_CLIPBOARD_STAGED_FILE"
+rm -f -- "$CLAUDE_CLIPBOARD_CONSUMED_FILE"
+echo "[clipshot] staged for Ctrl+V: $target" >&2
