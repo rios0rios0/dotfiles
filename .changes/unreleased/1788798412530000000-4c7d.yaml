@@ -1,3 +1,3 @@
 kind: 'Changed'
-body: 'refreshed `.github/skills/code-review/SKILL.md` and `.github/copilot-instructions.md` to match the current codebase: replaced the secret-hygiene fixture bullet with vendor prefixes truncated short of what the `sast:gitleaks` rules match (the hyphenated Slack prefix it carried was a live finding), added the `test-clipboard-shim` target to the `make test` summary, and added the `clipshot` logging prefix'
+body: 'refreshed `.github/skills/code-review/SKILL.md` and `.github/copilot-instructions.md` to match the current codebase: reworded the secret-hygiene bullet in the `code-review` skill to name the vendor behind each credential prefix and to drop the hyphen from the Slack example, the one shape the shared Gitleaks history scan matches on its own, added the `test-clipboard-shim` target to the `make test` summary, and added the `clipshot` logging prefix'
 time: '2026-09-07T12:00:00.000000000Z'
