@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed global npm packages disappearing when NVM moves to a new LTS major: `install_nvm` now passes `--reinstall-packages-from` the current version, so `codex`, `sentry` and Claude Code are rebuilt in the new tree instead of being left behind in the old one. The flag is omitted on a first install, where `nvm current` prints `none`/`system` and nvm aborts on such a source'
+time: '2026-09-11T03:03:22.749581695Z'

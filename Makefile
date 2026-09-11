@@ -26,9 +26,9 @@ lint-syntax:
 
 # === Test targets ===
 
-.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials
+.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials test-nvm-resolution
 
-test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials test-clipboard-shim
+test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials test-clipboard-shim test-nvm-resolution
 
 test-template-render:
 	@bash $(CI_DIR)/scripts/test-template-render.sh
@@ -53,6 +53,9 @@ test-shell-credentials:
 
 test-clipboard-shim:
 	@bash $(CI_DIR)/scripts/test-clipboard-shim.sh
+
+test-nvm-resolution:
+	@bash $(CI_DIR)/scripts/test-nvm-resolution.sh
 
 # === SAST targets ===
 

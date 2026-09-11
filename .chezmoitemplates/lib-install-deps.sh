@@ -132,7 +132,18 @@ install_nvm() {
     if [[ -n "$lts_version" && "$current_version" == "$lts_version" ]]; then
         echo "[install-deps] Node.js LTS $lts_version is already installed, skipping" >&2
     else
-        nvm install --lts
+        # Globally installed npm packages live inside the active version's tree, so a
+        # new LTS major starts empty and every `npm install -g` CLI this installer
+        # placed (`codex`, `sentry`, Claude Code) silently disappears from PATH -- the
+        # old tree still holds them, which is why nothing downstream reports an error.
+        # `--reinstall-packages-from` rebuilds them in the new tree. It is only passed
+        # when there is a version to copy from: on a first install `nvm current` prints
+        # `none`/`system`, and nvm aborts the whole install on such a source.
+        local -a reinstall_from=()
+        if [[ "$current_version" =~ ^v[0-9] ]]; then
+            reinstall_from=(--reinstall-packages-from="$current_version")
+        fi
+        nvm install --lts "${reinstall_from[@]}"
     fi
 
     # corepack ships no lifecycle scripts, so `--ignore-scripts` costs nothing and

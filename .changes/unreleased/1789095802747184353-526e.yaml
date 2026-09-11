@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed `dot_zshenv.tmpl` putting a Node version on PATH that NVM would not have chosen: it treated an `lts/*` default alias as "use the newest installed version", so a machine holding both an LTS and a newer non-LTS Current release got the Current one, while the dependency installer''s `npm install -g` had written into the LTS tree — `codex`, `sentry` and Claude Code were installed correctly and missing from every shell, with nothing reporting an error. The block now follows the alias chain to a concrete version (with a hop budget, since `nvm alias` permits cycles), honours `system` by leaving PATH alone, and falls back to the newest installed version only when resolution genuinely fails'
+time: '2026-09-11T03:03:22.747119567Z'

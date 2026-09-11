@@ -282,12 +282,32 @@ install_copilot_cli() {
 # also bundles `codex-resources/bwrap`, which gives the sandbox its bubblewrap backend
 # on WSL2 without an apt package. Android cannot take this route at all -- see
 # `install_codex_cli` in the Android installer and the `codex` wrapper it relies on.
+#
+# The install is verified rather than assumed. `npm install -g` writes into the
+# *active* Node version's tree, so this call is only as good as the version
+# `install_nvm` left current -- and a missing `npm`, a registry failure, or a
+# package that lands somewhere PATH does not reach all produce the same silent
+# outcome: no `codex`, no error, and an installer that reports success.
 install_codex_cli() {
     if command -v codex &>/dev/null; then
         echo "[configure-deps] Codex CLI is already installed, skipping" >&2
         return
     fi
-    npm install -g @openai/codex
+
+    if ! command -v npm &>/dev/null; then
+        echo "[codex] ERROR: npm is not available; install_nvm must run before install_codex_cli" >&2
+        return 1
+    fi
+
+    if ! npm install -g @openai/codex; then
+        echo "[codex] ERROR: npm install -g @openai/codex failed" >&2
+        return 1
+    fi
+
+    if ! command -v codex &>/dev/null; then
+        echo "[codex] ERROR: codex is still not on PATH after a successful npm install" >&2
+        return 1
+    fi
 }
 
 # https://github.com/rios0rios0/dev-toolkit
@@ -368,56 +388,141 @@ install_aws_cli() {
     )
 }
 
-# https://pypi.org/project/azure-cli/
-install_azure_cli() {
-    # Ensure pip is available from pyenv's Python
+# Make pyenv's managed Python -- and the `pip`/`pipx` that belong to it -- the
+# active one. `run_once_before_*` scripts run before chezmoi applies
+# `dot_zshenv.tmpl`, so PATH does not carry pyenv yet.
+use_pyenv_python() {
     export PYENV_ROOT="$HOME/.pyenv"
     export PATH="$PYENV_ROOT/bin:$PATH"
     eval "$(pyenv init -)"
+}
 
-    if pip show azure-cli &>/dev/null; then
-        echo "[configure-deps] azure-cli is already installed, skipping" >&2
+# https://pipx.pypa.io/
+# pipx gives every Python CLI its own virtualenv, and that isolation is the whole
+# point of installing the applications below through it.
+#
+# `pip install`-ing two applications into one interpreter makes them share a single
+# dependency namespace, and pip resolves each command against only that command's
+# graph -- it does not look at unrelated distributions that are already installed.
+# So the second application silently moves a pin the first one depends on, and pip
+# reports the breakage only after it has written it. Observed here with `pip install
+# oci-cli` pulling `cryptography` up to 50.x, past the `<49` that azure-cli's `msal`
+# declares:
+#
+#   ERROR: pip's dependency resolver does not currently take into account all the
+#   packages that are installed. [...] msal 1.35.0b1 requires cryptography<49,>=2.5,
+#   but you have cryptography 50.0.1 which is incompatible.
+#
+# Pinning around one such collision only defers the next one; separate venvs remove
+# the shared namespace that produces them. `python -m pipx` is used throughout
+# rather than the `pipx` shim: `pip install pipx` places the shim, but it only
+# becomes callable after `pyenv rehash`, which is not guaranteed in a
+# non-interactive script context.
+install_pipx() {
+    use_pyenv_python
+
+    if python -m pip show pipx &>/dev/null; then
+        echo "[configure-deps] pipx is already installed, skipping" >&2
         return
     fi
 
-    pip install --upgrade pip
-    pip install azure-cli
+    python -m pip install --upgrade pipx
+    python -m pipx ensurepath
+}
+
+# True when pipx manages an application of this name.
+pipx_has() {
+    python -m pipx list --short 2>/dev/null | grep -q "^$1 "
+}
+
+# Install a Python CLI with pipx, migrating it out of the shared pyenv environment
+# when an earlier revision of this script put it there with `pip install`.
+#
+# $1 is the pipx package, $2 the command it must provide, and the rest are the pip
+# distributions the old route left in the shared environment (the ones that own
+# console scripts -- their dependency trees stay behind as harmless orphans, since
+# uninstalling a closure risks taking packages other tools still import).
+#
+# Three rules matter, each of them learned from a way this goes wrong quietly:
+#
+#   1. pipx first, and the shared-environment copy is removed only once the
+#      isolated one exists, so a failed download leaves a working CLI behind
+#      rather than none.
+#   2. The entry point is verified to land inside the pipx venv. pipx refuses to
+#      overwrite a command it does not own -- a launcher from a vendor's own
+#      install script, a shim from another tool -- and reports that as a note, not
+#      a failure, so the package installs while its command goes on resolving
+#      somewhere else entirely. `~/.local/bin/oci` was such a launcher, left by
+#      Oracle's install.sh; pipx skipped the symlink, the shared-environment copy
+#      was removed next, and `oci` was one stale venv away from vanishing.
+#      `--force` reclaims the name.
+#   3. `pyenv rehash` after the uninstall is not optional. `$PYENV_ROOT/shims`
+#      sits ahead of `~/.local/bin` on PATH, so a stale shim keeps shadowing the
+#      pipx entry point and the machine goes on running the conflicted copy.
+install_pipx_app() {
+    local app="$1"
+    local binary="$2"
+    shift 2
+    local -a pip_dists=("$@")
+
+    use_pyenv_python
+
+    if pipx_has "$app"; then
+        echo "[configure-deps] $app is already installed via pipx, skipping" >&2
+    elif ! python -m pipx install "$app"; then
+        echo "[configure-deps] ERROR: pipx install $app failed" >&2
+        return 1
+    fi
+
+    if ! pipx_has "$app"; then
+        echo "[configure-deps] ERROR: $app is not registered with pipx after the install" >&2
+        return 1
+    fi
+
+    local bin_dir venv_bin
+    bin_dir="$(python -m pipx environment --value PIPX_BIN_DIR 2>/dev/null)"
+    venv_bin="$(python -m pipx environment --value PIPX_LOCAL_VENVS 2>/dev/null)/$app/bin/$binary"
+    if [[ -n "$bin_dir" && -n "$venv_bin" \
+        && "$(readlink -f "$bin_dir/$binary" 2>/dev/null)" != "$venv_bin" ]]; then
+        echo "[configure-deps] $app: $bin_dir/$binary does not point into the pipx venv, reclaiming it" >&2
+        python -m pipx install --force "$app" || {
+            echo "[configure-deps] ERROR: pipx could not reclaim $bin_dir/$binary for $app" >&2
+            return 1
+        }
+    fi
+
+    local dist
+    local -a stale=()
+    for dist in "${pip_dists[@]}"; do
+        if python -m pip show "$dist" &>/dev/null; then
+            stale+=("$dist")
+        fi
+    done
+    [[ "${#stale[@]}" -eq 0 ]] && return 0
+
+    echo "[configure-deps] $app: removing the shared-environment copy (${stale[*]})" >&2
+    python -m pip uninstall --yes "${stale[@]}" >&2 \
+        || echo "[configure-deps] WARN: failed to remove ${stale[*]} from the pyenv environment" >&2
+    pyenv rehash
+}
+
+# https://pypi.org/project/azure-cli/
+# Extensions are unaffected by the move to pipx: `az extension add` writes to
+# ~/.azure/cliextensions, which is outside the interpreter either way.
+install_azure_cli() {
+    install_pipx_app azure-cli az azure-cli azure-cli-core azure-cli-telemetry
 }
 
 # https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm
 install_oci_cli() {
-    # Same pyenv Python the Azure CLI lives in
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)"
-
-    if pip show oci-cli &>/dev/null; then
-        echo "[configure-deps] oci-cli is already installed, skipping" >&2
-        return
-    fi
-
-    pip install --upgrade pip
-    pip install oci-cli
+    install_pipx_app oci-cli oci oci-cli oci
 }
 
 # https://docs.gitguardian.com/ggshield-docs/getting-started
 install_ggshield() {
-    # Ensure pip is available from pyenv's Python (so pipx lives in the managed Python)
-    export PYENV_ROOT="$HOME/.pyenv"
-    export PATH="$PYENV_ROOT/bin:$PATH"
-    eval "$(pyenv init -)"
+    use_pyenv_python
 
-    # Use `python -m pipx` throughout to avoid pyenv shim timing issues:
-    # `pip install pipx` places the shim, but it only becomes callable after
-    # `pyenv rehash`, which isn't guaranteed in a non-interactive script context.
-    if ! python -m pip show pipx &>/dev/null; then
-        python -m pip install --upgrade pipx
-        python -m pipx ensurepath
-    else
-        echo "[configure-deps] pipx is already installed, skipping" >&2
-    fi
-
-    if python -m pipx list --short 2>/dev/null | grep -q '^ggshield '; then
+    if pipx_has ggshield; then
         # ggshield prints "A new version of ggshield has been released" on
         # every invocation when out of date. Auto-upgrade keeps it current.
         echo "[configure-deps] ggshield is already installed, upgrading via pipx" >&2
@@ -426,7 +531,7 @@ install_ggshield() {
         python -m pipx install ggshield
     fi
 
-    if ! python -m pipx list --short 2>/dev/null | grep -q '^ggshield '; then
+    if ! pipx_has ggshield; then
         echo "[configure-deps] ERROR: ggshield installation failed" >&2
         exit 1
     fi
@@ -626,6 +731,9 @@ install_copilot_cli
 install_codex_cli
 install_sentry_cli
 install_dev_toolkit
+
+# pipx backs every Python CLI below, so it is bootstrapped before the first one
+install_pipx
 
 install_github_cli
 install_aws_cli

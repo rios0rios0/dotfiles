@@ -341,6 +341,20 @@ install_codex_cli() {
     # is a no-op afterwards, so this call doubles as the idempotency check.
     "$wrapper" --version \
         || echo "[codex] WARN: bootstrap failed; the wrapper retries on the next codex launch" >&2
+
+    # Verify a build actually landed. `--version` exiting non-zero is not the only
+    # way the bootstrap fails to leave one: the wrapper prunes a download that does
+    # not run and returns to the caller, so the only reliable evidence is a binary
+    # under the versions directory. Report it rather than let the installer finish
+    # claiming success with no Codex CLI on the device.
+    local versions_dir="$HOME/.local/share/codex/versions"
+    local installed
+    installed="$(find "$versions_dir" -mindepth 2 -maxdepth 2 -name codex -type f 2>/dev/null | head -1)"
+    if [ -z "$installed" ]; then
+        echo "[codex] ERROR: no Codex CLI build under $versions_dir after the bootstrap" >&2
+        echo "[codex] ERROR: run 'codex --version' once the device is online to retry the download" >&2
+        return 1
+    fi
 }
 
 # https://github.com/rios0rios0/dev-toolkit

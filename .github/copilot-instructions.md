@@ -9,11 +9,11 @@ The "build" is `chezmoi apply`; there is no compilation step. Repo *changes* (te
 
 ```bash
 make lint    # shellcheck, Go template syntax, Python (ruff), PowerShell, YAML/JSON
-make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, $TMPDIR modcache prune, shell credentials, clipboard shim
+make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
-Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-remove-dependencies`, `make test-shell-credentials`. See the `Makefile` for the full target list.
+Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-remove-dependencies`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
 
 ## Working Effectively
 
@@ -329,6 +329,27 @@ This repository is a sync, not a bootstrapper. Deleting an `install_*()` functio
 Strategies: `apt`, `gh_extension`, `npm_global`, `path`, `pipx` (Linux/Android, defined in `.chezmoitemplates/lib-remove-dependencies.sh`); `npm_global`, `path`, `winget` (Windows, inline). `remove_path` refuses targets outside `$HOME` — never widen that guard, these scripts run unattended.
 
 See `.docs/dependency-lifecycle.md` for the rationale and why Nix/home-manager was rejected.
+
+### Installing a Python CLI (Linux/WSL)
+Use `install_pipx_app <package> <binary> [pip-dists...]`, never a bare `pip install`. pip resolves each
+command against only that command's dependency graph, so two applications in one interpreter share a
+dependency namespace and the second install silently moves a pin the first one needs — that is how
+`pip install oci-cli` pushed `cryptography` past the `<49` bound azure-cli's `msal` declares. Do not
+answer such a collision with a pin; one venv per application removes the cause. `install_pipx_app`
+also verifies the entry point resolves into the pipx venv (pipx will not overwrite a command it does
+not own, and says so as a *note*, not a failure) and runs `pyenv rehash` after dropping the old copy,
+because `$PYENV_ROOT/shims` precedes `~/.local/bin` on PATH. Android still uses `pip install` — its
+`crc32c`/`psutil`/PyNaCl build workarounds live in the shared environment. See "One Interpreter Per
+Python CLI" in `CLAUDE.md`.
+
+### Installing a CLI from npm
+Global npm packages live inside the *active* Node version's tree, so anything `npm install -g` places
+disappears from PATH when NVM moves to a new LTS major, with no error anywhere. Two rules follow:
+`install_nvm` passes `--reinstall-packages-from` the current version on an upgrade, and
+`dot_zshenv.tmpl` must resolve NVM's `default` alias chain to the same version the real `nvm` would —
+"newest installed" is wrong on any machine that also has a non-LTS Current release. Verify the binary
+is on PATH after installing rather than trusting the exit status. `make test-nvm-resolution` covers the
+resolver; see "NVM Resolution Must Agree With NVM" in `CLAUDE.md`.
 
 ### Working with Encrypted Files
 1. Use age encryption for sensitive files

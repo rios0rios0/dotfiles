@@ -15,6 +15,14 @@ set -euo pipefail
 # Add one group per removal, newest first, and reference the commit that dropped
 # the installer so the entry can be retired once every machine has converged.
 TOMBSTONES=(
+    # OCI CLI installed from Oracle's own install.sh, superseded by the pipx route
+    # in this repository's `install_oci_cli`. The venv is ~750 MB of dead weight
+    # once pipx owns `~/.local/bin/oci`, and the launcher it left there was what
+    # stopped pipx claiming that name in the first place. `~/.oci` is deliberately
+    # NOT listed: it holds the user's tenancy config and API keys, not the CLI.
+    "path:$HOME/.local/lib/oracle-cli"
+    "path:$HOME/.local/bin/oci-cli-scripts"
+
     # Gemini CLI and Cursor CLI -- removed in 601cbeb (2026-07-21)
     "npm_global:@google/gemini-cli"
     "path:$HOME/.local/bin/cursor-agent"

@@ -1,0 +1,3 @@
+kind: 'Removed'
+body: 'removed the leftover OCI CLI installed from Oracle''s own `install.sh` through tombstones for `~/.local/lib/oracle-cli` (~750 MB) and `~/.local/bin/oci-cli-scripts`, now that pipx owns `~/.local/bin/oci`; `~/.oci` is deliberately untouched, since it holds tenancy config and API keys rather than the CLI'
+time: '2026-09-11T03:03:22.758204353Z'
