@@ -137,41 +137,68 @@ if [[ -d "$sdkmanRoot/candidates" ]]; then
 fi
 
 # NVM - Node.js version manager
-# Read the default alias to determine which Node version to use
+# Resolve the default alias to the Node version NVM itself would select.
+#
+# "Latest installed" is NOT that version. NVM's aliases form a chain --
+# `default` -> `lts/*` -> `lts/<codename>` -> `vX.Y.Z` -- and a machine that ever
+# installed a non-LTS Current release keeps it in `versions/node`, where a
+# version sort ranks it above the LTS the chain points at. That is not a
+# cosmetic difference: `npm install -g` writes into the *active* version's tree,
+# so the dependency installer (which runs the real `nvm`) puts `codex`, `sentry`
+# and Claude Code under the LTS, while a shell that picked the higher Current
+# release sees none of them and reports every one of those CLIs as missing.
 nvmRoot="$HOME/.nvm"
 if [[ -d "$nvmRoot" ]]; then
     export NVM_DIR="$nvmRoot"
     nvmNodeBin=""
-    # Try to get the default Node version from NVM alias
+    nvmVersion=""
     if [[ -f "$nvmRoot/alias/default" ]]; then
-        nvmDefault=$(command cat "$nvmRoot/alias/default" 2>/dev/null)
-        # Handle different alias formats
-        if [[ "$nvmDefault" == lts/* || "$nvmDefault" == "lts/*" ]]; then
-            # For LTS aliases (lts/*, lts/iron, etc.), use the latest installed version
-            # NVM sorts versions, so the last one alphabetically is usually the latest
-            latestNode=$(command ls -1 "$nvmRoot/versions/node" 2>/dev/null | sort -V | tail -1)
-            if [[ -n "$latestNode" ]]; then
-                nvmNodeBin="$nvmRoot/versions/node/$latestNode/bin"
+        nvmVersion=$(command cat "$nvmRoot/alias/default" 2>/dev/null)
+        # Follow the chain until it lands on a concrete version. The hop budget
+        # is a cycle guard: NVM will happily store `alias a b` and `alias b a`.
+        nvmHops=0
+        while [[ -n "$nvmVersion" && "$nvmVersion" != "system" \
+            && ! "$nvmVersion" =~ ^v?[0-9] && "$nvmHops" -lt 10 ]]; do
+            if [[ -f "$nvmRoot/alias/$nvmVersion" ]]; then
+                nvmVersion=$(command cat "$nvmRoot/alias/$nvmVersion" 2>/dev/null)
+                nvmHops=$((nvmHops + 1))
+            else
+                nvmVersion=""
             fi
-        elif [[ "$nvmDefault" =~ ^[0-9] || "$nvmDefault" =~ ^v[0-9] ]]; then
-            # Direct version number (20.18.3 or v20.18.3)
-            nvmNodeBin="$nvmRoot/versions/node/v${nvmDefault#v}/bin"
-        else
-            # Other aliases - try to resolve from alias file
-            if [[ -f "$nvmRoot/alias/$nvmDefault" ]]; then
-                resolvedVersion=$(command cat "$nvmRoot/alias/$nvmDefault" 2>/dev/null)
-                nvmNodeBin="$nvmRoot/versions/node/v${resolvedVersion#v}/bin"
+        done
+        # `default -> system` deliberately means "no NVM Node on PATH", so leave
+        # PATH alone instead of falling back to an installed version.
+        if [[ "$nvmVersion" == "system" ]]; then
+            nvmVersion=""
+            nvmNodeBin="system"
+        elif [[ -n "$nvmVersion" ]]; then
+            nvmVersion="v${nvmVersion#v}"
+            nvmNodeBin="$nvmRoot/versions/node/$nvmVersion/bin"
+            # A partial alias (`nvm alias default 22`) is a valid NVM version spec
+            # that resolves to the newest installed match, not to a directory named
+            # `v22`. Without this the constructed path fails the check below and the
+            # fallback hands back an unrelated newest version -- the same mismatch
+            # between what NVM picks and what the shell picks that this block exists
+            # to prevent. Anchoring on `.` keeps `v2` off `v20.x`.
+            if [[ ! -d "$nvmNodeBin" ]]; then
+                nvmMatch=$(command ls -1 "$nvmRoot/versions/node" 2>/dev/null \
+                    | command grep -E "^${nvmVersion}(\.|\$)" | sort -V | tail -1)
+                if [[ -n "$nvmMatch" ]]; then
+                    nvmNodeBin="$nvmRoot/versions/node/$nvmMatch/bin"
+                fi
             fi
         fi
     fi
-    # Fallback: if no alias found, use the latest installed version
-    if [[ -z "$nvmNodeBin" || ! -d "$nvmNodeBin" ]]; then
+    # Fallback: no alias, a dangling chain, or an alias naming a version that is
+    # no longer installed -- use the newest installed version so the shell still
+    # has a Node.
+    if [[ "$nvmNodeBin" != "system" && ( -z "$nvmNodeBin" || ! -d "$nvmNodeBin" ) ]]; then
         latestNode=$(command ls -1 "$nvmRoot/versions/node" 2>/dev/null | sort -V | tail -1)
         if [[ -n "$latestNode" ]]; then
             nvmNodeBin="$nvmRoot/versions/node/$latestNode/bin"
         fi
     fi
-    if [[ -d "$nvmNodeBin" ]]; then
+    if [[ "$nvmNodeBin" != "system" && -d "$nvmNodeBin" ]]; then
         export PATH="$nvmNodeBin:$PATH"
     fi
 fi

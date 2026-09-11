@@ -24,6 +24,7 @@ make test-remove-dependencies       # dependency removal library (tombstones, $H
 make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
 make test-shell-credentials         # 1Password credential/workspace loading and removal
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
+make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
 ```
 
 ## Essential Commands
@@ -208,6 +209,99 @@ See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-ma
 Keep platform-specific provisioning in the platform installers: apt repositories versus binary downloads (`gh`, `kubectl`), upstream install scripts versus source builds (`terra`, `dev-toolkit`, `aisync`), pyenv versus Termux's native Python. A function moves into the library only when the same body is right on both platforms. The library is pure bash (no template directives), so `make lint-shellcheck` lints it as a plain `.sh` file, and its messages use the `[install-deps]` prefix.
 
 Oh My Zsh is installed with `--unattended` on both platforms, so the login shell is switched explicitly right after it, and only when the install succeeded: `usermod` on Linux, Termux's `chsh -s zsh` on Android. Every remote installer in the library (Oh My Zsh, SDKMAN, NVM) goes through `run_remote_installer`, which forwards extra arguments to the script; do not reintroduce `sh -c "$(curl ...)"`, because a failed download becomes an empty command that exits 0. On Termux `install_nvm` keeps the native `nodejs` package and only enables corepack; the check is on Termux's prefix, not on where `npm` resolves from, because WSL exposes Windows' `npm` through PATH interop.
+
+## One Interpreter Per Python CLI (pipx, Not pip)
+
+On Linux/WSL, every Python **application** this repository installs goes through
+pipx, never `pip install`. `install_pipx_app` in
+`run_once_before_linux-002-install-dependencies.sh.tmpl` is the entry point for every
+application that has to be migrated out of the shared pyenv environment;
+`install_azure_cli` and `install_oci_cli` are one line each on top of it.
+
+`install_ggshield` is the deliberate exception, and the only one: it calls
+`python -m pipx install` / `python -m pipx upgrade` directly, because it was never
+`pip install`ed (there is nothing to migrate) and it re-upgrades on every apply,
+which `install_pipx_app` does not express. A new Python CLI goes on
+`install_pipx_app` unless it needs that upgrade-on-every-run behaviour — do not add
+a third way of installing one.
+
+The reason is that pip resolves each command against only that command's
+dependency graph — it does not look at unrelated distributions already present in
+the environment. Two applications in one interpreter therefore share a single
+dependency namespace, and the second install silently moves a pin the first one
+depends on, reporting the damage only after writing it:
+
+```
+ERROR: pip's dependency resolver does not currently take into account all the
+packages that are installed. [...] msal 1.35.0b1 requires cryptography<49,>=2.5,
+but you have cryptography 50.0.1 which is incompatible.
+```
+
+That was `pip install oci-cli` pulling `cryptography` past the bound azure-cli's
+`msal` declares. **Do not fix a collision like that by pinning it.** The pin holds
+until the next release moves, and the same environment had already produced a
+second one (`websocket-client 1.9.0` against azure-cli's `~=1.8.0`). Separate
+venvs remove the shared namespace that produces them.
+
+Three things about the migration are load-bearing, each of them a way this fails
+quietly rather than loudly:
+
+| Rule | Why |
+|------|-----|
+| pipx install first, remove the shared-environment copy second | A failed download then leaves a working CLI behind instead of none |
+| Verify the entry point resolves *into* the pipx venv, and `--force` when it does not | pipx refuses to overwrite a command it does not own and reports that as a note, not a failure — so the package installs while its command goes on resolving elsewhere. `~/.local/bin/oci` was such a squatter, left by Oracle's `install.sh` |
+| An unreadable pipx layout fails verification, never skips it | Guarding the check on a non-empty `PIPX_BIN_DIR` would turn "cannot verify" into "verified", and the uninstall below would then remove the only working copy — the exact outcome the check exists to prevent, reported as success |
+| A failed `pip uninstall` is fatal, not a warning | The shared environment keeps its console script and `pyenv rehash` keeps the shim, so every later shell runs the conflicted copy while the script claims isolation |
+| `pyenv rehash` after the `pip uninstall` | `$PYENV_ROOT/shims` sits ahead of `~/.local/bin` on PATH, so a stale shim keeps shadowing the pipx entry point and the machine goes on running the conflicted copy |
+
+**Remove only the distribution that owns the console scripts** (`azure-cli`,
+`oci-cli`) — those are what `pyenv rehash` turns into shims. Everything else the old
+route pulled in stays behind as an orphan, because uninstalling a closure risks
+taking packages other tools still import. `oci` is the clearest case: it is the
+Oracle SDK, importable by user code, owns no console script, and removing it would
+buy nothing.
+
+A `return 1` from any of this is invisible on its own — the installer has no
+`set -e`, so execution falls through and the last command decides the exit status.
+The verified installers are therefore called through `verify`, which collects
+failures and exits non-zero at the end: collecting keeps one failure from skipping
+the dozen installers after it, and the non-zero exit is what makes the failure
+self-healing, since chezmoi records a `run_once_` script's state only on success and
+retries the whole installer on the next apply.
+
+Android still uses `pip install` for both CLIs. Its installer carries build
+workarounds that live in the shared environment — a pre-built `crc32c` wheel, a
+patched `psutil` source tree, `SODIUM_INSTALL=system` — none of which survive into
+a fresh pipx venv unmodified. Moving Termux over is its own change.
+
+## NVM Resolution Must Agree With NVM
+
+`dot_zshenv.tmpl` picks the Node version for every shell by resolving NVM's
+`default` alias itself, because `nvm.sh` is too slow to source on every shell
+start. That resolution has to reach the same version the real `nvm` would.
+
+**"Newest installed" is not that version.** NVM's aliases form a chain —
+`default` → `lts/*` → `lts/<codename>` → `vX.Y.Z` — and a machine that ever
+installed a non-LTS Current release keeps it in `versions/node`, where a version
+sort ranks it above the LTS the chain points at.
+
+The consequence is invisible, which is what makes it worth a test. Global npm
+packages live inside the active version's tree, so the dependency installer (which
+runs the real `nvm`) puts `codex`, `sentry` and Claude Code under the LTS, while a
+shell that picked the higher Current release sees none of them. Every one of those
+CLIs is installed correctly and missing from PATH, and nothing anywhere reports an
+error — `install_codex_cli` had been running `npm install -g @openai/codex`
+successfully into a tree the user's shell never looked at.
+
+Two halves keep it fixed, and both are needed:
+
+| Half | Mechanism |
+|------|-----------|
+| The shell picks what NVM picks | `dot_zshenv.tmpl` follows the alias chain to a concrete version (with a hop budget, since `nvm alias` permits cycles), honours `system` by leaving PATH alone, and falls back to the newest installed version only when resolution genuinely fails |
+| An LTS bump carries the CLIs with it | `install_nvm` passes `--reinstall-packages-from` the current version, since a new major otherwise starts with an empty global tree. It is omitted on a first install, where `nvm current` prints `none`/`system` and nvm aborts on such a source |
+
+`make test-nvm-resolution` covers the resolver, including the exact shape that
+produced the bug: an LTS and a newer Current release installed side by side.
 
 ## Important Timing Constraints
 
