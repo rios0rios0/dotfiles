@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'changed `install_codex_cli` on Linux/WSL and Android to verify the install instead of assuming it: the Linux function now fails when `npm` is unavailable, when the install errors, or when `codex` is still absent from PATH afterwards, and the Android function fails when no build landed under `~/.local/share/codex/versions` after the wrapper bootstrap. All of these previously left the installer reporting success with no Codex CLI on the machine'
-time: '2026-09-11T03:03:22.7523795Z'

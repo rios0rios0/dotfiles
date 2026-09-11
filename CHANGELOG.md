@@ -22,6 +22,27 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.23.0] - 2026-09-11
+
+### Added
+
+- added `make test-nvm-resolution`, covering NVM default-alias resolution in `dot_zshenv.tmpl` — the alias chain past a newer Current release, a bare version number, a target that is no longer installed, a partial version alias and one that must not match a longer major, the `system` alias, an alias cycle, and no alias at all
+
+### Changed
+
+- changed `install_codex_cli` on Linux/WSL and Android to verify the install instead of assuming it: the Linux function now fails when `npm` is unavailable, when the install errors, or when `codex` is still absent from PATH afterwards, and the Android function fails when no build landed under `~/.local/share/codex/versions` after the wrapper bootstrap. All of these previously left the installer reporting success with no Codex CLI on the machine
+- changed the Linux/WSL and Android dependency installers to propagate the failures they verify: neither script enables `set -e`, so a `return 1` from `install_codex_cli`, `install_pipx` or `install_pipx_app` used to fall through to the next installer and the final command decided the exit status. Those calls now go through a `verify` helper that collects failures and exits non-zero at the end — collecting so one failure does not skip the dozen installers after it, and exiting non-zero because chezmoi records a `run_once_` script's state only on success, so the next `chezmoi apply` retries instead of leaving a half-migrated machine reporting success
+
+### Fixed
+
+- fixed `az` and `oci` colliding in one Python environment on Linux/WSL: `install_azure_cli` and `install_oci_cli` both ran `pip install` into pyenv's interpreter, and because pip resolves each command against only that command's dependency graph, `pip install oci-cli` raised `cryptography` to `50.0.1` past the `<49` that azure-cli's `msal` declares and reported the breakage only after writing it — both CLIs now install through the new `install_pipx_app`, which gives each its own pipx venv, verifies the entry point resolves into that venv (`~/.local/bin/oci` was squatted by a launcher from Oracle's `install.sh`, which pipx reports as a note rather than a failure), treats an unreadable pipx layout and a failed uninstall as failures rather than skipping the check, removes only the distribution that owns the console scripts so importable libraries such as the `oci` SDK stay put, and runs `pyenv rehash` after removing the shared-environment copy so the stale shim stops shadowing it
+- fixed `dot_zshenv.tmpl` putting a Node version on PATH that NVM would not have chosen: it treated an `lts/*` default alias as "use the newest installed version", so a machine holding both an LTS and a newer non-LTS Current release got the Current one, while the dependency installer's `npm install -g` had written into the LTS tree — `codex`, `sentry` and Claude Code were installed correctly and missing from every shell, with nothing reporting an error. The block now follows the alias chain to a concrete version (with a hop budget, since `nvm alias` permits cycles), honours `system` by leaving PATH alone, resolves a partial alias (`nvm alias default 22`) against the installed versions the way NVM does instead of building a directory name that cannot exist, and falls back to the newest installed version only when resolution genuinely fails
+- fixed global npm packages disappearing when NVM moves to a new LTS major: `install_nvm` now passes `--reinstall-packages-from` the current version, so `codex`, `sentry` and Claude Code are rebuilt in the new tree instead of being left behind in the old one. The flag is omitted on a first install, where `nvm current` prints `none`/`system` and nvm aborts on such a source
+
+### Removed
+
+- removed the leftover OCI CLI installed from Oracle's own `install.sh` through tombstones for `~/.local/lib/oracle-cli` (~750 MB) and `~/.local/bin/oci-cli-scripts`, now that pipx owns `~/.local/bin/oci`; `~/.oci` is deliberately untouched, since it holds tenancy config and API keys rather than the CLI
+
 ## [0.22.1] - 2026-09-08
 
 ### Changed
