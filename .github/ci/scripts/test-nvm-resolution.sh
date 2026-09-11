@@ -84,7 +84,7 @@ run_case() {
     local expected="$2"
     local actual="$3"
 
-    if [ "$actual" = "$expected" ]; then
+    if [[ "$actual" == "$expected" ]]; then
         echo "[test-nvm-resolution] PASS: $description" >&2
     else
         echo "[test-nvm-resolution] FAIL: $description" >&2
@@ -148,6 +148,23 @@ set_alias "$HOME_DIR" beta alpha
 run_case "does not hang on an alias cycle" \
     "v24.21.0" "$(resolve "$HOME_DIR")"
 
+# given a partial version alias, which NVM resolves to the newest installed match
+new_home
+make_nvm "$HOME_DIR" v22.5.0 v22.23.2 v24.21.0
+set_alias "$HOME_DIR" default 22
+# when / then the newest v22 is chosen, not the literal `v22` directory (which does
+# not exist) and not the unrelated newest version the fallback would pick
+run_case "resolves a partial version alias to the newest installed match" \
+    "v22.23.2" "$(resolve "$HOME_DIR")"
+
+# given a partial alias that is a prefix of a higher major's digits
+new_home
+make_nvm "$HOME_DIR" v2.5.0 v20.18.3
+set_alias "$HOME_DIR" default v2
+# when / then `v2` matches v2.x only, never v20.x
+run_case "does not let a partial alias match a longer major" \
+    "v2.5.0" "$(resolve "$HOME_DIR")"
+
 # given an NVM root with no alias at all
 new_home
 make_nvm "$HOME_DIR" v24.21.0 v26.7.0
@@ -155,7 +172,7 @@ make_nvm "$HOME_DIR" v24.21.0 v26.7.0
 run_case "uses the newest installed version when no default alias exists" \
     "v26.7.0" "$(resolve "$HOME_DIR")"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-nvm-resolution] all cases passed" >&2
 fi
 

@@ -439,9 +439,12 @@ pipx_has() {
 # when an earlier revision of this script put it there with `pip install`.
 #
 # $1 is the pipx package, $2 the command it must provide, and the rest are the pip
-# distributions the old route left in the shared environment (the ones that own
-# console scripts -- their dependency trees stay behind as harmless orphans, since
-# uninstalling a closure risks taking packages other tools still import).
+# distributions to remove from the shared environment -- strictly the ones that own
+# the console scripts, because those are what `pyenv rehash` turns into shims.
+# Everything else the old route pulled in stays behind as a harmless orphan:
+# uninstalling a closure risks taking packages other tools still import. `oci` is the
+# clearest case -- it is the Oracle SDK, importable by user code, owns no console
+# script, and removing it would buy nothing.
 #
 # Three rules matter, each of them learned from a way this goes wrong quietly:
 #
@@ -479,11 +482,25 @@ install_pipx_app() {
         return 1
     fi
 
-    local bin_dir venv_bin
+    # An unreadable pipx layout is a verification *failure*, never a pass. Guarding
+    # the comparison on a non-empty `bin_dir` would skip rule 2 silently on a pipx
+    # too old for `pipx environment` (1.1.0), and the uninstall below would then
+    # remove the only working copy -- the exact outcome rule 2 exists to prevent,
+    # reported as success. `install_pipx` returns early once pipx is present, so an
+    # ancient pipx is never upgraded into a newer one either.
+    local bin_dir venvs_dir venv_bin
     bin_dir="$(python -m pipx environment --value PIPX_BIN_DIR 2>/dev/null)"
-    venv_bin="$(python -m pipx environment --value PIPX_LOCAL_VENVS 2>/dev/null)/$app/bin/$binary"
-    if [[ -n "$bin_dir" && -n "$venv_bin" \
-        && "$(readlink -f "$bin_dir/$binary" 2>/dev/null)" != "$venv_bin" ]]; then
+    venvs_dir="$(python -m pipx environment --value PIPX_LOCAL_VENVS 2>/dev/null)"
+    if [[ -z "$bin_dir" || -z "$venvs_dir" ]]; then
+        echo "[configure-deps] ERROR: $app: could not read pipx's directories, so the entry point cannot be verified" >&2
+        echo "[configure-deps] ERROR: $app: leaving the shared-environment copy in place" >&2
+        return 1
+    fi
+
+    # `readlink -f` canonicalises both operands, so a symlinked $HOME does not make
+    # the comparison fail on every apply.
+    venv_bin="$(readlink -f "$venvs_dir/$app/bin/$binary" 2>/dev/null)"
+    if [[ "$(readlink -f "$bin_dir/$binary" 2>/dev/null)" != "$venv_bin" ]]; then
         echo "[configure-deps] $app: $bin_dir/$binary does not point into the pipx venv, reclaiming it" >&2
         python -m pipx install --force "$app" || {
             echo "[configure-deps] ERROR: pipx could not reclaim $bin_dir/$binary for $app" >&2
@@ -500,9 +517,16 @@ install_pipx_app() {
     done
     [[ "${#stale[@]}" -eq 0 ]] && return 0
 
+    # A failed uninstall is fatal rather than a warning: the shared environment keeps
+    # its console script, `pyenv rehash` keeps the shim, and `$PYENV_ROOT/shims`
+    # precedes `~/.local/bin`, so every later shell would go on running the
+    # conflicted copy while this script claimed the CLI was isolated.
     echo "[configure-deps] $app: removing the shared-environment copy (${stale[*]})" >&2
-    python -m pip uninstall --yes "${stale[@]}" >&2 \
-        || echo "[configure-deps] WARN: failed to remove ${stale[*]} from the pyenv environment" >&2
+    if ! python -m pip uninstall --yes "${stale[@]}" >&2; then
+        echo "[configure-deps] ERROR: $app: failed to remove ${stale[*]} from the pyenv environment;" >&2
+        echo "[configure-deps] ERROR: $app: its shim still shadows the pipx entry point" >&2
+        return 1
+    fi
     pyenv rehash
 }
 
@@ -510,12 +534,12 @@ install_pipx_app() {
 # Extensions are unaffected by the move to pipx: `az extension add` writes to
 # ~/.azure/cliextensions, which is outside the interpreter either way.
 install_azure_cli() {
-    install_pipx_app azure-cli az azure-cli azure-cli-core azure-cli-telemetry
+    install_pipx_app azure-cli az azure-cli
 }
 
 # https://docs.oracle.com/en-us/iaas/Content/API/SDKDocs/cliinstall.htm
 install_oci_cli() {
-    install_pipx_app oci-cli oci oci-cli oci
+    install_pipx_app oci-cli oci oci-cli
 }
 
 # https://docs.gitguardian.com/ggshield-docs/getting-started
@@ -725,21 +749,36 @@ install_sdkman
 install_nvm
 install_pyenv
 
+# Installers whose outcome this script verifies rather than assumes. A `return 1`
+# inside one of them is otherwise invisible: this script has no `set -e`, so
+# execution falls through to the next installer and the final command decides the
+# exit status. `verify` records the failure and `exit`s non-zero at the very end.
+#
+# Both halves matter. Collecting rather than aborting keeps one broken installer
+# from skipping the dozen that follow, in a script that takes 45-120 minutes.
+# Exiting non-zero is what makes a failure self-healing: chezmoi records a
+# `run_once_` script's state only on success, so the next `chezmoi apply` retries
+# the whole installer instead of leaving a half-migrated machine reporting success.
+verified_failures=()
+verify() {
+    "$@" || verified_failures+=("$1")
+}
+
 install_claude_cli
 install_ccswitch
 install_copilot_cli
-install_codex_cli
+verify install_codex_cli
 install_sentry_cli
 install_dev_toolkit
 
 # pipx backs every Python CLI below, so it is bootstrapped before the first one
-install_pipx
+verify install_pipx
 
 install_github_cli
 install_aws_cli
-install_azure_cli
+verify install_azure_cli
 install_fly_cli
-install_oci_cli
+verify install_oci_cli
 
 install_ggshield
 install_ruff
@@ -748,4 +787,10 @@ install_aisync
 install_acli
 
 install_speedtest_cli
+
+if [[ "${#verified_failures[@]}" -gt 0 ]]; then
+    echo "[configure-deps] ERROR: these installers failed: ${verified_failures[*]}" >&2
+    echo "[configure-deps] ERROR: the next 'chezmoi apply' will re-run this script" >&2
+    exit 1
+fi
 # =========================================================================================================

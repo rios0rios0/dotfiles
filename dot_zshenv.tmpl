@@ -172,7 +172,21 @@ if [[ -d "$nvmRoot" ]]; then
             nvmVersion=""
             nvmNodeBin="system"
         elif [[ -n "$nvmVersion" ]]; then
-            nvmNodeBin="$nvmRoot/versions/node/v${nvmVersion#v}/bin"
+            nvmVersion="v${nvmVersion#v}"
+            nvmNodeBin="$nvmRoot/versions/node/$nvmVersion/bin"
+            # A partial alias (`nvm alias default 22`) is a valid NVM version spec
+            # that resolves to the newest installed match, not to a directory named
+            # `v22`. Without this the constructed path fails the check below and the
+            # fallback hands back an unrelated newest version -- the same mismatch
+            # between what NVM picks and what the shell picks that this block exists
+            # to prevent. Anchoring on `.` keeps `v2` off `v20.x`.
+            if [[ ! -d "$nvmNodeBin" ]]; then
+                nvmMatch=$(command ls -1 "$nvmRoot/versions/node" 2>/dev/null \
+                    | command grep -E "^${nvmVersion}(\.|\$)" | sort -V | tail -1)
+                if [[ -n "$nvmMatch" ]]; then
+                    nvmNodeBin="$nvmRoot/versions/node/$nvmMatch/bin"
+                fi
+            fi
         fi
     fi
     # Fallback: no alias, a dangling chain, or an alias naming a version that is

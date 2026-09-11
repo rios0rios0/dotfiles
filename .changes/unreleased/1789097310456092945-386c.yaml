@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'changed the Linux/WSL and Android dependency installers to propagate the failures they verify: neither script enables `set -e`, so a `return 1` from `install_codex_cli`, `install_pipx` or `install_pipx_app` used to fall through to the next installer and the final command decided the exit status. Those calls now go through a `verify` helper that collects failures and exits non-zero at the end — collecting so one failure does not skip the dozen installers after it, and exiting non-zero because chezmoi records a `run_once_` script''s state only on success, so the next `chezmoi apply` retries instead of leaving a half-migrated machine reporting success'
+time: '2026-09-11T03:28:30.45597779Z'

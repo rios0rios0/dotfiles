@@ -331,14 +331,19 @@ Strategies: `apt`, `gh_extension`, `npm_global`, `path`, `pipx` (Linux/Android, 
 See `.docs/dependency-lifecycle.md` for the rationale and why Nix/home-manager was rejected.
 
 ### Installing a Python CLI (Linux/WSL)
-Use `install_pipx_app <package> <binary> [pip-dists...]`, never a bare `pip install`. pip resolves each
+Use `install_pipx_app <package> <binary> [pip-dists...]`, never a bare `pip install` (`install_ggshield` is
+the one deliberate exception — it calls `python -m pipx install`/`upgrade` directly because it was never
+pip-installed and re-upgrades on every apply). pip resolves each
 command against only that command's dependency graph, so two applications in one interpreter share a
 dependency namespace and the second install silently moves a pin the first one needs — that is how
 `pip install oci-cli` pushed `cryptography` past the `<49` bound azure-cli's `msal` declares. Do not
 answer such a collision with a pin; one venv per application removes the cause. `install_pipx_app`
 also verifies the entry point resolves into the pipx venv (pipx will not overwrite a command it does
-not own, and says so as a *note*, not a failure) and runs `pyenv rehash` after dropping the old copy,
-because `$PYENV_ROOT/shims` precedes `~/.local/bin` on PATH. Android still uses `pip install` — its
+not own, and says so as a *note*, not a failure), treats an unreadable pipx layout and a failed
+`pip uninstall` as failures rather than warnings, and runs `pyenv rehash` after dropping the old copy,
+because `$PYENV_ROOT/shims` precedes `~/.local/bin` on PATH. Remove only the distribution that owns the
+console scripts; the rest of the old dependency tree stays as orphans. Call verified installers through
+`verify` so a `return 1` reaches the script's exit status — there is no `set -e`. Android still uses `pip install` — its
 `crc32c`/`psutil`/PyNaCl build workarounds live in the shared environment. See "One Interpreter Per
 Python CLI" in `CLAUDE.md`.
 

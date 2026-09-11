@@ -214,8 +214,16 @@ Oh My Zsh is installed with `--unattended` on both platforms, so the login shell
 
 On Linux/WSL, every Python **application** this repository installs goes through
 pipx, never `pip install`. `install_pipx_app` in
-`run_once_before_linux-002-install-dependencies.sh.tmpl` is the only entry point;
+`run_once_before_linux-002-install-dependencies.sh.tmpl` is the entry point for every
+application that has to be migrated out of the shared pyenv environment;
 `install_azure_cli` and `install_oci_cli` are one line each on top of it.
+
+`install_ggshield` is the deliberate exception, and the only one: it calls
+`python -m pipx install` / `python -m pipx upgrade` directly, because it was never
+`pip install`ed (there is nothing to migrate) and it re-upgrades on every apply,
+which `install_pipx_app` does not express. A new Python CLI goes on
+`install_pipx_app` unless it needs that upgrade-on-every-run behaviour — do not add
+a third way of installing one.
 
 The reason is that pip resolves each command against only that command's
 dependency graph — it does not look at unrelated distributions already present in
@@ -242,11 +250,24 @@ quietly rather than loudly:
 |------|-----|
 | pipx install first, remove the shared-environment copy second | A failed download then leaves a working CLI behind instead of none |
 | Verify the entry point resolves *into* the pipx venv, and `--force` when it does not | pipx refuses to overwrite a command it does not own and reports that as a note, not a failure — so the package installs while its command goes on resolving elsewhere. `~/.local/bin/oci` was such a squatter, left by Oracle's `install.sh` |
+| An unreadable pipx layout fails verification, never skips it | Guarding the check on a non-empty `PIPX_BIN_DIR` would turn "cannot verify" into "verified", and the uninstall below would then remove the only working copy — the exact outcome the check exists to prevent, reported as success |
+| A failed `pip uninstall` is fatal, not a warning | The shared environment keeps its console script and `pyenv rehash` keeps the shim, so every later shell runs the conflicted copy while the script claims isolation |
 | `pyenv rehash` after the `pip uninstall` | `$PYENV_ROOT/shims` sits ahead of `~/.local/bin` on PATH, so a stale shim keeps shadowing the pipx entry point and the machine goes on running the conflicted copy |
 
-Dependency trees of the removed distributions stay behind as orphans in the pyenv
-environment. That is deliberate: uninstalling a closure risks taking packages
-other tools still import, and an unreferenced library is harmless.
+**Remove only the distribution that owns the console scripts** (`azure-cli`,
+`oci-cli`) — those are what `pyenv rehash` turns into shims. Everything else the old
+route pulled in stays behind as an orphan, because uninstalling a closure risks
+taking packages other tools still import. `oci` is the clearest case: it is the
+Oracle SDK, importable by user code, owns no console script, and removing it would
+buy nothing.
+
+A `return 1` from any of this is invisible on its own — the installer has no
+`set -e`, so execution falls through and the last command decides the exit status.
+The verified installers are therefore called through `verify`, which collects
+failures and exits non-zero at the end: collecting keeps one failure from skipping
+the dozen installers after it, and the non-zero exit is what makes the failure
+self-healing, since chezmoi records a `run_once_` script's state only on success and
+retries the whole installer on the next apply.
 
 Android still uses `pip install` for both CLIs. Its installer carries build
 workarounds that live in the shared environment — a pre-built `crc32c` wheel, a

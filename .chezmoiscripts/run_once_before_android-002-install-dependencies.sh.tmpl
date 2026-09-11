@@ -347,9 +347,19 @@ install_codex_cli() {
     # not run and returns to the caller, so the only reliable evidence is a binary
     # under the versions directory. Report it rather than let the installer finish
     # claiming success with no Codex CLI on the device.
+    #
+    # The test is `-x`, matching the wrapper's own `list_installed_versions`. A
+    # regular-file test would accept a partial or non-executable download that the
+    # wrapper refuses to run, which is the same false success in a new disguise.
     local versions_dir="$HOME/.local/share/codex/versions"
-    local installed
-    installed="$(find "$versions_dir" -mindepth 2 -maxdepth 2 -name codex -type f 2>/dev/null | head -1)"
+    local candidate
+    local installed=""
+    for candidate in "$versions_dir"/*/codex; do
+        if [ -x "$candidate" ]; then
+            installed="$candidate"
+            break
+        fi
+    done
     if [ -z "$installed" ]; then
         echo "[codex] ERROR: no Codex CLI build under $versions_dir after the bootstrap" >&2
         echo "[codex] ERROR: run 'codex --version' once the device is online to retry the download" >&2
@@ -612,7 +622,17 @@ install_copilot_cli
 
 # Removes a broken global npm install and bootstraps ~/.local/bin/codex from
 # 001f. The release is static, so unlike Claude Code it needs no patchelf.
-install_codex_cli
+#
+# Wrapped in `verify` because this script has no `set -e`: a bare call would let
+# `install_codex_cli`'s failure fall through to the next installer and the final
+# command would decide the exit status. See the definition for why the failure is
+# collected rather than raised on the spot.
+verified_failures=()
+verify() {
+    "$@" || verified_failures+=("$1")
+}
+
+verify install_codex_cli
 # Sentry CLI from npm, shared with Linux/WSL (lib-install-deps.sh). Termux's native
 # Node runs the plain JavaScript bundle without any wrapper; the official install
 # script's Bun-compiled glibc binary cannot start on bionic at all.
@@ -654,4 +674,14 @@ configure_neovim() {
 }
 
 configure_neovim
+
+# Collected rather than raised on the spot, so one broken installer does not skip
+# everything after it in a script that takes 45-120 minutes. The non-zero exit is
+# what makes the failure self-healing: chezmoi records a `run_once_` script's state
+# only on success, so the next `chezmoi apply` retries the whole installer.
+if [[ "${#verified_failures[@]}" -gt 0 ]]; then
+    echo "[install-deps] ERROR: these installers failed: ${verified_failures[*]}" >&2
+    echo "[install-deps] ERROR: the next 'chezmoi apply' will re-run this script" >&2
+    exit 1
+fi
 # =========================================================================================================
