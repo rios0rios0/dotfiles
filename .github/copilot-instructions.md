@@ -15,6 +15,15 @@ make sast    # gitleaks + semgrep secret/code scanning
 
 Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-remove-dependencies`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
 
+## Codex CLI Shortcut
+
+`dot_zshrc.tmpl` defines `codexx` for Linux/WSL and Android. It runs
+`command codex --dangerously-bypass-approvals-and-sandbox "$@"`, bypassing command
+approvals and sandboxing while preserving argument boundaries. Keep it a function
+with a preceding `unalias` so re-sourcing handles an existing alias. Keep PATH
+resolution so Android still launches its managed `~/.local/bin/codex` wrapper.
+Reasoning effort remains controlled by Codex configuration.
+
 ## Working Effectively
 
 ### Bootstrap and Apply Dotfiles Configuration

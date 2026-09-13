@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added the `codexx` shell function on Linux/WSL and Android to launch Codex without command approvals or sandboxing, preserving arguments and the Termux wrapper'
+time: '2026-09-13T19:36:19.601467941Z'

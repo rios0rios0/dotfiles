@@ -478,6 +478,15 @@ These ship to every platform, not only Android: both blocks sit outside the chez
 - `dot_zshenv.tmpl` relaxes `nomatch` for non-interactive shells (`[[ -o interactive ]] || setopt NO_NOMATCH`), so a glob that matches nothing is passed through to the command instead of aborting the whole line. Interactive shells keep the prompt-time error.
 - `dot_zshrc.tmpl` replaces the `common-aliases` `rm`/`cp`/`mv -i` aliases with functions, defined right after oh-my-zsh loads, that keep `-i` only when stdin is a terminal. Against a closed stdin `-i` reads EOF and skips the operation with exit 0 — a `cp` that never happened, reported as success.
 
+## Codex CLI Shortcut
+
+`dot_zshrc.tmpl` defines `codexx` for Linux/WSL and Android. It runs
+`command codex --dangerously-bypass-approvals-and-sandbox "$@"`, bypassing command
+approvals and sandboxing while preserving argument boundaries. Keep it a function
+with a preceding `unalias` so re-sourcing handles an existing alias. Keep PATH
+resolution so Android still launches its managed `~/.local/bin/codex` wrapper.
+Reasoning effort remains controlled by Codex configuration.
+
 ## Claude Account Rotation (ccswitch)
 
 Claude Code subscription tokens live in `~/.claude/.credentials.json` (not chezmoi-managed on Linux/WSL). [`ccswitch`](https://github.com/rios0rios0/ccswitch) is a Go CLI installed by `install_ccswitch()` in the Linux/WSL dependency script that monitors Claude Code usage (via the `GET /api/oauth/usage` OAuth endpoint) and rotates between enrolled backup accounts when the active account's limits are exhausted.

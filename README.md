@@ -139,6 +139,24 @@ This repository uses a layered approach to secrets management:
 
 Encrypted files end in `.age` and are automatically decrypted during `chezmoi apply`.
 
+## Codex CLI Shortcut
+
+On Linux/WSL and Android, `codexx` starts Codex with command approvals and sandboxing
+disabled, matching the permission behavior of `claudex`. Commands run with your user
+account's access. Arguments are forwarded unchanged, for example `codexx resume --last`.
+Reasoning effort follows your Codex configuration.
+
+After updating the dotfiles, apply and reload the shell configuration:
+
+```sh
+chezmoi apply ~/.zshrc
+source ~/.zshrc
+codexx
+```
+
+The function uses `codex` from PATH, preserving the Android wrapper's environment
+and update handling. Plain `codex` continues to use its configured permissions.
+
 ## Claude Code Configuration
 
 This repository manages four Claude Code configuration files. Each targets a different file on disk because Claude Code separates instructions, permissions, and MCP servers into distinct subsystems that cannot be consolidated into a single file.
