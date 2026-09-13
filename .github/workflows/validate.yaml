@@ -97,8 +97,8 @@ jobs:
           sha256sum --check --ignore-missing checksums.txt
           tar -xzf "$archive" chezmoi
           sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install jq
-        run: sudo apt-get install -y jq
+      - name: Install jq and zsh
+        run: sudo apt-get install -y jq zsh
       - name: Test template rendering with mock op
         run: make test-template-render
 
