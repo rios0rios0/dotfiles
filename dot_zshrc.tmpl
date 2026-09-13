@@ -442,6 +442,14 @@ source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
 ###### Workspace Aliases ###########################################################
 source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
 
+###### Codex CLI ###################################################################
+# Match claudex's permission bypass; keep PATH resolution for the Termux wrapper.
+# Remove any old alias so re-sourcing can safely define the function.
+unalias codexx 2>/dev/null
+codexx() {
+    command codex --dangerously-bypass-approvals-and-sandbox "$@"
+}
+
 ###### Claude Code #################################################################
 # Shared pre-launch guard for every Claude Code entrypoint below: a no-network call
 # that puts the current (healthy) account's credentials on disk, so account
