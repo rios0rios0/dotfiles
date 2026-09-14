@@ -22,6 +22,13 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.24.0] - 2026-09-14
+
+### Added
+
+- added Linux and Android rendering and behavior regression checks for `codexx`, mirrored its Copilot usage contract, and formatted its changelog identifier
+- added the `codexx` shell function on Linux/WSL and Android to launch Codex without command approvals or sandboxing, preserving arguments and the Termux wrapper
+
 ## [0.23.0] - 2026-09-11
 
 ### Added
