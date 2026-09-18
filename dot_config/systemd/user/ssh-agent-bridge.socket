@@ -1,0 +1,26 @@
+# Exposes the Windows OpenSSH agent (1Password) as a Unix-domain socket.
+#
+# Anything that speaks the SSH agent protocol over AF_UNIX rather than by executing `ssh`
+# -- go-git, Go's x/crypto/ssh, libgit2 -- cannot reach the Windows agent on its own: its
+# keys sit behind the named pipe \\.\pipe\openssh-ssh-agent, and a named pipe is not a
+# socket. The `ssh` -> `ssh.exe` wrapper in ~/.local/bin and `core.sshCommand` in
+# ~/.gitconfig do not help them, because neither runs a binary at all.
+#
+# Accept=yes is what removes the need for socat: systemd owns the listener, forks per
+# connection, and hands each one to the relay on stdio -- exactly socat's UNIX-LISTEN,fork
+# EXEC pairing, minus the dependency. The private keys never leave 1Password, so its
+# approval prompt still guards every signature.
+#
+# See CLAUDE.md, "SSH Agent Bridge (WSL)".
+
+[Unit]
+Description=SSH agent bridge to the Windows OpenSSH agent (1Password)
+Documentation=https://github.com/jstarks/npiperelay
+
+[Socket]
+ListenStream=%h/.ssh/agent.sock
+SocketMode=0600
+Accept=yes
+
+[Install]
+WantedBy=sockets.target

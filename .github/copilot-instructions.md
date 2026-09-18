@@ -203,6 +203,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `modify_dot_claude.json.tmpl` → `~/.claude.json`: MCP servers for Claude Code (Linux/Windows, Docker-based)
 - `dot_config/mcphub/servers.json.tmpl` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android, npx-based)
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
+- `dot_config/systemd/user/ssh-agent-bridge.socket` + `ssh-agent-bridge@.service` → `~/.config/systemd/user/`: WSL-only SSH agent bridge (see below)
 - `dot_scripts/` → `~/.scripts/`: User utility scripts
 
 ### Scripts and Automation
@@ -215,6 +216,33 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note, records `_OP_WS_NAMES`, and removes ones a later successful load no longer returns
   - `linux-toolbox-watch-compress-folders.sh`: Background script watching and compressing `~/.histdb`, `~/.john`, etc.
   - `android-patch-claude-code-tmpdir.sh`: Patches Claude Code for Termux compatibility (replaces hardcoded `/tmp` paths, symlinks system ripgrep)
+
+### SSH Agent Bridge (WSL Only)
+
+On WSL the SSH keys live in 1Password on the Windows side. Everything that reaches them today
+does so by **executing a Windows binary**: the `ssh` → `ssh.exe` wrapper in `~/.local/bin`, and
+`gpg.ssh.program = op-ssh-sign-wsl` for commit signing.
+
+That leaves out any program doing SSH *itself* rather than shelling out to `ssh` — go-git
+(AutoBump), Go's `x/crypto/ssh`, libgit2. They dial an `AF_UNIX` socket and speak the agent
+protocol, never execute a binary (so `core.sshCommand` is not consulted), and cannot dial the
+Windows named pipe the agent listens on. Symptom: signing and `git push` work, one tool reports
+no usable SSH credential.
+
+`ssh-agent-bridge.socket` listens on `~/.ssh/agent.sock` and hands each connection to
+`ssh-agent-bridge@.service`, which runs npiperelay against `\\.\pipe\openssh-ssh-agent`.
+`Accept=yes` gives listen + fork-per-connection + stdio handover natively, which is why no
+`socat` and no shell-spawned daemon are needed.
+
+**When editing:** (1) the `.chezmoiignore` gate is on `.chezmoi.kernel`, not `.chezmoi.os` —
+`linux` alone does not separate WSL from bare metal, and `test-chezmoiignore.sh` substitutes a
+literal kernel so both branches are assertable on any host; (2) `SSH_AUTH_SOCK` is exported from
+`dot_zshenv.tmpl`, because the consumers are non-interactive shells that never read `.zshrc`, and
+only the pointer belongs there — systemd binds the socket at login, so spawning a relay from the
+profile would start one per shell; (3) the installer is `run_onchange_after_`, since machines
+that predate it already ran every `run_once_` script; (4) the npiperelay download is checksum-pinned
+and refuses to install on a mismatch. Verify with `/usr/bin/ssh-add -l` — the bare `ssh-add` is the
+`.exe` wrapper and proves nothing about the bridge. Requires `systemd=true` in `/etc/wsl.conf`.
 
 ### Platform Matrix
 
@@ -480,7 +508,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

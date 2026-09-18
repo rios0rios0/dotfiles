@@ -116,7 +116,7 @@ chezmoi init --apply rios0rios0
 .chezmoiremove           # Target paths deleted from $HOME on every apply (see Dependency Lifecycle)
 .chezmoitemplates/       # Shared template fragments (shared install functions, font installer, dependency removal, MCP server logic, username)
 dot_claude/              # Claude Code config (settings, permissions, trust) -> ~/.claude/
-dot_config/              # XDG config (mcphub MCP servers for Android) -> ~/.config/
+dot_config/              # XDG config (mcphub MCP servers for Android; systemd user units for the WSL SSH agent bridge) -> ~/.config/
 dot_docker/              # Docker daemon config -> ~/.docker/
 dot_scripts/             # Utility scripts (version manager, credential loader, git sync, etc.)
 dot_ssh/                 # SSH config, keys, signing (1Password-backed) -> ~/.ssh/
@@ -138,6 +138,37 @@ This repository uses a layered approach to secrets management:
 - **Per-device SSH/GPG signing** matches keys by hostname against 1Password device notes ("Device: \<hostname\>")
 
 Encrypted files end in `.age` and are automatically decrypted during `chezmoi apply`.
+
+## SSH Agent Bridge (WSL)
+
+On WSL the SSH keys live in 1Password on the Windows side, and both mechanisms that reach them
+work by running a Windows binary: the `ssh` -> `ssh.exe` wrapper in `~/.local/bin`, and
+`gpg.ssh.program = op-ssh-sign-wsl`, which signs commits.
+
+Neither helps a program that speaks SSH itself instead of shelling out to `ssh`. go-git
+([AutoBump](https://github.com/rios0rios0/autobump)), Go's `x/crypto/ssh`, and libgit2
+authenticate by dialing an `AF_UNIX` socket, never execute a binary, and cannot dial the
+Windows named pipe the agent listens on. Signing succeeds, `git push` succeeds, and those
+tools alone report that no SSH key can be found.
+
+A systemd user socket bridges the gap: `~/.ssh/agent.sock` is relayed to
+`\\.\pipe\openssh-ssh-agent` by [npiperelay](https://github.com/jstarks/npiperelay), one
+short-lived relay per connection. Socket activation supplies the listener and the per-connection
+fork, so no `socat` and no background daemon are involved, and the keys stay in 1Password with
+its approval prompt intact.
+
+It is installed automatically on WSL by `chezmoi apply`, and ships nowhere else -- the gate is
+the kernel release, since `linux` alone does not distinguish WSL from bare metal. Verify with the
+**Linux** `ssh-add` (the bare name is the `ssh-add.exe` wrapper, which proves nothing about the
+bridge):
+
+```bash
+/usr/bin/ssh-add -l
+systemctl --user status ssh-agent-bridge.socket
+```
+
+Requires systemd in WSL (`systemd=true` under `[boot]` in `/etc/wsl.conf`). Without it the
+installer warns and skips.
 
 ## Codex CLI Shortcut
 

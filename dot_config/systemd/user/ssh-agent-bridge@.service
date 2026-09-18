@@ -1,0 +1,19 @@
+# One short-lived relay per connection accepted by ssh-agent-bridge.socket.
+#
+# npiperelay.exe is a Windows binary run through WSL interop; it copies bytes between its
+# stdio and the named pipe. systemd connects that stdio to the accepted socket, so the
+# process is a pure pipe with no state of its own and nothing to restart.
+#
+# -ei terminates the relay on EOF from stdin, so a client that has finished does not leave
+# it resident: without it one process would survive per agent query.
+
+[Unit]
+Description=SSH agent bridge connection %i
+Documentation=https://github.com/jstarks/npiperelay
+
+[Service]
+Type=simple
+ExecStart=%h/.local/bin/npiperelay.exe -ei -s //./pipe/openssh-ssh-agent
+StandardInput=socket
+StandardOutput=socket
+StandardError=journal

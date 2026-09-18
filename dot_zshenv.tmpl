@@ -22,6 +22,24 @@ export __ZSHENV_SOURCED_PID="$$"
 if [[ -n "$PREFIX" && -d "$PREFIX/tmp" ]]; then
     export TMPDIR="${TMPDIR:-$PREFIX/tmp}"
 fi
+{{- if and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) }}
+
+###### SSH Agent Bridge (WSL) ############################################################################################
+# Point every shell at the bridged Windows agent. `ssh-agent-bridge.socket` (a systemd user
+# unit, installed by .chezmoiscripts/run_onchange_after_linux-008-setup-ssh-agent-bridge.sh)
+# relays this socket to \\.\pipe\openssh-ssh-agent, so the keys held by 1Password on the
+# Windows side are reachable by tools that dial an AF_UNIX socket instead of running `ssh`.
+#
+# Only the pointer belongs here, never a daemon: systemd binds the socket at login through
+# sockets.target, and socket activation means the listener exists whether or not anything
+# has connected yet. Spawning a relay from the shell would start one per shell.
+#
+# It lives in ~/.zshenv rather than ~/.zshrc because the tools that need it are the ones a
+# non-interactive shell launches -- IDE terminals, MCP servers, Claude Code's Bash tool --
+# and those read this file only. The path matches the Android agent's on purpose: both
+# platforms answer `SSH_AUTH_SOCK` at ~/.ssh/agent.sock, with a different provider behind it.
+export SSH_AUTH_SOCK="$HOME/.ssh/agent.sock"
+{{- end }}
 
 {{- if eq .chezmoi.os "android" }}
 

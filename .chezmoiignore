@@ -30,6 +30,14 @@ AppData
 .ssh
 {{- end }}
 
+{{- /* WSL-exclusive files. The SSH agent bridge relays a Windows named pipe, so it is
+     meaningless on bare-metal Linux -- there is no Windows agent to reach, and the unit would
+     point at an npiperelay.exe that is never installed. Gated on the kernel rather than the OS
+     because "linux" alone does not distinguish WSL from bare metal. */ -}}
+{{- if not (and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString))) }}
+.config/systemd
+{{- end }}
+
 {{- /* Linux‑exclusive files – only for Linux. When not running Linux, ignore them. */ -}}
 {{- if ne .chezmoi.os "linux" }}
 .chezmoiscripts/linux-*.sh
