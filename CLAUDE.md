@@ -533,6 +533,63 @@ rec -c 1 -r 16000 /tmp/mic-test.wav trim 0 3 && play /tmp/mic-test.wav
 
 If SoX picks the wrong driver, force it with `AUDIODRIVER=pulse`.
 
+## SSH Agent Bridge (WSL)
+
+Every SSH key on this setup lives in 1Password on the Windows side. Two mechanisms carry that
+across the WSL boundary, and **both work by executing a Windows binary**: the `ssh` →
+`ssh.exe` wrapper in `dot_local/bin/executable_ssh`, and `gpg.ssh.program = op-ssh-sign-wsl`
+in `dot_gitconfig.tmpl`, which signs every commit.
+
+Neither reaches a program that does SSH *itself* rather than shelling out to `ssh`. go-git
+([AutoBump](https://github.com/rios0rios0/autobump)), Go's `x/crypto/ssh`, and libgit2
+authenticate by dialing an `AF_UNIX` socket and speaking the agent protocol; they never
+execute a binary, so `core.sshCommand` is never consulted and the wrapper is never invoked.
+Go cannot dial a Windows named pipe, so for those tools the keys simply do not exist. That is
+the whole shape of the bug it produces: signing works, `git push` works, and one tool reports
+no usable SSH credential — which reads as that tool losing a key that demonstrably exists.
+
+`dot_config/systemd/user/ssh-agent-bridge.socket` closes the gap. It listens on
+`~/.ssh/agent.sock` and, per connection, hands the accepted socket to
+`ssh-agent-bridge@.service`, which runs [npiperelay](https://github.com/jstarks/npiperelay)
+to copy bytes to and from `\\.\pipe\openssh-ssh-agent`.
+
+**`Accept=yes` is what removes the `socat` dependency.** The usual recipe for this bridge is
+`socat UNIX-LISTEN:...,fork EXEC:'npiperelay.exe ...'`; systemd socket activation does the
+same three things natively — listen, fork per connection, hand it over on stdio — so the
+package is unnecessary, and so is a relay daemon spawned from a shell profile. Private keys
+never leave 1Password, so its approval prompt still guards every signature.
+
+Three placement decisions carry the design:
+
+- **`.chezmoiignore` gates on the kernel, not the OS.** `"linux"` alone does not separate WSL
+  from bare metal, where there is no Windows agent and the unit would point at an
+  `npiperelay.exe` that is never installed. `test-chezmoiignore.sh` substitutes a literal
+  kernel so both branches are assertable on any host — otherwise whichever kernel the test
+  host happens to run would silently decide the result.
+- **`SSH_AUTH_SOCK` is exported from `dot_zshenv.tmpl`, not `dot_zshrc.tmpl`.** The tools that
+  need it are the ones a *non-interactive* shell launches (IDE terminals, MCP servers, Claude
+  Code's Bash tool), and those read `.zshenv` only. Only the pointer belongs there: systemd
+  binds the socket at login through `sockets.target`, and socket activation means the listener
+  exists before anything connects. Spawning a relay from the profile would start one per shell.
+  The path deliberately matches the Android agent's — both platforms answer `SSH_AUTH_SOCK` at
+  `~/.ssh/agent.sock`, with a different provider behind it.
+- **The installer is `run_onchange_after_`, not `run_once_before_`.** Existing machines already
+  ran every `run_once_` script, so an installer added there would never reach them.
+
+The relay download is pinned by version and verified against the SHA-256 upstream publishes;
+a mismatch refuses to install rather than leaving a binary that fails once per connection.
+
+Verify with the **Linux** `ssh-add` — the bare name resolves to the `ssh-add.exe` wrapper,
+which would query the Windows agent directly and prove nothing about the bridge:
+
+```bash
+/usr/bin/ssh-add -l                              # should list the 1Password keys
+systemctl --user status ssh-agent-bridge.socket  # should be active (listening)
+```
+
+The bridge needs systemd in WSL (`systemd=true` under `[boot]` in `/etc/wsl.conf`). Without
+it the installer warns and exits 0, leaving `SSH_AUTH_SOCK` pointing at nothing.
+
 ## Encryption Setup
 
 - Private key: `~/.ssh/chezmoi`
