@@ -29,9 +29,17 @@ prefix="ssh-agent-bridge"
 
 # Pinned with the checksum upstream publishes; npiperelay ships no arm64 build, and a wrong
 # binary here would fail per connection rather than at install time.
+#
+# Two checksums, because they answer different questions. `checksum` is over the archive and
+# is the supply-chain check: it is the value upstream publishes, so it is what proves the
+# download is the release. `binary_checksum` is over the extracted `.exe` and is the identity
+# check: it is what lets a re-run tell "the pinned version is already here" from "some other
+# npiperelay is already here", which existence alone cannot. They are different digests over
+# different bytes and neither substitutes for the other.
 version="0.1.0"
 archive="npiperelay_windows_amd64.zip"
 checksum="6b9ef61ffd17c03507a9a3d54d815dceb3dae669ac67fc3bf4225d1e764ce5f6"
+binary_checksum="ff41951c3f519138bb0e61038d7155c6c38194d4d8a3304f46c67c4572ee8bec"
 url="https://github.com/jstarks/npiperelay/releases/download/v${version}/${archive}"
 
 relay="$HOME/.local/bin/npiperelay.exe"
@@ -51,8 +59,14 @@ fi
 install_relay() {
     local workdir status
 
-    if [[ -x "$relay" ]]; then
-        echo "[$prefix] npiperelay is already installed, skipping download" >&2
+    # Gate on the pinned digest, not on the file existing. Existence alone would make the
+    # version and checksum pins inert after the first install: bumping them changes this
+    # file, so chezmoi re-runs the script on every machine, and every one of them would keep
+    # its old binary and exit 0 with nothing recording the drift. Comparing the digest makes
+    # a version bump reinstall, and re-verifies a binary that was corrupted or replaced
+    # after installation.
+    if [[ -x "$relay" ]] && echo "$binary_checksum  $relay" | sha256sum --check --status; then
+        echo "[$prefix] npiperelay $version is already installed, skipping download" >&2
         return 0
     fi
 
@@ -84,6 +98,17 @@ install_relay() {
         return 1
     fi
 
+    # The archive digest already proved these bytes; this checks that `binary_checksum` --
+    # the value the skip-gate compares against -- still describes them. A stale one would
+    # otherwise be invisible: the gate would never match, and every apply would silently
+    # re-download and reinstall the same binary forever.
+    if ! echo "$binary_checksum  $workdir/npiperelay.exe" | sha256sum --check --status; then
+        echo "[$prefix] ERROR: binary_checksum does not match npiperelay.exe in $archive" >&2
+        echo "[$prefix] ERROR: update binary_checksum to $(sha256sum "$workdir/npiperelay.exe" | cut -d' ' -f1)" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+
     mkdir -p "$(dirname "$relay")"
     install -m 0755 "$workdir/npiperelay.exe" "$relay" || status=1
     rm -rf "$workdir"
@@ -104,9 +129,14 @@ fi
 
 systemctl --user daemon-reload
 
-# `enable --now` both wires the socket into sockets.target for later logins and binds it for
-# this one. Restart rather than start, so a unit already bound to an older ExecStart picks up
-# the new one instead of reporting success and continuing to run the previous relay.
+# `enable` wires the socket into sockets.target for later logins; the `restart` below binds it
+# for this one. Restart rather than start, so a socket already bound to an older
+# ListenStream/SocketMode rebinds with the current unit instead of reporting success and
+# continuing to listen with the previous settings.
+#
+# Neither call is what picks up a changed relay command: `ExecStart` lives in
+# ssh-agent-bridge@.service, not in the socket, and what carries an edit to it is the
+# `daemon-reload` above plus the fact that Accept=yes spawns a fresh instance per connection.
 if ! systemctl --user enable "$socket_unit" >/dev/null 2>&1; then
     echo "[$prefix] WARN: could not enable $socket_unit" >&2
     exit 0
