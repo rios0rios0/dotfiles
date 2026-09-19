@@ -57,7 +57,9 @@
 #     until a model actually asks for Code Mode, so this survived several
 #     auto-updates unnoticed. install_version now fetches both assets into one
 #     staging directory, and ensure_code_mode_host backfills a version that an
-#     older wrapper revision installed without it.
+#     older wrapper revision installed without it -- on its own 24h stamp, since
+#     releases that predate the asset can never succeed and would otherwise
+#     re-download on every launch.
 #
 # Update model (same as the claude wrapper):
 #   - check at most once per 24h (timestamp at $XDG_CACHE_HOME/codex-wrapper/)
@@ -65,7 +67,8 @@
 #   - new versions land at ~/.local/share/codex/versions/<X.Y.Z>/codex, next to
 #     the matching codex-code-mode-host, and are used on the next launch -- the
 #     running session keeps its current build
-#   - the most recent KEEP_VERSIONS=3 builds are retained; older are pruned
+#   - the most recent KEEP_VERSIONS=3 builds are retained; older are pruned,
+#     along with staging directories a killed download left behind
 #   - with nothing installed, the first launch downloads the latest release in
 #     the foreground; that is how the Android dependency installer bootstraps it
 #
@@ -206,15 +209,60 @@ install_code_mode_host() {
 # Backfill the Code Mode host for an installed version that lacks it -- a version
 # downloaded by a wrapper revision from before the host was fetched at all, or
 # one whose host download failed. Cheap when nothing is missing: one file test.
+#
+# Rate-limited on a per-version stamp, and deliberately stamped BEFORE the
+# attempt rather than after a success like run_update_check, because the two want
+# opposite things. A missed release is worth retrying on the next launch; a
+# version whose host asset does not exist at all can never succeed -- older
+# releases publish no codex-code-mode-host asset (rust-v0.140.0, for one) and
+# CODEX_WRAPPER_FORCE_VERSION can select one -- so stamping only on success would
+# fork a doomed download on every single launch, forever. Per version rather than
+# shared, so an upgrade still repairs itself on its first launch: a fresh version
+# carries no stamp.
+#
+# A failure is logged rather than silent. The whole point of this function is a
+# gap that surfaces only when a model asks for Code Mode, and an empty $LOGFILE
+# beside a still-broken Code Mode would reproduce that one layer up.
 ensure_code_mode_host() {
-    local version="$1" dir="$VERSIONS_DIR/$1"
+    local version="$1" dir="$VERSIONS_DIR/$1" stamp last now
 
     [ -x "$dir/$HOST_BIN" ] && return 0
     [ -x "$dir/codex" ] || return 0
 
+    stamp="${STAMP_FILE%/*}/last-host-check-$version"
+    if [ -f "$stamp" ]; then
+        last=$(stat -c '%Y' "$stamp" 2>/dev/null || echo 0)
+        now=$(date +%s)
+        [ $((now - last)) -lt "$CHECK_INTERVAL_SECONDS" ] && return 0
+    fi
+    mkdir -p "${stamp%/*}" 2>/dev/null && touch "$stamp"
+
     if install_code_mode_host "$version" "$dir"; then
         echo "[codex-wrapper] installed the Code Mode host for $version (used on next launch)" >&2
+    else
+        echo "[codex-wrapper] WARN: could not fetch the Code Mode host for $version; Code Mode stays unavailable, retrying in 24h" >&2
     fi
+}
+
+# Remove staging directories left by an install that died before its own cleanup
+# could run. Every failure path in install_version and install_code_mode_host
+# removes its mktemp directory, but a SIGKILL has no such path -- and on Android
+# the phantom-process killer reaps background children exactly like the ones
+# these downloads run in, leaving tens of megabytes behind (a 51 MB .install-*
+# directory was found by hand on a device). Only this wrapper's own mktemp
+# patterns are considered, and only past the check interval, so a download still
+# running in a concurrent launch -- capped at --max-time 600 -- is never removed.
+prune_stale_staging() {
+    local entry now last
+    now=$(date +%s)
+    for entry in "$VERSIONS_DIR"/.install-* "$VERSIONS_DIR"/.host-*; do
+        [ -d "$entry" ] || continue
+        last=$(stat -c '%Y' "$entry" 2>/dev/null || echo "$now")
+        if [ $((now - last)) -gt "$CHECK_INTERVAL_SECONDS" ]; then
+            rm -rf "$entry"
+            echo "[codex-wrapper] removed the stale staging directory $entry" >&2
+        fi
+    done
 }
 
 # Download release X.Y.Z to $VERSIONS_DIR/X.Y.Z/codex. The archive is unpacked
@@ -341,8 +389,10 @@ CODEX_BIN="$VERSIONS_DIR/$CODEX_VERSION/codex"
 # launch selected, so a version left hostless by an older wrapper revision is
 # repaired rather than waiting for the next release. It lands after this
 # process has exec'd, so like an update it takes effect on the next launch.
+# Both network steps carry their own 24h stamp, so this fork stays bounded even
+# when neither can ever succeed.
 if [ "${BOOTSTRAPPED:-0}" != "1" ]; then
-    ( ensure_code_mode_host "$CODEX_VERSION"; run_update_check ) >> "$LOGFILE" 2>&1 &
+    ( prune_stale_staging; ensure_code_mode_host "$CODEX_VERSION"; run_update_check ) >> "$LOGFILE" 2>&1 &
     disown 2>/dev/null || true
 fi
 
