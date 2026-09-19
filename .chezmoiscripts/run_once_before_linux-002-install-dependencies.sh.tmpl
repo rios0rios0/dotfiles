@@ -10,6 +10,7 @@ requirements=(
     "curl"
     "zip"           # required for SDKMan
     "unzip"         # required for SDKMan
+    "xz-utils"      # required to extract the Flutter SDK archive (.tar.xz)
     "age"           # required for Chezmoi (decrypt files with SSH)
     "gpg"           # required for import and export GPGs
     "gpg-agent"     # required for import and export GPGs
@@ -230,6 +231,151 @@ install_pyenv() {
 
     # Rehash to make pyenv/pip available
     eval "$(pyenv init -)"
+}
+
+# https://docs.flutter.dev/install/manual
+#
+# The SDK is the official Linux x64 tarball, resolved from Flutter's own releases manifest
+# the way `install_gvm` resolves Go from go.dev: `current_release.stable` names a hash, and
+# the matching entry carries the archive path and its SHA-256, so the download is pinned to
+# what Google published rather than to a version this file would have to be bumped for.
+#
+# It lands in ~/.local/share/flutter -- beside `zinit`, `codex` and the hand-installed
+# `dart-sdk` it replaces -- and is reached through two symlinks in ~/.local/bin rather than a
+# PATH entry. A PATH entry would have to win against ~/.local/bin in BOTH `.zshenv` and
+# `.zshrc`, which prepend it independently, and a `dart` there that is not the Flutter one
+# is exactly what `flutter doctor` warns about: two Dart SDKs whose versions drift. The
+# SDK's own `bin/flutter` and `bin/dart` resolve symlinks before locating the SDK, so the
+# links are the supported shape. An existing ~/.local/bin/dart pointing anywhere else is
+# repointed, with a line saying so.
+#
+# `bin/cache` is populated on the first run and by `precache`; `--web` is the one platform
+# this machine builds for, and the Android toolchain, Chrome and the Linux desktop toolchain
+# `flutter doctor` goes on listing are deliberately not installed here.
+install_flutter() {
+    local flutter_root="$HOME/.local/share/flutter"
+    local manifest_url="https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json"
+    local manifest version archive sha256 base_url
+
+    # Flutter publishes a Linux SDK for x64 only -- the manifest's every entry is `dart_sdk_arch:
+    # x64` -- so on any other host the archive would download, verify, extract and plant its
+    # links before `precache` died with an exec-format error, and `verify` would then re-run this
+    # whole 45-120 minute script on every apply over a platform upstream does not ship. Skipped
+    # with a warning rather than failed, the way the Android installer skips GVM: an arm64 host
+    # (WSL2 on an ARM Windows device is the realistic one) is not a broken machine.
+    if [[ "$(uname -m)" != "x86_64" ]]; then
+        echo "[configure-deps] WARN: Flutter publishes no Linux $(uname -m) SDK; skipping" >&2
+        return 0
+    fi
+
+    manifest="$(curl -fsSL "$manifest_url")" || {
+        echo "[configure-deps] ERROR: failed to download the Flutter releases manifest from $manifest_url" >&2
+        return 1
+    }
+    IFS=$'\t' read -r version archive sha256 base_url < <(jq -r '
+        .base_url as $base
+        | .current_release.stable as $hash
+        | .releases[]
+        | select(.hash == $hash and .channel == "stable")
+        | [.version, .archive, .sha256, $base]
+        | @tsv' <<<"$manifest")
+    if [[ -z "$version" || -z "$archive" || -z "$sha256" || -z "$base_url" ]]; then
+        echo "[configure-deps] ERROR: the Flutter releases manifest names no stable release" >&2
+        return 1
+    fi
+    echo "[configure-deps] latest stable Flutter resolved: $version" >&2
+
+    # Read from `bin/cache/flutter.version.json`, not from the top-level `version` file: 3.47
+    # ships with `omit-legacy-version-file` on, so that file does not exist, and an empty read
+    # here sent every apply back through the 1.4 GB download (measured: 3m33s per re-run). The
+    # JSON is written by the tool on its first run, which this function performs below, so it is
+    # absent only on an SDK that was extracted and never started -- reinstalling that is right.
+    local installed=""
+    if [[ -x "$flutter_root/bin/flutter" ]]; then
+        installed="$(jq -r '.frameworkVersion // empty' "$flutter_root/bin/cache/flutter.version.json" 2>/dev/null)"
+    fi
+
+    if [[ "$installed" == "$version" ]]; then
+        echo "[configure-deps] Flutter $version is already installed, skipping" >&2
+    elif [[ -n "$installed" ]] && "$flutter_root/bin/flutter" upgrade --force; then
+        # The tarball is a git checkout on the stable branch, so an installed SDK moves to
+        # the next stable in place -- a fetch of what changed, not another 1.4 GB.
+        #
+        # The version cache is dropped and rebuilt afterwards rather than trusted: the tool
+        # rewrites `flutter.version.json` only when the git revision it caches against changed,
+        # so a marker that was stale for any other reason survives an `upgrade` that found
+        # nothing to do, and this branch would run again on every apply while logging an
+        # upgrade "from X to X" (measured, with the marker edited by hand).
+        rm -f "$flutter_root/bin/cache/flutter.version.json"
+        "$flutter_root/bin/flutter" --version >/dev/null 2>&1
+        echo "[configure-deps] Flutter upgraded from $installed to $(jq -r '.frameworkVersion // empty' "$flutter_root/bin/cache/flutter.version.json" 2>/dev/null)" >&2
+    else
+        [[ -n "$installed" ]] && echo "[configure-deps] WARN: 'flutter upgrade' failed; replacing the SDK from the archive" >&2
+
+        # Cached under $TMPDIR so a run cut off between the download and the extraction --
+        # this is a 45-120 minute script -- resumes from the file instead of the network.
+        # A cached file that does not match the manifest's digest is a different release
+        # (or a truncated download) and is fetched again.
+        local cached
+        cached="${TMPDIR:-/tmp}/$(basename "$archive")"
+        if [[ ! -f "$cached" ]] || ! sha256sum "$cached" | grep -q "^$sha256 "; then
+            echo "[configure-deps] downloading Flutter $version ($archive)..." >&2
+            if ! curl -fL --retry 3 -o "$cached" "$base_url/$archive"; then
+                echo "[configure-deps] ERROR: failed to download $base_url/$archive" >&2
+                rm -f "$cached"
+                return 1
+            fi
+        fi
+        if ! sha256sum "$cached" | grep -q "^$sha256 "; then
+            echo "[configure-deps] ERROR: $cached does not match the SHA-256 the manifest publishes; refusing to install it" >&2
+            rm -f "$cached"
+            return 1
+        fi
+
+        # Extracted beside the destination and renamed into place, so an interrupted
+        # extraction never leaves a half-written tree where `bin/flutter` already exists.
+        local staging="$flutter_root.tmp.$$"
+        rm -rf "$staging"
+        mkdir -p "$staging"
+        if ! tar -xf "$cached" -C "$staging"; then
+            echo "[configure-deps] ERROR: failed to extract $cached" >&2
+            rm -rf "$staging"
+            return 1
+        fi
+        rm -rf "$flutter_root"
+        if ! mv "$staging/flutter" "$flutter_root"; then
+            echo "[configure-deps] ERROR: could not move the extracted SDK into place at $flutter_root" >&2
+            rm -rf "$staging"
+            return 1
+        fi
+        rm -rf "$staging" "$cached"
+        echo "[configure-deps] Flutter $version installed under $flutter_root" >&2
+    fi
+
+    # ~/.local/bin is on PATH in every shell this repository configures; the SDK's own
+    # launchers resolve these links before locating the SDK.
+    mkdir -p "$HOME/.local/bin"
+    local tool link
+    for tool in flutter dart; do
+        link="$HOME/.local/bin/$tool"
+        if [[ -e "$link" || -L "$link" ]] \
+            && [[ "$(readlink -f "$link" 2>/dev/null)" != "$(readlink -f "$flutter_root/bin/$tool")" ]]; then
+            echo "[configure-deps] $link pointed at $(readlink -f "$link" 2>/dev/null || echo '<dangling>'); repointing it at the Flutter SDK's $tool" >&2
+        fi
+        ln -sfn "$flutter_root/bin/$tool" "$link"
+    done
+
+    # Unattended, so the analytics consent prompt is answered here rather than on the first
+    # interactive run; the web artifacts are fetched now for the same reason.
+    "$flutter_root/bin/flutter" --disable-analytics >/dev/null 2>&1 \
+        || echo "[configure-deps] WARN: could not disable Flutter analytics" >&2
+    "$flutter_root/bin/dart" --disable-analytics >/dev/null 2>&1 \
+        || echo "[configure-deps] WARN: could not disable Dart analytics" >&2
+    if ! "$flutter_root/bin/flutter" precache --web; then
+        echo "[configure-deps] ERROR: 'flutter precache --web' failed; the SDK is installed but cannot build for the web yet" >&2
+        return 1
+    fi
+    "$flutter_root/bin/flutter" --version
 }
 
 # https://github.com/anthropics/claude-code
@@ -763,6 +909,12 @@ verified_failures=()
 verify() {
     "$@" || verified_failures+=("$1")
 }
+
+# Flutter is resolved and downloaded here rather than by a version manager, so it is verified
+# like the other downloaders: a manifest that could not be read, an archive whose digest does
+# not match, or a `precache` that did not finish must fail the run, not leave a half-installed
+# SDK that `flutter --version` happens to answer for.
+verify install_flutter
 
 install_claude_cli
 install_ccswitch

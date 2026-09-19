@@ -191,7 +191,7 @@ Phase 3 is what authenticates every template here.
 
 ### What the dependency installer provides
 
-apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, `zip`, `unzip`,
+apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, `zip`, `unzip`, `xz-utils`,
 `age`, `gpg`, `gpg-agent`, `zsh`, `eza`, `sqlite3`, `bsdmainutils`, `binutils`, `bison`, `gcc`,
 `clang`, `make`, `htop`, `screenfetch`, `jq`, `yq`, `bat`, `ripgrep`, `silversearcher-ag`,
 `inotify-tools`, `dos2unix`, `expect`, `aria2`, `file`, `parallel`, `cloc`, `rename`, `whois`,
@@ -206,6 +206,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | Java and Gradle, via SDKMAN                      | `install_sdkman`                     | `[automated]` | Latest candidates, refreshed on every run.                                                                                      |
 | Node.js LTS, via NVM `v0.40.2`, plus corepack    | `install_nvm`                        | `[automated]` |                                                                                                                                 |
 | Python `3.13.2`, via pyenv                       | `install_pyenv`                      | `[automated]` | Also installs the apt build dependencies pyenv needs.                                                                           |
+| Flutter (current stable, with its Dart)          | `install_flutter`                    | `[automated]` | The official Linux x64 tarball, resolved from Flutter's releases manifest and verified against the SHA-256 it publishes, under `~/.local/share/flutter`; `flutter` and `dart` are linked into `~/.local/bin`, so a Dart SDK that was there by hand is repointed (logged). An installed SDK moves to the next stable with `flutter upgrade`. Web artifacts are precached; the Android toolchain, Chrome and the Linux desktop toolchain that `flutter doctor` lists are deliberately not installed. |
 | Claude Code                                      | `install_claude_cli`                 | `[automated]` | npm package.                                                                                                                    |
 | ccswitch                                         | `install_ccswitch`                   | `[partial]`   | Installed here; every account still has to be enrolled once with `ccswitch enroll` after `claude` and `/login`.                 |
 | GitHub Copilot CLI                               | `install_copilot_cli`                | `[automated]` | Upstream installer into `~/.local/bin`.                                                                                          |
@@ -306,7 +307,7 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 `patchelf`, `htop`, `screenfetch`, `jq`, `yq`, `bat`, `ripgrep`, `silversearcher-ag`,
 `inotify-tools`, `dos2unix`, `expect`, `which`, `mlocate`, `openssh`, `netcat-openbsd`, `parallel`,
 `rsync`, `rclone`, `dnsutils`, `tmux`, `shellcheck`, `postgresql`, `ruff`, `golang`, `rust`,
-`nodejs`, `python`, `python-pip`.
+`nodejs`, `python`, `python-pip`, `dart`.
 
 | Tool                                                              | Function                                                                          | Marker        | Notes                                                                                                                                                                                              |
 |-------------------------------------------------------------------|-----------------------------------------------------------------------------------|---------------|----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
@@ -317,6 +318,7 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 | Java and Gradle, via SDKMAN                                       | `install_sdkman`                                                                  | `[automated]` |                                                                                                                                                                                                    |
 | Node.js                                                           | `install_nvm`                                                                     | `[automated]` | Keeps the native `nodejs` package and enables corepack; NVM is not used.                                                                                                                           |
 | Python                                                            | `install_pyenv`                                                                   | `[automated]` | Keeps the native `python`; pyenv is not used.                                                                                                                                                      |
+| Flutter `3.47.5` (community build)                                | `install_flutter`                                                                 | `[partial]`   | Flutter publishes no Linux arm64 host SDK, so this is [GeneralKaos666/flutter-for-termux](https://github.com/GeneralKaos666/flutter-for-termux) — mumumusuc's bionic cross-build as a Termux `.deb` — pinned to a version and an **integrity-only** SHA-256 computed from the inspected file (the project's README hash did not match its asset; the package's framework revision, engine revision and Dart version equal Google's 3.47.5 tarball, which is the corroboration on record), `apt`-installed under `$PREFIX/opt/flutter` with `x11-repo` for its gtk3 dependency, and fronted by two bash wrappers in `~/.local/bin`. **Not yet run on a device**: `flutter --version` is the hard check, `precache --web` is reported and not fatal. Termux's own `dart` package (above) is the baseline for `dart format` either way. |
 | GitHub Copilot CLI                                                | `install_copilot_cli`                                                             | `[partial]`   | npm, best effort: skipped with a warning when Termux's Node.js is older than 22.                                                                                                                   |
 | Claude Code                                                       | none                                                                              | `[manual]`    | The musl build is bootstrapped by hand following `examples/claude-code.md` in [rios0rios0/termux-etc-redirect](https://github.com/rios0rios0/termux-etc-redirect); the `claude` wrapper from step 2 handles every later update. |
 | Codex CLI                                                         | `install_codex_cli`                                                               | `[automated]` | The `codex` wrapper from step 2 downloads the latest static musl release on its first launch and keeps it updated in the background; a global npm install is removed first, because npm cannot install the `linux-arm64` platform package on Termux. |
@@ -391,6 +393,7 @@ Candidates for future issues, in rough order of payoff:
 8. **Post-install steps that need a token**: `aisync` first pull, `ccswitch enroll`, the Claude Code bootstrap on Android. The `cred:` fields on the device note could feed them.
 9. **`imagemagick`, `pdftk` on WSL, PDM**: decide where they belong and add them to the installers or drop them from the checklist.
 10. **Zone.Identifier cleanup** after a backup restore could live in a `dot_scripts` helper.
+11. **Flutter on Termux is unverified.** `install_flutter` in the Android installer was written from `dpkg-deb` inspection of the community package, not from a run on a device. Run one `chezmoi apply` on the phone and record whether `flutter --version`, `flutter precache --web` and `flutter test` work; if the package cannot be made to start, demote the row to `[manual]` and keep only the native `dart`.
 
 ## Appendix: the original checklist, item by item
 

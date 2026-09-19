@@ -81,6 +81,10 @@ languages=(
     "nodejs"        # issue described on line 261
     "python"        # issue described on line 261
     "python-pip"    # issue described on line 261
+    "dart"          # Termux's own Dart SDK, built from source for aarch64: what `dart format` and
+                    # the i18n generator of a Flutter project run on, whether or not the Flutter
+                    # SDK below installs. Flutter's bundled `dart` takes precedence through
+                    # ~/.local/bin once it is verified working (see `install_flutter`).
 )
 apt install --no-install-recommends --yes "${languages[@]}"
 # =========================================================================================================
@@ -435,6 +439,129 @@ install_golangci_lint() {
     fi
 }
 
+# Flutter for Termux -- a COMMUNITY build, and the one place this installer trusts a binary that
+# Google does not publish.
+#
+# Flutter ships no Linux arm64 host SDK: the official releases manifest lists x64 only, and the
+# host artifacts the tool fetches for itself (`gen_snapshot`, `flutter_tester`, the Dart VM) have
+# no android-arm64 build, so the official tarball's tool starts and dies at its first artifact
+# download. What exists instead is mumumusuc's build tooling -- an engine and Dart VM
+# cross-compiled against bionic -- packaged as a Termux `.deb` by
+# https://github.com/GeneralKaos666/flutter-for-termux, which tracks the stable channel (3.47.5
+# was published the day upstream cut it). It is pinned to a version and a SHA-256 checked here,
+# the way `install_golangci_lint` pins its release.
+#
+# **The pin is integrity-only, and that is a recorded, accepted risk.** The project publishes no
+# signature, and its README's hash did not match the asset on the day this was written (README
+# 6994580359002c..., asset 556c39cbb19be0...), so the value below is the digest of the file that
+# was downloaded and inspected here: it guarantees a future apply gets these same bytes, not that
+# these bytes are what the maintainer built. What corroborates them, read from inside the package
+# rather than from any page: the SDK tree is a git checkout at 6a19cca5 (`refs/tags/3.47.5`),
+# `bin/internal/engine.version` is af7e796e16, and the bundled Dart is 3.13.4 -- the framework
+# revision, engine revision and Dart version of Google's own 3.47.5 tarball, exactly. The README
+# hash was committed at 01:09Z and the asset was built by the project's GitHub-hosted CI at
+# 02:47Z the same night, which is the shape of a stale hash from a local build rather than of a
+# swapped artifact. No upstream issue asking which digest is authoritative has been filed; if
+# one is and the README is corrected, this paragraph shrinks to a line.
+#
+# What the package is, read with `dpkg-deb -I`/`-c` rather than from its README: `Package:
+# flutter`, `Architecture: aarch64`, `Pre-Depends: x11-repo`, `Depends: git which gtk3 xorgproto
+# ninja cmake clang pkg-config`, no maintainer scripts, 21,475 files under `$PREFIX/opt/flutter`.
+# The Dart VM is a bionic executable (`/system/bin/linker64`), so DNS and TLS go through
+# Android's own resolver and no termux-etc wrapper is needed. `bin/cache` ships the
+# `linux-arm64` engine -- `flutter_tester` and `gen_snapshot` included -- and the Dart SDK, and
+# NOT the web SDK, which `precache --web` fetches from Google keyed on the engine hash.
+#
+# NOT verified on a device by the change that added it: there was no Termux to run it on. The
+# hard check is that the SDK answers `flutter --version`; `precache --web` is reported and not
+# fatal, because an artifact the custom engine cannot fetch would otherwise fail every apply
+# forever. Termux's own `dart` package (in `languages`) is the guaranteed baseline underneath.
+install_flutter() {
+    local version="3.47.5"
+    local sha256="556c39cbb19be084222bd5cee907ee093334f211307f6c09af74d9219c637851"
+    local deb_name="flutter_${version}_aarch64.deb"
+    local deb_url="https://github.com/GeneralKaos666/flutter-for-termux/releases/download/${version}/${deb_name}"
+    local flutter_root="$PREFIX/opt/flutter"
+
+    # Same source of truth as the Linux installer: `bin/cache/flutter.version.json`, written by
+    # the tool on its first run; the top-level `version` file no longer ships.
+    local installed=""
+    if [[ -x "$flutter_root/bin/flutter" ]]; then
+        installed="$(jq -r '.frameworkVersion // empty' "$flutter_root/bin/cache/flutter.version.json" 2>/dev/null)"
+    fi
+
+    if [[ "$installed" == "$version" ]]; then
+        echo "[install-deps] Flutter $version is already installed, skipping" >&2
+    else
+        # `Pre-Depends: x11-repo`: gtk3 and xorgproto live in that repository, and apt refuses the
+        # package until it is enabled.
+        if ! apt install --no-install-recommends --yes x11-repo || ! apt update; then
+            echo "[install-deps] ERROR: could not enable x11-repo, which the Flutter package pre-depends on" >&2
+            return 1
+        fi
+
+        # Cached under $TMPDIR (Termux's, set in .zshenv) so a run cut off between the download
+        # and the install resumes from the file; a cached file that does not match the pin is
+        # refetched.
+        local cached
+        cached="${TMPDIR:-/tmp}/$deb_name"
+        if [[ ! -f "$cached" ]] || ! sha256sum "$cached" | grep -q "^$sha256 "; then
+            echo "[install-deps] downloading Flutter $version for Termux ($deb_name, ~615 MB)..." >&2
+            if ! curl -fL --retry 3 -o "$cached" "$deb_url"; then
+                echo "[install-deps] ERROR: failed to download $deb_url" >&2
+                rm -f "$cached"
+                return 1
+            fi
+        fi
+        if ! sha256sum "$cached" | grep -q "^$sha256 "; then
+            echo "[install-deps] ERROR: $cached does not match the pinned SHA-256; refusing to install it" >&2
+            rm -f "$cached"
+            return 1
+        fi
+        # `apt`, not `dpkg -i`: the dependencies are resolved from the repositories, and a path
+        # argument (anything containing a `/`) is what tells apt this is a file, not a name.
+        if ! apt install --yes "$cached"; then
+            echo "[install-deps] ERROR: apt could not install $cached" >&2
+            return 1
+        fi
+        rm -f "$cached"
+        echo "[install-deps] Flutter $version installed under $flutter_root" >&2
+    fi
+
+    # The SDK's launchers are `#!/usr/bin/env bash` scripts, a path Android does not have. From
+    # a Termux shell termux-exec rewrites it; a wrapper that names Termux's bash explicitly works
+    # from anywhere -- an IDE, a tool call, an SSH login that never had the preload -- and
+    # `~/.local/bin` is on PATH in every shell this repository configures. Written only after the
+    # SDK answered, so a package that does not start never shadows Termux's own `dart`.
+    if ! bash "$flutter_root/bin/flutter" --version >/dev/null 2>&1; then
+        echo "[install-deps] ERROR: $flutter_root/bin/flutter is installed but does not start; leaving ~/.local/bin alone" >&2
+        return 1
+    fi
+    mkdir -p "$HOME/.local/bin"
+    local tool
+    for tool in flutter dart; do
+        cat > "$HOME/.local/bin/$tool" <<WRAPPER_EOF
+#!/data/data/com.termux/files/usr/bin/bash
+# Flutter SDK launcher (community Termux build under \$PREFIX/opt/flutter), written by
+# run_once_before_android-002-install-dependencies. The SDK's own launcher is a
+# #!/usr/bin/env script, which needs termux-exec to start; naming bash here does not.
+exec "/data/data/com.termux/files/usr/bin/bash" "/data/data/com.termux/files/usr/opt/flutter/bin/${tool}" "\$@"
+WRAPPER_EOF
+        chmod +x "$HOME/.local/bin/$tool"
+    done
+
+    # Unattended, so the analytics consent prompt is answered here rather than on the first
+    # interactive run. The web artifacts are the one target this build is for.
+    "$HOME/.local/bin/flutter" --disable-analytics >/dev/null 2>&1 \
+        || echo "[install-deps] WARN: could not disable Flutter analytics" >&2
+    "$HOME/.local/bin/dart" --disable-analytics >/dev/null 2>&1 \
+        || echo "[install-deps] WARN: could not disable Dart analytics" >&2
+    if ! "$HOME/.local/bin/flutter" precache --web; then
+        echo "[install-deps] WARN: 'flutter precache --web' failed; the SDK starts, but cannot build for the web until 'flutter precache --web' succeeds by hand" >&2
+    fi
+    "$HOME/.local/bin/flutter" --version
+}
+
 # https://developer.atlassian.com/cloud/acli/guides/install-linux/
 # Atlassian only publishes a rolling `latest` endpoint (no versioned URLs, no checksums/signatures),
 # so pinning or cryptographic verification is not possible upstream; the install tracks the latest
@@ -645,6 +772,9 @@ install_pyenv
 install_1password_cli
 install_github_cli
 install_golangci_lint
+# Verified: a 615 MB download that does not match its pin, or a package that does not start,
+# must fail the run rather than leave a half-installed SDK behind.
+verify install_flutter
 install_aws_cli
 install_azure_cli
 install_fly_cli
