@@ -33,6 +33,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 ### Version Managers
 
 - **GVM** (Go), **NVM** (Node.js), **Pyenv** (Python), **SDKMAN** (Java, Gradle, Maven, Kotlin), **Cargo** (Rust)
+- **Flutter** (the stable SDK, with the Dart it bundles): on Linux/WSL the official tarball, resolved from Flutter's releases manifest and checked against the SHA-256 it publishes, under `~/.local/share/flutter` with `flutter` and `dart` linked into `~/.local/bin`; on Android, Termux's own `dart` package plus a pinned community `.deb` (Flutter ships no Linux arm64 host SDK) — see the [fresh-machine runbook](.docs/fresh-machine-setup.md) for exactly what that trusts
 - Automatic version switching via `dot_scripts/linux-engineering-version-manager.sh` (detects `go.mod`, `.nvmrc`, `pyproject.toml`)
 
 ### Cloud and Infrastructure

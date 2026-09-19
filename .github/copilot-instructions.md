@@ -97,6 +97,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **SDKMAN** — Java/Gradle ecosystem (installs latest Java and Gradle)
   - **NVM** (v0.40.2) — Node.js version manager (installs LTS + corepack)
   - **Pyenv** — Python version manager (installs Python 3.13.2)
+  - **Flutter** — the current stable SDK from the official tarball (resolved from Flutter's releases manifest, SHA-256 verified) under `~/.local/share/flutter`, with `flutter` and `dart` linked into `~/.local/bin`; `flutter upgrade` moves an installed SDK forward
   - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
   - **GitHub Copilot CLI** (binary `copilot`, via upstream install script into `~/.local/bin`)
   - **Codex CLI** (`@openai/codex` npm package; its platform package bundles the bubblewrap the sandbox needs, so nothing else is installed for it)
@@ -125,7 +126,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Runs `termux-setup-storage` and `termux-change-repo` first (both interactive) so storage is available and a reachable package mirror is selected before any `apt` call
 - Installs Termux packages: git, curl, age, eza, sqlite, vim, neovim, zsh, proot, proot-distro, etc.
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
-- Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv
+- Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv, Termux's `dart` package, Flutter (a pinned community `.deb` under `$PREFIX/opt/flutter`, fronted by bash wrappers in `~/.local/bin` — unverified on a device)
 - Oh My Zsh, SDKMAN, NVM, the Fly.io CLI and the Sentry CLI come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh (only when its install succeeded), and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
 - Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), Codex CLI (static musl release, bootstrapped through the `codex` wrapper from `001f`; a global npm install is removed first because npm skips the `linux-arm64` platform package on Termux), Sentry CLI (`sentry` npm package through the shared `install_sentry_cli`; the plain JavaScript bundle needs no wrapper under Termux's native Node), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)

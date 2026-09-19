@@ -210,6 +210,21 @@ Keep platform-specific provisioning in the platform installers: apt repositories
 
 Oh My Zsh is installed with `--unattended` on both platforms, so the login shell is switched explicitly right after it, and only when the install succeeded: `usermod` on Linux, Termux's `chsh -s zsh` on Android. Every remote installer in the library (Oh My Zsh, SDKMAN, NVM) goes through `run_remote_installer`, which forwards extra arguments to the script; do not reintroduce `sh -c "$(curl ...)"`, because a failed download becomes an empty command that exits 0. On Termux `install_nvm` keeps the native `nodejs` package and only enables corepack; the check is on Termux's prefix, not on where `npm` resolves from, because WSL exposes Windows' `npm` through PATH interop.
 
+## Flutter SDK (Symlinks, Not PATH)
+
+Both dependency installers carry an `install_flutter`, and the two bodies are different on purpose — they stay out of `lib-install-deps.sh` for the reason that file states.
+
+| Platform | Source | Where | Reached through |
+|----------|--------|-------|-----------------|
+| Linux/WSL | The official Linux x64 tarball. `releases_linux.json`'s `current_release.stable` names the release, which carries the archive path and its SHA-256, so the download is pinned to what Google published rather than to a version this repository would have to bump — the same shape as `install_gvm` resolving Go from go.dev. | `~/.local/share/flutter` | `~/.local/bin/flutter` and `~/.local/bin/dart`, symlinks into the SDK |
+| Android/Termux | Flutter publishes no Linux arm64 host SDK. `GeneralKaos666/flutter-for-termux` packages mumumusuc's bionic cross-build as a Termux `.deb`; it is pinned to a version and a SHA-256 **computed from the inspected file**, because the project's README hash did not match its asset on the day it was added. `Pre-Depends: x11-repo` is why the installer enables that repository first. | `$PREFIX/opt/flutter` | Two bash wrappers in `~/.local/bin` that name Termux's bash, because the SDK's own launchers are `#!/usr/bin/env` scripts and that path needs termux-exec to start |
+
+**Why links in `~/.local/bin` and not a PATH entry in `dot_zshenv.tmpl`.** `~/.local/bin` is prepended by `.zshenv` *and* again by `.zshrc`, independently, so a PATH entry for the SDK would have to win against it twice — and a `dart` in `~/.local/bin` that is not the Flutter one is exactly what `flutter doctor` warns about: two Dart SDKs whose versions drift. The SDK's launchers resolve symlinks before locating the SDK (`follow_links` in `bin/flutter`), so the links are the supported shape, and an existing `~/.local/bin/dart` pointing anywhere else is repointed with a line saying so.
+
+**The version marker is `bin/cache/flutter.version.json`, never the top-level `version` file.** 3.47 ships with `omit-legacy-version-file`, so that file does not exist, and an empty read sent every apply back through the 1.4 GB download (measured: 3m33s per re-run). The marker is dropped and rebuilt after `flutter upgrade`, because the tool rewrites it only when the git revision changed — a marker stale for any other reason would otherwise trigger the upgrade branch on every apply.
+
+**Android is unverified on a device.** The function was written from `dpkg-deb -I`/`-c` of the package (no maintainer scripts; 21,475 files; a bionic Dart VM, so no termux-etc wrapper; the `linux-arm64` engine including `flutter_tester`, and no web SDK, which `precache --web` fetches). `flutter --version` is the hard check; `precache --web` is reported and not fatal, because an artifact the custom engine cannot fetch would fail every apply forever. Termux's own `dart` package sits in `languages` as the baseline for `dart format` whether or not the SDK starts. Flutter's bundled `dart` shadows it through `~/.local/bin` only after the SDK answered.
+
 ## One Interpreter Per Python CLI (pipx, Not pip)
 
 On Linux/WSL, every Python **application** this repository installs goes through
