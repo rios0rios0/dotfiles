@@ -257,8 +257,19 @@ install_flutter() {
     local manifest_url="https://storage.googleapis.com/flutter_infra_release/releases/releases_linux.json"
     local manifest version archive sha256 base_url
 
+    # Flutter publishes a Linux SDK for x64 only -- the manifest's every entry is `dart_sdk_arch:
+    # x64` -- so on any other host the archive would download, verify, extract and plant its
+    # links before `precache` died with an exec-format error, and `verify` would then re-run this
+    # whole 45-120 minute script on every apply over a platform upstream does not ship. Skipped
+    # with a warning rather than failed, the way the Android installer skips GVM: an arm64 host
+    # (WSL2 on an ARM Windows device is the realistic one) is not a broken machine.
+    if [[ "$(uname -m)" != "x86_64" ]]; then
+        echo "[configure-deps] WARN: Flutter publishes no Linux $(uname -m) SDK; skipping" >&2
+        return 0
+    fi
+
     manifest="$(curl -fsSL "$manifest_url")" || {
-        echo "[install-deps] ERROR: failed to download the Flutter releases manifest from $manifest_url" >&2
+        echo "[configure-deps] ERROR: failed to download the Flutter releases manifest from $manifest_url" >&2
         return 1
     }
     IFS=$'\t' read -r version archive sha256 base_url < <(jq -r '
@@ -269,10 +280,10 @@ install_flutter() {
         | [.version, .archive, .sha256, $base]
         | @tsv' <<<"$manifest")
     if [[ -z "$version" || -z "$archive" || -z "$sha256" || -z "$base_url" ]]; then
-        echo "[install-deps] ERROR: the Flutter releases manifest names no stable release" >&2
+        echo "[configure-deps] ERROR: the Flutter releases manifest names no stable release" >&2
         return 1
     fi
-    echo "[install-deps] latest stable Flutter resolved: $version" >&2
+    echo "[configure-deps] latest stable Flutter resolved: $version" >&2
 
     # Read from `bin/cache/flutter.version.json`, not from the top-level `version` file: 3.47
     # ships with `omit-legacy-version-file` on, so that file does not exist, and an empty read
@@ -285,7 +296,7 @@ install_flutter() {
     fi
 
     if [[ "$installed" == "$version" ]]; then
-        echo "[install-deps] Flutter $version is already installed, skipping" >&2
+        echo "[configure-deps] Flutter $version is already installed, skipping" >&2
     elif [[ -n "$installed" ]] && "$flutter_root/bin/flutter" upgrade --force; then
         # The tarball is a git checkout on the stable branch, so an installed SDK moves to
         # the next stable in place -- a fetch of what changed, not another 1.4 GB.
@@ -297,9 +308,9 @@ install_flutter() {
         # upgrade "from X to X" (measured, with the marker edited by hand).
         rm -f "$flutter_root/bin/cache/flutter.version.json"
         "$flutter_root/bin/flutter" --version >/dev/null 2>&1
-        echo "[install-deps] Flutter upgraded from $installed to $(jq -r '.frameworkVersion // empty' "$flutter_root/bin/cache/flutter.version.json" 2>/dev/null)" >&2
+        echo "[configure-deps] Flutter upgraded from $installed to $(jq -r '.frameworkVersion // empty' "$flutter_root/bin/cache/flutter.version.json" 2>/dev/null)" >&2
     else
-        [[ -n "$installed" ]] && echo "[install-deps] WARN: 'flutter upgrade' failed; replacing the SDK from the archive" >&2
+        [[ -n "$installed" ]] && echo "[configure-deps] WARN: 'flutter upgrade' failed; replacing the SDK from the archive" >&2
 
         # Cached under $TMPDIR so a run cut off between the download and the extraction --
         # this is a 45-120 minute script -- resumes from the file instead of the network.
@@ -308,15 +319,15 @@ install_flutter() {
         local cached
         cached="${TMPDIR:-/tmp}/$(basename "$archive")"
         if [[ ! -f "$cached" ]] || ! sha256sum "$cached" | grep -q "^$sha256 "; then
-            echo "[install-deps] downloading Flutter $version ($archive)..." >&2
+            echo "[configure-deps] downloading Flutter $version ($archive)..." >&2
             if ! curl -fL --retry 3 -o "$cached" "$base_url/$archive"; then
-                echo "[install-deps] ERROR: failed to download $base_url/$archive" >&2
+                echo "[configure-deps] ERROR: failed to download $base_url/$archive" >&2
                 rm -f "$cached"
                 return 1
             fi
         fi
         if ! sha256sum "$cached" | grep -q "^$sha256 "; then
-            echo "[install-deps] ERROR: $cached does not match the SHA-256 the manifest publishes; refusing to install it" >&2
+            echo "[configure-deps] ERROR: $cached does not match the SHA-256 the manifest publishes; refusing to install it" >&2
             rm -f "$cached"
             return 1
         fi
@@ -327,14 +338,18 @@ install_flutter() {
         rm -rf "$staging"
         mkdir -p "$staging"
         if ! tar -xf "$cached" -C "$staging"; then
-            echo "[install-deps] ERROR: failed to extract $cached" >&2
+            echo "[configure-deps] ERROR: failed to extract $cached" >&2
             rm -rf "$staging"
             return 1
         fi
         rm -rf "$flutter_root"
-        mv "$staging/flutter" "$flutter_root"
+        if ! mv "$staging/flutter" "$flutter_root"; then
+            echo "[configure-deps] ERROR: could not move the extracted SDK into place at $flutter_root" >&2
+            rm -rf "$staging"
+            return 1
+        fi
         rm -rf "$staging" "$cached"
-        echo "[install-deps] Flutter $version installed under $flutter_root" >&2
+        echo "[configure-deps] Flutter $version installed under $flutter_root" >&2
     fi
 
     # ~/.local/bin is on PATH in every shell this repository configures; the SDK's own
@@ -345,7 +360,7 @@ install_flutter() {
         link="$HOME/.local/bin/$tool"
         if [[ -e "$link" || -L "$link" ]] \
             && [[ "$(readlink -f "$link" 2>/dev/null)" != "$(readlink -f "$flutter_root/bin/$tool")" ]]; then
-            echo "[install-deps] $link pointed at $(readlink -f "$link" 2>/dev/null || echo '<dangling>'); repointing it at the Flutter SDK's $tool" >&2
+            echo "[configure-deps] $link pointed at $(readlink -f "$link" 2>/dev/null || echo '<dangling>'); repointing it at the Flutter SDK's $tool" >&2
         fi
         ln -sfn "$flutter_root/bin/$tool" "$link"
     done
@@ -353,11 +368,11 @@ install_flutter() {
     # Unattended, so the analytics consent prompt is answered here rather than on the first
     # interactive run; the web artifacts are fetched now for the same reason.
     "$flutter_root/bin/flutter" --disable-analytics >/dev/null 2>&1 \
-        || echo "[install-deps] WARN: could not disable Flutter analytics" >&2
+        || echo "[configure-deps] WARN: could not disable Flutter analytics" >&2
     "$flutter_root/bin/dart" --disable-analytics >/dev/null 2>&1 \
-        || echo "[install-deps] WARN: could not disable Dart analytics" >&2
+        || echo "[configure-deps] WARN: could not disable Dart analytics" >&2
     if ! "$flutter_root/bin/flutter" precache --web; then
-        echo "[install-deps] ERROR: 'flutter precache --web' failed; the SDK is installed but cannot build for the web yet" >&2
+        echo "[configure-deps] ERROR: 'flutter precache --web' failed; the SDK is installed but cannot build for the web yet" >&2
         return 1
     fi
     "$flutter_root/bin/flutter" --version
