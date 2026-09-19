@@ -48,13 +48,27 @@
 #   - Updates: `codex update` refuses a manual install ("Could not detect the
 #     Codex installation method"), so the wrapper handles them. Being static, the
 #     binary needs no musl loader and no patchelf step, unlike Claude Code.
+#   - Code Mode: codex resolves its Code Mode sidecar as a sibling of its own
+#     executable, but ships it as a separate release asset
+#     (codex-code-mode-host-<target>.tar.gz). Downloading only the codex asset
+#     therefore leaves every version directory one file short, and codex reports
+#     "failed to spawn code-mode host <dir>/codex-code-mode-host: host
+#     executable was not found. Code mode will fail closed". Nothing surfaces
+#     until a model actually asks for Code Mode, so this survived several
+#     auto-updates unnoticed. install_version now fetches both assets into one
+#     staging directory, and ensure_code_mode_host backfills a version that an
+#     older wrapper revision installed without it -- on its own 24h stamp, since
+#     releases that predate the asset can never succeed and would otherwise
+#     re-download on every launch.
 #
 # Update model (same as the claude wrapper):
 #   - check at most once per 24h (timestamp at $XDG_CACHE_HOME/codex-wrapper/)
 #   - the check runs in the background; codex startup never blocks on it
-#   - new versions land at ~/.local/share/codex/versions/<X.Y.Z>/codex and are
-#     used on the next launch -- the running session keeps its current build
-#   - the most recent KEEP_VERSIONS=3 builds are retained; older are pruned
+#   - new versions land at ~/.local/share/codex/versions/<X.Y.Z>/codex, next to
+#     the matching codex-code-mode-host, and are used on the next launch -- the
+#     running session keeps its current build
+#   - the most recent KEEP_VERSIONS=3 builds are retained; older are pruned,
+#     along with staging directories a killed download left behind
 #   - with nothing installed, the first launch downloads the latest release in
 #     the foreground; that is how the Android dependency installer bootstraps it
 #
@@ -112,6 +126,11 @@ export SSL_CERT_FILE
 VERSIONS_DIR="$HOME/.local/share/codex/versions"
 RELEASES_URL="https://github.com/openai/codex/releases"
 ASSET="codex-aarch64-unknown-linux-musl"
+# Code Mode's sidecar. Codex ships it as its own release asset and looks for it
+# next to the codex binary, so a version directory holding only `codex` has Code
+# Mode fail closed. See install_code_mode_host below.
+HOST_ASSET="codex-code-mode-host-aarch64-unknown-linux-musl"
+HOST_BIN="codex-code-mode-host"
 STAMP_FILE="${XDG_CACHE_HOME:-$HOME/.cache}/codex-wrapper/last-update-check"
 LOGFILE="${XDG_CACHE_HOME:-$HOME/.cache}/codex-wrapper/update.log"
 CHECK_INTERVAL_SECONDS=$((24 * 3600))
@@ -152,6 +171,100 @@ resolve_latest_version() {
     printf '%s\n' "$location"
 }
 
+# Download release X.Y.Z's Code Mode host into <dir>/codex-code-mode-host.
+#
+# Codex resolves the host as a sibling of its own executable -- with the binary
+# missing it reports "failed to spawn code-mode host <dir>/codex-code-mode-host:
+# host executable was not found" and Code Mode fails closed. The host is a
+# separate release asset, so downloading only codex-<target>.tar.gz leaves every
+# version directory one file short; nothing surfaces until a model actually asks
+# for Code Mode, which is why this went unnoticed through several auto-updates.
+#
+# Deliberately non-fatal everywhere it is called: Code Mode is an optional
+# feature, and a codex that runs without it beats no codex at all. A version left
+# without the host is backfilled by ensure_code_mode_host on a later launch.
+# Statically linked like codex itself, so no loader or patchelf step.
+install_code_mode_host() {
+    local version="$1" dir="$2" tmp
+
+    tmp=$(mktemp -d "$VERSIONS_DIR/.host-XXXXXX") || return 1
+    if ! download_https_only --max-time 600 -o "$tmp/$HOST_ASSET.tar.gz" \
+            "$RELEASES_URL/download/rust-v$version/$HOST_ASSET.tar.gz" \
+        || ! tar -xzf "$tmp/$HOST_ASSET.tar.gz" -C "$tmp" "$HOST_ASSET" \
+        || ! mv "$tmp/$HOST_ASSET" "$tmp/$HOST_BIN" \
+        || ! chmod +x "$tmp/$HOST_BIN"; then
+        rm -rf "$tmp"
+        return 1
+    fi
+
+    # Land it with a rename so a concurrent launch never sees a partial file;
+    # the host takes no --version, so there is no run check to make here.
+    if ! mv "$tmp/$HOST_BIN" "$dir/$HOST_BIN"; then
+        rm -rf "$tmp"
+        return 1
+    fi
+    rm -rf "$tmp"
+}
+
+# Backfill the Code Mode host for an installed version that lacks it -- a version
+# downloaded by a wrapper revision from before the host was fetched at all, or
+# one whose host download failed. Cheap when nothing is missing: one file test.
+#
+# Rate-limited on a per-version stamp, and deliberately stamped BEFORE the
+# attempt rather than after a success like run_update_check, because the two want
+# opposite things. A missed release is worth retrying on the next launch; a
+# version whose host asset does not exist at all can never succeed -- older
+# releases publish no codex-code-mode-host asset (rust-v0.140.0, for one) and
+# CODEX_WRAPPER_FORCE_VERSION can select one -- so stamping only on success would
+# fork a doomed download on every single launch, forever. Per version rather than
+# shared, so an upgrade still repairs itself on its first launch: a fresh version
+# carries no stamp.
+#
+# A failure is logged rather than silent. The whole point of this function is a
+# gap that surfaces only when a model asks for Code Mode, and an empty $LOGFILE
+# beside a still-broken Code Mode would reproduce that one layer up.
+ensure_code_mode_host() {
+    local version="$1" dir="$VERSIONS_DIR/$1" stamp last now
+
+    [ -x "$dir/$HOST_BIN" ] && return 0
+    [ -x "$dir/codex" ] || return 0
+
+    stamp="${STAMP_FILE%/*}/last-host-check-$version"
+    if [ -f "$stamp" ]; then
+        last=$(stat -c '%Y' "$stamp" 2>/dev/null || echo 0)
+        now=$(date +%s)
+        [ $((now - last)) -lt "$CHECK_INTERVAL_SECONDS" ] && return 0
+    fi
+    mkdir -p "${stamp%/*}" 2>/dev/null && touch "$stamp"
+
+    if install_code_mode_host "$version" "$dir"; then
+        echo "[codex-wrapper] installed the Code Mode host for $version (used on next launch)" >&2
+    else
+        echo "[codex-wrapper] WARN: could not fetch the Code Mode host for $version; Code Mode stays unavailable, retrying in 24h" >&2
+    fi
+}
+
+# Remove staging directories left by an install that died before its own cleanup
+# could run. Every failure path in install_version and install_code_mode_host
+# removes its mktemp directory, but a SIGKILL has no such path -- and on Android
+# the phantom-process killer reaps background children exactly like the ones
+# these downloads run in, leaving tens of megabytes behind (a 51 MB .install-*
+# directory was found by hand on a device). Only this wrapper's own mktemp
+# patterns are considered, and only past the check interval, so a download still
+# running in a concurrent launch -- capped at --max-time 600 -- is never removed.
+prune_stale_staging() {
+    local entry now last
+    now=$(date +%s)
+    for entry in "$VERSIONS_DIR"/.install-* "$VERSIONS_DIR"/.host-*; do
+        [ -d "$entry" ] || continue
+        last=$(stat -c '%Y' "$entry" 2>/dev/null || echo "$now")
+        if [ $((now - last)) -gt "$CHECK_INTERVAL_SECONDS" ]; then
+            rm -rf "$entry"
+            echo "[codex-wrapper] removed the stale staging directory $entry" >&2
+        fi
+    done
+}
+
 # Download release X.Y.Z to $VERSIONS_DIR/X.Y.Z/codex. The archive is unpacked
 # in a temporary directory on the same filesystem and moved into place only
 # after the binary has proven it runs, so list_installed_versions never sees a
@@ -174,6 +287,12 @@ install_version() {
         return 1
     fi
     rm -f "$tmp/$ASSET.tar.gz"
+
+    # Fetch the Code Mode host into the same staging directory so both binaries
+    # become visible in one rename. Failure is not fatal (see the function):
+    # ensure_code_mode_host retries it on a later launch.
+    install_code_mode_host "$version" "$tmp" \
+        || echo "[codex-wrapper] WARN: could not fetch the Code Mode host for $version; Code Mode stays unavailable until a later launch retries it" >&2
 
     # A concurrent launch may have installed the same version meanwhile; a
     # leftover directory without a working binary is replaced.
@@ -237,19 +356,14 @@ if [ -z "$(list_installed_versions)" ]; then
         echo "[codex-wrapper] ERROR: could not resolve the latest release from $RELEASES_URL/latest" >&2
         exit 1
     fi
-    echo "[codex-wrapper] downloading Codex CLI $latest ($ASSET, about 90 MB)..." >&2
+    echo "[codex-wrapper] downloading Codex CLI $latest ($ASSET plus the Code Mode host, about 115 MB)..." >&2
     if ! install_version "$latest"; then
         echo "[codex-wrapper] ERROR: failed to install Codex CLI $latest" >&2
         exit 1
     fi
     mkdir -p "$(dirname "$STAMP_FILE")" 2>/dev/null && touch "$STAMP_FILE"
     echo "[codex-wrapper] installed Codex CLI $latest" >&2
-else
-    # Fire-and-forget background update check. Output goes to a logfile so the
-    # terminal stays clean, and any failure is silent -- codex startup never
-    # blocks or fails because of an update issue.
-    ( run_update_check ) >> "$LOGFILE" 2>&1 &
-    disown 2>/dev/null || true
+    BOOTSTRAPPED=1
 fi
 
 # Pin or pick the newest installed version. CODEX_WRAPPER_FORCE_VERSION must
@@ -265,6 +379,22 @@ else
     CODEX_VERSION=$(list_installed_versions | tail -1)
 fi
 CODEX_BIN="$VERSIONS_DIR/$CODEX_VERSION/codex"
+
+# Fire-and-forget background work, skipped right after a bootstrap that already
+# did both (a fork is not free under Android's phantom-process budget). Output
+# goes to a logfile so the terminal stays clean, and any failure is silent --
+# codex startup never blocks or fails because of an update issue.
+#
+# The backfill runs before the update check and is scoped to the version this
+# launch selected, so a version left hostless by an older wrapper revision is
+# repaired rather than waiting for the next release. It lands after this
+# process has exec'd, so like an update it takes effect on the next launch.
+# Both network steps carry their own 24h stamp, so this fork stays bounded even
+# when neither can ever succeed.
+if [ "${BOOTSTRAPPED:-0}" != "1" ]; then
+    ( prune_stale_staging; ensure_code_mode_host "$CODEX_VERSION"; run_update_check ) >> "$LOGFILE" 2>&1 &
+    disown 2>/dev/null || true
+fi
 
 if ! command -v termux-etc-mount >/dev/null 2>&1; then
     echo "[codex-wrapper] ERROR: termux-etc-mount not found in PATH" >&2
