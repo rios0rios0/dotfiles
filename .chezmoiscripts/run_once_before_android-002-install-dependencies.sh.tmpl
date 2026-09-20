@@ -493,6 +493,11 @@ install_flutter() {
     local deb_name="flutter_${version}_aarch64.deb"
     local deb_url="https://github.com/GeneralKaos666/flutter-for-termux/releases/download/${version}/${deb_name}"
     local flutter_root="$PREFIX/opt/flutter"
+    # Cached under $TMPDIR (Termux's, set in .zshenv) so a run cut off anywhere between the
+    # download and the first successful launch resumes from the file rather than re-fetching
+    # 615 MB. Declared at function scope because the delete happens after the verification
+    # below, outside the install branch.
+    local cached="${TMPDIR:-/tmp}/$deb_name"
 
     # Same source of truth as the Linux installer: `bin/cache/flutter.version.json`, written by
     # the tool on its first run; the top-level `version` file no longer ships.
@@ -511,11 +516,7 @@ install_flutter() {
             return 1
         fi
 
-        # Cached under $TMPDIR (Termux's, set in .zshenv) so a run cut off between the download
-        # and the install resumes from the file; a cached file that does not match the pin is
-        # refetched.
-        local cached
-        cached="${TMPDIR:-/tmp}/$deb_name"
+        # A cached file that does not match the pin is refetched.
         if [[ ! -f "$cached" ]] || ! sha256sum "$cached" | grep -q "^$sha256 "; then
             echo "[install-deps] downloading Flutter $version for Termux ($deb_name, ~615 MB)..." >&2
             if ! curl -fL --retry 3 -o "$cached" "$deb_url"; then
@@ -529,13 +530,30 @@ install_flutter() {
             rm -f "$cached"
             return 1
         fi
+        # The package names `$PREFIX/share/flutter/manifest.json` without carrying a directory
+        # entry for its parent, and dpkg creates no implicit parents -- it extracts entries in
+        # archive order, so that one file aborts the whole unpack:
+        #     unable to create '.../usr/share/flutter/manifest.json.dpkg-new' (while processing
+        #     'data/.../usr/share/flutter/manifest.json'): No such file or directory
+        # and apt reports only `dpkg returned an error code (1)`. The archive orphans three other
+        # parents (`$PREFIX/bin`, `$PREFIX/etc/profile.d`, and `/data`), but every one of those
+        # already exists on a Termux install; this is the only one that does not.
+        #
+        # The orphan set is a property of the pinned bytes, not of the version, so the SHA-256
+        # above is what keeps this line sufficient. When bumping the pin, re-derive it instead of
+        # trusting this directory to still be the only one:
+        #     dpkg-deb -c <deb> | awk '{p=$0; sub(/^([^ ]+ +){5}/,"",p); sub(/ -> .*$/,"",p);
+        #       sub(/\/$/,"",p); if ($1 ~ /^d/) d[p]=1; n=split(p,a,"/"); if (n>1) {
+        #       q=a[1]; for(i=2;i<n;i++) q=q "/" a[i]; P[q]=1 } }
+        #       END { for (x in P) if (!(x in d)) print x }'
+        mkdir -p "$PREFIX/share/flutter"
+
         # `apt`, not `dpkg -i`: the dependencies are resolved from the repositories, and a path
         # argument (anything containing a `/`) is what tells apt this is a file, not a name.
         if ! apt install --yes "$cached"; then
             echo "[install-deps] ERROR: apt could not install $cached" >&2
             return 1
         fi
-        rm -f "$cached"
         echo "[install-deps] Flutter $version installed under $flutter_root" >&2
     fi
 
@@ -548,6 +566,13 @@ install_flutter() {
         echo "[install-deps] ERROR: $flutter_root/bin/flutter is installed but does not start; leaving ~/.local/bin alone" >&2
         return 1
     fi
+    # Only here is the download expendable. The first launch builds the flutter tool from source
+    # and resolves its dependencies (~2 min, network), and it is that run -- not the `apt
+    # install` -- which writes `bin/cache/flutter.version.json`. Deleting the file any earlier
+    # leaves a window where the marker does not exist yet and the cache is already gone, so a
+    # phantom-process kill or a dropped network in those two minutes costs the full 615 MB on
+    # the next apply. The `return 1` above keeps the file for the retry on the same grounds.
+    rm -f "$cached"
     mkdir -p "$HOME/.local/bin"
     local tool
     for tool in flutter dart; do

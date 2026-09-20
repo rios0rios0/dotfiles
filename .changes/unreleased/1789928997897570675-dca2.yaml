@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed the Android Flutter install aborting with `dpkg returned an error code (1)`: the community Termux `.deb` names `$PREFIX/share/flutter/manifest.json` without a directory entry for its parent, and `dpkg` creates no implicit parents, so `install_flutter` now creates that directory before handing the package to `apt`'
+time: '2026-09-20T18:29:57.897490519Z'
