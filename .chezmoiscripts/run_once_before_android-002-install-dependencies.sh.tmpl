@@ -529,6 +529,24 @@ install_flutter() {
             rm -f "$cached"
             return 1
         fi
+        # The package names `$PREFIX/share/flutter/manifest.json` without carrying a directory
+        # entry for its parent, and dpkg creates no implicit parents -- it extracts entries in
+        # archive order, so that one file aborts the whole unpack:
+        #     unable to create '.../usr/share/flutter/manifest.json.dpkg-new' (while processing
+        #     'data/.../usr/share/flutter/manifest.json'): No such file or directory
+        # and apt reports only `dpkg returned an error code (1)`. The archive orphans three other
+        # parents (`$PREFIX/bin`, `$PREFIX/etc/profile.d`, and `/data`), but every one of those
+        # already exists on a Termux install; this is the only one that does not.
+        #
+        # The orphan set is a property of the pinned bytes, not of the version, so the SHA-256
+        # above is what keeps this line sufficient. When bumping the pin, re-derive it instead of
+        # trusting this directory to still be the only one:
+        #     dpkg-deb -c <deb> | awk '{p=$0; sub(/^([^ ]+ +){5}/,"",p); sub(/ -> .*$/,"",p);
+        #       sub(/\/$/,"",p); if ($1 ~ /^d/) d[p]=1; n=split(p,a,"/"); if (n>1) {
+        #       q=a[1]; for(i=2;i<n;i++) q=q "/" a[i]; P[q]=1 } }
+        #       END { for (x in P) if (!(x in d)) print x }'
+        mkdir -p "$PREFIX/share/flutter"
+
         # `apt`, not `dpkg -i`: the dependencies are resolved from the repositories, and a path
         # argument (anything containing a `/`) is what tells apt this is a file, not a name.
         if ! apt install --yes "$cached"; then
