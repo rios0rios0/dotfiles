@@ -452,17 +452,23 @@ install_golangci_lint() {
 # the way `install_golangci_lint` pins its release.
 #
 # **The pin is integrity-only, and that is a recorded, accepted risk.** The project publishes no
-# signature, and its README's hash did not match the asset on the day this was written (README
-# 6994580359002c..., asset 556c39cbb19be0...), so the value below is the digest of the file that
-# was downloaded and inspected here: it guarantees a future apply gets these same bytes, not that
-# these bytes are what the maintainer built. What corroborates them, read from inside the package
-# rather than from any page: the SDK tree is a git checkout at 6a19cca5 (`refs/tags/3.47.5`),
-# `bin/internal/engine.version` is af7e796e16, and the bundled Dart is 3.13.4 -- the framework
-# revision, engine revision and Dart version of Google's own 3.47.5 tarball, exactly. The README
-# hash was committed at 01:09Z and the asset was built by the project's GitHub-hosted CI at
-# 02:47Z the same night, which is the shape of a stale hash from a local build rather than of a
-# swapped artifact. No upstream issue asking which digest is authoritative has been filed; if
-# one is and the README is corrected, this paragraph shrinks to a line.
+# signature, so the value below is the digest of the file that was downloaded and inspected here:
+# it guarantees a future apply gets these same bytes, not that these bytes are what the maintainer
+# built. What corroborates them, read from inside the package rather than from any page: the SDK
+# tree is a git checkout at 6a19cca5 (`refs/tags/3.47.5`), `bin/internal/engine.version` is
+# af7e796e161ae0bb1ff0758c71a7105418bd9ded, and the bundled Dart is 3.13.4 -- the framework
+# revision, engine revision and Dart version of Google's own 3.47.5 release, exactly.
+#
+# **Expect this pin to need bumping, because upstream REPLACES the asset under a fixed tag.** The
+# first pin here (556c39cb...) stopped matching a day later: GitHub's API reports the 3.47.5 asset
+# created at 2026-09-20T02:02Z against a release published 2026-09-19T02:47Z, and the same shape
+# holds for the two releases before it (3.47.4: published 09-12, asset 09-18; 3.47.3: published
+# 09-10, asset 09-11), where every release up to 3.47.2 had its asset within seconds of publishing.
+# The re-upload carried an IDENTICAL engine revision, framework commit and Dart version, so it is a
+# CI rebuild whose tar/xz bytes are not reproducible, not a change of content -- but the digest
+# moves regardless, and a mismatch here is therefore the expected failure mode rather than a
+# discovery. Re-run the corroboration above before bumping it; do not bump it on the download
+# alone, which proves only that GitHub served what GitHub currently holds.
 #
 # What the package is, read with `dpkg-deb -I`/`-c` rather than from its README: `Package:
 # flutter`, `Architecture: aarch64`, `Pre-Depends: x11-repo`, `Depends: git which gtk3 xorgproto
@@ -478,7 +484,7 @@ install_golangci_lint() {
 # forever. Termux's own `dart` package (in `languages`) is the guaranteed baseline underneath.
 install_flutter() {
     local version="3.47.5"
-    local sha256="556c39cbb19be084222bd5cee907ee093334f211307f6c09af74d9219c637851"
+    local sha256="a6f5b1af27adf9fc1016a27433bc1dfb296cd34d206118ec61af8e2c39fe0e5e"
     local deb_name="flutter_${version}_aarch64.deb"
     local deb_url="https://github.com/GeneralKaos666/flutter-for-termux/releases/download/${version}/${deb_name}"
     local flutter_root="$PREFIX/opt/flutter"
