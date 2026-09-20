@@ -468,7 +468,12 @@ install_golangci_lint() {
 # CI rebuild whose tar/xz bytes are not reproducible, not a change of content -- but the digest
 # moves regardless, and a mismatch here is therefore the expected failure mode rather than a
 # discovery. Re-run the corroboration above before bumping it; do not bump it on the download
-# alone, which proves only that GitHub served what GitHub currently holds.
+# alone, which proves only that GitHub served what GitHub currently holds. Nothing bounds a bad
+# bump: `dpkg` runs nothing, since the control archive carries no maintainer scripts, but this
+# function executes the payload moments later -- `bash bin/flutter --version`, then
+# `precache --web`, which fetches further artifacts -- and writes `dart`/`flutter` into
+# `~/.local/bin`, where they shadow Termux's own `dart` for every later shell. The corroboration
+# is the whole of the defence.
 #
 # What the package is, read with `dpkg-deb -I`/`-c` rather than from its README: `Package:
 # flutter`, `Architecture: aarch64`, `Pre-Depends: x11-repo`, `Depends: git which gtk3 xorgproto
