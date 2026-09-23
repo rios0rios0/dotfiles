@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added `install_flutter` to the Linux/WSL dependency installer: the current stable Flutter SDK from the official tarball, resolved from Flutter''s releases manifest and verified against the SHA-256 it publishes, under `~/.local/share/flutter` with `flutter` and `dart` linked into `~/.local/bin` (an existing hand-installed `dart` link is repointed and logged); an installed SDK is moved to the next stable with `flutter upgrade`, web artifacts are precached, and `xz-utils` joins the apt requirements for the archive'
-time: '2026-09-19T18:17:53.751200229Z'

@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added Termux''s own `dart` package to the Android installer''s `languages`, and an `install_flutter` that installs the pinned community `flutter_3.47.5_aarch64.deb` from GeneralKaos666/flutter-for-termux (Flutter ships no Linux arm64 host SDK) after checking it against a SHA-256 computed from the inspected file, enables `x11-repo` for its gtk3 pre-dependency, and fronts the SDK under `$PREFIX/opt/flutter` with two bash wrappers in `~/.local/bin` — unverified on a device, so `flutter --version` is the hard check and `precache --web` is reported rather than fatal'
-time: '2026-09-19T18:17:53.756180578Z'

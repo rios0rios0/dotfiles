@@ -22,6 +22,23 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.25.0] - 2026-09-23
+
+### Added
+
+- added `install_flutter` to the Linux/WSL dependency installer: the current stable Flutter SDK from the official tarball, resolved from Flutter's releases manifest and verified against the SHA-256 it publishes, under `~/.local/share/flutter` with `flutter` and `dart` linked into `~/.local/bin` (an existing hand-installed `dart` link is repointed and logged); an installed SDK is moved to the next stable with `flutter upgrade`, web artifacts are precached, and `xz-utils` joins the apt requirements for the archive
+- added a WSL SSH agent bridge exposing the Windows 1Password agent as a Unix socket at `~/.ssh/agent.sock`, so Go-based tools that dial a socket instead of running `ssh` can reach the keys
+- added Termux's own `dart` package to the Android installer's `languages`, and an `install_flutter` that installs the pinned community `flutter_3.47.5_aarch64.deb` from GeneralKaos666/flutter-for-termux (Flutter ships no Linux arm64 host SDK) after checking it against a SHA-256 computed from the inspected file, enables `x11-repo` for its gtk3 pre-dependency, and fronts the SDK under `$PREFIX/opt/flutter` with two bash wrappers in `~/.local/bin` — unverified on a device, so `flutter --version` is the hard check and `precache --web` is reported rather than fatal
+
+### Fixed
+
+- fixed Code Mode failing closed on Termux with `host executable was not found`: the Codex CLI wrapper downloaded only the `codex` release asset, leaving every version directory without the `codex-code-mode-host` sidecar that Codex resolves next to its own binary
+- fixed the Android Flutter install aborting with `dpkg returned an error code (1)`: the community Termux `.deb` names `$PREFIX/share/flutter/manifest.json` without a directory entry for its parent, and `dpkg` creates no implicit parents, so `install_flutter` now creates that directory before handing the package to `apt`
+- fixed the Android Flutter install failing with `does not match the pinned SHA-256` after upstream replaced the `3.47.5` release asset under the same tag; re-pinned to the current digest after re-checking the package identity (framework commit `6a19cca5`, engine `af7e796e16`, Dart `3.13.4`) against Google's release
+- fixed the Android Flutter installer deleting the cached `.deb` before the SDK had started: the first launch is what writes `bin/cache/flutter.version.json`, so an apply interrupted in that window re-downloaded 615 MB; the delete now happens only after `flutter --version` answers
+- fixed the Codex CLI wrapper leaving partially downloaded staging directories under `~/.local/share/codex/versions` when a download was killed mid-flight, which on Android is routine because the phantom-process killer reaps the background child it runs in
+- fixed the WSL SSH agent bridge installer skipping a version bump, by gating the install on the pinned binary digest rather than on the file existing
+
 ## [0.24.0] - 2026-09-14
 
 ### Added

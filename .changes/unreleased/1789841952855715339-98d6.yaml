@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the Codex CLI wrapper leaving partially downloaded staging directories under `~/.local/share/codex/versions` when a download was killed mid-flight, which on Android is routine because the phantom-process killer reaps the background child it runs in'
-time: '2026-09-19T18:19:12.855580391Z'
