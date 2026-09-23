@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the Android Flutter installer deleting the cached `.deb` before the SDK had started: the first launch is what writes `bin/cache/flutter.version.json`, so an apply interrupted in that window re-downloaded 615 MB; the delete now happens only after `flutter --version` answers'
-time: '2026-09-20T18:37:30.313895971Z'

@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the WSL SSH agent bridge installer skipping a version bump, by gating the install on the pinned binary digest rather than on the file existing'
-time: '2026-09-18T22:48:53.550029077Z'
