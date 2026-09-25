@@ -1,7 +1,18 @@
 {
     "$help": "https://aka.ms/terminal-documentation",
     "$schema": "https://aka.ms/terminal-profiles-schema",
-    "actions": [],
+    "actions":
+    [
+        {
+            "command":
+            {
+                "action": "sendInput",
+                "input": "\u0016"
+            },
+            "id": "User.SendCtrlVToApplication",
+            "name": "Send Ctrl+V to terminal application"
+        }
+    ],
     "copyFormatting": "none",
     "copyOnSelect": false,
     "defaultProfile": "{bd4ba1f0-e3a6-4711-a400-2a31076205f3}",
@@ -10,8 +21,12 @@
     "keybindings":
     [
         {
-            "id": "Terminal.PasteFromClipboard",
+            "id": "User.SendCtrlVToApplication",
             "keys": "ctrl+v"
+        },
+        {
+            "id": "Terminal.PasteFromClipboard",
+            "keys": "ctrl+shift+v"
         },
         {
             "id": "Terminal.FindText",

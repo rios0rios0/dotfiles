@@ -99,6 +99,8 @@ Set-ExecutionPolicy RemoteSigned -Scope Process
 chezmoi init --apply rios0rios0
 ```
 
+Windows Terminal forwards **Ctrl+V** to the running application as `\u0016`, so Codex CLI in WSL can attach an image from the Windows clipboard. Use **Ctrl+Shift+V** for normal terminal paste. These bindings apply to all Windows Terminal profiles and are deployed by the Windows chezmoi configuration; run `chezmoi update` from PowerShell to sync them on an existing computer.
+
 ### Termux on Android
 
 > **Important**: Install Termux from [F-Droid](https://f-droid.org/en/packages/com.termux/), not the Play Store ([reason](https://www.reddit.com/r/termux/comments/zu8ets/do_not_install_termux_from_play_store/)).
