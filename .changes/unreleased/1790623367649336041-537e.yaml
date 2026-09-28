@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed the Oh My Zsh deprecation warning printed at every shell start by replacing the `github` plugin, which only wraps the legacy `hub` CLI (not installed), with the `gh` plugin that generates GitHub CLI completions'
+time: '2026-09-28T19:22:47.649336041Z'

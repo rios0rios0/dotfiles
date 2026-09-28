@@ -1,0 +1,3 @@
+kind: 'Security'
+body: 'restricted `~/.kube` to `0700` and `~/.kube/config` to `0600`: the kubeconfig source lacked the `private_` attribute, so chezmoi deployed it group- and world-readable, which also made Helm print two insecure-permission warnings at every shell start through the Oh My Zsh `helm` plugin'
+time: '2026-09-28T19:22:47.666606089Z'

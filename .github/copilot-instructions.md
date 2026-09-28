@@ -399,6 +399,7 @@ resolver; see "NVM Resolution Must Agree With NVM" in `CLAUDE.md`.
 2. Add encrypted files with: `chezmoi add --encrypt ~/.sensitive-file`
 3. **Critical**: Verify private key exists at `~/.ssh/chezmoi`
 4. Test decryption: `chezmoi cat ~/.sensitive-file`
+5. `private_dot_kube/` deploys `~/.kube` as `0700` and `~/.kube/config` as `0600` (Helm warns at every shell start otherwise), but its `encrypted_config-files.tar.age` deliberately stays non-private: the headless folder watcher re-adds that tarball from a `0644` file, and chezmoi's "would remove private attribute" prompt, which nothing can answer, would silently stop the backup; see "Kubeconfig Permissions (the Tarball Stays Non-Private)" in `CLAUDE.md`
 
 ### Debugging Installation Issues
 - Check chezmoi status: `chezmoi doctor`

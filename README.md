@@ -125,12 +125,12 @@ dot_scripts/             # Utility scripts (version manager, credential loader, 
 dot_ssh/                 # SSH config, keys, signing (1Password-backed) -> ~/.ssh/
 dot_aws/                 # Encrypted AWS credentials -> ~/.aws/
 dot_azure/               # Encrypted Azure profile -> ~/.azure/
-dot_kube/                # Encrypted Kubernetes configs -> ~/.kube/
+private_dot_kube/        # Encrypted Kubernetes configs -> ~/.kube/ (owner-only)
 AppData/                 # Windows Terminal settings (Windows only)
 modify_dot_claude.json.tmpl  # MCP server config for Claude Code -> ~/.claude.json
 ```
 
-Chezmoi translates `dot_` prefixes to `.` in the target path (e.g., `dot_zshrc.tmpl` becomes `~/.zshrc`).
+Chezmoi translates `dot_` prefixes to `.` in the target path (e.g., `dot_zshrc.tmpl` becomes `~/.zshrc`), and `private_` strips group and world permissions from the target (e.g., `private_dot_kube/` becomes `~/.kube` with mode `0700`).
 
 ## Secrets and Encryption
 
