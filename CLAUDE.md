@@ -616,6 +616,31 @@ it the installer warns and exits 0, leaving `SSH_AUTH_SOCK` pointing at nothing.
 - Recipients file: `~/.age_recipients` (template at `dot_age_recipients.tmpl`)
 - Encrypted files end in `.age` and must show `"age encrypted file, ASCII armored"` when checked with `file`
 
+## Kubeconfig Permissions (the Tarball Stays Non-Private)
+
+`private_dot_kube/` deploys `~/.kube` as `0700`, and `encrypted_private_config.age` deploys
+`~/.kube/config` as `0600`. Helm checks the kubeconfig's mode on every invocation, and the Oh My
+Zsh `helm` plugin runs `helm completion zsh` at every shell start, so a group- or world-readable
+kubeconfig prints two `WARNING: Kubernetes configuration file is ... insecure` lines in every new
+terminal. Keep the fix in the source attribute: chezmoi manages the mode, so a `chmod` on the
+target is reverted by the next apply.
+
+**`encrypted_config-files.tar.age` deliberately carries no `private_`; do not add one to match its
+sibling.** The folder watcher (`dot_scripts/executable_linux-toolbox-watch-compress-folders.sh`)
+rebuilds that tarball from `~/.kube/config-files` on every change and re-adds it with
+`chezmoi add --encrypt`. `tar` writes it `0644` under the default umask, and re-adding a `0644`
+file over a `private_` entry makes chezmoi ask
+`adding .kube/config-files.tar would remove private attribute, continue?`. The watcher runs
+headless (`nohup … &>/dev/null &` from `dot_zshrc.tmpl`), so nothing can answer: the add fails,
+`archive_dir` deletes the archive anyway, and the source keeps the stale tarball. The
+`~/.kube/config-files` backup silently stops; the only trace is
+`/tmp/linux-toolbox-watch-compress-folders.log`, and no apply, lint or test fails.
+
+The `0700` directory is what protects the tarball: other users cannot traverse into `~/.kube`,
+whatever the file's own mode. To make the tarball private anyway, change the watcher first (wrap
+its `tar -cf` in `umask 077`); the next re-add then gains `private_` by itself, because chezmoi
+adds the attribute without prompting. Renaming the source file alone springs the trap above.
+
 <!-- chlog:start -->
 ## Changelog (chlog) — MANDATORY
 
