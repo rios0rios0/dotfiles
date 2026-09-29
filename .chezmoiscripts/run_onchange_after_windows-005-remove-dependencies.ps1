@@ -17,6 +17,19 @@ $script:removed = 0
 # Removal strategies. Each handler takes the target as its only argument, returns
 # without acting when the target is already absent, and logs only when it actually
 # removes something.
+#
+# A removal counts only if the target is gone afterwards. When it is still there,
+# the handler throws, so `Invoke-TombstoneList` reports the failure instead of
+# counting it as removed. The tool's exit code is not the judge: an uninstaller
+# can exit 0 without removing anything.
+
+# True when winget lists the package as installed.
+function Test-WingetPackage {
+    param([string]$Target)
+
+    $listed = winget list --id $Target --exact --accept-source-agreements 2>$null | Out-String
+    return $listed -match [regex]::Escape($Target)
+}
 
 # Uninstall a winget package by its exact package ID.
 function Remove-WingetPackage {
@@ -24,9 +37,7 @@ function Remove-WingetPackage {
     param([string]$Target)
 
     if (-not (Get-Command winget -ErrorAction SilentlyContinue)) { return }
-
-    $listed = winget list --id $Target --exact --accept-source-agreements 2>$null | Out-String
-    if ($listed -notmatch [regex]::Escape($Target)) { return }
+    if (-not (Test-WingetPackage $Target)) { return }
 
     if ($PSCmdlet.ShouldProcess($Target, "Uninstall winget package")) {
         Write-Host "[$prefix] removing winget package: $Target"
@@ -36,8 +47,20 @@ function Remove-WingetPackage {
         # recognized for the current command".
         winget uninstall --id $Target --exact `
             --accept-source-agreements --silent --disable-interactivity | Out-Null
+        $exitCode = $LASTEXITCODE
+        if (Test-WingetPackage $Target) {
+            throw "still installed after winget uninstall (exit code $exitCode)"
+        }
         $script:removed++
     }
+}
+
+# True when npm lists the package among its global installs.
+function Test-NpmGlobalPackage {
+    param([string]$Target)
+
+    npm ls -g --depth=0 $Target 2>$null | Out-Null
+    return $LASTEXITCODE -eq 0
 }
 
 # Uninstall a globally installed npm package.
@@ -46,13 +69,15 @@ function Remove-NpmGlobalPackage {
     param([string]$Target)
 
     if (-not (Get-Command npm -ErrorAction SilentlyContinue)) { return }
-
-    npm ls -g --depth=0 $Target 2>$null | Out-Null
-    if ($LASTEXITCODE -ne 0) { return }
+    if (-not (Test-NpmGlobalPackage $Target)) { return }
 
     if ($PSCmdlet.ShouldProcess($Target, "Uninstall npm global package")) {
         Write-Host "[$prefix] removing npm global package: $Target"
         npm uninstall -g $Target | Out-Null
+        $exitCode = $LASTEXITCODE
+        if (Test-NpmGlobalPackage $Target) {
+            throw "still installed after npm uninstall (exit code $exitCode)"
+        }
         $script:removed++
     }
 }
@@ -76,7 +101,12 @@ function Remove-TargetPath {
     if ($PSCmdlet.ShouldProcess($Target, "Remove path")) {
         Write-Host "[$prefix] removing path: $Target"
         # -Confirm:$false so the outer ShouldProcess is the only decision point.
+        # A locked file is reported by Remove-Item and left in place, which the
+        # check below turns into a failure.
         Remove-Item -LiteralPath $Target -Recurse -Force -Confirm:$false
+        if (Test-Path -LiteralPath $Target) {
+            throw "still present after Remove-Item"
+        }
         $script:removed++
     }
 }
@@ -88,33 +118,48 @@ $removalHandlers = @{
     "winget"     = "Remove-WingetPackage"
 }
 
+# Run every "<strategy>:<target>" tombstone passed in.
+function Invoke-TombstoneList {
+    param([string[]]$Tombstones)
+
+    foreach ($tombstone in $Tombstones) {
+        $strategy, $target = $tombstone -split ":", 2
+
+        if (-not $removalHandlers.ContainsKey($strategy)) {
+            Write-Host "[$prefix] WARN: unknown removal strategy '$strategy' for '$target', skipping"
+            continue
+        }
+
+        # A single failed removal must never abort `chezmoi apply`.
+        try {
+            & $removalHandlers[$strategy] $target
+        }
+        catch {
+            Write-Host "[$prefix] WARN: failed to remove '$target' via '$strategy': $_"
+        }
+    }
+
+    if ($script:removed -gt 0) {
+        Write-Host "[$prefix] removed $($script:removed) leftover dependency entries"
+    }
+}
+
 # =========================================================================================================
 # Tombstone list, format "<strategy>:<target>". Add one group per removal, newest
-# first, and reference the commit that dropped the installer so the entry can be
-# retired once every machine has converged.
+# first, and reference the pull request that dropped the installer so the entry
+# can be retired once every machine has converged (a commit hash from the feature
+# branch changes when the branch is rebased before merge).
 $tombstones = @(
+    # Chrome Remote Desktop Host -- removed in #209 (2026-09-29)
+    "winget:Google.ChromeRemoteDesktopHost",
+
     # Cursor and Gemini CLI -- removed in 601cbeb (2026-07-21)
     "winget:Anysphere.Cursor",
     "npm_global:@google/gemini-cli"
 )
 
-foreach ($tombstone in $tombstones) {
-    $strategy, $target = $tombstone -split ":", 2
-
-    if (-not $removalHandlers.ContainsKey($strategy)) {
-        Write-Host "[$prefix] WARN: unknown removal strategy '$strategy' for '$target', skipping"
-        continue
-    }
-
-    # A single failed removal must never abort `chezmoi apply`.
-    try {
-        & $removalHandlers[$strategy] $target
-    }
-    catch {
-        Write-Host "[$prefix] WARN: failed to remove '$target' via '$strategy': $_"
-    }
-}
-
-if ($script:removed -gt 0) {
-    Write-Host "[$prefix] removed $($script:removed) leftover dependency entries"
+# Dot-sourcing the script, as `make test-remove-dependencies-windows` does, only
+# defines the handlers; running it applies the list.
+if ($MyInvocation.InvocationName -ne ".") {
+    Invoke-TombstoneList $tombstones
 }

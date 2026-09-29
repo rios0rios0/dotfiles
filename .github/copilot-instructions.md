@@ -13,7 +13,7 @@ make test    # template rendering (mock op), .chezmoiignore logic, script order,
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
-Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-remove-dependencies`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
+Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
 
 ## Codex CLI Shortcut
 
@@ -138,6 +138,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
 - Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, Brother drivers, PerformanceTest
 - Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify, VirtualBox, Grammarly, etc.
+- Installs RustDesk outside winget (its publisher had it removed from winget): `Install-RustDesk` downloads the pinned MSI from the GitHub release, installs it only after its SHA-256 and its `PURSLANE` Authenticode signer check out, and skips machines where RustDesk is already installed
 - Installs development: Claude Code, GitHub Copilot CLI (`GitHub.Copilot`), Codex CLI (`OpenAI.Codex`), NVM for Windows, Docker Desktop, GitHub CLI, JetBrains Toolbox, Postman, ripgrep, jq, yq, bat, etc.
 - Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy
 
@@ -360,9 +361,9 @@ and refuses to install on a mismatch. Verify with `/usr/bin/ssh-add -l` — the 
 This repository is a sync, not a bootstrapper. Deleting an `install_*()` function only stops *new* machines from installing the tool — machines that already ran the installer keep it forever, because chezmoi has no concept of packages and no history of the source state.
 
 1. Delete the `install_*()` function (or package-list entry) from the platform's `run_once_before_*-install-dependencies.*` script
-2. Add a `"<strategy>:<target>"` tombstone to `.chezmoiscripts/run_onchange_after_<platform>-*-remove-dependencies.*` for **every** platform that installed it, commenting the removing commit
+2. Add a `"<strategy>:<target>"` tombstone to `.chezmoiscripts/run_onchange_after_<platform>-*-remove-dependencies.*` for **every** platform that installed it, commenting the pull request that removed it (a commit hash from the feature branch changes when the branch is rebased)
 3. Add any orphaned config directory to `.chezmoiremove`
-4. Run `make test-remove-dependencies`
+4. Run `make test-remove-dependencies`, and `make test-remove-dependencies-windows` for the Windows script (needs `pwsh`)
 
 Strategies: `apt`, `gh_extension`, `npm_global`, `path`, `pipx` (Linux/Android, defined in `.chezmoitemplates/lib-remove-dependencies.sh`); `npm_global`, `path`, `winget` (Windows, inline). `remove_path` refuses targets outside `$HOME` — never widen that guard, these scripts run unattended.
 

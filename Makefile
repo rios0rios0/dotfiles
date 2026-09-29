@@ -26,9 +26,9 @@ lint-syntax:
 
 # === Test targets ===
 
-.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials test-nvm-resolution
+.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-nvm-resolution
 
-test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-prune-tmp-modcache test-shell-credentials test-clipboard-shim test-nvm-resolution
+test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-clipboard-shim test-nvm-resolution
 
 test-template-render:
 	@bash $(CI_DIR)/scripts/test-template-render.sh
@@ -44,6 +44,13 @@ test-modify-scripts:
 
 test-remove-dependencies:
 	@bash $(CI_DIR)/scripts/test-remove-dependencies.sh
+
+test-remove-dependencies-windows:
+	@if command -v pwsh >/dev/null 2>&1; then \
+		pwsh -NoProfile -File $(CI_DIR)/scripts/test-remove-dependencies-windows.ps1; \
+	else \
+		echo "[test-remove-dependencies-windows] SKIP: pwsh not installed" >&2; \
+	fi
 
 test-prune-tmp-modcache:
 	@bash $(CI_DIR)/scripts/test-prune-tmp-modcache.sh

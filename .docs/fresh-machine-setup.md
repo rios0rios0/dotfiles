@@ -123,7 +123,7 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 
 | Step | Script                                                                                       | Marker        | What it does                                                                                                                                                                        |
 |------|----------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1    | `run_once_before_windows-001-install-dependencies.ps1`                                       | `[automated]` | 52 winget packages, skipping the ones `winget export` already lists (section 3.3).                                                                                                  |
+| 1    | `run_once_before_windows-001-install-dependencies.ps1`                                       | `[automated]` | 52 winget packages, skipping the ones `winget export` already lists, plus RustDesk from its GitHub release (section 3.3).                                                           |
 | 2    | `run_once_before_windows-002-configure-dependencies.ps1`                                     | `[partial]`   | Phase 2. It also runs `nvm install --lts`, which fails on the very first pass because NVM for Windows is not on `PATH` yet; run it again from a new terminal.                         |
 | 3    | `run_once_before_windows-003-install-fonts.ps1`                                              | `[automated]` | MesloLGS NF, Meslo Nerd Font and FiraCode Nerd Font into `$env:WINDIR\Fonts` plus the `HKLM` font registry entries. Needs the elevated shell.                                       |
 | 4    | `run_once_before_windows-004-export-private-key.ps1`                                         | `[automated]` | Writes the age identity from `op://personal/Chezmoi Key/private key` to `~\.ssh\chezmoi`.                                                                                           |
@@ -138,10 +138,18 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 
 - `$requirements`: `AgileBits.1Password`, `AgileBits.1Password.CLI`, `FiloSottile.age`, `Git.Git`, `JanDeDobbeleer.OhMyPosh`, `Microsoft.PowerShell`, `Microsoft.WSL`, `Microsoft.WindowsTerminal`
 - `$hardware`: `Brother.FullDriver`, `CPUID.CPU-Z.ROG`, `FinalWire.AIDA64.Extreme`, `Logitech.GHUB`, `PerformanceTest`
-- `$utilities`: `Adobe.Acrobat.Reader.64-bit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Google.ChromeRemoteDesktopHost`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.CCleaner`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `Spotify.Spotify`, `Oracle.VirtualBox`
+- `$utilities`: `Adobe.Acrobat.Reader.64-bit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.CCleaner`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `Spotify.Spotify`, `Oracle.VirtualBox`
 - `$communication`: `SlackTechnologies.Slack`, `Discord.Discord`, `Zoom.Zoom.EXE`
 - `$development`: `Anthropic.ClaudeCode`, `CoreyButler.NVMforWindows`, `Docker.DockerDesktop`, `ExpressVPN.ExpressVPN`, `GitHub.cli`, `GitHub.Copilot`, `GoLang.Go`, `JetBrains.Toolbox`, `Microsoft.AzureStorageExplorer`, `Microsoft.VisualStudio.2022.Community`, `Mirantis.Lens`, `OpenAI.Codex`, `OpenVPNTechnologies.OpenVPNConnect`, `Postman.Postman`, `BurntSushi.ripgrep.MSVC`, `jqlang.jq`, `MikeFarah.yq`, `sharkdp.bat`, `koalaman.shellcheck`
 - `$gaming`: `ElectronicArts.EADesktop`, `EpicGames.EpicGamesLauncher`, `GOG.Galaxy`, `Valve.Steam`
+
+RustDesk is installed right after `$utilities`, but not through winget: its publisher had every
+version removed from winget in March 2026, after the package was falsely flagged as malware
+([microsoft/winget-pkgs#352094](https://github.com/microsoft/winget-pkgs/issues/352094)).
+`Install-RustDesk` downloads the pinned MSI from the [GitHub release](https://github.com/rustdesk/rustdesk/releases)
+and installs it only if its SHA-256 matches and its Authenticode signature is valid and from `PURSLANE`,
+RustDesk's publisher. It skips machines where RustDesk is already installed, whether from the `.exe`
+or the MSI. The MSI installs per machine, so a non-elevated apply shows a UAC prompt for it.
 
 Commented out in the script with the reason, so `[manual]`: `Asus.ArmouryCrate` (never detected as
 installed), `Blizzard.BattleNet` (asks for a path and never installs), `Ubisoft.Connect` (hash
@@ -157,6 +165,7 @@ oh-my-posh version
 Get-ChildItem "$env:WINDIR\Fonts" -Filter 'MesloLGS*'
 Test-Path ~\.ssh\chezmoi
 docker run --rm hello-world          # after starting Docker Desktop once and accepting its terms
+Get-Service RustDesk                 # Running once Install-RustDesk has installed it
 ```
 
 ## Phase 4: Kali on WSL bootstrap
