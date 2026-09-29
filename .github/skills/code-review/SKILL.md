@@ -76,8 +76,9 @@ them before the generic ones.
 - **Apply must be idempotent.** `.chezmoiscripts/` entries are numbered for execution order and many are `run_once_`/`run_after_`. A script that appends to a file without a guard duplicates its line on every apply; a script renamed loses its `run_once` state and re-runs.
 - **`.chezmoiignore` is a Go template over `.chezmoi.os`** — a new file must be considered for all three platforms (Linux/WSL, Windows, Termux). A Windows-only file that is not ignored elsewhere breaks apply on the other two.
 - **`.chezmoiremove` deletes paths from the home directory on every apply.** Adding an entry destroys whatever is at that path — it needs an explicit justification, and a broad or templated path is a Critical finding.
-- **Shared fragments live in `.chezmoitemplates/`** (`lib-install-fonts.sh`, `lib-modify-mcp-servers.sh`, `lib-remove-dependencies.sh`, `username.tmpl`). Copying one inline instead of including it guarantees drift.
-- **`modify_` scripts merge, they do not overwrite.** `modify_dot_claude.json.tmpl` rewrites a file the user also edits — it must preserve unknown keys.
+- **Shared fragments live in `.chezmoitemplates/`** (`lib-install-fonts.sh`, `lib-modify-mcp-servers.tmpl`, `lib-remove-dependencies.sh`, `username.tmpl`). Copying one inline instead of including it guarantees drift.
+- **`modify_` files merge, they do not overwrite.** `modify_dot_claude.json` rewrites a file the user also edits — it must preserve unknown keys.
+- **A `modify_` file that deploys on Windows must be a modify-template** (the `chezmoi:modify-template` marker, no `.tmpl` suffix, no `#!` line). Windows cannot start a script, so a bash one fails the whole apply there; `make test-modify-scripts` checks this against the file list chezmoi resolves for Windows.
 - **Shell changes are tested by the matching target**, for example `make test-template-render`, `make test-remove-dependencies`, `make test-shell-credentials`. A change to `dot_zshrc.tmpl` without a rendering test is incomplete.
 - **`dot_zshrc.tmpl` keeps the `ccswitch` monitor alive and wraps `claude` on Linux/WSL.** A change there affects the user's account rotation — read it against [`ccswitch`](https://github.com/rios0rios0/ccswitch) before approving.
 - ShellCheck, ruff, PowerShell, and YAML/JSON linting all run under `make lint`; a new disable directive needs a reason.

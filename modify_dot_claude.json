@@ -1,0 +1,11 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Merges this repository's MCP servers into ~/.claude.json; the server list and the
+  merge live in .chezmoitemplates/lib-modify-mcp-servers.tmpl.
+
+  A modify-template, not a script: chezmoi evaluates it in-process with the file's
+  current content in .chezmoi.stdin, so it also works on Windows, which cannot
+  start a #! script. Keep it without a .tmpl suffix -- with one, chezmoi renders it
+  as an ordinary template first, where .chezmoi.stdin does not exist.
+*/ -}}
+{{- includeTemplate "lib-modify-mcp-servers.tmpl" (dict "stdin" .chezmoi.stdin "os" .chezmoi.os "file" "~/.claude.json") -}}

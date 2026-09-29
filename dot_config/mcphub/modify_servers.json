@@ -1,0 +1,8 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Merges this repository's MCP servers into ~/.config/mcphub/servers.json; the
+  server list and the merge live in .chezmoitemplates/lib-modify-mcp-servers.tmpl.
+  A modify-template for the reasons given in modify_dot_claude.json at the source
+  root, which also explain why it has no .tmpl suffix.
+*/ -}}
+{{- includeTemplate "lib-modify-mcp-servers.tmpl" (dict "stdin" .chezmoi.stdin "os" .chezmoi.os "file" "~/.config/mcphub/servers.json") -}}

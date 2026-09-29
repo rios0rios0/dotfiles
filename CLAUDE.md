@@ -73,7 +73,7 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 | Shell      | Zsh + Oh My Zsh + p10k       | PowerShell + Oh My Posh | Zsh + Oh My Zsh + p10k           |
 | Scripts    | `.sh`                        | `.ps1`                  | `.sh`                            |
 | Docker     | Native                       | N/A                     | `termux-etc-seccomp` wrapper     |
-| MCP config | `modify_dot_claude.json.tmpl` (Docker-based) | `modify_dot_claude.json.tmpl` (Docker-based) | `dot_config/mcphub/` (npx-based) |
+| MCP config | `modify_dot_claude.json` (Docker-based) | `modify_dot_claude.json` (Docker-based) | `dot_config/mcphub/` (npx-based) |
 | 1Password  | Native `op` CLI              | Native `op` CLI         | `termux-etc-seccomp` wrapper at `.local/bin/op` |
 
 ## Key Files
@@ -178,7 +178,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | Templates (`.tmpl`) | `warnf "[prefix] message"` — writes to stderr during rendering (do NOT add `\n`, chezmoi appends its own newline) |
 | Shell scripts (`.sh`) | `echo "[prefix] message" >&2` |
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
-| Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
+| Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
 Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`
 
@@ -204,6 +204,27 @@ A removal that leaves its target behind is reported (`WARN: failed to remove ...
 `remove_path` refuses any target outside `$HOME` — these scripts run unattended, so never widen that guard. `make test-remove-dependencies` covers it, and `make test-remove-dependencies-windows` covers the Windows script (it needs `pwsh`, which CI installs).
 
 See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-manager was evaluated and rejected (it cannot cover Windows-native or Termux).
+
+## JSON Patching (Modify-Templates, Not Scripts)
+
+`~/.claude.json`, `~/.claude/.claude.json`, `~/.claude/settings.json` and mcphub's
+`servers.json` are merged into, never overwritten, by `modify_` files that are chezmoi
+**modify-templates**: chezmoi evaluates them itself, with the file's current content in
+`.chezmoi.stdin`, and writes back what they output. They used to be bash scripts that
+ran embedded Python, and on Windows they could never start: chezmoi picks an interpreter
+from the file extension (`.json` has none), Windows has no `#!`, and the apply aborted at
+`fork/exec …..claude.json: %1 is not a valid Win32 application`.
+
+| Rule | Why |
+|------|-----|
+| The file carries `chezmoi:modify-template` and has **no** `.tmpl` suffix | With `.tmpl`, chezmoi renders it as an ordinary template first, where `.chezmoi.stdin` does not exist |
+| Shared logic is pulled in with `includeTemplate`, not `template` | `.chezmoitemplates/` is not associated with a modify-template, so `{{ template … }}` fails with `not defined`. `.chezmoi.targetFile` is missing there too, which is why the MCP library takes the file name as an argument |
+| Output `.chezmoi.stdin` unchanged when nothing managed is missing | Go maps keep no order, so `toPrettyJson` emits sorted keys. Passing the content through keeps the layout Claude Code wrote, and a real change is the only time a file is re-serialised |
+| Compare with `toJson`, never `eq` on decoded values | A missing key decodes to `""`, and `eq` between a string and a bool is an error rather than `false` |
+| Invalid JSON fails the template | The old scripts started from `{}` and replaced the file; failing leaves it for a person to repair |
+
+`make test-modify-scripts` runs each one through `chezmoi cat` in a sandbox, and fails when
+any `modify_` file that chezmoi resolves for Windows is not a modify-template.
 
 ## Shared Install Library
 

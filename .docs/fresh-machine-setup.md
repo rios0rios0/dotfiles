@@ -38,7 +38,7 @@ both cases. Name the note after that normalized form: a hostname or `CHEZMOI_DEV
 means `Device: my-laptop`. On Windows and WSL the hostname is fine. On Termux the hostname is
 `localhost`, so `CHEZMOI_DEVICE` has to be exported before the first apply (Phase 5).
 
-The MCP servers in `~/.claude.json` are not a render-time dependency: `modify_dot_claude.json.tmpl`
+The MCP servers in `~/.claude.json` are not a render-time dependency: `modify_dot_claude.json`
 writes `${GITHUB_PERSONAL_ACCESS_TOKEN}`, `${ADO_PERSONAL_ACCESS_TOKEN}`, `${ADO_ORGANIZATION_NAME}`,
 `${SONARQUBE_URL}` and `${SONARQUBE_TOKEN}` placeholders that Claude Code expands from the environment,
 so those names need `cred:` fields on the device note. Nothing about them blocks the first apply.

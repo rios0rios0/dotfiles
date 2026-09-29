@@ -192,7 +192,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `.chezmoiignore`: Platform-conditional file exclusion (uses Go templates with `.chezmoi.os`)
 - `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
-- `.chezmoitemplates/`: Shared template fragments (`lib-install-deps.sh`, `lib-install-fonts.sh`, `lib-modify-mcp-servers.sh`, `lib-remove-dependencies.sh`, `username.tmpl`)
+- `.chezmoitemplates/`: Shared template fragments (`lib-install-deps.sh`, `lib-install-fonts.sh`, `lib-modify-mcp-servers.tmpl`, `lib-remove-dependencies.sh`, `username.tmpl`)
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
 ### Key Managed Files
@@ -202,8 +202,8 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_p10k.zsh` → `~/.p10k.zsh`: Powerlevel10k theme configuration
 - `dot_oh-my-posh.json` → `~/.oh-my-posh.json`: Oh My Posh theme (Windows only)
 - `dot_age_recipients.tmpl` → `~/.age_recipients`: Age encryption recipients
-- `modify_dot_claude.json.tmpl` → `~/.claude.json`: MCP servers for Claude Code (Linux/Windows, Docker-based)
-- `dot_config/mcphub/servers.json.tmpl` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android, npx-based)
+- `modify_dot_claude.json` → `~/.claude.json`: MCP servers for Claude Code (Docker-based on Linux/Windows, the HTTP GitHub server on Android); a modify-template, see CLAUDE.md
+- `dot_config/mcphub/modify_servers.json` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android only; same list and merge as `~/.claude.json`, from `.chezmoitemplates/lib-modify-mcp-servers.tmpl`)
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
 - `dot_config/systemd/user/ssh-agent-bridge.socket` + `ssh-agent-bridge@.service` → `~/.config/systemd/user/`: WSL-only SSH agent bridge (see below)
 - `dot_scripts/` → `~/.scripts/`: User utility scripts
@@ -509,9 +509,9 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | Templates (`.tmpl`) | `warnf "[prefix] message"` — writes to stderr during rendering (do NOT add `\n`, chezmoi appends its own newline) |
 | Shell scripts (`.sh`) | `echo "[prefix] message" >&2` |
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
-| Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
+| Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

@@ -1,0 +1,51 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Merges this repository's permission rules into ~/.claude/settings.json and sets
+  effortLevel when it is missing. Rules already present, including ones added by
+  hand, keep their place; missing ones are appended in the order below.
+
+  A modify-template for the reasons given in modify_dot_claude.json at the source
+  root, which also explain why it has no .tmpl suffix. When nothing is missing,
+  the current content is returned byte for byte; a real change re-serialises the
+  file, and toPrettyJson then sorts its keys. Invalid JSON fails the template
+  instead of replacing the file.
+*/ -}}
+{{- $rules := list
+      "Bash(git:*)" "Bash(chezmoi:*)" "Bash(ls:*)" "Bash(cat:*)" "Bash(head:*)"
+      "Bash(tail:*)" "Bash(find:*)" "Bash(grep:*)" "Bash(rg:*)" "Bash(gh:*)"
+      "Bash(test:*)" "Bash(echo:*)" "Bash(chmod:*)" "Bash(mkdir:*)" "Bash(cp:*)"
+      "Bash(mv:*)" "Read" "Edit" "Write" "Glob" "Grep" "WebSearch" "mcp__github__*" -}}
+{{- $settings := dict -}}
+{{- if trim .chezmoi.stdin -}}
+{{-   $settings = fromJson .chezmoi.stdin -}}
+{{- end -}}
+{{- $changed := false -}}
+{{- if not (hasKey $settings "effortLevel") -}}
+{{-   $_ := set $settings "effortLevel" "high" -}}
+{{-   $changed = true -}}
+{{- end -}}
+{{- $permissions := dict -}}
+{{- if kindIs "map" (get $settings "permissions") -}}
+{{-   $permissions = get $settings "permissions" -}}
+{{- end -}}
+{{- $allow := list -}}
+{{- if kindIs "slice" (get $permissions "allow") -}}
+{{-   $allow = get $permissions "allow" -}}
+{{- end -}}
+{{- $missing := list -}}
+{{- range $rules -}}
+{{-   if not (has . $allow) -}}
+{{-     $missing = append $missing . -}}
+{{-   end -}}
+{{- end -}}
+{{- if $missing -}}
+{{-   $_ := set $permissions "allow" (concat $allow $missing) -}}
+{{-   $_ := set $settings "permissions" $permissions -}}
+{{-   $changed = true -}}
+{{- end -}}
+{{- if $changed -}}
+{{-   warnf "[claude-settings] updated ~/.claude/settings.json (%d permission rules added)" (len $missing) -}}
+{{-   toPrettyJson $settings -}}
+{{- else -}}
+{{-   .chezmoi.stdin -}}
+{{- end -}}

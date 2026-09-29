@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+	"strings"
 	"text/template"
 
 	sprig "github.com/Masterminds/sprig/v3"
@@ -27,6 +28,7 @@ func main() {
 		"joinPath":            func(elem ...string) string { return filepath.Join(elem...) },
 		"mozillaInstallHash":  func(path string) string { return "stub-hash" },
 		"include":             func(name string, data ...interface{}) string { return "" },
+		"includeTemplate":     func(name string, data ...interface{}) string { return "" },
 		"output":              func(name string, args ...string) string { return "" },
 		"replaceAllRegex":     func(pattern, repl, s string) string { return s },
 	}
@@ -53,6 +55,13 @@ func main() {
 		}
 		if !info.IsDir() && filepath.Ext(path) == ".tmpl" {
 			tmplFiles = append(tmplFiles, path)
+		}
+		// Modify-templates are templates without a .tmpl suffix: chezmoi recognises
+		// them by the chezmoi:modify-template marker in a modify_ file.
+		if !info.IsDir() && strings.HasPrefix(info.Name(), "modify_") && filepath.Ext(path) != ".tmpl" {
+			if content, err := os.ReadFile(path); err == nil && strings.Contains(string(content), "chezmoi:modify-template") {
+				tmplFiles = append(tmplFiles, path)
+			}
 		}
 		return nil
 	})

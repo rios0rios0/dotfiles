@@ -127,7 +127,7 @@ dot_aws/                 # Encrypted AWS credentials -> ~/.aws/
 dot_azure/               # Encrypted Azure profile -> ~/.azure/
 private_dot_kube/        # Encrypted Kubernetes configs -> ~/.kube/ (owner-only)
 AppData/                 # Windows Terminal settings (Windows only)
-modify_dot_claude.json.tmpl  # MCP server config for Claude Code -> ~/.claude.json
+modify_dot_claude.json   # MCP server config for Claude Code -> ~/.claude.json
 ```
 
 Chezmoi translates `dot_` prefixes to `.` in the target path (e.g., `dot_zshrc.tmpl` becomes `~/.zshrc`), and `private_` strips group and world permissions from the target (e.g., `private_dot_kube/` becomes `~/.kube` with mode `0700`).
@@ -198,11 +198,11 @@ This repository manages four Claude Code configuration files. Each targets a dif
 | Repository Path | Deployed To | Purpose |
 |-----------------|-------------|---------|
 | `dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global instructions loaded into every Claude Code session (WSL preferences) |
-| `dot_claude/modify_settings.json.tmpl` | `~/.claude/settings.json` | Default permission rules (`allow` list) and effort level |
-| `dot_claude/modify_dot_claude.json.tmpl` | `~/.claude/.claude.json` | Auto-trusts project directories to skip the trust dialog |
-| `modify_dot_claude.json.tmpl` (root) | `~/.claude.json` | User-scoped MCP servers (GitHub, Azure DevOps, SonarQube, Kubernetes) |
+| `dot_claude/modify_settings.json` | `~/.claude/settings.json` | Default permission rules (`allow` list) and effort level |
+| `dot_claude/modify_dot_claude.json` | `~/.claude/.claude.json` | Auto-trusts project directories to skip the trust dialog |
+| `modify_dot_claude.json` (root) | `~/.claude.json` | User-scoped MCP servers (GitHub, Azure DevOps, SonarQube, Kubernetes) |
 
-The three `modify_*.tmpl` files are chezmoi [modify scripts](https://www.chezmoi.io/reference/source-state-attributes/#modify): they receive the current file content on stdin, merge desired settings via embedded Python, and output the result. This preserves any user-added configuration while ensuring defaults are always present.
+The three `modify_*` files are chezmoi [modify-templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file): chezmoi evaluates them itself, with the file's current content in `.chezmoi.stdin`, and writes back the merged result, so they need neither bash nor Python and run on Windows too. This preserves any user-added configuration while ensuring defaults are always present, and a file that already holds every default is left byte for byte untouched.
 
 > **Note**: The `dot_claude/` directory is deployed only on **Windows** and **Android** (excluded on Linux via `.chezmoiignore`).
 
