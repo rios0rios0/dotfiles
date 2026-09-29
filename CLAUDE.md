@@ -21,6 +21,7 @@ make test-chezmoiignore             # platform file inclusion logic
 make test-script-order              # script dependency ordering
 make test-modify-scripts            # modify script (merge) behavior
 make test-remove-dependencies       # dependency removal library (tombstones, $HOME safety rail)
+make test-remove-dependencies-windows # Windows removal script, failed removals reported (needs pwsh)
 make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
 make test-shell-credentials         # 1Password credential/workspace loading and removal
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
@@ -193,12 +194,14 @@ This repository is a **sync**, not a bootstrapper. Deleting an `install_*()` fun
 **When removing a dependency, always do all three:**
 
 1. Delete the `install_*()` function (or package-list entry) from the platform installer.
-2. Add a `"<strategy>:<target>"` tombstone to the removal script of **every** platform that installed it, with a comment referencing the removing commit.
+2. Add a `"<strategy>:<target>"` tombstone to the removal script of **every** platform that installed it, with a comment referencing the pull request that removed it. Not a commit hash from the feature branch: a rebase before merge rewrites it, which is how the `keychain` entries came to cite `9b19f46`, a commit that never reached `main`.
 3. Add any orphaned config directory to `.chezmoiremove`.
 
 Strategies live in `.chezmoitemplates/lib-remove-dependencies.sh` (shared by Linux and Android; Windows has its own inline set): `apt`, `gh_extension`, `npm_global`, `path`, `pipx`, `winget`. Every handler is idempotent and silent when the target is already absent.
 
-`remove_path` refuses any target outside `$HOME` — these scripts run unattended, so never widen that guard. `make test-remove-dependencies` covers it.
+A removal that leaves its target behind is reported (`WARN: failed to remove ...`), never counted as removed. The Windows handlers decide that by checking whether the package or path is still there, not by the uninstaller's exit code, which can be 0 when nothing was removed. The scripts still exit 0, so a failed removal is not retried until the tombstone list changes.
+
+`remove_path` refuses any target outside `$HOME` — these scripts run unattended, so never widen that guard. `make test-remove-dependencies` covers it, and `make test-remove-dependencies-windows` covers the Windows script (it needs `pwsh`, which CI installs).
 
 See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-manager was evaluated and rejected (it cannot cover Windows-native or Termux).
 

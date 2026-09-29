@@ -58,7 +58,11 @@ TOMBSTONES=(
 
 Strategies are implemented once in `.chezmoitemplates/lib-remove-dependencies.sh`
 (shared by Linux and Android) and inline in the Windows script. Every handler is
-idempotent, so a clean machine produces no output.
+idempotent, so a clean machine produces no output. A removal that leaves its
+target behind is reported (`WARN: failed to remove ...`) and never counted as
+removed; the Windows handlers check whether the package or path is still there
+rather than trusting the uninstaller's exit code, which can be 0 when nothing was
+removed.
 
 | Strategy | Platforms | Removes |
 |----------|-----------|---------|
@@ -80,7 +84,11 @@ list changes and skips them otherwise.
    script for every platform that installed it, with the strategy that undoes how
    it was installed.
 3. **Add any leftover config directory** to `.chezmoiremove`.
-4. Reference the removing commit in a comment so the entry can be retired later.
+4. Reference the pull request that removed it in a comment (`removed in #209`) so
+   the entry can be retired later. A commit hash is only safe once it is on
+   `main`: rebasing the feature branch before merge rewrites it, which is how the
+   `keychain` entries came to cite `9b19f46`, a commit `main` never had, instead
+   of `bec4050`.
 5. Add a changelog fragment — `CHANGELOG.md` is generated from them and never
    edited by hand:
    ```bash
@@ -152,7 +160,12 @@ These are accepted trade-offs, not oversights.
   Termux needs no privilege escalation and is unaffected.
 - **Entries can be retired, but only deliberately.** Once every machine has
   converged, a tombstone can be deleted. There is no signal for when that is true,
-  so the commit reference in each comment is the only dating mechanism.
+  so the reference in each comment is the only dating mechanism.
+- **A failed removal is reported, not retried.** The scripts exit 0 even when a
+  removal fails, so one stuck package cannot fail every apply. chezmoi therefore
+  records the run, and the removal is attempted again only when the tombstone list
+  changes. On Windows, a per-machine package (an MSI that registers a service)
+  needs an elevated apply to uninstall.
 
 True reconciliation — recording what the repository installed and diffing it
 against a declared manifest — would remove the first limitation at the cost of
