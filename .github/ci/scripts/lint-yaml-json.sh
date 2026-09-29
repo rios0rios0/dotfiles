@@ -6,7 +6,9 @@ EXIT_CODE=0
 
 echo "[lint-syntax] validating YAML/JSON files..." >&2
 
-# Validate JSON files (skip .tmpl files and .git directory)
+# Validate JSON files (skip .tmpl files and .git directory). modify_ files are
+# skipped too: a modify-template holds template code, not JSON, and the JSON it
+# produces is checked by test-modify-scripts.sh.
 while IFS= read -r -d '' file; do
     rel=$(realpath --relative-to="$REPO_ROOT" "$file")
     if ! jq empty "$file" 2>/dev/null; then
@@ -15,7 +17,7 @@ while IFS= read -r -d '' file; do
     else
         echo "[lint-syntax] PASS: $rel" >&2
     fi
-done < <(find "$REPO_ROOT" -name '*.json' -not -path '*/.git/*' -not -path '*/.github/ci/*' -not -name '*.tmpl' -print0)
+done < <(find "$REPO_ROOT" -name '*.json' -not -path '*/.git/*' -not -path '*/.github/ci/*' -not -name '*.tmpl' -not -name 'modify_*' -print0)
 
 # Validate YAML files
 while IFS= read -r -d '' file; do

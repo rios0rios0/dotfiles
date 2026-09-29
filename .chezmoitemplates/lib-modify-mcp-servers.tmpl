@@ -1,0 +1,102 @@
+{{- /*
+  Shared MCP server merge for modify_dot_claude.json (~/.claude.json) and
+  dot_config/mcphub/modify_servers.json. Both are chezmoi modify-templates, so this
+  runs inside chezmoi on every platform, Windows included -- no bash, no python3.
+
+  Called through includeTemplate with a dict: "stdin" is the target's current
+  content, "os" is .chezmoi.os, and "file" names the target in the log line.
+
+  Each server below is written under "mcpServers", replacing an entry of the same
+  name; other servers and every other key are left as they are. When all of them
+  already match, the current content is returned byte for byte, so the file keeps
+  the layout its owner wrote. Only a real change re-serialises it, and toPrettyJson
+  then sorts the keys, because Go maps keep no order.
+
+  Invalid JSON in the target fails the template instead of replacing the file.
+*/ -}}
+{{- /*
+  One variable name per line: gitleaks' generic-api-key rule reads a *_TOKEN name
+  followed by a quoted string on the same line (an image name here) as a secret.
+*/ -}}
+{{- $servers := fromJson `{
+  "github": {
+    "type": "stdio",
+    "command": "docker",
+    "args": [
+      "run", "-i", "--rm",
+      "-e", "GITHUB_PERSONAL_ACCESS_TOKEN",
+      "ghcr.io/github/github-mcp-server"
+    ],
+    "env": {
+      "GITHUB_PERSONAL_ACCESS_TOKEN": "${GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  },
+  "azure-devops": {
+    "type": "stdio",
+    "command": "docker",
+    "args": [
+      "run", "-i", "--rm",
+      "-e", "ADO_ORG",
+      "-e", "ADO_MCP_AUTH_TOKEN",
+      "ghcr.io/helgeu/ado-mcp-docker-img"
+    ],
+    "env": {
+      "ADO_ORG": "${ADO_ORGANIZATION_NAME}",
+      "ADO_MCP_AUTH_TOKEN": "${ADO_PERSONAL_ACCESS_TOKEN}"
+    }
+  },
+  "sonarqube": {
+    "command": "docker",
+    "args": [
+      "run", "-i", "--rm",
+      "-e", "SONARQUBE_URL",
+      "-e", "SONARQUBE_TOKEN",
+      "mcp/sonarqube"
+    ],
+    "env": {
+      "SONARQUBE_URL": "${SONARQUBE_URL}",
+      "SONARQUBE_TOKEN": "${SONARQUBE_TOKEN}"
+    }
+  },
+  "kubernetes": {
+    "type": "stdio",
+    "command": "npx",
+    "args": [
+      "-y",
+      "kubernetes-mcp-server@latest"
+    ]
+  }
+}` -}}
+{{- if eq .os "android" -}}
+{{-   $servers = fromJson `{
+  "github": {
+    "type": "http",
+    "url": "https://api.githubcopilot.com/mcp/",
+    "headers": {
+      "Authorization": "Bearer ${GITHUB_PERSONAL_ACCESS_TOKEN}"
+    }
+  }
+}` -}}
+{{- end -}}
+{{- $config := dict -}}
+{{- if trim .stdin -}}
+{{-   $config = fromJson .stdin -}}
+{{- end -}}
+{{- $current := dict -}}
+{{- if kindIs "map" (get $config "mcpServers") -}}
+{{-   $current = get $config "mcpServers" -}}
+{{- end -}}
+{{- $changed := list -}}
+{{- range $name, $server := $servers -}}
+{{-   if ne (toJson (get $current $name)) (toJson $server) -}}
+{{-     $_ := set $current $name $server -}}
+{{-     $changed = append $changed $name -}}
+{{-   end -}}
+{{- end -}}
+{{- if $changed -}}
+{{-   $_ := set $config "mcpServers" $current -}}
+{{-   warnf "[mcp-servers] set %s in %s" (join ", " $changed) .file -}}
+{{-   toPrettyJson $config -}}
+{{- else -}}
+{{-   .stdin -}}
+{{- end -}}

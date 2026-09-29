@@ -1,0 +1,48 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Pre-accepts Claude Code's trust dialog in ~/.claude/.claude.json for the home
+  directory, the development base, and every repository cloned under it.
+
+  A modify-template for the reasons given in modify_dot_claude.json at the source
+  root, which also explain why it has no .tmpl suffix. Paths go through joinPath,
+  so each uses the platform's own separators -- the form Claude Code records for a
+  project there. glob is given forward slashes, which it expects on every platform.
+
+  When every directory is already trusted, the current content is returned byte
+  for byte; only a newly trusted directory re-serialises the file, and toPrettyJson
+  then sorts its keys. Invalid JSON fails the template instead of replacing the file.
+*/ -}}
+{{- $home := joinPath .chezmoi.homeDir -}}
+{{- $dirs := list $home (joinPath $home "Development" "github.com" "rios0rios0") -}}
+{{- range glob (printf "%s/Development/github.com/rios0rios0/*" .chezmoi.homeDir) -}}
+{{-   if (stat .).isDir -}}
+{{-     $dirs = append $dirs (joinPath .) -}}
+{{-   end -}}
+{{- end -}}
+{{- $config := dict -}}
+{{- if trim .chezmoi.stdin -}}
+{{-   $config = fromJson .chezmoi.stdin -}}
+{{- end -}}
+{{- $projects := dict -}}
+{{- if kindIs "map" (get $config "projects") -}}
+{{-   $projects = get $config "projects" -}}
+{{- end -}}
+{{- $trusted := list -}}
+{{- range $dirs -}}
+{{-   $project := dict -}}
+{{-   if kindIs "map" (get $projects .) -}}
+{{-     $project = get $projects . -}}
+{{-   end -}}
+{{-   if ne (toJson (get $project "hasTrustDialogAccepted")) "true" -}}
+{{-     $_ := set $project "hasTrustDialogAccepted" true -}}
+{{-     $_ := set $projects . $project -}}
+{{-     $trusted = append $trusted . -}}
+{{-   end -}}
+{{- end -}}
+{{- if $trusted -}}
+{{-   $_ := set $config "projects" $projects -}}
+{{-   warnf "[claude-trust] trusted %d more directories in ~/.claude/.claude.json" (len $trusted) -}}
+{{-   toPrettyJson $config -}}
+{{- else -}}
+{{-   .chezmoi.stdin -}}
+{{- end -}}

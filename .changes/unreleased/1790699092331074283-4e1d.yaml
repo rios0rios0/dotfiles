@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed three Windows package IDs that winget could not resolve exactly: `PerformanceTest` is now `PassMark.PerformanceTest`, `Microsoft.AzureStorageExplorer` is now `Microsoft.Azure.StorageExplorer`, and `Brother.FullDriver`, which is not in the winget source, is commented out and documented as a manual install'
+time: '2026-09-29T16:24:52.330886867Z'

@@ -133,8 +133,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      # The JSON modify_ files are modify-templates, which only run inside chezmoi.
+      - name: 'Install chezmoi'
+        run: |
+          cd "$(mktemp -d)"
+          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive" chezmoi
+          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
       - name: Install tools
-        run: sudo apt-get install -y jq python3
+        run: 'sudo apt-get install -y jq'
       - name: Test modify scripts
         run: make test-modify-scripts
 
@@ -162,6 +173,23 @@ jobs:
           sudo apt-get install -y powershell
       - name: 'Test Windows dependency removal script'
         run: 'make test-remove-dependencies-windows'
+
+  test-install-dependencies-windows:
+    name: 'Test (dependency installer, Windows)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Install PowerShell'
+        run: |
+          sudo apt-get install -y wget apt-transport-https software-properties-common
+          source /etc/os-release
+          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          rm packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
+      - name: 'Test Windows dependency installer'
+        run: 'make test-install-dependencies-windows'
 
   test-prune-tmp-modcache:
     name: Test (TMPDIR module cache pruning)

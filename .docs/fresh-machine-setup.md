@@ -38,7 +38,7 @@ both cases. Name the note after that normalized form: a hostname or `CHEZMOI_DEV
 means `Device: my-laptop`. On Windows and WSL the hostname is fine. On Termux the hostname is
 `localhost`, so `CHEZMOI_DEVICE` has to be exported before the first apply (Phase 5).
 
-The MCP servers in `~/.claude.json` are not a render-time dependency: `modify_dot_claude.json.tmpl`
+The MCP servers in `~/.claude.json` are not a render-time dependency: `modify_dot_claude.json`
 writes `${GITHUB_PERSONAL_ACCESS_TOKEN}`, `${ADO_PERSONAL_ACCESS_TOKEN}`, `${ADO_ORGANIZATION_NAME}`,
 `${SONARQUBE_URL}` and `${SONARQUBE_TOKEN}` placeholders that Claude Code expands from the environment,
 so those names need `cred:` fields on the device note. Nothing about them blocks the first apply.
@@ -62,7 +62,8 @@ winget manifest, or with a manifest that is broken (the `#TODO` comments in
 | AIDA64 OSD label order                                          | `[manual]`        | Configured in the AIDA64 UI after Phase 3.                                                                                   |
 | ASUS GPU Tweak III                                              | `[manual]`        | `Asus.GPUTweak` sits in the commented-out `$hardwareDesktop` array (RTX 4090 desktop only).                                  |
 | NVIDIA App                                                      | `[manual]`        | nvidia.com download.                                                                                                         |
-| Logitech G HUB, Brother full driver, PassMark PerformanceTest   | `[automated]`     | `Logitech.GHUB`, `Brother.FullDriver` and `PerformanceTest` in `$hardware`. Phase 3 installs them.                           |
+| Logitech G HUB, PassMark PerformanceTest                        | `[automated]`     | `Logitech.GHUB` and `PassMark.PerformanceTest` in `$hardware`. Phase 3 installs them.                                        |
+| Brother full driver                                             | `[manual]`        | Not in the winget source, so `Brother.FullDriver` is commented out; download the model's package from support.brother.com.   |
 | Lian Li L-Connect 3, Samsung Magician                           | `[manual]`        | Vendor downloads.                                                                                                            |
 | CyberPower PowerPanel Personal, APC PowerChute                  | `[manual]`        | `CyberPowerSystems.PowerPanel.Personal` is in the commented-out `$utilitiesDesktop` array; PowerChute is a vendor download.  |
 
@@ -123,7 +124,7 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 
 | Step | Script                                                                                       | Marker        | What it does                                                                                                                                                                        |
 |------|----------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1    | `run_once_before_windows-001-install-dependencies.ps1`                                       | `[automated]` | 52 winget packages, skipping the ones `winget export` already lists, plus RustDesk from its GitHub release (section 3.3).                                                           |
+| 1    | `run_once_before_windows-001-install-dependencies.ps1`                                       | `[automated]` | 51 packages (Spotify from the Microsoft Store, the rest from winget), skipping any that `winget list` finds under its exact ID, plus RustDesk from its GitHub release (section 3.3). |
 | 2    | `run_once_before_windows-002-configure-dependencies.ps1`                                     | `[partial]`   | Phase 2. It also runs `nvm install --lts`, which fails on the very first pass because NVM for Windows is not on `PATH` yet; run it again from a new terminal.                         |
 | 3    | `run_once_before_windows-003-install-fonts.ps1`                                              | `[automated]` | MesloLGS NF, Meslo Nerd Font and FiraCode Nerd Font into `$env:WINDIR\Fonts` plus the `HKLM` font registry entries. Needs the elevated shell.                                       |
 | 4    | `run_once_before_windows-004-export-private-key.ps1`                                         | `[automated]` | Writes the age identity from `op://personal/Chezmoi Key/private key` to `~\.ssh\chezmoi`.                                                                                           |
@@ -137,11 +138,16 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 ### 3.3 What the winget pass installs
 
 - `$requirements`: `AgileBits.1Password`, `AgileBits.1Password.CLI`, `FiloSottile.age`, `Git.Git`, `JanDeDobbeleer.OhMyPosh`, `Microsoft.PowerShell`, `Microsoft.WSL`, `Microsoft.WindowsTerminal`
-- `$hardware`: `Brother.FullDriver`, `CPUID.CPU-Z.ROG`, `FinalWire.AIDA64.Extreme`, `Logitech.GHUB`, `PerformanceTest`
-- `$utilities`: `Adobe.Acrobat.Reader.64-bit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.CCleaner`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `Spotify.Spotify`, `Oracle.VirtualBox`
+- `$hardware`: `CPUID.CPU-Z.ROG`, `FinalWire.AIDA64.Extreme`, `Logitech.GHUB`, `PassMark.PerformanceTest`
+- `$utilities`: `Adobe.Acrobat.Reader.64-bit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.CCleaner`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `msstore:9NCBCSZSJRSB` (Spotify, Microsoft Store edition), `Oracle.VirtualBox`
 - `$communication`: `SlackTechnologies.Slack`, `Discord.Discord`, `Zoom.Zoom.EXE`
-- `$development`: `Anthropic.ClaudeCode`, `CoreyButler.NVMforWindows`, `Docker.DockerDesktop`, `ExpressVPN.ExpressVPN`, `GitHub.cli`, `GitHub.Copilot`, `GoLang.Go`, `JetBrains.Toolbox`, `Microsoft.AzureStorageExplorer`, `Microsoft.VisualStudio.2022.Community`, `Mirantis.Lens`, `OpenAI.Codex`, `OpenVPNTechnologies.OpenVPNConnect`, `Postman.Postman`, `BurntSushi.ripgrep.MSVC`, `jqlang.jq`, `MikeFarah.yq`, `sharkdp.bat`, `koalaman.shellcheck`
+- `$development`: `Anthropic.ClaudeCode`, `CoreyButler.NVMforWindows`, `Docker.DockerDesktop`, `ExpressVPN.ExpressVPN`, `GitHub.cli`, `GitHub.Copilot`, `GoLang.Go`, `JetBrains.Toolbox`, `Microsoft.Azure.StorageExplorer`, `Microsoft.VisualStudio.2022.Community`, `Mirantis.Lens`, `OpenAI.Codex`, `OpenVPNTechnologies.OpenVPNConnect`, `Postman.Postman`, `BurntSushi.ripgrep.MSVC`, `jqlang.jq`, `MikeFarah.yq`, `sharkdp.bat`, `koalaman.shellcheck`
 - `$gaming`: `ElectronicArts.EADesktop`, `EpicGames.EpicGamesLauncher`, `GOG.Galaxy`, `Valve.Steam`
+
+An entry counts as installed when `winget list --id <id> --exact --source <source>` finds it;
+an entry written `msstore:<id>` comes from the Microsoft Store source. Spotify is one: the
+`Spotify.Spotify` installer refuses to run beside the Store edition (exit code 29). A failed install
+prints a `WARN` with winget's exit code, and the run ends with a list of everything not installed.
 
 RustDesk is installed right after `$utilities`, but not through winget: its publisher had every
 version removed from winget in March 2026, after the package was falsely flagged as malware
@@ -152,9 +158,9 @@ RustDesk's publisher. It skips machines where RustDesk is already installed, whe
 or the MSI. The MSI installs per machine, so a non-elevated apply shows a UAC prompt for it.
 
 Commented out in the script with the reason, so `[manual]`: `Asus.ArmouryCrate` (never detected as
-installed), `Blizzard.BattleNet` (asks for a path and never installs), `Ubisoft.Connect` (hash
-mismatch, Windows blocks the installer), and the desktop-only `Asus.GPUTweak` and
-`CyberPowerSystems.PowerPanel.Personal`.
+installed), `Brother.FullDriver` (not in the winget source), `Blizzard.BattleNet` (asks for a path
+and never installs), `Ubisoft.Connect` (hash mismatch, Windows blocks the installer), and the
+desktop-only `Asus.GPUTweak` and `CyberPowerSystems.PowerPanel.Personal`.
 
 **Verify:**
 
@@ -447,7 +453,7 @@ repository does today. Script paths are under `.chezmoiscripts/`; winget IDs ref
 |---------------|-----------------------------------------------------------------|
 | 1Password     | `[automated]` `AgileBits.1Password` (winget build, not the Store one) |
 | WhatsApp      | `[manual]`                                                      |
-| Spotify       | `[automated]` `Spotify.Spotify`                                 |
+| Spotify       | `[automated]` `msstore:9NCBCSZSJRSB` (Store edition)            |
 | Telegram      | `[manual]`                                                      |
 | TranslucentTB | `[automated]` `CharlesMilette.TranslucentTB`                    |
 | CineBench     | `[manual]`                                                      |
@@ -461,7 +467,7 @@ repository does today. Script paths are under `.chezmoiscripts/`; winget IDs ref
 |-------------------------------------|----------------------------------------------------------------------------------------------|
 | Notion                              | `[manual]`                                                                                   |
 | Grammarly                           | `[automated]` `Grammarly.Grammarly`                                                          |
-| PassMark PerformanceTest            | `[automated]` `PerformanceTest`                                                              |
+| PassMark PerformanceTest            | `[automated]` `PassMark.PerformanceTest`                                                     |
 | EaseUS Partition Master Professional | `[automated]` `EaseUS.PartitionMaster`; the license is `[manual]`                            |
 | Revo Uninstaller Pro                | `[automated]` `RevoUninstaller.RevoUninstallerPro`; the license is `[manual]`                |
 | Adobe Acrobat Reader                | `[automated]` `Adobe.Acrobat.Reader.64-bit`                                                  |
@@ -474,7 +480,7 @@ repository does today. Script paths are under `.chezmoiscripts/`; winget IDs ref
 | Zoom Workplace                      | `[automated]` `Zoom.Zoom.EXE`                                                                |
 | Authy Desktop                       | `[manual]`, discontinued upstream                                                            |
 | GIMP                                | `[automated]` `GIMP.GIMP`                                                                    |
-| Brother Full Setup                  | `[automated]` `Brother.FullDriver`                                                           |
+| Brother Full Setup                  | `[manual]` not in the winget source                                                          |
 | `sudo apt install pdftk imagemagick` | `[manual]` on WSL: neither is installed there; `pdftk` is on Windows (`PDFLabs.PDFtk.Free`) and baremetal Linux |
 | CyberPower Personal                 | `[manual]`, `CyberPowerSystems.PowerPanel.Personal` commented out (desktop only)             |
 
@@ -509,7 +515,7 @@ repository does today. Script paths are under `.chezmoiscripts/`; winget IDs ref
 | WSL: `az`                                                   | `[automated]` `install_azure_cli`                                                                        |
 | WSL: sqlite3, jq, age, inotify-tools                        | `[automated]` apt arrays                                                                                 |
 | WSL: chezmoi                                                | `[automated]` by the `get.chezmoi.io` one-liner                                                          |
-| Microsoft Azure Storage Explorer                            | `[automated]` `Microsoft.AzureStorageExplorer`                                                           |
+| Microsoft Azure Storage Explorer                            | `[automated]` `Microsoft.Azure.StorageExplorer`                                                          |
 | Postman                                                     | `[automated]` `Postman.Postman`                                                                          |
 | Draw.io, NiceHash Miner                                     | `[manual]`, both still question marks on the checklist                                                   |
 

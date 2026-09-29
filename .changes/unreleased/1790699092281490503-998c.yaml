@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed the Windows installer reinstalling packages that were already installed and announcing failed installs as successes: it now asks `winget list --id <id> --exact` for each package instead of trusting `winget export`, which left out installed packages (GIMP, Codex, yq, ShellCheck, the Copilot CLI and the EA app), installs Spotify as the Microsoft Store edition (`msstore:9NCBCSZSJRSB`) because the `Spotify.Spotify` installer exits 29 beside it, and reports a failed install as a `WARN` with winget''s exit code, listing every failure at the end'
+time: '2026-09-29T16:24:52.281391495Z'
