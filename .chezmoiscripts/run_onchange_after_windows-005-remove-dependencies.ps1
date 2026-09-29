@@ -93,6 +93,9 @@ $removalHandlers = @{
 # first, and reference the commit that dropped the installer so the entry can be
 # retired once every machine has converged.
 $tombstones = @(
+    # Chrome Remote Desktop Host -- removed in #209 (2026-09-29)
+    "winget:Google.ChromeRemoteDesktopHost",
+
     # Cursor and Gemini CLI -- removed in 601cbeb (2026-07-21)
     "winget:Anysphere.Cursor",
     "npm_global:@google/gemini-cli"

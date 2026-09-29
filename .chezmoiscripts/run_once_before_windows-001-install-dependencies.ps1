@@ -69,7 +69,6 @@ $utilities = @(
     "CharlesMilette.TranslucentTB",
     "EaseUS.PartitionMaster",
     "GIMP.GIMP",
-    "Google.ChromeRemoteDesktopHost",
     "Grammarly.Grammarly",
     "Microsoft.OneDrive",
     "Notepad++.Notepad++",
