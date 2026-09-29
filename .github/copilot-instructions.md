@@ -188,7 +188,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_*` files: Managed dotfiles (become `.filename` in home directory)
 - `dot_*.tmpl`: Template files processed by chezmoi (e.g., `dot_zshrc.tmpl` → `~/.zshrc`)
 - `encrypted_*.age`: Encrypted files using age encryption (format: "age encrypted file, ASCII armored")
-- `.chezmoi.yaml.tmpl`: Main chezmoi config — sets age encryption and platform-specific `op` command path
+- `.chezmoi.yaml.tmpl`: Main chezmoi config — sets age encryption, the platform-specific `op` command path and `data.deviceName`. Only `chezmoi init` re-renders it, so `.chezmoiscripts/run_before_000-verify-chezmoi-config.tmpl` stops an apply whose config predates a data key; add every new `data:` key to that guard
 - `.chezmoiignore`: Platform-conditional file exclusion (uses Go templates with `.chezmoi.os`)
 - `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
@@ -511,7 +511,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

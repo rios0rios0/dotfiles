@@ -95,6 +95,23 @@ Commonly used chezmoi template variables in this repo:
 - `onepassword` — Fetch full item by name/UUID from 1Password (preferred — returns `.title` + `.fields`)
 - `onepasswordRead` — Fetch a single scalar field by `op://` URI (use only for simple direct reads)
 
+## Config Data Comes From `chezmoi init`, Never From Apply
+
+`.chezmoi.yaml.tmpl` is rendered into `~/.config/chezmoi/chezmoi.yaml` by `chezmoi init`
+only -- `chezmoi apply` and `chezmoi update` never re-render it -- so a key added under its
+`data:` (like `deviceName`) does not exist on a machine until init runs there again. chezmoi
+prints `config file template has changed, run chezmoi init to regenerate config file` at the
+top of each apply, which is easy to lose above a long installer run, and
+`chezmoi apply --force` silences it without regenerating anything. A Windows config written
+in January from the template before `deviceName` existed stayed that way for months, hidden
+behind the `.claude.json` failure that aborted every apply earlier in the same run.
+
+`.chezmoiscripts/run_before_000-verify-chezmoi-config.tmpl` makes that gap loud. It renders
+to nothing when every data key is present, so chezmoi never executes it, and otherwise
+fails the apply before any installer with an instruction to run `chezmoi init`. **When adding
+a key under `data:` in `.chezmoi.yaml.tmpl`, add it to that guard's list too.**
+`make test-template-render` covers both directions.
+
 ## 1Password Template Pattern
 
 Each device has a single **"Device: \<deviceName\>"** Secure Note in the `personal` vault. The note combines two storage mechanisms:
@@ -181,7 +198,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
