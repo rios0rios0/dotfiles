@@ -22,6 +22,7 @@ make test-script-order              # script dependency ordering
 make test-modify-scripts            # modify script (merge) behavior
 make test-remove-dependencies       # dependency removal library (tombstones, $HOME safety rail)
 make test-remove-dependencies-windows # Windows removal script, failed removals reported (needs pwsh)
+make test-install-dependencies-windows # Windows installer: detection by exact ID, failed installs reported (needs pwsh)
 make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
 make test-shell-credentials         # 1Password credential/workspace loading and removal
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
@@ -633,6 +634,22 @@ systemctl --user status ssh-agent-bridge.socket  # should be active (listening)
 
 The bridge needs systemd in WSL (`systemd=true` under `[boot]` in `/etc/wsl.conf`). Without
 it the installer warns and exits 0, leaving `SSH_AUTH_SOCK` pointing at nothing.
+
+## Windows Package Detection (winget list, Not export)
+
+`Install-PackageList` in `run_once_before_windows-001-install-dependencies.ps1` decides what is
+already installed with `winget list --id <id> --exact --source <source>`, one call per entry
+(about 1.3 s each). It used to read `winget export` once, which looked cheaper and was wrong:
+export leaves out packages that are installed -- on the machine this was found on it omitted
+GIMP, Codex, yq, ShellCheck, the Copilot CLI and the EA app -- so every run installed them again.
+
+| Rule | Why |
+|------|-----|
+| Every entry is an **exact** ID in its source | Detection and install both pass `--exact`. Without it `winget install` accepts a partial match, which is how `PerformanceTest` quietly meant `PassMark.PerformanceTest` while never counting as installed. Check a new entry with `winget show --id <id> --exact --source <source>` |
+| `msstore:<id>` names a Microsoft Store app | Spotify is `msstore:9NCBCSZSJRSB`: the Store edition is what the machine had, and the `Spotify.Spotify` installer refuses to run beside it (exit code 29, logged as `A Windows Store install of Spotify is already on the system`). winget matches a Store app to its ID only when asked in the `msstore` source |
+| A failed install is a `WARN`, never "installed successfully" | The script prints winget's exit code and ends with the list of everything that failed, RustDesk included. It still exits 0, because a failing `run_once_before_` script aborts the apply before any file is written; the cost is that a failed package is retried only when the script changes |
+
+`make test-install-dependencies-windows` runs `Install-PackageList` against a stubbed `winget`.
 
 ## RustDesk on Windows (GitHub Release, Not winget)
 

@@ -1,34 +1,43 @@
-# Retrieve installed packages in JSON format and extract their IDs.
-$tempFile = [System.IO.Path]::GetTempFileName() -replace '\.tmp$', '.json'
-winget export --output $tempFile | Out-Null
-$installedPackageIds = @()
-if (Test-Path $tempFile) {
-    $json = Get-Content $tempFile -Raw | ConvertFrom-Json
-    $installedPackageIds = $json.Sources.Packages | ForEach-Object { $_.PackageIdentifier }
-    Remove-Item $tempFile -Force
-}
+$prefix = "install-deps"
+$script:failed = @()
 
-function Is-PackageInstalled {
+# True when winget lists the package as installed under exactly this ID and source.
+# `winget export` is no substitute: it leaves out packages that are installed -- it
+# omitted GIMP, Codex, yq, ShellCheck, the Copilot CLI and the EA app on the machine
+# this was found on -- so every run went back to installing them again.
+function Test-PackageInstalled {
     param (
-        [string]$packageId
+        [string]$Id,
+        [string]$Source
     )
-    # Check if the array of installed package IDs contains the specific package ID.
-    return $installedPackageIds -contains $packageId
+
+    winget list --id $Id --exact --source $Source --accept-source-agreements --disable-interactivity 2>$null | Out-Null
+    return $LASTEXITCODE -eq 0
 }
 
+# Install each package that is not installed yet. An entry is a winget ID, or
+# "<source>:<id>" for another winget source, e.g. "msstore:<id>" for a Store app.
 function Install-PackageList {
     param (
         [string[]]$packageList
     )
 
-    foreach ($package in $packageList) {
-        if (-not (Is-PackageInstalled -packageId $package)) {
-            # Install the package using its exact ID.
-            winget install --id $package --source winget --accept-package-agreements --accept-source-agreements
-            Write-Host "$package installed successfully..."
+    foreach ($entry in $packageList) {
+        $source, $id = if ($entry.Contains(":")) { $entry -split ":", 2 } else { "winget", $entry }
+
+        if (Test-PackageInstalled -Id $id -Source $source) {
+            Write-Host "[$prefix] $id is already installed..."
+            continue
+        }
+
+        winget install --id $id --exact --source $source --accept-package-agreements --accept-source-agreements
+        $exitCode = $LASTEXITCODE
+        if ($exitCode -eq 0) {
+            Write-Host "[$prefix] $id installed successfully..."
         }
         else {
-            Write-Host "$package is already installed..."
+            Write-Host "[$prefix] WARN: $id was not installed (winget exit code $exitCode)"
+            $script:failed += $id
         }
     }
 }
@@ -90,6 +99,7 @@ function Install-RustDesk {
     }
     catch {
         Write-Host "[rustdesk] WARN: not installed: $_"
+        $script:failed += "RustDesk"
         return
     }
 
@@ -103,8 +113,13 @@ function Install-RustDesk {
     }
     else {
         Write-Host "[rustdesk] WARN: msiexec exited with $($process.ExitCode), RustDesk is not installed"
+        $script:failed += "RustDesk"
     }
 }
+
+# Dot-sourcing the script, as `make test-install-dependencies-windows` does, stops
+# here with the functions defined; running it installs the lists below.
+if ($MyInvocation.InvocationName -eq ".") { return }
 
 # =========================================================================================================
 # Requirements for this repository to work properly
@@ -123,11 +138,11 @@ Install-PackageList $requirements
 # Hardware
 $hardware = @(
     #"Asus.ArmouryCrate",            # TODO: it's never found. Always asking to install
-    "Brother.FullDriver",
+    #"Brother.FullDriver",           # TODO: not in the winget source (Brother has only BRAdmin and iPrint&Scan there)
     "CPUID.CPU-Z.ROG",
     "FinalWire.AIDA64.Extreme",
     "Logitech.GHUB",
-    "PerformanceTest"
+    "PassMark.PerformanceTest"
 )
 Install-PackageList $hardware
 # Hardware for Desktop
@@ -149,7 +164,7 @@ $utilities = @(
     "Piriform.CCleaner",
     "Piriform.Recuva",
     "RevoUninstaller.RevoUninstallerPro",
-    "Spotify.Spotify",
+    "msstore:9NCBCSZSJRSB",             # Spotify, the Microsoft Store edition: the Spotify.Spotify installer refuses to run beside it (exit code 29)
     "Oracle.VirtualBox"
 )
 Install-PackageList $utilities
@@ -178,7 +193,7 @@ $development = @(
     "GitHub.Copilot",                   # agentic GitHub Copilot CLI (binary `copilot`)
     "GoLang.Go",
     "JetBrains.Toolbox",
-    "Microsoft.AzureStorageExplorer",
+    "Microsoft.Azure.StorageExplorer",
     "Microsoft.VisualStudio.2022.Community",
     "Mirantis.Lens",
     "OpenAI.Codex",                     # Codex CLI (binary `codex`); winget unpacks the portable release zip
@@ -203,3 +218,6 @@ $gaming = @(
 )
 Install-PackageList $gaming
 # =========================================================================================================
+if ($script:failed) {
+    Write-Host "[$prefix] WARN: $($script:failed.Count) packages were not installed: $($script:failed -join ', ')"
+}

@@ -13,7 +13,7 @@ make test    # template rendering (mock op), .chezmoiignore logic, script order,
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
-Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
+Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
 
 ## Codex CLI Shortcut
 
@@ -134,10 +134,10 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 
 #### Windows Dependencies (`.chezmoiscripts/run_once_before_windows-001-install-dependencies.ps1`)
 - **TIMING**: Takes 30-60 minutes to complete. NEVER CANCEL - Set timeout to 90+ minutes.
-- Uses winget with explicit package IDs (checks already-installed packages before installing)
+- Uses winget with exact package IDs: `winget list --id <id> --exact` decides what is already installed, `msstore:<id>` entries come from the Microsoft Store source (Spotify), and a failed install is reported as a WARN and listed at the end
 - Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
-- Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, Brother drivers, PerformanceTest
-- Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify, VirtualBox, Grammarly, etc.
+- Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, PassMark PerformanceTest
+- Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify (Microsoft Store edition), VirtualBox, Grammarly, etc.
 - Installs RustDesk outside winget (its publisher had it removed from winget): `Install-RustDesk` downloads the pinned MSI from the GitHub release, installs it only after its SHA-256 and its `PURSLANE` Authenticode signer check out, and skips machines where RustDesk is already installed
 - Installs development: Claude Code, GitHub Copilot CLI (`GitHub.Copilot`), Codex CLI (`OpenAI.Codex`), NVM for Windows, Docker Desktop, GitHub CLI, JetBrains Toolbox, Postman, ripgrep, jq, yq, bat, etc.
 - Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy
