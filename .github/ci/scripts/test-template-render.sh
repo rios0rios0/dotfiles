@@ -150,6 +150,36 @@ for platform in linux android; do
     fi
 done
 
+# The config guard must render to nothing for a current config -- chezmoi then
+# never runs it -- and stop a config generated before a data key existed, pointing
+# at `chezmoi init`.
+guard="$REPO_ROOT/.chezmoiscripts/run_before_000-verify-chezmoi-config.tmpl"
+
+# given the test config, which has every data key
+# when
+if output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$guard" 2>&1) &&
+    # then
+    [ -z "${output//[[:space:]]/}" ]; then
+    echo "[test-template-render] PASS: config guard renders to nothing for a current config" >&2
+else
+    echo "[test-template-render] FAIL: config guard is not silent for a current config: $output" >&2
+    EXIT_CODE=1
+fi
+
+# given a config generated before data.deviceName existed
+printf 'onePassword:\n  command: "%s"\n' "$MOCK_OP" > "$TMPDIR/stale.yaml"
+# when
+if output=$(chezmoi execute-template --config="$TMPDIR/stale.yaml" < "$guard" 2>&1); then
+    echo "[test-template-render] FAIL: config guard let a config without deviceName through" >&2
+    EXIT_CODE=1
+# then
+elif grep -q 'run `chezmoi init`' <<<"$output"; then
+    echo "[test-template-render] PASS: config guard stops a config without deviceName and names chezmoi init" >&2
+else
+    echo "[test-template-render] FAIL: config guard failed without pointing at chezmoi init: $output" >&2
+    EXIT_CODE=1
+fi
+
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-template-render] all template rendering tests passed" >&2
 fi

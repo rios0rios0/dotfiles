@@ -1,0 +1,19 @@
+{{- /*
+  Stops `chezmoi apply` before anything runs when the config file lacks data the
+  templates read. Only `chezmoi init` renders ~/.config/chezmoi/chezmoi.yaml from
+  .chezmoi.yaml.tmpl, so a machine initialised before a data key existed keeps a
+  config without it. chezmoi does print "config file template has changed, run
+  chezmoi init" at the top of every apply, but on Windows that line scrolled away
+  under the winget pass, and the apply then died at dot_gitconfig.tmpl with only
+  `map has no entry for key "deviceName"`. `chezmoi apply --force` silences that
+  warning without regenerating the config; this check is not fooled by it.
+
+  It renders to nothing when the config is current, so chezmoi never runs it, and
+  its name sorts before every platform's installers. Add each new data key from
+  .chezmoi.yaml.tmpl to the list below.
+*/ -}}
+{{- range list "deviceName" -}}
+{{-   if not (hasKey $ .) -}}
+{{-     fail (printf "[chezmoi-config] ERROR: the chezmoi config has no %q because it was generated from an older .chezmoi.yaml.tmpl; run `chezmoi init` to regenerate it, then apply again" .) -}}
+{{-   end -}}
+{{- end -}}
