@@ -179,7 +179,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Python (in `modify_*`) | `print("[prefix] message", file=sys.stderr)` |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -609,6 +609,28 @@ systemctl --user status ssh-agent-bridge.socket  # should be active (listening)
 
 The bridge needs systemd in WSL (`systemd=true` under `[boot]` in `/etc/wsl.conf`). Without
 it the installer warns and exits 0, leaving `SSH_AUTH_SOCK` pointing at nothing.
+
+## RustDesk on Windows (GitHub Release, Not winget)
+
+RustDesk is the remote-access tool, and it must **not** go back into the `$utilities` winget
+list: its publisher had every `RustDesk.RustDesk` version removed from winget in March 2026,
+after Microsoft's scan falsely flagged it as malware and it could not be allowlisted again
+([microsoft/winget-pkgs#352094](https://github.com/microsoft/winget-pkgs/issues/352094)).
+`winget install RustDesk.RustDesk` now fails with `No package found`.
+
+`Install-RustDesk` in `run_once_before_windows-001-install-dependencies.ps1` installs the
+release MSI instead, through `Save-VerifiedDownload`:
+
+| Check | Why |
+|-------|-----|
+| SHA-256 pinned to one MSI | Pins the exact bytes. RustDesk publishes no checksum file, so the pin is GitHub's asset `digest`, which on its own proves only that GitHub served what GitHub holds |
+| Authenticode signature `Valid`, signer `PURSLANE` | The provenance the pin lacks: a pin bumped from a tampered release still installs nothing RustDesk did not sign. Verified 2026-09-29: the `1.4.9` MSI and the working manual install share signer thumbprint `4230334F8A7DD84E50D0273EF379E8B4A82F5DA5` |
+| Skipped when an Uninstall entry is named `RustDesk` | The `.exe` installer registers the key `RustDesk`, the MSI its product code, and both use that display name, so a manual install is left alone instead of getting a second copy beside it |
+
+The MSI is per-machine (`ALLUSERS=1`) and registers the `RustDesk` service, so it runs with
+`/passive`, not `/qn`: a non-elevated apply then raises a UAC prompt instead of failing
+silently. To bump the pin, take the new MSI's `digest` from the release API; the signer check
+needs no change unless RustDesk changes certificates.
 
 ## Encryption Setup
 

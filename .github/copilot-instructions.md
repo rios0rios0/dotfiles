@@ -138,6 +138,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
 - Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, Brother drivers, PerformanceTest
 - Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify, VirtualBox, Grammarly, etc.
+- Installs RustDesk outside winget (its publisher had it removed from winget): `Install-RustDesk` downloads the pinned MSI from the GitHub release, installs it only after its SHA-256 and its `PURSLANE` Authenticode signer check out, and skips machines where RustDesk is already installed
 - Installs development: Claude Code, GitHub Copilot CLI (`GitHub.Copilot`), Codex CLI (`OpenAI.Codex`), NVM for Windows, Docker Desktop, GitHub CLI, JetBrains Toolbox, Postman, ripgrep, jq, yq, bat, etc.
 - Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy
 
