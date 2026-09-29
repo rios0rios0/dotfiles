@@ -32,3 +32,6 @@ fabric.properties
 .claude/
 !.claude/settings.json
 .wakatime-project
+
+# Added by ggshield
+.cache_ggshield

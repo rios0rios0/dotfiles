@@ -210,6 +210,8 @@ The three `modify_*` files are chezmoi [modify-templates](https://www.chezmoi.io
 
 The global `~/.gitignore` (managed via `dot_gitignore`) ignores `.claude/` by default to prevent accidentally committing Claude Code's internal files (caches, memory, `settings.local.json`) across all repositories. However, `.claude/settings.json` is explicitly un-ignored because Claude Code designates it as team-shared project configuration — meant to be committed alongside the codebase. Personal or machine-specific settings belong in `.claude/settings.local.json`, which remains ignored.
 
+It also ignores `.cache_ggshield`, which ggshield's global pre-commit hook writes to a repository's root when it finds a secret. On its next run ggshield appends `# Added by ggshield` and `.cache_ggshield` to that repository's own `.gitignore` unless `git check-ignore` already matches the file, so the global entry is what keeps the hook from editing the `.gitignore` of every repository it flags.
+
 ## Chezmoi Conventions
 
 | Prefix/Suffix | Meaning |

@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed ggshield appending `# Added by ggshield` and `.cache_ggshield` to the `.gitignore` of every repository where its pre-commit hook found a secret, by ignoring `.cache_ggshield` in the global `~/.gitignore` (ggshield skips the append when `git check-ignore` already matches its cache)'
+time: '2026-09-29T20:23:59.895968896Z'
