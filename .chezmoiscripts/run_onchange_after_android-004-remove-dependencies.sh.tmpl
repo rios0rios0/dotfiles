@@ -12,10 +12,12 @@ set -euo pipefail
 {{ template "lib-remove-dependencies.sh" }}
 
 # Format: "<strategy>:<target>" -- strategies are defined in the library above.
-# Add one group per removal, newest first, and reference the commit that dropped
-# the installer so the entry can be retired once every machine has converged.
+# Add one group per removal, newest first, and reference the pull request that
+# dropped the installer so the entry can be retired once every machine has
+# converged (a commit hash from the feature branch changes when the branch is
+# rebased before merge).
 TOMBSTONES=(
-    # `keychain` -- removed in 9b19f46 (2026-07-23). It cannot pin the agent
+    # `keychain` -- removed in bec4050 (2026-07-23). It cannot pin the agent
     # socket path on Termux (it records whichever random path ssh-agent picked,
     # and ignores a pre-bound SSH_AUTH_SOCK), so `dot_zshrc.tmpl` now binds the
     # agent itself with `ssh-agent -a ~/.ssh/agent.sock` and no longer calls it

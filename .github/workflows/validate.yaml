@@ -146,6 +146,23 @@ jobs:
       - name: Test dependency removal library
         run: make test-remove-dependencies
 
+  test-remove-dependencies-windows:
+    name: 'Test (dependency removal, Windows)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Install PowerShell'
+        run: |
+          sudo apt-get install -y wget apt-transport-https software-properties-common
+          source /etc/os-release
+          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          rm packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
+      - name: 'Test Windows dependency removal script'
+        run: 'make test-remove-dependencies-windows'
+
   test-prune-tmp-modcache:
     name: Test (TMPDIR module cache pruning)
     runs-on: ubuntu-latest

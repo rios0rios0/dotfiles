@@ -12,8 +12,10 @@ set -euo pipefail
 {{ template "lib-remove-dependencies.sh" }}
 
 # Format: "<strategy>:<target>" -- strategies are defined in the library above.
-# Add one group per removal, newest first, and reference the commit that dropped
-# the installer so the entry can be retired once every machine has converged.
+# Add one group per removal, newest first, and reference the pull request that
+# dropped the installer so the entry can be retired once every machine has
+# converged (a commit hash from the feature branch changes when the branch is
+# rebased before merge).
 TOMBSTONES=(
     # OCI CLI installed from Oracle's own install.sh, superseded by the pipx route
     # in this repository's `install_oci_cli`. The venv is ~750 MB of dead weight
