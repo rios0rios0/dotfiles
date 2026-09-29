@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed the Windows SSH public key and PEM scripts writing only the last key when the device note lists several: a trailing `-}}` in the template glued each block onto the previous `Set-Content … -Force`, which PowerShell rejected as a parameter named `Force#`. The test fixture''s device note now holds two entries of every type, so each loop is exercised across a block boundary'
+time: '2026-09-29T18:47:15.024918938Z'

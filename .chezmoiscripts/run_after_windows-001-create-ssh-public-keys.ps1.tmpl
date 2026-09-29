@@ -25,7 +25,7 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 {{-        if eq $type "ssh" }}
 {{-        $item := onepassword $name "Private" "my" -}}
 {{-        $sshName := $item.title | trim -}}
-{{-        warnf "[windows-ssh-keys] creating public key for \"%s\"" $sshName -}}
+{{-        warnf "[windows-ssh-keys] creating public key for \"%s\"" $sshName }}
 
 # read the SSH public key from 1Password
 $sshName = "{{ $sshName }}"

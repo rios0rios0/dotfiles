@@ -1,0 +1,26 @@
+{
+  "title": "Test PEM Key",
+  "category": "SECURE_NOTE",
+  "fields": [
+    {
+      "id": "pem_host_alias",
+      "label": "pem host alias",
+      "value": "test-server"
+    },
+    {
+      "id": "pem_host",
+      "label": "pem host",
+      "value": "192.168.1.1"
+    },
+    {
+      "id": "pem_user",
+      "label": "pem user",
+      "value": "ubuntu"
+    },
+    {
+      "id": "notesPlain",
+      "label": "notesPlain",
+      "value": "```\nfixture-pem-placeholder\n```"
+    }
+  ]
+}
