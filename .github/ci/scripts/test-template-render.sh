@@ -150,6 +150,33 @@ for platform in linux android; do
     fi
 done
 
+# The Windows key scripts emit one PowerShell block per ssh:/pem: entry on the
+# device note, and the fixture has two of each, so the boundary between blocks is
+# exercised. A `-}}` that eats the newline there glues the next block's comment
+# onto `Set-Content ... -Force`, which PowerShell reads as a parameter `Force#`.
+for script in run_after_windows-001-create-ssh-public-keys.ps1.tmpl run_after_windows-002-create-ssh-pems.ps1.tmpl; do
+    # given the device note with two entries of each type
+    # when
+    if ! output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" \
+        --override-data '{"chezmoi": {"os": "windows"}}' \
+        < "$REPO_ROOT/.chezmoiscripts/$script" 2>/dev/null); then
+        echo "[test-template-render] FAIL: $script (execution failed)" >&2
+        EXIT_CODE=1
+        continue
+    fi
+
+    # then: one Set-Content per entry, each ending its line, no comment glued to code
+    set_contents=$(grep -c '^Set-Content ' <<<"$output" || true)
+    unterminated=$(grep '^Set-Content ' <<<"$output" | grep -cv -- '-Force$' || true)
+    glued=$(grep -cE '[^[:space:]]#' <<<"$output" || true)
+    if [ "$set_contents" = "2" ] && [ "$unterminated" = "0" ] && [ "$glued" = "0" ]; then
+        echo "[test-template-render] PASS: $script keeps each entry's block on its own lines" >&2
+    else
+        echo "[test-template-render] FAIL: $script ($set_contents Set-Content lines, $unterminated not ending in -Force, $glued comments glued to code)" >&2
+        EXIT_CODE=1
+    fi
+done
+
 # The config guard must render to nothing for a current config -- chezmoi then
 # never runs it -- and stop a config generated before a data key existed, pointing
 # at `chezmoi init`.

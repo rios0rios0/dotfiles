@@ -25,7 +25,7 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 {{-        if eq $type "pem" }}
 {{-        $item := onepassword $name "Private" "my" -}}
 {{-        $pemName := $item.title | trim -}}
-{{-        warnf "[windows-pem-keys] creating PEM key for \"%s\"" $pemName -}}
+{{-        warnf "[windows-pem-keys] creating PEM key for \"%s\"" $pemName }}
 
 # read the PEM private key from 1Password
 $pemName = "{{ $pemName }}"

@@ -48,6 +48,11 @@ case "$CMD" in
                     "Device: testdevice")
                         cat "$FIXTURES_DIR/device-testdevice.json"
                         ;;
+                    *PEM*)
+                        # PEM entries are Secure Notes: the key in notesPlain, plus
+                        # the host fields dot_ssh/config.tmpl reads
+                        cat "$FIXTURES_DIR/pem-item-sample.json"
+                        ;;
                     *)
                         # Individual item lookup (e.g., "Test SSH Key")
                         cat "$FIXTURES_DIR/ssh-item-sample.json"

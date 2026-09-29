@@ -158,6 +158,14 @@ Templates fetch this note (cached by chezmoi across all template files) and filt
 
 **Always guard with `hasKey . "value"`** — some 1Password fields lack a `value` property; accessing it without a guard causes `map has no entry for key "value"`.
 
+**When the loop emits code, keep a newline on both sides of each block.** A trailing `-}}`
+eats every newline up to the next character, so an action right before a block's first line
+glues that line onto whatever the previous iteration emitted last. In the Windows key
+scripts, a `-}}` after the `warnf` turned a second `ssh:` entry into
+`Set-Content … -Force# read the SSH public key…`, which PowerShell reads as a parameter named
+`Force#` — only the last key was written. The fixture device note therefore carries **two**
+entries of every type, and `make test-template-render` checks those scripts line by line.
+
 **Do not use `onepasswordItemFields`** — it only returns section-level fields and misses built-in properties like `"public key"` and `"private key"` on SSH Key items. The `onepassword` + `dict`/`set` pattern accesses all fields and chezmoi caches the underlying `op item get` call across all template files automatically.
 
 ## Runtime Credential Lifecycle (Removal Needs a Manifest)
