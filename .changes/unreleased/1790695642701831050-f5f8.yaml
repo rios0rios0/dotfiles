@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the Windows dependency-removal script reporting a failed uninstall as removed: each handler now checks that its winget package, npm package or path is actually gone and otherwise prints `WARN: failed to remove`, matching the Linux and Android library, and the new `make test-remove-dependencies-windows` covers it'
-time: '2026-09-29T15:27:22.701781215Z'
