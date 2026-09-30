@@ -22,6 +22,37 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.26.0] - 2026-09-30
+
+### Added
+
+- added a pre-apply check that stops `chezmoi apply` before any installer runs when the machine's chezmoi config predates a data key the templates read, such as `deviceName`, and says to run `chezmoi init`; a config generated from an older `.chezmoi.yaml.tmpl` used to surface only after the installers, as `map has no entry for key "deviceName"` in `dot_gitconfig.tmpl`
+- added RustDesk to the Windows installer as a verified download, since its publisher had it removed from winget: `Install-RustDesk` fetches the pinned `1.4.9` MSI from the GitHub release, installs it only when its SHA-256 matches and its Authenticode signature is valid and from `PURSLANE`, and skips machines where RustDesk is already installed
+
+### Changed
+
+- documented in `CLAUDE.md` and `.github/copilot-instructions.md` why `private_dot_kube/encrypted_config-files.tar.age` deliberately stays non-private: the headless folder watcher re-adds that tarball from a `0644` file, and chezmoi stops to confirm removing a `private_` attribute, which nothing can answer, so the `~/.kube/config-files` backup would silently stop
+
+### Fixed
+
+- fixed `chezmoi apply` aborting on Windows at `~/.claude.json` with `%1 is not a valid Win32 application`: the JSON `modify_` files for `~/.claude.json`, `~/.claude/.claude.json`, `~/.claude/settings.json` and mcphub's `servers.json` are now chezmoi modify-templates instead of bash scripts running embedded Python, which Windows could never start. They leave a file byte for byte untouched when it already holds every managed value, fail on invalid JSON instead of replacing the file, and `make test-modify-scripts` now covers them and rejects any `modify_` script deployed on Windows
+- fixed Codex clipboard image paste in Windows Terminal by forwarding Ctrl+V to the running application and moving terminal paste to Ctrl+Shift+V
+- fixed ggshield appending `# Added by ggshield` and `.cache_ggshield` to the `.gitignore` of every repository where its pre-commit hook found a secret, by ignoring `.cache_ggshield` in the global `~/.gitignore` (ggshield skips the append when `git check-ignore` already matches its cache)
+- fixed the `keychain` tombstones in `.chezmoiremove` and the Android removal script citing `9b19f46`, a commit that never reached `main`, to cite `bec4050`, and changed the tombstone convention to cite the pull request instead, because rebasing a branch before merge rewrites its commit hashes
+- fixed the Oh My Zsh deprecation warning printed at every shell start by replacing the `github` plugin, which only wraps the legacy `hub` CLI (not installed), with the `gh` plugin that generates GitHub CLI completions
+- fixed the Windows dependency-removal script reporting a failed uninstall as removed: each handler now checks that its winget package, npm package or path is actually gone and otherwise prints `WARN: failed to remove`, matching the Linux and Android library, and the new `make test-remove-dependencies-windows` covers it
+- fixed the Windows installer reinstalling packages that were already installed and announcing failed installs as successes: it now asks `winget list --id <id> --exact` for each package instead of trusting `winget export`, which left out installed packages (GIMP, Codex, yq, ShellCheck, the Copilot CLI and the EA app), installs Spotify as the Microsoft Store edition (`msstore:9NCBCSZSJRSB`) because the `Spotify.Spotify` installer exits 29 beside it, and reports a failed install as a `WARN` with winget's exit code, listing every failure at the end
+- fixed the Windows SSH public key and PEM scripts writing only the last key when the device note lists several: a trailing `-}}` in the template glued each block onto the previous `Set-Content … -Force`, which PowerShell rejected as a parameter named `Force#`. The test fixture's device note now holds two entries of every type, so each loop is exercised across a block boundary
+- fixed three Windows package IDs that winget could not resolve exactly: `PerformanceTest` is now `PassMark.PerformanceTest`, `Microsoft.AzureStorageExplorer` is now `Microsoft.Azure.StorageExplorer`, and `Brother.FullDriver`, which is not in the winget source, is commented out and documented as a manual install
+
+### Removed
+
+- removed Chrome Remote Desktop Host (`Google.ChromeRemoteDesktopHost`) from the Windows winget installer now that remote access goes through RustDesk, and added a `winget` tombstone so Windows machines that already installed it uninstall it on the next `chezmoi apply`
+
+### Security
+
+- restricted `~/.kube` to `0700` and `~/.kube/config` to `0600`: the kubeconfig source lacked the `private_` attribute, so chezmoi deployed it group- and world-readable, which also made Helm print two insecure-permission warnings at every shell start through the Oh My Zsh `helm` plugin
+
 ## [0.25.0] - 2026-09-23
 
 ### Added

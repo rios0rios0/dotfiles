@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed `chezmoi apply` aborting on Windows at `~/.claude.json` with `%1 is not a valid Win32 application`: the JSON `modify_` files for `~/.claude.json`, `~/.claude/.claude.json`, `~/.claude/settings.json` and mcphub''s `servers.json` are now chezmoi modify-templates instead of bash scripts running embedded Python, which Windows could never start. They leave a file byte for byte untouched when it already holds every managed value, fail on invalid JSON instead of replacing the file, and `make test-modify-scripts` now covers them and rejects any `modify_` script deployed on Windows'
-time: '2026-09-29T16:15:41.323319687Z'

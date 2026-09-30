@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added RustDesk to the Windows installer as a verified download, since its publisher had it removed from winget: `Install-RustDesk` fetches the pinned `1.4.9` MSI from the GitHub release, installs it only when its SHA-256 matches and its Authenticode signature is valid and from `PURSLANE`, and skips machines where RustDesk is already installed'
-time: '2026-09-29T15:18:13.341519193Z'

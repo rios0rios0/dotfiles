@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the `keychain` tombstones in `.chezmoiremove` and the Android removal script citing `9b19f46`, a commit that never reached `main`, to cite `bec4050`, and changed the tombstone convention to cite the pull request instead, because rebasing a branch before merge rewrites its commit hashes'
-time: '2026-09-29T15:27:22.704199781Z'
