@@ -22,6 +22,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.26.1] - 2026-10-07
+
+### Changed
+
+- changed `.gitignore` to carry the block `make gitignore` generates from the shared pipeline, so the CodeQL database a failed scan leaves behind and the other files the pipeline writes into the working tree are ignored instead of waiting to be committed
+
 ## [0.26.0] - 2026-09-30
 
 ### Added
