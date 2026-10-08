@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added an `[include]` of the unmanaged `~/.gitconfig.local` at the end of `~/.gitconfig`, replacing the commented-out `includeIf` placeholder, so machine-local settings such as a work identity selected by `includeIf` stay out of this public repository'
+time: '2026-10-08T19:26:01.690137685Z'

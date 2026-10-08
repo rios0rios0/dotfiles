@@ -151,5 +151,7 @@
 [push]
     autoSetupRemote = true
 
-# [includeIf 'gitdir:~/work/acme/']
-#   path = ~/work/acme/.gitconfig
+# machine-local config kept out of this public repo (e.g. work identities through includeIf);
+# git skips the include silently when the file does not exist
+[include]
+    path = ~/.gitconfig.local
