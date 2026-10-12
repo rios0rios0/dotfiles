@@ -46,6 +46,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 ### Development Tools
 
 - **Claude Code**, **Codex CLI** and **GitHub Copilot CLI** (AI coding assistants)
+- Optional **Ollama** coding model for Claude Code on WSL; see the [local coding model guide](.docs/local-coding-model.md)
 - **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm)
 - **Neovim** with AstroVim (Android)
 
@@ -121,6 +122,7 @@ chezmoi init --apply rios0rios0
 dot_claude/              # Claude Code config (settings, permissions, trust) -> ~/.claude/
 dot_config/              # XDG config (mcphub MCP servers for Android; systemd user units for the WSL SSH agent bridge) -> ~/.config/
 dot_docker/              # Docker daemon config -> ~/.docker/
+dot_local/bin/           # Executable user commands -> ~/.local/bin/ (platform-filtered)
 dot_scripts/             # Utility scripts (version manager, credential loader, git sync, etc.)
 dot_ssh/                 # SSH config, keys, signing (1Password-backed) -> ~/.ssh/
 dot_aws/                 # Encrypted AWS credentials -> ~/.aws/
@@ -213,6 +215,10 @@ The global `~/.gitignore` (managed via `dot_gitignore`) ignores `.claude/` by de
 
 It also ignores `.cache_ggshield`, which ggshield's global pre-commit hook writes to a repository's root when it finds a secret. On its next run ggshield appends `# Added by ggshield` and `.cache_ggshield` to that repository's own `.gitignore` unless `git check-ignore` already matches the file, so the global entry is what keeps the hook from editing the `.gitignore` of every repository it flags.
 
+## Local Coding Model (WSL)
+
+`ollama-claude-setup` installs Ollama when needed, configures a 65,536-token service context, and pulls `qwen3.8:27b`. `claude-local` routes only that invocation through Ollama; `claude-switch` offers a terminal picker or direct local/Anthropic selection. The regular `claude` command and its account login remain unchanged. The [local coding model guide](.docs/local-coding-model.md) covers setup, switching, quality checks, and connecting to the remote 4090 over SSH.
+
 ## Chezmoi Conventions
 
 | Prefix/Suffix | Meaning |
@@ -225,6 +231,7 @@ It also ignores `.cache_ggshield`, which ggshield's global pre-commit hook write
 | `run_onchange_after_*` | Script runs after application, but only when its own content changes |
 | `private_` | File deployed with restricted permissions |
 | `modify_` | Script that merges changes into an existing file |
+| `executable_` | File deployed with executable permissions |
 
 Platform-specific scripts are prefixed: `linux-*`, `windows-*`, `android-*`. Exclusion rules in `.chezmoiignore` ensure only the correct platform's files are applied.
 

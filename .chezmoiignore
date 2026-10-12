@@ -36,6 +36,8 @@ AppData
      because "linux" alone does not distinguish WSL from bare metal. */ -}}
 {{- if not (and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString))) }}
 .config/systemd
+.local/bin/claude-local
+.local/bin/ollama-claude-setup
 {{- end }}
 
 {{- /* Linux‑exclusive files – only for Linux. When not running Linux, ignore them. */ -}}

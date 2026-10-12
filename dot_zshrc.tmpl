@@ -485,6 +485,41 @@ claudex() {
 }
 {{- if eq .chezmoi.os "linux" }}
 
+###### Claude Provider Switching ##################################################
+unalias claude-switch 2>/dev/null
+claude-switch() {
+    local mode="${1:-}"
+
+    if [[ -n "$mode" ]]; then
+        shift
+    else
+        printf '%s\n' 'Choose Claude Code provider:' '  local  - Ollama model' '  claude - Anthropic account'
+        printf '> '
+        read -r mode
+    fi
+
+    case "$mode" in
+        local|ollama)
+            if ! command -v claude-local >/dev/null 2>&1; then
+                printf '%s\n' '[claude-switch] claude-local is available only on WSL; apply dotfiles there first' >&2
+                return 127
+            fi
+            command claude-local "$@"
+            ;;
+        claude|normal|cloud)
+            claude "$@"
+            ;;
+        --help|-h)
+            printf '%s\n' 'Usage: claude-switch [local|claude] [Claude Code arguments...]' \
+                'With no provider argument, show an interactive provider selector.'
+            ;;
+        *)
+            printf '%s\n' '[claude-switch] choose local or claude' >&2
+            return 2
+            ;;
+    esac
+}
+
 ###### Claude Account Rotation (ccswitch) ##########################################
 # Monitor Claude Code usage and rotate between backup accounts when limits run out.
 # See https://github.com/rios0rios0/ccswitch. Enroll each account once with

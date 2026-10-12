@@ -193,6 +193,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
 - `.chezmoitemplates/`: Shared template fragments (`lib-install-deps.sh`, `lib-install-fonts.sh`, `lib-modify-mcp-servers.tmpl`, `lib-remove-dependencies.sh`, `username.tmpl`)
+- `dot_local/bin/`: Executable user commands deployed through chezmoi; the local-model setup and launcher are included only on WSL
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
 ### Key Managed Files
@@ -206,6 +207,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_config/mcphub/modify_servers.json` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android only; same list and merge as `~/.claude.json`, from `.chezmoitemplates/lib-modify-mcp-servers.tmpl`)
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
 - `dot_config/systemd/user/ssh-agent-bridge.socket` + `ssh-agent-bridge@.service` → `~/.config/systemd/user/`: WSL-only SSH agent bridge (see below)
+- `dot_local/bin/executable_ollama-claude-setup` + `executable_claude-local` → `~/.local/bin/`: opt-in WSL Ollama setup and a process-scoped Claude Code launcher; `claude-switch` in `dot_zshrc.tmpl` selects local or Anthropic mode; see `.docs/local-coding-model.md`
 - `dot_scripts/` → `~/.scripts/`: User utility scripts
 
 ### Scripts and Automation
