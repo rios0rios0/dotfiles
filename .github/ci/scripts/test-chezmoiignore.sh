@@ -175,6 +175,27 @@ check_platform "windows" --gpu \
     --ignore ".local/bin/claude-local" \
     --ignore-line ".config/systemd"
 
+# Tailscale reaches every Linux machine, GPU or not. claude-remote and claude-local-task drive
+# claude-local, so they ship only where it does.
+check_platform "linux" --kernel "6.11.0-generic" \
+    --include-line ".local/bin/tailscale-up" \
+    --ignore-line ".local/bin/claude-remote" \
+    --ignore-line ".local/bin/claude-local-task"
+
+check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
+    --include-line ".local/bin/tailscale-up" \
+    --include-line ".local/bin/claude-remote" \
+    --include-line ".local/bin/claude-local-task"
+
+check_platform "windows" --gpu \
+    --ignore-line ".local/bin/tailscale-up" \
+    --ignore-line ".local/bin/claude-remote" \
+    --ignore-line ".local/bin/claude-local-task"
+
+check_platform "android" \
+    --ignore-line ".local/bin/tailscale-up" \
+    --ignore-line ".local/bin/claude-remote"
+
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-chezmoiignore] all platform logic tests passed" >&2
 fi

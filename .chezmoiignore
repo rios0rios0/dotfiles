@@ -53,6 +53,8 @@ AppData
 {{- if not $localLLM }}
 .config/systemd/user/ollama.service
 .local/bin/claude-local
+.local/bin/claude-local-task
+.local/bin/claude-remote
 {{- end }}
 
 {{- if not (or $wsl $localLLM) }}
@@ -62,6 +64,7 @@ AppData
 {{- /* Linux‑exclusive files – only for Linux. When not running Linux, ignore them. */ -}}
 {{- if ne .chezmoi.os "linux" }}
 .chezmoiscripts/linux-*.sh
+.local/bin/tailscale-up
 .config/ggshield
 .docker
 .histdb

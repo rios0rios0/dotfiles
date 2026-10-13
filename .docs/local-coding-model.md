@@ -49,6 +49,7 @@ Everything lives in `.chezmoidata/local-llm.yaml`, which chezmoi reads on every 
 | `keepAlive` | `15m` | How long an idle model stays in VRAM before the GPU is given back |
 | `rules` | `code-style`, `git-flow`, `testing` | The global rules a local session keeps |
 | `tools` | `Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep` | The tools it gets |
+| `shareOnTailnet` | `true` | Whether this machine's server is shared on the tailnet for `claude-remote` |
 | `devices` | none | Per-device overrides of any key above, by chezmoi `deviceName` |
 
 ## Why the session is lean
@@ -111,13 +112,73 @@ shows the split.
   non-zero exit as `Error: exit status N` with status 1. Ctrl+C is unaffected: Claude Code reads it
   as input, so it interrupts a reply as usual.
 
-## Another GPU on the network
+## Another machine's GPU (`claude-remote`)
 
-Not wired up yet. `OLLAMA_HOST=<host>:<port> claude-local` reaches another Ollama server, but
-`claude-local` still declares the local window from the data file, and on this machine an SSH
-tunnel is easy to get wrong: `ssh` is the `ssh.exe` wrapper and WSL runs in NAT mode, so
-`ssh -L` opens the port on Windows' loopback, which WSL cannot reach. A tunnel would need
-`/usr/bin/ssh` through the [SSH agent bridge](../CLAUDE.md), or mirrored networking.
+`claude-remote` is `claude-local` with the model served by another machine on the tailnet. Claude
+Code itself still runs here: every file it reads or edits and every command it runs is on this
+machine, and only inference happens on the other one.
+
+```bash
+claude-remote                                  # an interactive session on the other machine's GPU
+CLAUDE_REMOTE_HOST=desktop claude-remote       # a machine named explicitly
+```
+
+How the two machines meet:
+
+1. Both run Tailscale (see "Tailscale" in [CLAUDE.md](../CLAUDE.md)): `chezmoi update` installs it
+   and waits for the login, and every interactive zsh keeps the machine on the tailnet.
+2. A machine with the local model shares its server on the tailnet's port 11434, unless
+   `shareOnTailnet` in `.chezmoidata/local-llm.yaml` says otherwise. It is `tailscale serve`, so
+   Ollama itself stays on loopback and nothing reaches it from outside the tailnet. The API has
+   no authentication, so the tailnet is the whole boundary: every device on it can use, pull and
+   delete models.
+3. `claude-remote` picks the first online machine that answers there, or the one
+   `CLAUDE_REMOTE_HOST` names.
+
+Before handing over, it loads the model on that machine and reads back how the server holds it:
+
+- **A different context window stops the launch.** `claude-local` declares the window from this
+  machine's data file. A server rendered from an older checkout, or with a per-device override,
+  would truncate the prompt where Claude Code expects to compact it. Run `chezmoi update` there.
+- **A model partly on the CPU only warns.** A GPU busy with a game leaves part of the model on
+  that machine's CPU, where every request still succeeds, many times slower.
+
+**A WSL machine serves only while its WSL runs**, and Windows stops WSL a few seconds after the
+last WSL terminal closes. To use a desktop's GPU from the laptop, open a WSL terminal on the
+desktop (RustDesk will do) and leave it open: Tailscale and Ollama start with it.
+
+The other machine's GPU has the same 24 GB as this one, so it runs the same model, not a bigger
+one: it is a second worker, useful while this GPU is busy, on battery, or already serving a run.
+
+## Delegating a task (`claude-local-task`)
+
+An agent that hands a task to the local model -- `ollama-local` and `ollama-remote` in the
+[aifiles](https://github.com/rios0rios0/aifiles) agents -- runs it through `claude-local-task`:
+
+```bash
+claude-local-task brief.md            # on this machine's GPU
+claude-local-task --remote brief.md   # on another machine's, through claude-remote
+```
+
+The model runs unattended with every permission check off, as the caller's own session does, so
+it can run whatever the task needs. Nobody watches it, so instead of restricting it,
+`claude-local-task` returns all of it to the caller:
+
+- **every action**, in order, with its result: each command and its output, each file read or
+  written, a write outside the repository flagged as one;
+- **the change**, measured between snapshots of the working tree taken before and after the run,
+  untracked files included. The snapshots go through a scratch copy of the index, so the
+  caller's own index is never touched, and edits that were already in the tree are never
+  attributed to the run;
+- **one command that undoes exactly that change** (`git diff --binary <before> <after> | git
+  apply -R`), and one that shows it;
+- **the transcript**, which Claude Code keeps under `~/.claude-local/projects`.
+
+It prints the audit in short and saves it in full under `~/.claude-local/audits`. What an audit
+cannot take back is whatever left the working tree -- a commit, a push, a request to a server, a
+write somewhere else. Those show up in the action list and as a moved HEAD, and nowhere else.
+
+Measured on this machine: a two-file Go change with tests, 6 turns, 46 seconds.
 
 ## References
 
@@ -126,3 +187,5 @@ tunnel is easy to get wrong: `ssh` is the `ssh.exe` wrapper and WSL runs in NAT 
 - [Ollama: context length](https://docs.ollama.com/context-length)
 - [Claude Code: environment variables](https://code.claude.com/docs/en/env-vars)
 - [Claude Code: model configuration](https://code.claude.com/docs/en/model-config)
+- [Tailscale: `tailscale serve`](https://tailscale.com/docs/reference/tailscale-cli/serve)
+- [Tailscale: why resolv.conf gets overwritten](https://tailscale.com/docs/reference/faq/dns-resolv-conf)

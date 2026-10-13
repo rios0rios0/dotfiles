@@ -27,7 +27,8 @@ make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR s
 make test-shell-credentials         # 1Password credential/workspace loading and removal
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
-make test-local-llm                 # claude-local: shared settings, one context window, launcher, capacity hint
+make test-local-llm                 # claude-local, claude-remote and claude-local-task: one context window, the launchers, the audit, the capacity hint
+make test-tailscale                 # tailscale-up: the quiet pass every zsh runs, the login, sharing the model's server
 ```
 
 ## Essential Commands
@@ -207,7 +208,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -582,6 +583,8 @@ The same guard asks `ccswitch capacity` (no network) whether any enrolled accoun
 | Install, restart on change, model pull, GPU check | `.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.sh.tmpl` |
 | Server | `dot_config/systemd/user/ollama.service.tmpl` (a user unit) |
 | Launcher | `dot_local/bin/executable_claude-local.tmpl` |
+| Another machine's GPU | `dot_local/bin/executable_claude-remote.tmpl`, and the share in `dot_local/bin/executable_tailscale-up.tmpl` |
+| Delegated, audited runs | `dot_local/bin/executable_claude-local-task` |
 | Gate | `.chezmoiignore`: Linux **and** `nvidia-smi` on `PATH`, not WSL |
 
 **Keep these, each prevents a failure that was observed or measured:**
@@ -594,8 +597,32 @@ The same guard asks `ccswitch capacity` (no network) whether any enrolled accoun
 6. **The installer proves GPU placement.** It loads the model once and reads `size_vram` from `/api/ps`: none on the GPU while it has room fails the apply; partial or no placement while Windows or a game holds the VRAM warns, with the free VRAM in the message. A CPU fallback is otherwise silent -- every request still succeeds, ten times slower.
 7. **Gate on the driver and the OS, not on WSL.** Nothing here depends on Windows, so bare-metal Linux with a GPU qualifies; but `lookPath` finds `nvidia-smi.exe` on Windows too, so `.chezmoiignore` pairs the driver check with `eq .chezmoi.os "linux"`.
 8. **Device overrides are laid over key by key.** sprig's `merge` and `mergeOverwrite` both count `false` as empty, so a device's `enabled: false` would lose to the default `true`; `lib-local-llm.tmpl` uses `set` per key instead.
+9. **Invariant 1 crosses machines, so `claude-remote` checks it.** The other machine's server renders its window from *its* checkout of the data file, which can be older or carry a per-device override, and nothing on the wire says so. `claude-remote` loads the model there the way the first request would, reads `context_length` back from `/api/ps`, and refuses a mismatch; partial GPU placement only warns. Claude Code still runs locally under `claude-remote` -- only inference is remote -- so tools, files and the transcript stay on this machine.
+10. **A delegated run is returned, not restricted.** `claude-local-task` runs the model with permissions off, as the caller's own session runs, and hands back every action with its result, the change measured between two working-tree snapshots, an undo command and the transcript. The snapshots go through a **scratch copy of the index** (`GIT_INDEX_FILE`), never the caller's: the caller's staged work stays as it was, and edits already in the tree are never attributed to the run. What an audit cannot reach -- commits, pushes, requests, writes outside the repository -- is listed, not prevented; say so wherever a delegation is offered.
 
-`make test-local-llm` covers 1, 3 (argument order and environment), 7 and 8, the installer's render gate, and the capacity hint; `make test-chezmoiignore` covers the gate per platform. Ollama, its models and `~/.claude-local` live under `$HOME`, so removing the feature means `path:` tombstones for `.local/share/ollama`, `.ollama` and `.claude-local`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service`, `~/.local/bin/claude-local` and `~/.local/bin/ollama`.
+`make test-local-llm` covers 1, 3 (argument order and environment), 7 to 10, the installer's render gate, and the capacity hint; `make test-chezmoiignore` covers the gate per platform. Ollama, its models and `~/.claude-local` live under `$HOME`, so removing the feature means `path:` tombstones for `.local/share/ollama`, `.ollama` and `.claude-local`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service`, `~/.local/bin/claude-local`, `~/.local/bin/claude-remote`, `~/.local/bin/claude-local-task` and `~/.local/bin/ollama`.
+
+## Tailscale
+
+Every Linux machine (WSL or bare metal) joins the tailnet. Three files carry it:
+
+| Part | Where |
+|------|-------|
+| Install from Tailscale's apt repository, enable `tailscaled`, log in | `.chezmoiscripts/run_onchange_after_linux-010-setup-tailscale.sh.tmpl` |
+| Login, preferences, sharing the model's server; the quiet pass every shell runs | `dot_local/bin/executable_tailscale-up.tmpl` (`tailscale-up`, `tailscale-up --no-login`) |
+| The shell hook | `dot_zshrc.tmpl`, "Tailscale" |
+
+**Keep these:**
+
+1. **The shell's pass never waits and never asks for a password.** It runs in every interactive zsh, so a logged-out machine gets a one-line hint pointing at `tailscale-up`, not a login that blocks the prompt, and a failed daemon gets a hint, not `sudo systemctl`. A daemon that is enabled and not failed is still starting -- WSL boots with the first terminal -- and gets nothing at all.
+2. **The operator is set once, through sudo, at the first login.** `--operator=$USER` is what lets the shell's pass bring a node back up, and `tailscale serve` run, without root.
+3. **The shell's pass uses a bare `tailscale up`.** Only the bare form is the "just switch it back on" special case; any flag, even `--timeout`, makes `tailscale up` re-check every non-default preference and fail with `requires mentioning all non-default flags`. The direct call spells out both preferences for the same reason, and `tailscale set` re-applies them to a node logged in some other way without touching the rest.
+4. **MagicDNS stays off (`--accept-dns=false`).** WSL writes `/etc/resolv.conf` itself and runs no DNS manager, so tailscaled would replace the file, and every lookup would fail while tailscaled is down. Peers are reached by address: `tailscale ip -4 <name>`, or `tailscale status --json`, as `claude-remote` does.
+5. **The repository key is checked before apt trusts it:** exactly one key, with Tailscale's fingerprint. A keyring carrying a second key would make apt trust that one too. Upstream's `install.sh` maps every Kali release since 2021 to the Debian bullseye suite; the package is the same static build for every release.
+6. **The installer tracks `tailscale-up`'s rendered digest**, so switching `shareOnTailnet` or the local model on or off re-runs it, and the share follows.
+7. **A WSL machine serves only while its WSL runs.** Windows stops WSL a few seconds after the last WSL terminal closes, and `tailscaled` and the Ollama unit with it. Nothing here keeps it running, by choice: whoever wants the desktop's GPU opens a terminal there (RustDesk) and leaves it open.
+
+`make test-tailscale` covers 1 to 3 and 6 against a stubbed `tailscale`, `systemctl` and `sudo`, and `make test-chezmoiignore` the gate.
 
 ## Claude Code Voice Input (WSL)
 

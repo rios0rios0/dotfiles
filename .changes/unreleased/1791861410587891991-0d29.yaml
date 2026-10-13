@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `claude-remote`, which runs `claude-local` on another machine''s GPU across the tailnet, refusing a server whose context window differs from the local one and warning when part of the model runs on that machine''s CPU; each machine with the local model shares its server on the tailnet unless `shareOnTailnet` is false'
+time: '2026-10-13T03:16:50.587845084Z'

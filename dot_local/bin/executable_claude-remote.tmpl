@@ -1,0 +1,91 @@
+{{- $llm := includeTemplate "lib-local-llm.tmpl" . | fromJson -}}
+#!/bin/bash
+
+# claude-remote: claude-local, but with the model served by another machine's GPU on the tailnet.
+# See .docs/local-coding-model.md, "Another machine's GPU".
+#
+# Claude Code itself still runs here, so every file it reads or edits and every command it runs is
+# on this machine; only inference happens on the other one. The server is the first machine on
+# the tailnet that answers Ollama's API on port 11434, where tailscale-up shares each GPU machine's
+# server, unless CLAUDE_REMOTE_HOST names one: a tailnet machine name or an address.
+#
+# Before handing over to claude-local, this loads the model on that server, just as the first
+# request would, and reads back how the server holds it. Two things there would otherwise fail
+# silently:
+#   - The context window. claude-local declares the one rendered from this machine's
+#     .chezmoidata/local-llm.yaml, and a server with older dotfiles, or a per-device override,
+#     would truncate prompts where Claude Code expects to compact them.
+#   - GPU placement. A GPU busy with a game leaves part of the model on that machine's CPU, where
+#     every request still succeeds, many times slower.
+
+set -euo pipefail
+
+prefix="claude-remote"
+port=11434
+default_model={{ $llm.model | quote }}
+model="${CLAUDE_LOCAL_MODEL:-$default_model}"
+window={{ int $llm.contextTokens }}
+keep_alive={{ $llm.keepAlive | quote }}
+
+die() {
+    echo "[$prefix] ERROR: $1" >&2
+    exit 1
+}
+
+answers() {
+    curl -fsS --max-time 2 "http://$1:$port/api/version" >/dev/null 2>&1
+}
+
+for tool in claude-local curl jq; do
+    command -v "$tool" >/dev/null 2>&1 || die "$tool is not installed; run 'chezmoi apply'"
+done
+
+if [[ -n "${CLAUDE_REMOTE_HOST:-}" ]]; then
+    name="$CLAUDE_REMOTE_HOST"
+    # A tailnet machine name resolves without MagicDNS, which tailscale-up leaves off; anything
+    # else is taken as an address or a name the system resolves.
+    address="$(tailscale ip -4 "$name" 2>/dev/null | head -1 || true)"
+    address="${address:-$name}"
+    answers "$address" || die "no Ollama server answers on $name:$port"
+else
+    command -v tailscale >/dev/null 2>&1 || die "tailscale is not installed; run 'chezmoi apply'"
+    status="$(tailscale status --json 2>/dev/null)" || die "tailscaled is not running; run 'tailscale-up'"
+    [[ "$(jq -r '.BackendState' <<<"$status")" == "Running" ]] ||
+        die "this machine is not on the tailnet; run 'tailscale-up'"
+    address=""
+    while read -r ip peer; do
+        if answers "$ip"; then
+            address="$ip"
+            name="$peer"
+            break
+        fi
+    done < <(jq -r '.Peer // {} | .[] | select(.Online) | [((.TailscaleIPs // [])[] | select(test("^[0-9.]+$"))), .HostName] | @tsv' <<<"$status")
+    # WSL stops a few seconds after its last terminal closes, and the server with it.
+    [[ -n "$address" ]] ||
+        die "no machine on the tailnet shares Ollama on port $port; on the one with the GPU, keep a WSL terminal open and run 'tailscale-up' there once"
+fi
+
+base="http://$address:$port"
+echo "[$prefix] using $name ($address)" >&2
+
+curl -fsS --max-time 300 "$base/api/generate" \
+    -d "$(jq -nc --arg model "$model" --arg keep "$keep_alive" '{model: $model, keep_alive: $keep}')" >/dev/null ||
+    die "$name could not load $model; check 'ollama list' there"
+
+held="$(curl -fsS --max-time 5 "$base/api/ps" | jq -r --arg model "$model" \
+    '([.models[]? | select(.name == $model or .model == $model)][0] // {}) | "\(.context_length // 0) \(.size // 0) \(.size_vram // 0)"')" ||
+    die "$name loaded $model but did not say how it holds it"
+read -r served size vram <<<"$held"
+
+if (( served == 0 )); then
+    die "$name loaded $model but does not list it as running"
+fi
+if (( served != window )); then
+    die "$name gives $model a ${served}-token window where claude-local declares $window: run 'chezmoi update' there, or give both machines the same contextTokens"
+fi
+if (( size > 0 && vram < size )); then
+    echo "[$prefix] WARN: $(( (size - vram) * 100 / size ))% of $model runs on the CPU of $name, whose GPU is busy; expect it to be much slower" >&2
+fi
+
+export OLLAMA_HOST="$base"
+exec claude-local "$@"

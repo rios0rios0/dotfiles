@@ -36,6 +36,11 @@ localLLM:
   # How long an idle model stays in VRAM. The GPU is shared with the Windows desktop and games,
   # so it is given back after a while rather than held for good.
   keepAlive: '15m'
+  # Share this machine's server with the other machines on the tailnet, so that their
+  # `claude-remote` can use this GPU: tailscale-up forwards the tailnet's port 11434 to it
+  # (`tailscale serve`, never Funnel). The tailnet is the only boundary -- Ollama's API has no
+  # authentication, so every device on it can run, pull and delete models here.
+  shareOnTailnet: true
   # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
   #   devices:
   #     some-desktop:

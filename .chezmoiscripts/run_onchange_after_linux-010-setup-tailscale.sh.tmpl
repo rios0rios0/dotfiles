@@ -1,0 +1,76 @@
+#!/bin/bash
+
+# Installs Tailscale from its apt repository, enables tailscaled, and logs this machine in.
+#
+# The login is the one step that needs a person. When the apply runs in a terminal, tailscale-up
+# prints the login URL and waits until it is used; otherwise the login waits for the next
+# `tailscale-up`, which every interactive zsh points at until it happens. From then on the node
+# rejoins by itself, because tailscaled starts with systemd, and each new zsh brings it back up
+# after a `tailscale down`.
+#
+# `run_onchange_` rather than `run_once_`, so that it reaches machines that predate it, and so that
+# it runs again when tailscale-up changes, since that is where what this machine shares on the
+# tailnet is decided:
+#   tailscale-up {{ includeTemplate "dot_local/bin/executable_tailscale-up.tmpl" . | sha256sum }}
+#
+# See CLAUDE.md, "Tailscale".
+
+set -euo pipefail
+
+prefix="tailscale"
+
+# Tailscale's repository and its signing key, which apt trusts only after the key in the download
+# proves to be this one. Upstream's install.sh points every Kali release since 2021 at the Debian
+# bullseye suite; the package is the same static build for every Debian release.
+repo="https://pkgs.tailscale.com/stable/debian"
+suite="bullseye"
+signer_fingerprint="2596A99EAAB33821893C0A79458CA832957F5868"
+keyring="/usr/share/keyrings/tailscale-archive-keyring.gpg"
+source_list="/etc/apt/sources.list.d/tailscale.list"
+
+if ! command -v apt-get >/dev/null 2>&1; then
+    echo "[$prefix] WARN: no apt-get here; install Tailscale by hand (https://tailscale.com/download/linux)" >&2
+    exit 0
+fi
+
+if [[ ! -d /run/systemd/system ]]; then
+    echo "[$prefix] WARN: systemd is not running, so tailscaled cannot run as a service; on WSL, set systemd=true under [boot] in /etc/wsl.conf and restart WSL" >&2
+    exit 0
+fi
+
+install_tailscale() {
+    local tmp primary keys
+    tmp="$(mktemp -d)"
+    trap 'rm -rf "$tmp"' RETURN
+
+    curl -fsSL "$repo/$suite.noarmor.gpg" -o "$tmp/keyring.gpg"
+    # One key, and Tailscale's: a keyring that carried a second key would have apt trust it too.
+    keys="$(gpg --show-keys --with-colons "$tmp/keyring.gpg" 2>/dev/null | grep -c '^pub:' || true)"
+    primary="$(gpg --show-keys --with-colons "$tmp/keyring.gpg" 2>/dev/null |
+        awk -F: '$1 == "pub" { seen = 1; next } seen && $1 == "fpr" { print $10; exit }')"
+    if [[ "$keys" != "1" || "$primary" != "$signer_fingerprint" ]]; then
+        echo "[$prefix] ERROR: the repository key is not Tailscale's ($signer_fingerprint); refusing to trust it" >&2
+        return 1
+    fi
+
+    sudo install -D -m 0644 "$tmp/keyring.gpg" "$keyring"
+    echo "deb [signed-by=$keyring] $repo $suite main" | sudo tee "$source_list" >/dev/null
+    # Only Tailscale's list is refreshed: the rest of the system is the dependency installer's.
+    sudo apt-get update -o Dir::Etc::sourcelist="$source_list" -o Dir::Etc::sourceparts=- -o APT::Get::List-Cleanup=0
+    sudo apt-get install --yes --no-install-recommends tailscale
+}
+
+if ! command -v tailscale >/dev/null 2>&1; then
+    echo "[$prefix] installing Tailscale from $repo" >&2
+    install_tailscale
+fi
+
+sudo systemctl enable --now tailscaled
+
+# The login prints a URL and blocks until it is used, which only makes sense with someone at the
+# terminal.
+if [[ -t 0 ]]; then
+    "$HOME/.local/bin/tailscale-up"
+else
+    echo "[$prefix] WARN: not run from a terminal, so the login is left for later: run 'tailscale-up'" >&2
+fi

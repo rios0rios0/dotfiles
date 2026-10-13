@@ -284,6 +284,252 @@ else
     fail "claude-local without Claude Code: status=$status"
 fi
 
+# --- claude-remote -----------------------------------------------------------------------------
+
+render gpu "$REPO_ROOT/dot_local/bin/executable_claude-remote.tmpl" > "$TMP/claude-remote"
+chmod +x "$TMP/claude-remote"
+window="$(jq -r '.contextTokens' <<<"$(settings gpu)")"
+
+# Stubs: tailscale answers from files each case writes; curl answers /api/version only for the
+# addresses listed in remote-answering, loads any model, and reports remote-ps.json as the server's
+# running models; claude-local records what it was handed.
+REMOTE_STUBS="$TMP/remote-stubs"
+mkdir -p "$REMOTE_STUBS"
+cat > "$REMOTE_STUBS/tailscale" <<EOF
+#!/bin/bash
+[[ "\$1 \$2" == "status --json" ]] && exec cat "$TMP/remote-status.json"
+[[ "\$1 \$2" == "ip -4" ]] && { awk -v name="\$3" '\$1 == name { print \$2; found = 1 } END { exit !found }' "$TMP/remote-ips"; exit; }
+exit 1
+EOF
+cat > "$REMOTE_STUBS/curl" <<EOF
+#!/bin/bash
+url=""
+for arg in "\$@"; do [[ "\$arg" == http* ]] && url="\$arg"; done
+host="\${url#http://}"
+host="\${host%%:*}"
+[[ "\$url" == */api/version ]] && { grep -qxF "\$host" "$TMP/remote-answering"; exit; }
+[[ "\$url" == */api/generate ]] && { echo "\$host" >> "$TMP/remote-loaded"; echo '{"done":true}'; exit; }
+[[ "\$url" == */api/ps ]] && exec cat "$TMP/remote-ps.json"
+exit 7
+EOF
+cat > "$REMOTE_STUBS/claude-local" <<EOF
+#!/bin/bash
+echo "OLLAMA_HOST=\$OLLAMA_HOST" > "$TMP/remote.handed"
+printf '<%s>\n' "\$@" >> "$TMP/remote.handed"
+EOF
+chmod +x "$REMOTE_STUBS"/*
+
+# remote_case <backend state> <answering addresses...>: a tailnet of three peers -- laptop and
+# desktop online, an offline server that would answer -- and a model held entirely in VRAM
+remote_case() {
+    local state="$1"
+    shift
+    rm -f "$TMP/remote.handed" "$TMP/remote-loaded"
+    jq -n --arg state "$state" '{BackendState: $state, Peer: {
+        a: {HostName: "phone", Online: true, TailscaleIPs: ["100.64.0.2", "fd7a::2"]},
+        b: {HostName: "old-server", Online: false, TailscaleIPs: ["100.64.0.9"]},
+        c: {HostName: "desktop", Online: true, TailscaleIPs: ["fd7a::3", "100.64.0.3"]}}}' > "$TMP/remote-status.json"
+    printf '%s\n' "$@" > "$TMP/remote-answering"
+    printf 'desktop 100.64.0.3\n' > "$TMP/remote-ips"
+    jq -n --arg model "$model" --argjson ctx "$window" \
+        '{models: [{name: $model, model: $model, context_length: $ctx, size: 100, size_vram: 100}]}' > "$TMP/remote-ps.json"
+}
+
+run_remote() {
+    env -u CLAUDE_REMOTE_HOST -u CLAUDE_LOCAL_MODEL PATH="$REMOTE_STUBS:/usr/bin:/bin" "$@"
+}
+
+# given a tailnet where the first online peer has no server and the offline one would answer
+remote_case Running 100.64.0.9 100.64.0.3
+# when
+output="$(run_remote "$TMP/claude-remote" -p "two words" 2>&1)" || true
+# then: the online server is chosen, warmed, and claude-local is handed it with the arguments intact
+if [[ "$(head -1 "$TMP/remote.handed" 2>/dev/null)" == "OLLAMA_HOST=http://100.64.0.3:11434" &&
+    "$(tail -2 "$TMP/remote.handed" | tr '\n' '|')" == "<-p>|<two words>|" &&
+    "$(cat "$TMP/remote-loaded")" == "100.64.0.3" && "$output" == *"using desktop (100.64.0.3)"* ]]; then
+    pass "claude-remote finds the online server on the tailnet and hands it to claude-local"
+else
+    fail "claude-remote picked the wrong server: $output / $(tr '\n' ' ' < "$TMP/remote.handed" 2>/dev/null)"
+fi
+
+# given no machine that answers
+remote_case Running
+# when
+if output="$(run_remote "$TMP/claude-remote" -p hi 2>&1)"; then status=0; else status=$?; fi
+# then
+if [[ "$status" -ne 0 && "$output" == *"no machine on the tailnet shares Ollama"* && ! -e "$TMP/remote.handed" ]]; then
+    pass "claude-remote stops when no machine shares a server"
+else
+    fail "claude-remote without a server: status=$status output=$output"
+fi
+
+# given a server whose window differs from the one claude-local declares
+remote_case Running 100.64.0.3
+jq '.models[0].context_length = 32768' "$TMP/remote-ps.json" > "$TMP/remote-ps.tmp" && mv "$TMP/remote-ps.tmp" "$TMP/remote-ps.json"
+# when
+if output="$(run_remote "$TMP/claude-remote" -p hi 2>&1)"; then status=0; else status=$?; fi
+# then: a window mismatch truncates silently, so it stops the launch
+if [[ "$status" -ne 0 && "$output" == *"32768-token window"* && "$output" == *"chezmoi update"* && ! -e "$TMP/remote.handed" ]]; then
+    pass "claude-remote refuses a server whose context window differs"
+else
+    fail "claude-remote with a mismatched window: status=$status output=$output"
+fi
+
+# given a server whose GPU holds only part of the model
+remote_case Running 100.64.0.3
+jq '.models[0].size_vram = 40' "$TMP/remote-ps.json" > "$TMP/remote-ps.tmp" && mv "$TMP/remote-ps.tmp" "$TMP/remote-ps.json"
+# when
+output="$(run_remote "$TMP/claude-remote" -p hi 2>&1)" || true
+# then
+if [[ "$output" == *"WARN: 60% of $model runs on the CPU of desktop"* && -e "$TMP/remote.handed" ]]; then
+    pass "claude-remote warns when the server runs part of the model on its CPU, and goes on"
+else
+    fail "claude-remote with partial GPU placement: $output"
+fi
+
+# given a server named by the caller
+remote_case Running 100.64.0.3
+# when
+output="$(run_remote env CLAUDE_REMOTE_HOST=desktop "$TMP/claude-remote" -p hi 2>&1)" || true
+# then: the tailnet name resolves without MagicDNS
+if [[ "$(head -1 "$TMP/remote.handed" 2>/dev/null)" == "OLLAMA_HOST=http://100.64.0.3:11434" ]]; then
+    pass "CLAUDE_REMOTE_HOST picks a tailnet machine by name"
+else
+    fail "CLAUDE_REMOTE_HOST ignored: $output"
+fi
+
+# given a machine that is not logged in to the tailnet
+remote_case NeedsLogin 100.64.0.3
+# when
+if output="$(run_remote "$TMP/claude-remote" -p hi 2>&1)"; then status=0; else status=$?; fi
+# then
+if [[ "$status" -ne 0 && "$output" == *"run 'tailscale-up'"* && ! -e "$TMP/remote.handed" ]]; then
+    pass "claude-remote points at tailscale-up when this machine is off the tailnet"
+else
+    fail "claude-remote off the tailnet: status=$status output=$output"
+fi
+
+# --- claude-local-task -------------------------------------------------------------------------
+
+TASK="$REPO_ROOT/dot_local/bin/executable_claude-local-task"
+TASK_STUBS="$TMP/task-stubs"
+mkdir -p "$TASK_STUBS"
+
+# A run that edits, adds and deletes a file, writes outside the repository, and reports through
+# the events Claude Code streams: one command that succeeds, one that fails, then the result.
+cat > "$TMP/task-stream.jsonl" <<'EOF'
+{"type":"system","subtype":"init","session_id":"0123abcd-0000-4000-8000-000000000000"}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t1","name":"Bash","input":{"command":"go test ./..."}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t1","content":"ok  example.com/calc"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t2","name":"Write","input":{"file_path":"/elsewhere/notes.txt","content":"a\nb"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t2","content":"File created"}]}}
+{"type":"assistant","message":{"content":[{"type":"tool_use","id":"t3","name":"Bash","input":{"command":"git push"}}]}}
+{"type":"user","message":{"content":[{"type":"tool_result","tool_use_id":"t3","is_error":true,"content":"Exit code 128\nfatal: no remote"}]}}
+{"type":"result","subtype":"success","is_error":false,"num_turns":4,"result":"Done, tests pass.","session_id":"0123abcd-0000-4000-8000-000000000000"}
+{"type":"assistant","message":{"content":[{"type":"tool_use"
+EOF
+for launcher in claude-local claude-remote; do
+    cat > "$TASK_STUBS/$launcher" <<EOF
+#!/bin/bash
+cat > "$TMP/task-brief.seen"
+printf '<%s>\n' "\$@" > "$TMP/task-launcher.args"
+echo "$launcher" > "$TMP/task-launcher.name"
+echo "changed by the run" >> a.txt
+echo "added by the run" > new.txt
+rm -f gone.txt
+cat "$TMP/task-stream.jsonl"
+EOF
+done
+chmod +x "$TASK_STUBS"/*
+printf 'Add a feature.\n' > "$TMP/task-brief.md"
+
+# A repository with work of the caller's own: an uncommitted edit and a staged new file.
+task_repo() {
+    rm -rf "$TMP/task-repo" "$TMP/task-config"
+    git init -q "$TMP/task-repo"
+    printf 'one\n' > "$TMP/task-repo/a.txt"
+    printf 'doomed\n' > "$TMP/task-repo/gone.txt"
+    git -C "$TMP/task-repo" add -A
+    git -C "$TMP/task-repo" -c core.hooksPath=/dev/null -c user.email=test@example.com -c user.name=test commit -qm init
+    printf "the caller's edit\n" >> "$TMP/task-repo/a.txt"
+    printf 'staged\n' > "$TMP/task-repo/staged.txt"
+    git -C "$TMP/task-repo" add staged.txt
+}
+
+# The working tree's files and contents, which is what an undo must restore (tar would also
+# compare modification times).
+tree_state() {
+    (cd "$TMP/task-repo" && find . -path ./.git -prune -o -type f -print | LC_ALL=C sort |
+        while read -r file; do printf '%s %s\n' "$file" "$(sha256sum < "$file")"; done)
+}
+
+run_task() {
+    (cd "$TMP/task-repo" && env CLAUDE_LOCAL_CONFIG_DIR="$TMP/task-config" PATH="$TASK_STUBS:/usr/bin:/bin" bash "$TASK" "$@")
+}
+
+# given a repository with the caller's own work in progress
+task_repo
+index_before="$(sha256sum < "$TMP/task-repo/.git/index")"
+tree_before="$(tree_state)"
+# when
+if output="$(run_task "$TMP/task-brief.md" 2>&1)"; then status=0; else status=$?; fi
+# then: every action is listed with its result, a write outside the repository flagged
+if [[ "$status" -eq 0 && "$output" == *"1. Bash: go test ./... -> ok"* &&
+    "$output" == *"2. Write: [outside the repository] /elsewhere/notes.txt (2 lines) -> ok"* &&
+    "$output" == *"3. Bash: git push -> error: Exit code 128"* && "$output" == *"final message:"*"Done, tests pass."* ]]; then
+    pass "claude-local-task lists every action with its result"
+else
+    fail "unexpected action list (status $status): $output"
+fi
+# then: the change is the run's alone -- the caller's edit and staged file are not in it
+if [[ "$(sed -n '/^change:/,/^diff:/p' <<<"$output" | grep -E '^  [AMD]' | tr '\t' ' ' | tr '\n' '|')" == "  M a.txt|  D gone.txt|  A new.txt|" ]]; then
+    pass "claude-local-task attributes only the run's own change to it"
+else
+    fail "unexpected change: $(sed -n '/^change:/,/^undo:/p' <<<"$output")"
+fi
+# then: the caller's index is untouched, and the undo command restores the tree as it was
+undo="$(sed -n 's/^undo: //p' <<<"$output")"
+if [[ "$(sha256sum < "$TMP/task-repo/.git/index")" == "$index_before" ]] && (cd "$TMP/task-repo" && eval "$undo") &&
+    [[ "$(tree_state)" == "$tree_before" ]]; then
+    pass "claude-local-task leaves the caller's index alone, and its undo restores the tree"
+else
+    fail "the index changed or the undo did not restore the tree: $undo"
+fi
+# then: the launcher got the brief on stdin and an unattended run, and the full audit was saved
+audit="$(sed -n 's/^\[claude-local-task\] full audit: //p' <<<"$output")"
+if cmp -s "$TMP/task-brief.md" "$TMP/task-brief.seen" &&
+    grep -qx -- '<--dangerously-skip-permissions>' "$TMP/task-launcher.args" &&
+    grep -qx -- '<stream-json>' "$TMP/task-launcher.args" &&
+    [[ -f "$audit" ]] && grep -q '^## Actions' "$audit" && grep -q 'fatal: no remote' "$audit"; then
+    pass "claude-local-task runs the brief unattended and saves the full audit"
+else
+    fail "unexpected launcher call or audit: $(tr '\n' ' ' < "$TMP/task-launcher.args") / $audit"
+fi
+
+# given --remote
+task_repo
+# when
+run_task --remote "$TMP/task-brief.md" >/dev/null 2>&1 || true
+# then
+[[ "$(cat "$TMP/task-launcher.name")" == "claude-remote" ]] &&
+    pass "claude-local-task --remote runs the model through claude-remote" ||
+    fail "claude-local-task --remote used $(cat "$TMP/task-launcher.name")"
+
+# given a launcher that fails before the model runs
+task_repo
+printf '#!/bin/bash\necho "Error: no server" >&2\nexit 1\n' > "$TMP/task-stubs-failing"
+mkdir -p "$TMP/task-stubs-fail"
+cp "$TMP/task-stubs-failing" "$TMP/task-stubs-fail/claude-local"
+chmod +x "$TMP/task-stubs-fail/claude-local"
+# when
+if output="$(cd "$TMP/task-repo" && env CLAUDE_LOCAL_CONFIG_DIR="$TMP/task-config" PATH="$TMP/task-stubs-fail:/usr/bin:/bin" bash "$TASK" "$TMP/task-brief.md" 2>&1)"; then status=0; else status=$?; fi
+# then
+if [[ "$status" -ne 0 && "$output" == *"did not run (exit 1): Error: no server"* && "$output" == *"change: none"* ]]; then
+    pass "claude-local-task reports a run that never started, and fails"
+else
+    fail "claude-local-task with a failing launcher: status=$status output=$output"
+fi
+
 # --- capacity hint in the zsh wrapper ----------------------------------------------------------
 
 render gpu "$REPO_ROOT/dot_zshrc.tmpl" '{"chezmoi":{"os":"linux"}}' > "$TMP/zshrc.zsh"
