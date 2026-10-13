@@ -9,11 +9,11 @@ The "build" is `chezmoi apply`; there is no compilation step. Repo *changes* (te
 
 ```bash
 make lint    # shellcheck, Go template syntax, Python (ruff), PowerShell, YAML/JSON
-make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution
+make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution, local model, Tailscale
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
-Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-local-llm`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
+Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-local-llm`, `make test-tailscale`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
 
 ## Codex CLI Shortcut
 
@@ -208,6 +208,9 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
 - `dot_config/systemd/user/ssh-agent-bridge.socket` + `ssh-agent-bridge@.service` → `~/.config/systemd/user/`: WSL-only SSH agent bridge (see below)
 - `dot_local/bin/executable_claude-local.tmpl` → `~/.local/bin/claude-local`: Claude Code on a local Ollama model, launched through `ollama launch` with the context window and a lean profile added; the server is the user unit `dot_config/systemd/user/ollama.service.tmpl`, installed by `run_onchange_after_linux-009-setup-ollama.sh.tmpl`, and all three read `.chezmoidata/local-llm.yaml` through `.chezmoitemplates/lib-local-llm.tmpl`. Linux with an NVIDIA driver only; see "Local Model for Claude Code" in `CLAUDE.md` and `.docs/local-coding-model.md`
+- `dot_local/bin/executable_claude-remote.tmpl` → `~/.local/bin/claude-remote`: `claude-local` with the model served by another machine on the tailnet; it finds the first online machine sharing Ollama on port 11434 (or `CLAUDE_REMOTE_HOST`), refuses a server whose context window differs from the local one, and warns about partial GPU placement. Claude Code and its tools still run locally
+- `dot_local/bin/executable_claude-local-task` → `~/.local/bin/claude-local-task`: one unattended task on the local (or, with `--remote`, a tailnet) model, followed by an audit: every action with its result, the change measured between working-tree snapshots taken through a scratch index, an undo command and the transcript path; saved under `~/.claude-local/audits`
+- `dot_local/bin/executable_tailscale-up.tmpl` → `~/.local/bin/tailscale-up`: logs the machine in to the tailnet (waiting for the browser), sets `--operator=$USER` and `--accept-dns=false`, and shares the local model's server with `tailscale serve`; `tailscale-up --no-login` is the quiet pass every interactive zsh runs. Installed with `tailscaled` by `run_onchange_after_linux-010-setup-tailscale.sh.tmpl` on every Linux machine; see "Tailscale" in `CLAUDE.md`
 - `dot_scripts/` → `~/.scripts/`: User utility scripts
 
 ### Scripts and Automation
