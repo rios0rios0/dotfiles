@@ -455,9 +455,21 @@ codexx() {
 # that puts the current (healthy) account's credentials on disk, so account
 # rotation applies no matter which entrypoint is used. It is a no-op when ccswitch
 # is absent, which keeps the entrypoints working on platforms that never install it.
+#
+# When no enrolled account has capacity left, `ccswitch capacity` (also no network)
+# says when one recovers and exits 3, and the local model is pointed out for the
+# meantime. Only pointed out: switching from the account's model to a local one
+# without a word would surprise anyone in the middle of a task. Any other status --
+# capacity, an error, a ccswitch too old to know the command -- launches silently.
 _claude_ensure_account() {
     if command -v ccswitch >/dev/null 2>&1; then
         ccswitch ensure --quiet 2>/dev/null
+        if command -v claude-local >/dev/null 2>&1; then
+            ccswitch capacity 2>/dev/null
+            if (( $? == 3 )); then
+                print -u2 "[claude-local] \`claude-local\` runs Claude Code on the local GPU meanwhile"
+            fi
+        fi
     fi
     return 0
 }

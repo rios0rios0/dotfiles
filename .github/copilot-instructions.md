@@ -13,7 +13,7 @@ make test    # template rendering (mock op), .chezmoiignore logic, script order,
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
-Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
+Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-local-llm`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
 
 ## Codex CLI Shortcut
 
@@ -193,6 +193,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
 - `.chezmoitemplates/`: Shared template fragments (`lib-install-deps.sh`, `lib-install-fonts.sh`, `lib-modify-mcp-servers.tmpl`, `lib-remove-dependencies.sh`, `username.tmpl`)
+- `dot_local/bin/`: Executable user commands deployed through chezmoi (platform-filtered by `.chezmoiignore`)
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
 ### Key Managed Files
@@ -206,6 +207,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_config/mcphub/modify_servers.json` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android only; same list and merge as `~/.claude.json`, from `.chezmoitemplates/lib-modify-mcp-servers.tmpl`)
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
 - `dot_config/systemd/user/ssh-agent-bridge.socket` + `ssh-agent-bridge@.service` → `~/.config/systemd/user/`: WSL-only SSH agent bridge (see below)
+- `dot_local/bin/executable_claude-local.tmpl` → `~/.local/bin/claude-local`: Claude Code on a local Ollama model, launched through `ollama launch` with the context window and a lean profile added; the server is the user unit `dot_config/systemd/user/ollama.service.tmpl`, installed by `run_onchange_after_linux-009-setup-ollama.sh.tmpl`, and all three read `.chezmoidata/local-llm.yaml` through `.chezmoitemplates/lib-local-llm.tmpl`. Linux with an NVIDIA driver only; see "Local Model for Claude Code" in `CLAUDE.md` and `.docs/local-coding-model.md`
 - `dot_scripts/` → `~/.scripts/`: User utility scripts
 
 ### Scripts and Automation

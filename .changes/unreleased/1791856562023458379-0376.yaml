@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'changed `make test-chezmoiignore` to render with a config of its own, so it no longer passes locally on data from the developer config that a CI runner lacks'
+time: '2026-10-13T01:56:02.023395927Z'

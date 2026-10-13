@@ -1,0 +1,35 @@
+{{- /*
+  The local-model settings for this device, as JSON: .localLLM from .chezmoidata/local-llm.yaml
+  with .localLLM.devices.<deviceName> laid over it, plus `gpu`, whether an NVIDIA driver is on
+  PATH, and `enabled`, which is false unless both the settings and the driver allow it.
+
+  Every consumer reads it the same way,
+      includeTemplate "lib-local-llm.tmpl" . | fromJson
+  so the Ollama unit, its installer and claude-local agree on one model and one context window
+  by construction rather than by keeping copies in step.
+
+  The platform is not decided here. .chezmoiignore pairs `enabled` with its own OS check,
+  because lookPath finds nvidia-smi.exe on a Windows machine with an NVIDIA card as well, and
+  the test of .chezmoiignore substitutes the OS into that file's text, which would not reach a
+  check made in this one.
+*/ -}}
+{{- /* deviceName is read with `get`, which yields "" for a missing key, never as .deviceName, which
+       fails the render: .chezmoiignore includes this file and is rendered before any script runs,
+       so a config that predates deviceName would abort the apply with a template error before
+       run_before_000-verify-chezmoi-config could tell the user to run `chezmoi init`. */ -}}
+{{- $llm := .localLLM -}}
+{{- $deviceName := get . "deviceName" -}}
+{{- $device := dict -}}
+{{- if hasKey $llm.devices $deviceName -}}
+{{-   $device = get $llm.devices $deviceName -}}
+{{- end -}}
+{{- /* Laid over key by key with `set`, never with sprig's merge or mergeOverwrite: both go through
+       mergo, which counts false and 0 as empty, so a device's `enabled: false` would lose to the
+       default `true` in either direction. */ -}}
+{{- $settings := deepCopy (omit $llm "devices") -}}
+{{- range $key, $value := $device -}}
+{{-   $_ := set $settings $key $value -}}
+{{- end -}}
+{{- $_ := set $settings "gpu" (ne (lookPath "nvidia-smi") "") -}}
+{{- $_ := set $settings "enabled" (and (get $settings "enabled") (get $settings "gpu")) -}}
+{{- toJson $settings -}}

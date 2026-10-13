@@ -1,0 +1,43 @@
+# The local model behind `claude-local`: Claude Code on an Ollama server running on this
+# machine's NVIDIA GPU. See .docs/local-coding-model.md and CLAUDE.md, "Local Model for Claude
+# Code".
+#
+# chezmoi reads this file on every apply -- unlike `data:` in .chezmoi.yaml.tmpl, which only
+# `chezmoi init` regenerates -- so an edit reaches the Ollama unit, its installer and the
+# launcher together on the next apply. All three read it through
+# .chezmoitemplates/lib-local-llm.tmpl.
+localLLM:
+  # Installed and served on every Linux machine with an NVIDIA driver unless this is false,
+  # here or for one device below.
+  enabled: true
+  model: 'qwen3.8:27b'
+  # Rendered into both OLLAMA_CONTEXT_LENGTH, which is what the server allocates, and
+  # CLAUDE_CODE_MAX_CONTEXT_TOKENS, which is what Claude Code budgets against. Claude Code cannot
+  # read a window from Ollama and assumes 200K for a model it does not recognise, so the two must
+  # agree, and one value is what makes them agree.
+  #
+  # Sized for a 24 GB GPU that also drives a display: qwen3.8:27b is ~18 GB with its vision
+  # projector, and only 16 of its 64 layers keep a KV cache, so 64K of q8_0 cache costs ~2 GiB.
+  contextTokens: 65536
+  # Room Claude Code reserves for a reply, taken out of the window before it auto-compacts
+  # together with a fixed ~13K. An unrecognised model gets 32K by default, which would leave a
+  # 64K window with nothing for input.
+  maxOutputTokens: 8192
+  # What a local session loads before the first prompt has to fit the window, so it gets a lean
+  # profile (see claude-local). These are the global rules it keeps: the rest of ~/.claude/rules,
+  # ~30K tokens, is excluded.
+  rules: ['code-style', 'git-flow', 'testing']
+  # And the tools it gets. Claude Code defers rarely used tool schemas only for Claude models;
+  # for any other it sends every schema with every request, 27K tokens against 5.8K for these.
+  tools: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep']
+  # q8_0 halves the cache against the f16 default; it needs flash attention, which Ollama turns
+  # on by itself for any CUDA GPU from compute capability 6.0.
+  kvCacheType: 'q8_0'
+  # How long an idle model stays in VRAM. The GPU is shared with the Windows desktop and games,
+  # so it is given back after a while rather than held for good.
+  keepAlive: '15m'
+  # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
+  #   devices:
+  #     some-desktop:
+  #       contextTokens: 131072
+  devices: {}

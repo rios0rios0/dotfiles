@@ -30,11 +30,32 @@ AppData
 .ssh
 {{- end }}
 
+{{- /* Two Linux features ship systemd user units, and each is gated on what it serves.
+     .config/systemd itself is ignored only when neither applies, so that Windows, Android and a
+     machine with no use for either never get an empty ~/.config/systemd/user. */ -}}
+{{- $wsl := and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
+{{- $localLLM := and (eq .chezmoi.os "linux") (includeTemplate "lib-local-llm.tmpl" . | fromJson).enabled -}}
+
 {{- /* WSL-exclusive files. The SSH agent bridge relays a Windows named pipe, so it is
      meaningless on bare-metal Linux -- there is no Windows agent to reach, and the unit would
      point at an npiperelay.exe that is never installed. Gated on the kernel rather than the OS
      because "linux" alone does not distinguish WSL from bare metal. */ -}}
-{{- if not (and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString))) }}
+{{- if not $wsl }}
+.config/systemd/user/ssh-agent-bridge.socket
+.config/systemd/user/ssh-agent-bridge@.service
+{{- end }}
+
+{{- /* The local model for Claude Code (claude-local): Linux with an NVIDIA driver, unless
+     .chezmoidata/local-llm.yaml switches it off. Gated on the GPU rather than on WSL, because
+     nothing in it depends on Windows and a bare-metal machine with a GPU runs it the same way.
+     The OS check lives here, not in lib-local-llm.tmpl, because lookPath finds nvidia-smi.exe on
+     a Windows machine with an NVIDIA card too. */ -}}
+{{- if not $localLLM }}
+.config/systemd/user/ollama.service
+.local/bin/claude-local
+{{- end }}
+
+{{- if not (or $wsl $localLLM) }}
 .config/systemd
 {{- end }}
 

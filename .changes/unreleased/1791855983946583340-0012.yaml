@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `claude-local`, which runs Claude Code on a local Ollama model: on Linux with an NVIDIA GPU, `chezmoi apply` installs a pinned, checksum-verified Ollama as a user service, pulls the model named in `.chezmoidata/local-llm.yaml` and verifies that it runs on the GPU, and each session gets a context window matched to the server and a lean profile that fits in it'
+time: '2026-10-13T01:46:23.946540827Z'
