@@ -46,7 +46,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 ### Development Tools
 
 - **Claude Code**, **Codex CLI** and **GitHub Copilot CLI** (AI coding assistants)
-- Optional **Ollama** coding model for Claude Code on WSL; see the [local coding model guide](.docs/local-coding-model.md)
+- **`claude-local`**: Claude Code on a local **Ollama** model, on Linux machines with an NVIDIA GPU; see the [local model guide](.docs/local-coding-model.md)
 - **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm)
 - **Neovim** with AstroVim (Android)
 
@@ -215,9 +215,9 @@ The global `~/.gitignore` (managed via `dot_gitignore`) ignores `.claude/` by de
 
 It also ignores `.cache_ggshield`, which ggshield's global pre-commit hook writes to a repository's root when it finds a secret. On its next run ggshield appends `# Added by ggshield` and `.cache_ggshield` to that repository's own `.gitignore` unless `git check-ignore` already matches the file, so the global entry is what keeps the hook from editing the `.gitignore` of every repository it flags.
 
-## Local Coding Model (WSL)
+## Local Model for Claude Code
 
-`ollama-claude-setup` installs Ollama when needed, configures a 65,536-token service context, and pulls `qwen3.8:27b`. `claude-local` routes only that invocation through Ollama; `claude-switch` offers a terminal picker or direct local/Anthropic selection. The regular `claude` command and its account login remain unchanged. The [local coding model guide](.docs/local-coding-model.md) covers setup, switching, quality checks, and connecting to the remote 4090 over SSH.
+On Linux with an NVIDIA driver, `chezmoi apply` installs Ollama as a user service -- pinned, checksum-verified, no root -- pulls the model named in `.chezmoidata/local-llm.yaml`, and checks that it runs on the GPU. `claude-local` then starts Claude Code on that model, in a lean profile of its own, without touching the regular `claude`, its login or ccswitch's rotation. When ccswitch reports that no account has capacity left, `claude` points at `claude-local` before launching. The [local model guide](.docs/local-coding-model.md) covers settings, measurements on this hardware and troubleshooting.
 
 ## Chezmoi Conventions
 

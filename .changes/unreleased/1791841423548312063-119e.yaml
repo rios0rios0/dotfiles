@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added an opt-in WSL Ollama setup and process-scoped Claude Code launcher, with guidance for local and SSH-tunneled remote GPUs'
-time: '2026-10-12T21:43:43.548193381Z'

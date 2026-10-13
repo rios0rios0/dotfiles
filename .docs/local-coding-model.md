@@ -1,95 +1,128 @@
-# Local Coding Model for Claude Code
+# Local Model for Claude Code (`claude-local`)
 
-This optional WSL setup routes Claude Code through a local Ollama model for routine coding work. It keeps the existing `claude` command and Anthropic login intact; `claude-local` applies provider settings only to its own process.
+`claude-local` runs Claude Code on an Ollama model served from this machine's NVIDIA GPU. It
+changes nothing outside its own process: the regular `claude`, its login and ccswitch's account
+rotation stay exactly as they are, and both can run side by side.
 
-The setup scripts are managed in this repository because Ollama installation, GPU service settings, and CLI launchers are environment configuration. AI instructions and coding standards remain in the separate `aifiles` repository.
+## When it is installed
 
-## Local WSL Setup
+On every Linux machine -- WSL or bare metal -- that has an NVIDIA driver (`nvidia-smi` on `PATH`),
+unless `.chezmoidata/local-llm.yaml` sets `enabled: false`, globally or for one device.
+`chezmoi apply` then runs `run_onchange_after_linux-009-setup-ollama.sh`, which:
 
-Requirements:
+1. downloads the pinned Ollama release, checks it against the digest upstream publishes, and
+   unpacks it into `~/.local/share/ollama/<version>` (no root, no system user);
+2. starts `ollama.service` as a **user** unit, rendered from the same data file;
+3. pulls the model (about 18 GB the first time; Ollama itself is 1.4 GB);
+4. loads the model once and fails the apply if it landed on the CPU although the GPU had room
+   -- see [Troubleshooting](#troubleshooting) for why that check exists. A GPU that a game or
+   the desktop has filled only warns.
 
-- WSL2 with NVIDIA GPU support and `nvidia-smi` available
-- systemd enabled in WSL
-- Claude Code already installed
-- `curl` and `sudo`
+It runs again whenever the pinned version, the model or the unit's settings change.
 
-Apply the dotfiles, then run:
-
-```bash
-chezmoi apply
-ollama-claude-setup
-```
-
-The setup command installs Ollama from its official HTTPS installer when missing, creates a systemd override with a 65,536-token default context, starts the service, and downloads `qwen3.8:27b`. The current Ollama library build is a Q4_K_M model around 18 GB; model tags can change as the upstream publisher updates them. See the [Ollama model page](https://ollama.com/library/qwen3.8:27b).
-
-Start a local coding session with:
+## Usage
 
 ```bash
-claude-local
+claude-local                                   # an interactive session on the local model
+claude-local -p "add a test for Subtract"      # print mode, like `claude -p`
+CLAUDE_LOCAL_MODEL=qwen3.6:27b claude-local    # another pulled model, for one session
 ```
 
-After `chezmoi apply`, reload Zsh once with `source ~/.zshrc` (or open a new terminal). To switch providers, exit the current Claude Code process and run `claude-switch` for a prompt, or select a provider directly:
+The first launch shows Claude Code's onboarding once, because the session runs in its own profile
+(`~/.claude-local`), and its trust prompt once per project, as any new profile would.
 
-```bash
-claude-switch local --resume
-claude-switch claude --resume
-```
+When ccswitch reports that no enrolled account has capacity left, `claude` and `claudex` say so
+before launching and point at `claude-local`. They only point: nothing switches models without
+being asked.
 
-The current session cannot change its API endpoint in place; the provider is selected when Claude Code starts. `--resume` passes through to the selected CLI, letting you try to reopen a conversation under the other provider; if that transcript is incompatible, start fresh. Resuming sends the stored conversation to the selected provider, so switching from local to Anthropic sends that transcript to Anthropic. You can also use `claude-switch local` or `claude-switch claude` to start a fresh session.
+## Settings
 
-The launcher sets `ANTHROPIC_BASE_URL`, a placeholder Ollama auth token, the model and context variables, and clears Anthropic API-key and cloud-provider overrides for that process. It checks that Ollama responds before starting Claude Code. Select a model per session with `CLAUDE_LOCAL_MODEL`; to change context, update the Ollama service and launcher to the same value:
+Everything lives in `.chezmoidata/local-llm.yaml`, which chezmoi reads on every apply -- no
+`chezmoi init` needed:
 
-```bash
-ollama-claude-setup --context 32768
-CLAUDE_LOCAL_CONTEXT_TOKENS=32768 \
-claude-local
-```
+| Key | Default | What it controls |
+|-----|---------|------------------|
+| `model` | `qwen3.8:27b` | The model, for every Claude Code tier at once |
+| `contextTokens` | `65536` | Both `OLLAMA_CONTEXT_LENGTH` and `CLAUDE_CODE_MAX_CONTEXT_TOKENS`, from one value |
+| `maxOutputTokens` | `8192` | The reply reservation Claude Code subtracts from the window |
+| `kvCacheType` | `q8_0` | KV cache precision; half the memory of the `f16` default |
+| `keepAlive` | `15m` | How long an idle model stays in VRAM before the GPU is given back |
+| `rules` | `code-style`, `git-flow`, `testing` | The global rules a local session keeps |
+| `tools` | `Bash`, `Read`, `Edit`, `Write`, `Glob`, `Grep` | The tools it gets |
+| `devices` | none | Per-device overrides of any key above, by chezmoi `deviceName` |
 
-The setup command changes the Ollama service context; `CLAUDE_LOCAL_CONTEXT_TOKENS` must match it. The setup default is 65,536 tokens, a coding-oriented context that may need lowering if the GPU runs out of memory or Ollama offloads layers to the CPU. Check placement and allocated context with `ollama ps`.
+## Why the session is lean
 
-Pass normal Claude Code arguments through the launcher, including an explicit model override:
+The window has to hold everything Claude Code sends before the first prompt. Measured with
+`/context` on 2026-10-12 (Claude Code `2.1.296`):
 
-```bash
-claude-local --model qwen3.8:27b
-claude-local --resume
-```
+| Profile | dotfiles repository | ccswitch repository |
+|---------|--------------------|---------------------|
+| Regular profile | 72.8K tokens | 50.7K tokens |
+| Lean profile (`claude-local`) | 37.2K tokens, 7.1K free | 18.5K tokens, **25.9K free** |
 
-The launcher uses Ollama's [Anthropic Messages API compatibility](https://ollama.com/blog/claude). It does not edit `~/.claude/settings.json`, rotate accounts, or change the normal `claude` command. Ollama's API stays on its loopback listener by default.
+Three things account for the difference, and each needed its own fix:
 
-## Remote RTX 4090
+- **Tool schemas.** For a model it does not recognise, Claude Code sends every tool schema with
+  every request instead of deferring the rarely used ones: 27K tokens. `--tools` limits a local
+  session to six (5.8K).
+- **Global rules.** A separate `CLAUDE_CONFIG_DIR` does not drop `~/.claude/rules`: for any
+  project under `$HOME`, Claude Code reads that directory as the rules of the ancestor directory
+  `~`. `claudeMdExcludes` keeps only the rules listed in the data file.
+- **The reply reservation.** Claude Code reserves room for a reply plus about 13K before it
+  auto-compacts. An unrecognised model gets 32K by default, which left nothing of a 64K window;
+  `maxOutputTokens: 8192` makes it 21.2K.
 
-Install Ollama on the remote desktop, pull the same model there, and keep the Ollama API bound to loopback. The 27B model uses about 18 GB before context memory, so the 4090 may need a smaller context or CPU offload. Start at 16,384 tokens and check placement with `ollama ps`; lower it if the model does not fit fully in VRAM. Configure the Ollama server/app to use the same context. From WSL, forward a local port over SSH:
+A repository whose own `CLAUDE.md` is as large as this one's (26.9K tokens) leaves too little room
+for a 64K window and is better served by the regular `claude`.
 
-```bash
-ssh -N -L 11435:127.0.0.1:11434 <gpu-host>
-```
+## Performance on this machine
 
-In a second WSL terminal, route a session through that tunnel:
+Measured on 2026-10-12: RTX 5090 Laptop GPU (24 GB, also driving the display), Ollama `0.40.3`,
+`qwen3.8:27b` at a 64K window with a `q8_0` cache:
 
-```bash
-CLAUDE_LOCAL_BASE_URL=http://127.0.0.1:11435 \
-CLAUDE_LOCAL_CONTEXT_TOKENS=16384 \
-claude-local
-```
+| Measure | Result |
+|---------|--------|
+| Placement | 100% GPU, 21.8 GB of VRAM in use at peak (about 1.2 GB of it the Windows desktop) |
+| Prompt processing | 1,194 tokens/s (9,866 tokens in 8.3 s) |
+| Generation | 27.9 tokens/s |
+| Between turns | the prompt cache is reused; only new tokens are processed |
+| End to end | a 9-turn edit-test-run task in 45 s |
+| On the CPU instead | 55 s for a one-word reply |
 
-For a Windows remote host, install Ollama from the [official Windows download](https://ollama.com/download/windows), use PowerShell to pull `qwen3.8:27b`, and set its context length to 16,384 in Ollama's app settings. Keep Ollama running while the SSH tunnel is open. Do not expose port `11434` directly to the internet or an untrusted network; Ollama's local API does not require authentication.
-
-The local 5090 and remote 4090 are independent Ollama workers. Start separate Claude Code sessions and point each one at its worker; their VRAM is not combined. Use the remote endpoint only when its host is reachable over SSH or a trusted private network.
-
-## Quality Workflow
-
-- Use the local model first for well-scoped, low-risk issues with clear acceptance criteria.
-- Require the repository's normal tests, lint, build, and CI checks before merging.
-- Review the diff and test behavior; do not treat a model's report that checks passed as evidence.
-- Escalate ambiguous requirements, security-sensitive changes, migrations, architecture, and repeated failures to Claude Sonnet/Opus or a human reviewer.
-- Track rework and defects on a representative issue sample before moving higher-risk work to the local model.
+The GPU is shared with Windows. A game holding 10 GB of VRAM leaves too little for the model, and
+Ollama then runs part of it on the CPU: the installer reports that as a warning, and `ollama ps`
+shows the split.
 
 ## Troubleshooting
 
-- Check GPU visibility with `nvidia-smi` from WSL.
-- Check service state with `systemctl status ollama.service`.
-- Check that the model is installed with `ollama list`.
-- If a local session cannot reach Ollama, verify `CLAUDE_LOCAL_BASE_URL` and the `/api/tags` endpoint.
-- If Claude Code compacts too early or Ollama reports context errors, keep the launcher's context value aligned with the service context and lower it when VRAM is constrained.
+- **Where does the model run?** `ollama ps`: the `PROCESSOR` column must read `100% GPU`.
+- **Ollama found no GPU.** `journalctl --user -u ollama | grep 'inference compute'` should show
+  `library=CUDA`. A `GPU discovery` failure with `signal: bus error` means a damaged install: a
+  WSL VM that went down shortly after an install once left the two `libcublasLt` libraries
+  truncated under a marker that said the install was complete, and CUDA discovery then crashed on
+  every start while Ollama quietly served from the CPU. The installer now writes the marker only
+  after the files are on disk, re-verifies every file against a digest manifest whenever it runs,
+  and reinstalls when one no longer matches. To run it now:
+  `chezmoi execute-template < "$(chezmoi source-path)/.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.sh.tmpl" | bash`
+- **The server is not running.** `claude-local` starts the user unit on demand; otherwise
+  `systemctl --user status ollama`.
+- **Exit status.** `ollama launch` keeps running as the parent of `claude`, and reports any
+  non-zero exit as `Error: exit status N` with status 1. Ctrl+C is unaffected: Claude Code reads it
+  as input, so it interrupts a reply as usual.
 
-References: [Ollama install](https://ollama.com/download/linux), [Ollama context length](https://docs.ollama.com/context-length), [Claude Code environment variables](https://code.claude.com/docs/en/env-vars).
+## Another GPU on the network
+
+Not wired up yet. `OLLAMA_HOST=<host>:<port> claude-local` reaches another Ollama server, but
+`claude-local` still declares the local window from the data file, and on this machine an SSH
+tunnel is easy to get wrong: `ssh` is the `ssh.exe` wrapper and WSL runs in NAT mode, so
+`ssh -L` opens the port on Windows' loopback, which WSL cannot reach. A tunnel would need
+`/usr/bin/ssh` through the [SSH agent bridge](../CLAUDE.md), or mirrored networking.
+
+## References
+
+- [Ollama: Claude Code integration](https://docs.ollama.com/integrations/claude-code)
+- [Ollama: Anthropic API compatibility](https://docs.ollama.com/api/anthropic-compatibility)
+- [Ollama: context length](https://docs.ollama.com/context-length)
+- [Claude Code: environment variables](https://code.claude.com/docs/en/env-vars)
+- [Claude Code: model configuration](https://code.claude.com/docs/en/model-config)

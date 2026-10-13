@@ -1,0 +1,235 @@
+{{- $llm := includeTemplate "lib-local-llm.tmpl" . | fromJson -}}
+{{- if $llm.enabled -}}
+#!/bin/bash
+
+# Installs Ollama as a systemd user service and pulls the model `claude-local` runs.
+#
+# Ollama's own installer is a root script: it streams the release into /usr/local without
+# checking a digest, creates an `ollama` system user, and leaves its settings to a drop-in under
+# /etc that nothing tracks. Everything here lives under $HOME instead: the release, unpacked into
+# ~/.local/share/ollama/<version> once its digest matches the pin below; the models, in ~/.ollama;
+# and the unit, which chezmoi renders from .chezmoidata/local-llm.yaml. So the install needs no
+# root, and the configuration is versioned with the rest of this repository.
+#
+# `run_onchange_` rather than `run_once_`. A version bump changes the pins below, and a new model
+# or context window changes the digest of the rendered unit recorded on the next line, so either
+# re-runs this script, which restarts the server on the new binary and settings and pulls a model
+# that is not there yet:
+#   unit {{ includeTemplate "dot_config/systemd/user/ollama.service.tmpl" . | sha256sum }}
+#
+# Rendered only on Linux with an NVIDIA driver, and empty otherwise, which chezmoi never runs
+# (see lib-local-llm.tmpl). See CLAUDE.md, "Local Model for Claude Code".
+
+set -euo pipefail
+
+prefix="ollama"
+
+# Pinned with the digest upstream publishes in the release's sha256sum.txt. Each release ships one
+# archive per accelerator; this is the CUDA one.
+version="0.40.3"
+archive="ollama-linux-amd64.tar.zst"
+checksum="ce6f8b671a699bf1ebafb28d60dbbabf4f37b30b499145fa308a8ba72de021d6"
+url="https://github.com/ollama/ollama/releases/download/v${version}/${archive}"
+
+install_root="$HOME/.local/share/ollama"
+install_dir="$install_root/$version"
+marker="$install_dir/.archive-sha256"
+manifest_name=".files.sha256"
+link="$HOME/.local/bin/ollama"
+unit="ollama.service"
+api="http://127.0.0.1:11434"
+model={{ $llm.model | quote }}
+
+if [[ "$(uname -m)" != "x86_64" ]]; then
+    echo "[$prefix] WARN: no $(uname -m) build is pinned here; Ollama not installed" >&2
+    exit 0
+fi
+
+# The release counts as installed only when the marker names the pinned archive *and* every file
+# still matches the digest recorded when it was unpacked. The marker alone is not enough: a WSL VM
+# that went down after an install has left the two largest libraries (libcublasLt, ~500 MB each)
+# truncated under a valid marker, and CUDA discovery then died with SIGBUS on every start, which
+# Ollama answers by serving from the CPU with nothing but a line in its own log to say so.
+release_intact() {
+    [[ -x "$install_dir/bin/ollama" ]] &&
+        [[ "$(cat "$marker" 2>/dev/null)" == "$checksum" ]] &&
+        (cd "$install_dir" && sha256sum --check --status "$manifest_name" 2>/dev/null)
+}
+
+install_release() {
+    local workdir staging
+
+    if release_intact; then
+        echo "[$prefix] Ollama $version is already installed and intact, skipping download" >&2
+        return 0
+    fi
+    if [[ "$(cat "$marker" 2>/dev/null)" == "$checksum" ]]; then
+        echo "[$prefix] WARN: the installed Ollama $version no longer matches its digests; reinstalling" >&2
+    fi
+
+    if ! command -v zstd >/dev/null 2>&1; then
+        echo "[$prefix] ERROR: zstd is required to unpack $archive; the dependency installer provides it" >&2
+        return 1
+    fi
+
+    workdir="$(mktemp -d)"
+
+    # Downloaded to a file and verified before anything is unpacked. Streaming it into tar, as the
+    # upstream installer does, would unpack an HTTP error page or a tampered archive just as readily.
+    echo "[$prefix] downloading Ollama $version ($archive)" >&2
+    if ! curl --proto '=https' -fsSL "$url" -o "$workdir/$archive"; then
+        echo "[$prefix] ERROR: failed to download $url" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+
+    if ! echo "$checksum  $workdir/$archive" | sha256sum --check --status; then
+        echo "[$prefix] ERROR: checksum mismatch for $archive; refusing to install" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+
+    # Unpacked beside the target and renamed into place, so an interrupted run never leaves a
+    # half-populated version directory behind for the gate above to judge.
+    staging="$install_root/.staging-$version"
+    rm -rf "$staging"
+    mkdir -p "$staging"
+    if ! zstd -dc "$workdir/$archive" | tar -xf - -C "$staging"; then
+        echo "[$prefix] ERROR: failed to unpack $archive" >&2
+        rm -rf "$workdir" "$staging"
+        return 1
+    fi
+    rm -rf "$workdir"
+
+    if [[ ! -x "$staging/bin/ollama" ]]; then
+        echo "[$prefix] ERROR: $archive has no bin/ollama; refusing to install" >&2
+        rm -rf "$staging"
+        return 1
+    fi
+
+    # Record what was unpacked, then flush it to disk before the marker declares it complete: the
+    # marker is the commit record, so it must never reach the disk ahead of the data it vouches for.
+    (cd "$staging" && find . -type f ! -name "$manifest_name" -print0 | sort -z | xargs -0 sha256sum > "$manifest_name")
+    sync -f "$staging/$manifest_name"
+
+    rm -rf "$install_dir"
+    mv "$staging" "$install_dir"
+    echo "$checksum" > "$marker"
+    sync -f "$marker"
+    echo "[$prefix] installed Ollama $version to $install_dir" >&2
+}
+
+# Proves the model runs on the GPU by loading it once and reading where Ollama placed it. Nothing
+# else would tell: when CUDA discovery fails, Ollama serves from the CPU, an order of magnitude
+# slower, and every request still succeeds. Only that fails the run. Partial or no placement while
+# a game or the Windows desktop holds the VRAM is a warning, because it passes once that is freed.
+verify_gpu() {
+    local request placement size vram free_mib
+
+    request="$(jq -nc --arg model "$model" \
+        '{model: $model, prompt: "ok", stream: false, think: false, keep_alive: "30s", options: {num_predict: 1}}')"
+    if ! curl -fsS --max-time 600 "$api/api/generate" -d "$request" >/dev/null; then
+        echo "[$prefix] ERROR: $model failed to load; check 'journalctl --user -u $unit'" >&2
+        return 1
+    fi
+
+    placement="$(curl -fsS --max-time 5 "$api/api/ps" | jq -r --arg model "$model" \
+        '.models[] | select(.name == $model) | "\(.size) \(.size_vram)"' | head -1)"
+    read -r size vram <<<"$placement"
+    if [[ -z "$size" ]]; then
+        echo "[$prefix] ERROR: $model is not among the loaded models; check 'journalctl --user -u $unit'" >&2
+        return 1
+    fi
+
+    # None on the GPU means one of two things, told apart by what is free: a GPU that something
+    # else has filled, which passes, or one Ollama could not use although it had room.
+    if (( vram == 0 )); then
+        free_mib="$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -dc '0-9')"
+        if [[ -n "$free_mib" ]] && (( free_mib * 1024 * 1024 < size )); then
+            echo "[$prefix] WARN: $model runs on the CPU for now: only $free_mib MiB of VRAM is free; it moves to the GPU once that is freed" >&2
+            return 0
+        fi
+        echo "[$prefix] ERROR: $model runs on the CPU although the GPU has room: Ollama found no usable GPU; check 'journalctl --user -u $unit' for 'GPU discovery'" >&2
+        return 1
+    fi
+    if (( vram < size )); then
+        echo "[$prefix] WARN: only $(( vram * 100 / size ))% of $model fits in free VRAM now; the rest runs on the CPU until the GPU is freed" >&2
+        return 0
+    fi
+    echo "[$prefix] $model runs fully on the GPU ($(( vram / 1024 / 1024 / 1024 )) GiB of VRAM)" >&2
+}
+
+# Each release unpacks to several GB of CUDA libraries, so only the pinned one is kept. It runs
+# after the restart below, once the server no longer maps any of the older files.
+prune_releases() {
+    local dir
+    shopt -s nullglob
+    for dir in "$install_root"/*/; do
+        dir="${dir%/}"
+        [[ "$dir" == "$install_dir" ]] && continue
+        [[ "$(basename "$dir")" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]] || continue
+        rm -rf "$dir"
+        echo "[$prefix] removed the superseded release $(basename "$dir")" >&2
+    done
+    shopt -u nullglob
+}
+
+if command -v nvidia-smi >/dev/null 2>&1; then
+    echo "[$prefix] GPU: $(nvidia-smi --query-gpu=name,memory.total --format=csv,noheader 2>/dev/null | head -1)" >&2
+fi
+
+install_release || exit 1
+
+mkdir -p "$(dirname "$link")"
+ln -sfn "$install_dir/bin/ollama" "$link"
+
+if ! command -v systemctl >/dev/null 2>&1 || ! systemctl --user show-environment >/dev/null 2>&1; then
+    echo "[$prefix] WARN: no systemd user session; enable systemd in /etc/wsl.conf, or run 'ollama serve' by hand" >&2
+    exit 0
+fi
+
+# A system-wide server left by Ollama's own installer holds the same port, and this one would
+# fail to bind behind it.
+if systemctl is-active --quiet "$unit" 2>/dev/null; then
+    echo "[$prefix] WARN: a system-wide $unit is running and holds port 11434; stop and disable it" >&2
+fi
+
+systemctl --user daemon-reload
+if ! systemctl --user enable "$unit" >/dev/null 2>&1; then
+    echo "[$prefix] ERROR: could not enable the user unit $unit" >&2
+    exit 1
+fi
+
+# Restart rather than start: a running server keeps the binary and the settings it was started
+# with, and this script runs precisely when one of those changed.
+systemctl --user restart "$unit"
+
+ready=false
+for _ in $(seq 1 30); do
+    if curl -fsS --max-time 2 "$api/api/version" >/dev/null 2>&1; then
+        ready=true
+        break
+    fi
+    sleep 1
+done
+if [[ "$ready" != true ]]; then
+    echo "[$prefix] ERROR: the server did not answer at $api; check 'journalctl --user -u $unit'" >&2
+    exit 1
+fi
+
+prune_releases
+
+if "$link" show "$model" >/dev/null 2>&1; then
+    echo "[$prefix] $model is already pulled" >&2
+else
+    echo "[$prefix] pulling $model; the first pull is a download of many GB" >&2
+    if ! "$link" pull "$model"; then
+        echo "[$prefix] ERROR: failed to pull $model" >&2
+        exit 1
+    fi
+fi
+
+verify_gpu || exit 1
+
+echo "[$prefix] ready at $api with $model" >&2
+{{- end }}

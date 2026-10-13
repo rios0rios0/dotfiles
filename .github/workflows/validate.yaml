@@ -227,6 +227,26 @@ jobs:
       - name: Test NVM version resolution
         run: make test-nvm-resolution
 
+  test-local-llm:
+    name: Test (local model for Claude Code)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Install chezmoi
+        run: |
+          cd "$(mktemp -d)"
+          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive" chezmoi
+          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
+      - name: Install jq and zsh
+        run: sudo apt-get install -y jq zsh
+      - name: Test the local model setup (claude-local)
+        run: make test-local-llm
+
   sast:
     name: SAST
     runs-on: ubuntu-latest

@@ -27,6 +27,7 @@ make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR s
 make test-shell-credentials         # 1Password credential/workspace loading and removal
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
+make test-local-llm                 # claude-local: shared settings, one context window, launcher, capacity hint
 ```
 
 ## Essential Commands
@@ -206,7 +207,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -568,6 +569,33 @@ Both entrypoints run the same `_claude_ensure_account` guard before launching, s
 Keep `claudex` a **function**, not an alias: zsh refuses to define a function whose name is already an alias, and aliases are expanded only in interactive shells, so an aliased `claudex` does not exist in scripts, `zsh -c`, or `sudo zsh -c`. Keep its guard call **explicit** too — relying on a bare `claude` to pick up the wrapper works only because a bare command word resolves to a function before a binary, so changing it to `command claude` would silently drop rotation.
 
 **Note:** if `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set, Claude Code ignores the rotated OAuth credentials; `ccswitch` warns when it detects this.
+
+The same guard asks `ccswitch capacity` (no network) whether any enrolled account has capacity left, and when it exits `3` -- none -- points at `claude-local` before launching. Only exit `3` counts: `1` is any failure, including a ccswitch too old to know the command, so a stale binary stays silent rather than misleading.
+
+## Local Model for Claude Code (claude-local)
+
+`claude-local` runs Claude Code on an Ollama model served from the local NVIDIA GPU. User-facing setup, measurements and troubleshooting are in `.docs/local-coding-model.md`; these are the invariants:
+
+| Part | Where |
+|------|-------|
+| Settings (model, window, cache, rules, tools, per-device overrides) | `.chezmoidata/local-llm.yaml`, read through `.chezmoitemplates/lib-local-llm.tmpl` |
+| Install, restart on change, model pull, GPU check | `.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.sh.tmpl` |
+| Server | `dot_config/systemd/user/ollama.service.tmpl` (a user unit) |
+| Launcher | `dot_local/bin/executable_claude-local.tmpl` |
+| Gate | `.chezmoiignore`: Linux **and** `nvidia-smi` on `PATH`, not WSL |
+
+**Keep these, each prevents a failure that was observed or measured:**
+
+1. **One window, rendered twice.** `contextTokens` becomes both `OLLAMA_CONTEXT_LENGTH` (what the server allocates) and `CLAUDE_CODE_MAX_CONTEXT_TOKENS` (what Claude Code budgets against). Claude Code cannot read the window from Ollama and assumes 200K for an unrecognised model, so a mismatch means nothing compacts before the server truncates. Never hard-code either side.
+2. **Nothing is exported beyond the launched process.** An `ANTHROPIC_AUTH_TOKEN` in the shell outranks the claude.ai login and would silently disable ccswitch's rotation for every session.
+3. **The provider environment comes from `ollama launch`.** It sets the base URL, token and model tiers for the one process, plus `CLAUDE_CODE_TOTAL_TOKENS_REMINDER=off`, without which the reminder rewrites the prompt on every request and Ollama re-reads all of it each turn. Anthropic does not support Claude Code on other models, so Ollama maintaining that list as Claude Code changes is the point; the launcher adds only the window and the lean profile. It must check for `claude` first, because `ollama launch --yes` would otherwise accept its own offer to pipe Claude Code's installer into bash.
+4. **The session is lean, by three separate mechanisms.** Measured with `/context`, the regular profile starts at 50.7-72.8K tokens, which no local window holds. `CLAUDE_CONFIG_DIR=~/.claude-local` drops plugins, skills, agents and MCP servers and keeps `/model` choices out of the shared settings; `claudeMdExcludes` drops the global rules, which a separate config directory alone does **not** -- for a project under `$HOME`, Claude Code reads `~/.claude/rules` as the rules of the ancestor `~`; and `--tools` cuts the schemas Claude Code sends unconditionally for an unrecognised model (27K tokens) to 5.8K. `--tools` is variadic, so `--settings` must follow it before the caller's arguments, or a prompt given first is swallowed as a tool name.
+5. **The marker is a commit record.** The installer writes the release marker only after `sync`, and re-verifies every unpacked file against a digest manifest each time it runs. A WSL VM that went down after an install once left both `libcublasLt` libraries truncated under a valid marker; CUDA discovery then died with `SIGBUS` on every start, and Ollama served from the CPU without a visible error.
+6. **The installer proves GPU placement.** It loads the model once and reads `size_vram` from `/api/ps`: none on the GPU while it has room fails the apply; partial or no placement while Windows or a game holds the VRAM warns, with the free VRAM in the message. A CPU fallback is otherwise silent -- every request still succeeds, ten times slower.
+7. **Gate on the driver and the OS, not on WSL.** Nothing here depends on Windows, so bare-metal Linux with a GPU qualifies; but `lookPath` finds `nvidia-smi.exe` on Windows too, so `.chezmoiignore` pairs the driver check with `eq .chezmoi.os "linux"`.
+8. **Device overrides are laid over key by key.** sprig's `merge` and `mergeOverwrite` both count `false` as empty, so a device's `enabled: false` would lose to the default `true`; `lib-local-llm.tmpl` uses `set` per key instead.
+
+`make test-local-llm` covers 1, 3 (argument order and environment), 7 and 8, the installer's render gate, and the capacity hint; `make test-chezmoiignore` covers the gate per platform. Ollama, its models and `~/.claude-local` live under `$HOME`, so removing the feature means `path:` tombstones for `.local/share/ollama`, `.ollama` and `.claude-local`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service`, `~/.local/bin/claude-local` and `~/.local/bin/ollama`.
 
 ## Claude Code Voice Input (WSL)
 
