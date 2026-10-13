@@ -18,6 +18,13 @@ ln -s "$(command -v chezmoi)" "$BIN_DIRS/nogpu/chezmoi"
 printf '#!/bin/sh\necho "NVIDIA Test GPU, 24576 MiB"\n' > "$BIN_DIRS/gpu/nvidia-smi"
 chmod +x "$BIN_DIRS/gpu/nvidia-smi"
 
+# A config of its own, naming this checkout as the source and nothing else. Without one, chezmoi
+# reads the developer's real config, whose data (deviceName) a CI runner never has: the suite
+# then passes locally and fails on CI, which is how a template that required deviceName once got
+# through. Lacking every data key is also the strictest case for .chezmoiignore, which is
+# rendered before run_before_000-verify-chezmoi-config can report a stale config.
+printf 'sourceDir: "%s"\n' "$REPO_ROOT" > "$BIN_DIRS/chezmoi.yaml"
+
 # Render .chezmoiignore for a given OS and check assertions. --ignore and --include match a
 # substring of the rendered list; --ignore-line and --include-line match a whole line, for an
 # entry such as .config/systemd that is also the prefix of other entries.
@@ -58,12 +65,12 @@ check_platform() {
     # Substituting a literal makes both branches assertable anywhere. The rendered value stays
     # a string, which is what `| toString` in the template already expects.
     #
-    # --source points chezmoi at this checkout, whose .chezmoitemplates and .chezmoidata the
+    # The config points chezmoi at this checkout, whose .chezmoitemplates and .chezmoidata the
     # local-model gate reads; the default source directory is another clone, or nothing on CI.
     local rendered
     rendered=$(sed -e "s/\.chezmoi\.os/\"$os\"/g" \
                    ${kernel:+-e "s/\.chezmoi\.kernel/\"$kernel\"/g"} "$IGNORE_FILE" \
-        | PATH="$BIN_DIRS/$gpu" chezmoi execute-template --source "$REPO_ROOT" 2>/dev/null) || {
+        | PATH="$BIN_DIRS/$gpu" chezmoi execute-template --config "$BIN_DIRS/chezmoi.yaml" 2>/dev/null) || {
         echo "[test-chezmoiignore] FAIL: failed to render .chezmoiignore for $label" >&2
         EXIT_CODE=1
         return

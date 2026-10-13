@@ -90,6 +90,18 @@ json="$(settings gpu '{"localLLM":{"devices":{"testdevice":{"contextTokens":3276
 [[ "$(jq -r '.contextTokens' <<<"$json")" == "32768" ]] && pass "this device's override applies, another's does not" ||
     fail "device override: $json"
 
+# given a config that predates deviceName. .chezmoiignore includes the settings and is rendered
+# before run_before_000-verify-chezmoi-config can report the stale config, so they must render
+# with the defaults rather than abort the apply with a template error.
+printf 'sourceDir: "%s"\n' "$REPO_ROOT" > "$TMP/stale.yaml"
+# when
+if json="$(PATH="$TMP/bin-gpu" chezmoi execute-template --config "$TMP/stale.yaml" \
+    '{{ includeTemplate "lib-local-llm.tmpl" . }}' 2>&1)" && [[ "$(jq -r '.enabled' <<<"$json")" == "true" ]]; then
+    pass "settings render with the defaults when the config has no deviceName"
+else
+    fail "settings without deviceName: $json"
+fi
+
 # --- one window, two consumers ---------------------------------------------------------------
 
 for override in "" '{"localLLM":{"devices":{"testdevice":{"contextTokens":32768}}}}'; do
