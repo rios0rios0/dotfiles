@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added `claude-local-task`, which runs one unattended task on the local model (or, with `--remote`, a tailnet one) and returns an audit of the run: every action with its result, the change measured against snapshots of the working tree, one command that undoes it, and the transcript'
-time: '2026-10-13T03:16:50.590436446Z'

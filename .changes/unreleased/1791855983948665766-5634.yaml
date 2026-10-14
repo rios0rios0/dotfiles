@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added a pointer to `claude-local` in the `claude` and `claudex` wrappers when `ccswitch capacity` reports that no enrolled account has capacity left'
-time: '2026-10-13T01:46:23.948632112Z'
