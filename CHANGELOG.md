@@ -22,6 +22,22 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [0.27.0] - 2026-10-14
+
+### Added
+
+- added `claude-local-task`, which runs one unattended task on the local model (or, with `--remote`, a tailnet one) and returns an audit of the run: every action with its result, the change measured against snapshots of the working tree, one command that undoes it, and the transcript
+- added `claude-local`, which runs Claude Code on a local Ollama model: on Linux with an NVIDIA GPU, `chezmoi apply` installs a pinned, checksum-verified Ollama as a user service, pulls the model named in `.chezmoidata/local-llm.yaml` and verifies that it runs on the GPU, and each session gets a context window matched to the server and a lean profile that fits in it
+- added `claude-remote`, which runs `claude-local` on another machine's GPU across the tailnet, refusing a server whose context window differs from the local one and warning when part of the model runs on that machine's CPU; each machine with the local model shares its server on the tailnet unless `shareOnTailnet` is false
+- added a pointer to `claude-local` in the `claude` and `claudex` wrappers when `ccswitch capacity` reports that no enrolled account has capacity left
+- added an `[include]` of the unmanaged `~/.gitconfig.local` at the end of `~/.gitconfig`, replacing the commented-out `includeIf` placeholder, so machine-local settings such as a work identity selected by `includeIf` stay out of this public repository
+- added Tailscale on every Linux machine: installed from its signed apt repository with the key checked by fingerprint, logged in once by `chezmoi apply` (it prints the login URL and waits for it), and kept on the tailnet by every interactive zsh through `tailscale-up --no-login`, which never waits or asks for a password
+
+### Changed
+
+- changed `make lint-shellcheck` to lint the shell executables under `dot_local/bin`, which it skipped for lacking a `.sh` suffix
+- changed `make test-chezmoiignore` to render with a config of its own, so it no longer passes locally on data from the developer config that a CI runner lacks
+
 ## [0.26.1] - 2026-10-07
 
 ### Changed
