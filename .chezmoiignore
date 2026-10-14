@@ -17,11 +17,19 @@ docs
 .aws
 .azure
 AppData
-{{-   if ne .chezmoi.os "android" }}
-.claude
-{{-   end }}
 .oh-my-posh.json
 .wakatime.cfg
+{{- end }}
+
+{{- /* Claude Code's ~/.claude. Linux gets only the look: settings.json, which carries it there,
+     and the status line script it runs. The other files -- the WSL preference in CLAUDE.md, the
+     trust dialog in .claude.json -- serve Windows and Android, which get no status line: it is a
+     bash script that forks jq on every redraw. See dot_claude/modify_settings.json. */ -}}
+{{- if eq .chezmoi.os "linux" }}
+.claude/CLAUDE.md
+.claude/.claude.json
+{{- else }}
+.claude/statusline-command.sh
 {{- end }}
 
 {{- /* Files shared between Windows and Android.
@@ -49,8 +57,10 @@ AppData
      .chezmoidata/local-llm.yaml switches it off. Gated on the GPU rather than on WSL, because
      nothing in it depends on Windows and a bare-metal machine with a GPU runs it the same way.
      The OS check lives here, not in lib-local-llm.tmpl, because lookPath finds nvidia-smi.exe on
-     a Windows machine with an NVIDIA card too. */ -}}
+     a Windows machine with an NVIDIA card too. .claude-local carries the look claude-local's
+     profile shares with the regular claude. */ -}}
 {{- if not $localLLM }}
+.claude-local
 .config/systemd/user/ollama.service
 .local/bin/claude-local
 .local/bin/claude-local-task

@@ -267,6 +267,16 @@ jobs:
       - name: Test the tailnet setup (tailscale-up)
         run: make test-tailscale
 
+  test-statusline:
+    name: 'Test (Claude Code status line)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Install jq'
+        run: 'sudo apt-get install -y jq'
+      - name: 'Test the status line in both Claude Code profiles'
+        run: 'make test-statusline'
+
   sast:
     name: SAST
     runs-on: ubuntu-latest

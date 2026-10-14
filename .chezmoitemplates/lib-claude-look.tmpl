@@ -1,0 +1,23 @@
+{{- /*
+  Claude Code's look, as JSON: the colour theme, the renderer and the status line. It is
+  merged key by key into ~/.claude/settings.json by dot_claude/modify_settings.json and into
+  ~/.claude-local/settings.json -- the profile claude-local and claude-remote run in -- by
+  dot_claude-local/modify_settings.json, so the two profiles cannot drift apart. Change the
+  look here, never in one of those files.
+
+  Called through includeTemplate with the template data (.), for .chezmoi.homeDir.
+
+  - dark-ansi is the dark theme drawn in ANSI colours only, so the terminal's own palette
+    decides the hues.
+  - fullscreen is the flicker-free alt-screen renderer.
+  - The status line is dot_claude/executable_statusline-command.sh, one script for every
+    profile. padding 0 starts it at column 0, as the zsh prompt does.
+*/ -}}
+{{- dict
+      "theme" "dark-ansi"
+      "tui" "fullscreen"
+      "statusLine" (dict
+          "type" "command"
+          "command" (printf "bash %s/.claude/statusline-command.sh" .chezmoi.homeDir)
+          "padding" 0)
+    | toJson -}}

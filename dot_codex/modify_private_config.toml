@@ -1,0 +1,47 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Keeps Codex's look in ~/.codex/config.toml: the status line items, in order, coloured
+  from the syntax theme. Everything else in the file -- the model, trusted projects, hook
+  hashes -- is Codex's own, written as it runs, and left alone.
+
+  Codex hides an item until it has a value, so a new session shows the directory, branch,
+  model and context left; tokens used, the window size and both rate limits join after
+  the first reply. status_line_use_colors defaults to true and is written anyway, so that
+  neither the /statusline toggle nor a new default turns the colours off for good.
+
+  The status line is built into Codex, unlike Claude Code's script, so this ships on every
+  platform; a Codex too old for a key ignores it rather than rejecting the file. A value
+  that differs is set back, so change the list here, not with /statusline.
+
+  When both keys match, the current content is returned byte for byte. Otherwise toToml
+  re-serialises the file, which keeps every setting but drops comments and indents nested
+  tables. Invalid TOML fails the template instead of replacing the file. private_ keeps
+  the file at the 0600 it has on disk: MCP server entries in it can carry tokens.
+*/ -}}
+{{- $look := dict
+      "status_line" (list
+          "current-dir" "git-branch" "model-with-reasoning" "context-remaining"
+          "used-tokens" "context-window-size" "five-hour-limit" "weekly-limit")
+      "status_line_use_colors" true -}}
+{{- $config := dict -}}
+{{- if trim .chezmoi.stdin -}}
+{{-   $config = fromToml .chezmoi.stdin -}}
+{{- end -}}
+{{- $tui := dict -}}
+{{- if kindIs "map" (get $config "tui") -}}
+{{-   $tui = get $config "tui" -}}
+{{- end -}}
+{{- $updated := list -}}
+{{- range $key, $value := $look -}}
+{{-   if ne (toJson (get $tui $key)) (toJson $value) -}}
+{{-     $_ := set $tui $key $value -}}
+{{-     $updated = append $updated (printf "tui.%s" $key) -}}
+{{-   end -}}
+{{- end -}}
+{{- if $updated -}}
+{{-   $_ := set $config "tui" $tui -}}
+{{-   warnf "[codex-config] set %s in ~/.codex/config.toml" (join ", " $updated) -}}
+{{-   toToml $config -}}
+{{- else -}}
+{{-   .chezmoi.stdin -}}
+{{- end -}}

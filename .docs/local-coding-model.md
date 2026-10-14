@@ -31,6 +31,11 @@ CLAUDE_LOCAL_MODEL=qwen3.6:27b claude-local    # another pulled model, for one s
 The first launch shows Claude Code's onboarding once, because the session runs in its own profile
 (`~/.claude-local`), and its trust prompt once per project, as any new profile would.
 
+The profile looks like the regular `claude`: `chezmoi apply` keeps the same theme, fullscreen
+renderer and status line in `~/.claude-local/settings.json`, so a theme picked during onboarding
+lasts only until the next apply. The status line shows the local model and its context window,
+and no plan limits. See "Claude Code and Codex Look" in `CLAUDE.md`.
+
 When ccswitch reports that no enrolled account has capacity left, `claude` and `claudex` say so
 before launching and point at `claude-local`. They only point: nothing switches models without
 being asked.
