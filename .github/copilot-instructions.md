@@ -192,7 +192,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `.chezmoiignore`: Platform-conditional file exclusion (uses Go templates with `.chezmoi.os`)
 - `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
-- `.chezmoitemplates/`: Shared template fragments (`lib-install-deps.sh`, `lib-install-fonts.sh`, `lib-modify-mcp-servers.tmpl`, `lib-remove-dependencies.sh`, `username.tmpl`)
+- `.chezmoitemplates/`: Shared template fragments (`lib-claude-look.tmpl`, `lib-install-deps.sh`, `lib-install-fonts.sh`, `lib-modify-mcp-servers.tmpl`, `lib-remove-dependencies.sh`, `username.tmpl`)
 - `dot_local/bin/`: Executable user commands deployed through chezmoi (platform-filtered by `.chezmoiignore`)
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
@@ -205,6 +205,10 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_age_recipients.tmpl` → `~/.age_recipients`: Age encryption recipients
 - `modify_dot_claude.json` → `~/.claude.json`: MCP servers for Claude Code (Docker-based on Linux/Windows, the HTTP GitHub server on Android); a modify-template, see CLAUDE.md
 - `dot_config/mcphub/modify_servers.json` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android only; same list and merge as `~/.claude.json`, from `.chezmoitemplates/lib-modify-mcp-servers.tmpl`)
+- `dot_claude/modify_settings.json` → `~/.claude/settings.json`: on Linux, Claude Code's look (`dark-ansi` theme, fullscreen renderer, status line) from `.chezmoitemplates/lib-claude-look.tmpl`; on Windows and Android, permission rules and `effortLevel`. A modify-template; see "Claude Code and Codex Look" in CLAUDE.md
+- `dot_claude/executable_statusline-command.sh` → `~/.claude/statusline-command.sh`: the two-line status line styled after p10k, run by both Claude Code profiles (Linux only)
+- `dot_claude-local/modify_settings.json` → `~/.claude-local/settings.json`: the same look for `claude-local` and `claude-remote`, from the same library; ships with `claude-local`
+- `dot_codex/modify_private_config.toml` → `~/.codex/config.toml`: Codex's status line items and colours, on every platform; a TOML modify-template that leaves Codex's own settings alone and keeps the file `0600`
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
 - `dot_config/systemd/user/ssh-agent-bridge.socket` + `ssh-agent-bridge@.service` → `~/.config/systemd/user/`: WSL-only SSH agent bridge (see below)
 - `dot_local/bin/executable_claude-local.tmpl` → `~/.local/bin/claude-local`: Claude Code on a local Ollama model, launched through `ollama launch` with the context window and a lean profile added; the server is the user unit `dot_config/systemd/user/ollama.service.tmpl`, installed by `run_onchange_after_linux-009-setup-ollama.sh.tmpl`, and all three read `.chezmoidata/local-llm.yaml` through `.chezmoitemplates/lib-local-llm.tmpl`. Linux with an NVIDIA driver only; see "Local Model for Claude Code" in `CLAUDE.md` and `.docs/local-coding-model.md`

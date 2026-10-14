@@ -119,8 +119,10 @@ chezmoi init --apply rios0rios0
 ```
 .chezmoiscripts/         # 37 platform-specific setup scripts (run_once_before_*, run_after_*, run_onchange_after_*)
 .chezmoiremove           # Target paths deleted from $HOME on every apply (see Dependency Lifecycle)
-.chezmoitemplates/       # Shared template fragments (shared install functions, font installer, dependency removal, MCP server logic, username)
-dot_claude/              # Claude Code config (settings, permissions, trust) -> ~/.claude/
+.chezmoitemplates/       # Shared template fragments (shared install functions, font installer, dependency removal, MCP server logic, Claude Code look, username)
+dot_claude/              # Claude Code config (settings, permissions, trust; the status line on Linux) -> ~/.claude/
+dot_claude-local/        # Claude Code look for claude-local and claude-remote (Linux with an NVIDIA GPU) -> ~/.claude-local/
+dot_codex/               # Codex CLI status line, merged into its config -> ~/.codex/
 dot_config/              # XDG config (mcphub MCP servers for Android; systemd user units for the WSL SSH agent bridge) -> ~/.config/
 dot_docker/              # Docker daemon config -> ~/.docker/
 dot_local/bin/           # Executable user commands -> ~/.local/bin/ (platform-filtered)
@@ -197,18 +199,31 @@ and update handling. Plain `codex` continues to use its configured permissions.
 
 ## Claude Code Configuration
 
-This repository manages four Claude Code configuration files. Each targets a different file on disk because Claude Code separates instructions, permissions, and MCP servers into distinct subsystems that cannot be consolidated into a single file.
+This repository manages six Claude Code configuration files. Each targets a different file on disk because Claude Code separates instructions, settings, and MCP servers into distinct subsystems that cannot be consolidated into a single file.
 
 | Repository Path | Deployed To | Purpose |
 |-----------------|-------------|---------|
 | `dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global instructions loaded into every Claude Code session (WSL preferences) |
-| `dot_claude/modify_settings.json` | `~/.claude/settings.json` | Default permission rules (`allow` list) and effort level |
+| `dot_claude/modify_settings.json` | `~/.claude/settings.json` | Linux: the look (theme, renderer, status line). Windows and Android: default permission rules (`allow` list) and effort level |
+| `dot_claude/executable_statusline-command.sh` | `~/.claude/statusline-command.sh` | The status line both Claude Code profiles run (Linux) |
 | `dot_claude/modify_dot_claude.json` | `~/.claude/.claude.json` | Auto-trusts project directories to skip the trust dialog |
+| `dot_claude-local/modify_settings.json` | `~/.claude-local/settings.json` | The same look for `claude-local` and `claude-remote` |
 | `modify_dot_claude.json` (root) | `~/.claude.json` | User-scoped MCP servers (GitHub, Azure DevOps, SonarQube, Kubernetes) |
 
-The three `modify_*` files are chezmoi [modify-templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file): chezmoi evaluates them itself, with the file's current content in `.chezmoi.stdin`, and writes back the merged result, so they need neither bash nor Python and run on Windows too. This preserves any user-added configuration while ensuring defaults are always present, and a file that already holds every default is left byte for byte untouched.
+The `modify_*` files are chezmoi [modify-templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file): chezmoi evaluates them itself, with the file's current content in `.chezmoi.stdin`, and writes back the merged result, so they need neither bash nor Python and run on Windows too. This preserves any user-added configuration while ensuring defaults are always present, and a file that already holds every default is left byte for byte untouched.
 
-> **Note**: The `dot_claude/` directory is deployed only on **Windows** and **Android** (excluded on Linux via `.chezmoiignore`).
+> **Note**: Linux gets only `settings.json` and the status line script from `dot_claude/`. The rest of it is deployed only on **Windows** and **Android**, which get no status line (see `.chezmoiignore`).
+
+### Claude Code and Codex Look
+
+Both CLIs keep their look across machines and profiles: Claude Code in the `dark-ansi` theme (the terminal's own ANSI palette) with the fullscreen renderer and a two-line status line styled after the p10k prompt, and Codex with its built-in status line, coloured from its syntax theme. Codex shows the directory, branch, model with reasoning effort and context left from the start; tokens used, the window size and both rate limits join after the first reply.
+
+| Tool | Declared in | Applied to | Platforms |
+|------|-------------|------------|-----------|
+| Claude Code | `.chezmoitemplates/lib-claude-look.tmpl`, and the script in `dot_claude/` | `~/.claude/settings.json`, and `~/.claude-local/settings.json` for `claude-local` and `claude-remote` | Linux |
+| Codex | `dot_codex/modify_private_config.toml` | `~/.codex/config.toml` | Linux, Windows, Android |
+
+Only those keys are managed; everything else in the files stays as each tool wrote it. To change the look, edit it there and run `chezmoi apply`: a change made with `/theme` or `/statusline` lasts until the next apply, which sets the managed keys back and prints which. Rewriting `config.toml` keeps every Codex setting but drops its comments, and happens only when a managed key differs. See "Claude Code and Codex Look" in `CLAUDE.md` for why Claude Code's look stays on Linux.
 
 ### Gitignore Design
 

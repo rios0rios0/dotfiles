@@ -31,6 +31,8 @@ func main() {
 		"includeTemplate":     func(name string, data ...interface{}) string { return "" },
 		"output":              func(name string, args ...string) string { return "" },
 		"replaceAllRegex":     func(pattern, repl, s string) string { return s },
+		"fromToml":            func(text string) interface{} { return map[string]interface{}{} },
+		"toToml":              func(value interface{}) string { return "" },
 	}
 	for k, v := range chezmoiFuncs {
 		funcMap[k] = v

@@ -208,7 +208,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`, `codex-config`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -235,8 +235,9 @@ See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-ma
 
 ## JSON Patching (Modify-Templates, Not Scripts)
 
-`~/.claude.json`, `~/.claude/.claude.json`, `~/.claude/settings.json` and mcphub's
-`servers.json` are merged into, never overwritten, by `modify_` files that are chezmoi
+`~/.claude.json`, `~/.claude/.claude.json`, `~/.claude/settings.json`,
+`~/.claude-local/settings.json` and mcphub's `servers.json` (and, in TOML,
+`~/.codex/config.toml`) are merged into, never overwritten, by `modify_` files that are chezmoi
 **modify-templates**: chezmoi evaluates them itself, with the file's current content in
 `.chezmoi.stdin`, and writes back what they output. They used to be bash scripts that
 ran embedded Python, and on Windows they could never start: chezmoi picks an interpreter
@@ -250,6 +251,10 @@ from the file extension (`.json` has none), Windows has no `#!`, and the apply a
 | Output `.chezmoi.stdin` unchanged when nothing managed is missing | Go maps keep no order, so `toPrettyJson` emits sorted keys. Passing the content through keeps the layout Claude Code wrote, and a real change is the only time a file is re-serialised |
 | Compare with `toJson`, never `eq` on decoded values | A missing key decodes to `""`, and `eq` between a string and a bool is an error rather than `false` |
 | Invalid JSON fails the template | The old scripts started from `{}` and replaced the file; failing leaves it for a person to repair |
+
+`~/.codex/config.toml` follows the same rules through `fromToml` and `toToml`, with one cost
+JSON does not have: a TOML re-serialisation also drops the file's comments (see "Claude Code
+and Codex Look").
 
 `make test-modify-scripts` runs each one through `chezmoi cat` in a sandbox, and fails when
 any `modify_` file that chezmoi resolves for Windows is not a modify-template.
@@ -539,9 +544,50 @@ npm installs ship neither shell completions nor the agent skill, so `run_onchang
 
 ## AI Rules Sync
 
-AI assistant rules (Claude Code, GitHub Copilot CLI, Codex, etc.) are **not** managed by chezmoi. Directories like `~/.claude/` and `~/.codex/` are excluded from chezmoi and synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply).
+AI assistant rules (Claude Code, GitHub Copilot CLI, Codex, etc.) are **not** managed by chezmoi. The rules, agents and skills in directories like `~/.claude/` and `~/.codex/` are synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply). chezmoi touches only the individual files there that "JSON Patching" and "Claude Code and Codex Look" name.
 
 After the dependency installer finishes, run `aisync init`, `aisync source add guide --source-repo rios0rios0/guide --branch generated`, and `aisync pull` to populate the rules. Subsequent `aisync pull` calls refresh them on demand.
+
+## Claude Code and Codex Look
+
+The look of both CLIs is declared here and merged into each tool's own settings file by
+modify-templates, which set a managed key whose value differs and leave every other key alone:
+
+| Look | Declared in | Merged into |
+|------|-------------|-------------|
+| Claude Code: `theme` `dark-ansi`, `tui` `fullscreen`, `statusLine` | `.chezmoitemplates/lib-claude-look.tmpl` | `~/.claude/settings.json` on Linux, and `~/.claude-local/settings.json` wherever `claude-local` ships |
+| Claude Code's status line | `dot_claude/executable_statusline-command.sh` | `~/.claude/statusline-command.sh`, Linux only |
+| Codex: `tui.status_line`, `tui.status_line_use_colors` | `dot_codex/modify_private_config.toml` | `~/.codex/config.toml`, every platform |
+
+**Change the look here, never with `/theme` or `/statusline`.** Those write the same keys, so
+the next apply sets them back, with a `[claude-settings]`, `[claude-local]` or `[codex-config]`
+line naming each one.
+
+1. **One declaration for both Claude Code profiles.** `claude-local` and `claude-remote` run
+   under `CLAUDE_CONFIG_DIR=~/.claude-local`, which reads nothing from `~/.claude/settings.json`:
+   a local session used to keep the theme its onboarding picked, with no status line. Both
+   modify-templates read `lib-claude-look.tmpl`, so the profiles cannot drift apart, and one
+   script serves both -- it finds its credentials, usage cache and account through
+   `CLAUDE_CONFIG_DIR`, so a local session shows no plan limits.
+2. **Claude Code's look stays on Linux.** The status line forks bash and jq on every redraw,
+   which on Termux counts against Android's phantom-process budget and on Windows would need a
+   shell and paths of its own. `.chezmoiignore` therefore ships only `settings.json` and the
+   script from `dot_claude/` to Linux, and keeps the script off the other platforms.
+   `dot_claude/modify_settings.json` branches on the platform: the look on Linux, the
+   permission rules and `effortLevel` on Windows and Android as before -- Linux never had them.
+3. **Codex's look ships everywhere.** Its status line is built in, and Codex ignores a `[tui]`
+   key it does not know rather than rejecting the file. `status_line_use_colors` defaults to
+   `true` and is written anyway, so neither the toggle in `/statusline` nor a changed default
+   turns the colours off for good. Codex hides an item until it has a value: a new session shows
+   the directory, branch, model and context left; tokens used, the window size and both rate
+   limits join after the first reply.
+4. **TOML is re-serialised only on a real change.** When both keys match, `config.toml` passes
+   through byte for byte. Otherwise `toToml` rewrites it, which keeps every setting -- trusted
+   projects, hook hashes, the model -- but drops comments and indents nested tables. `private_`
+   keeps the file `0600`: MCP server entries in it can carry tokens.
+
+`make test-modify-scripts` covers every merge, the byte-for-byte passthroughs and the `0600`
+mode; `make test-chezmoiignore` covers which platform gets which file.
 
 ## Non-Interactive Shell Guards
 
@@ -585,6 +631,7 @@ The same guard asks `ccswitch capacity` (no network) whether any enrolled accoun
 | Launcher | `dot_local/bin/executable_claude-local.tmpl` |
 | Another machine's GPU | `dot_local/bin/executable_claude-remote.tmpl`, and the share in `dot_local/bin/executable_tailscale-up.tmpl` |
 | Delegated, audited runs | `dot_local/bin/executable_claude-local-task` |
+| Look (theme, renderer, status line) | `dot_claude-local/modify_settings.json`, from `.chezmoitemplates/lib-claude-look.tmpl`; see "Claude Code and Codex Look" |
 | Gate | `.chezmoiignore`: Linux **and** `nvidia-smi` on `PATH`, not WSL |
 
 **Keep these, each prevents a failure that was observed or measured:**

@@ -131,6 +131,31 @@ check_platform "android" \
     --include ".termux" \
     --include ".config/mcphub"
 
+# Claude Code's look: Linux gets settings.json and the status line script from ~/.claude and
+# nothing else there; Windows and Android keep the rest of ~/.claude and get no status line.
+# Codex's look is built into Codex, so ~/.codex/config.toml ships everywhere.
+check_platform "linux" \
+    --include-line ".claude" \
+    --include ".claude/settings.json" \
+    --include ".claude/statusline-command.sh" \
+    --ignore-line ".claude/CLAUDE.md" \
+    --ignore-line ".claude/.claude.json" \
+    --include ".codex"
+
+check_platform "windows" \
+    --include ".claude/settings.json" \
+    --include ".claude/CLAUDE.md" \
+    --include ".claude/.claude.json" \
+    --ignore-line ".claude/statusline-command.sh" \
+    --include ".codex"
+
+check_platform "android" \
+    --include ".claude/settings.json" \
+    --include ".claude/CLAUDE.md" \
+    --include ".claude/.claude.json" \
+    --ignore-line ".claude/statusline-command.sh" \
+    --include ".codex"
+
 # WSL vs bare-metal Linux. The SSH agent bridge relays a Windows named pipe, so it must ship
 # on WSL and nowhere else -- on bare metal its unit would point at an npiperelay.exe that is
 # never installed. The only signal separating the two is the kernel release string.
@@ -162,17 +187,21 @@ check_platform "linux" --kernel "6.11.0-generic" --gpu \
 check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
     --include "ssh-agent-bridge" \
     --include "ollama.service" \
-    --include "claude-local"
+    --include "claude-local" \
+    --include-line ".claude-local"
 
+# The look of claude-local's profile, in ~/.claude-local, ships with claude-local and no further.
 check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" \
     --ignore "ollama.service" \
-    --ignore ".local/bin/claude-local"
+    --ignore ".local/bin/claude-local" \
+    --ignore-line ".claude-local"
 
 # A Windows machine with an NVIDIA card has nvidia-smi on PATH as well, so the OS check, not the
 # driver, has to keep the Linux unit and launcher off it.
 check_platform "windows" --gpu \
     --ignore "ollama.service" \
     --ignore ".local/bin/claude-local" \
+    --ignore-line ".claude-local" \
     --ignore-line ".config/systemd"
 
 # Tailscale reaches every Linux machine, GPU or not. claude-remote and claude-local-task drive
