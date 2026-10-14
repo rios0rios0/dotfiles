@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `make test-statusline`, which runs the Claude Code status line in both profiles against stubbed `curl` and `mkdir`: what each profile draws, that one without a claude.ai login starts no usage refresh, and that the OAuth token reaches `curl` on stdin, never in its arguments'
+time: '2026-10-14T20:31:24.949225786Z'

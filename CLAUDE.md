@@ -29,6 +29,7 @@ make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image p
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
 make test-local-llm                 # claude-local, claude-remote and claude-local-task: one context window, the launchers, the audit, the capacity hint
 make test-tailscale                 # tailscale-up: the quiet pass every zsh runs, the login, sharing the model's server
+make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
 ```
 
 ## Essential Commands
@@ -568,26 +569,32 @@ line naming each one.
    a local session used to keep the theme its onboarding picked, with no status line. Both
    modify-templates read `lib-claude-look.tmpl`, so the profiles cannot drift apart, and one
    script serves both -- it finds its credentials, usage cache and account through
-   `CLAUDE_CONFIG_DIR`, so a local session shows no plan limits.
-2. **Claude Code's look stays on Linux.** The status line forks bash and jq on every redraw,
+   `CLAUDE_CONFIG_DIR`, so a local session shows no plan limits. Without a login it also
+   starts no usage refresh: one that cannot succeed never writes the cache, and would fork on
+   every redraw.
+2. **The OAuth token never reaches an argument list.** The refresh hands it to `curl` on
+   stdin (`-H @-`), because any local user can read a process's arguments in
+   `/proc/<pid>/cmdline`.
+3. **Claude Code's look stays on Linux.** The status line forks bash and jq on every redraw,
    which on Termux counts against Android's phantom-process budget and on Windows would need a
    shell and paths of its own. `.chezmoiignore` therefore ships only `settings.json` and the
    script from `dot_claude/` to Linux, and keeps the script off the other platforms.
    `dot_claude/modify_settings.json` branches on the platform: the look on Linux, the
    permission rules and `effortLevel` on Windows and Android as before -- Linux never had them.
-3. **Codex's look ships everywhere.** Its status line is built in, and Codex ignores a `[tui]`
+4. **Codex's look ships everywhere.** Its status line is built in, and Codex ignores a `[tui]`
    key it does not know rather than rejecting the file. `status_line_use_colors` defaults to
    `true` and is written anyway, so neither the toggle in `/statusline` nor a changed default
    turns the colours off for good. Codex hides an item until it has a value: a new session shows
    the directory, branch, model and context left; tokens used, the window size and both rate
    limits join after the first reply.
-4. **TOML is re-serialised only on a real change.** When both keys match, `config.toml` passes
+5. **TOML is re-serialised only on a real change.** When both keys match, `config.toml` passes
    through byte for byte. Otherwise `toToml` rewrites it, which keeps every setting -- trusted
    projects, hook hashes, the model -- but drops comments and indents nested tables. `private_`
    keeps the file `0600`: MCP server entries in it can carry tokens.
 
 `make test-modify-scripts` covers every merge, the byte-for-byte passthroughs and the `0600`
-mode; `make test-chezmoiignore` covers which platform gets which file.
+mode; `make test-chezmoiignore` covers which platform gets which file; `make test-statusline`
+covers the script in both profiles, including 1 and 2, against stubbed `curl` and `mkdir`.
 
 ## Non-Interactive Shell Guards
 

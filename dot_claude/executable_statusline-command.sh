@@ -87,10 +87,13 @@ refresh_usage() {
     now=$EPOCHSECONDS
     [ "${exp:-0}" -gt "$((now + 30))" ] || return 1
 
+    # The token goes to curl on stdin (-H @-), never in argv: every local user can
+    # read a process's arguments in /proc/<pid>/cmdline.
     resp=$(curl -sS -m 12 'https://api.anthropic.com/api/oauth/usage' \
-        -H "Authorization: Bearer $tok" \
+        -H @- \
         -H 'Content-Type: application/json' \
-        -H 'anthropic-beta: oauth-2025-04-20' 2>/dev/null) || return 1
+        -H 'anthropic-beta: oauth-2025-04-20' \
+        <<<"Authorization: Bearer $tok" 2>/dev/null) || return 1
     [ -n "$resp" ] || return 1
 
     account=$(read_account)
@@ -190,7 +193,10 @@ fi
 
 now=$EPOCHSECONDS
 usage_age=$(( now - usage_fetched ))
-if [ "$usage_age" -ge "$USAGE_TTL" ]; then
+# A profile without a claude.ai login -- claude-local's -- has nothing to fetch,
+# and a refresh that cannot succeed never writes the cache, so trying anyway
+# would fork one on every redraw.
+if [ "$usage_age" -ge "$USAGE_TTL" ] && [ -r "$CFG/.credentials.json" ]; then
     if [ -d "$USAGE_LOCK" ]; then
         # Reap a lock left behind by a refresh that was killed mid-flight.
         lock_age=$(( now - $(stat -c %Y "$USAGE_LOCK" 2>/dev/null || echo "$now") ))

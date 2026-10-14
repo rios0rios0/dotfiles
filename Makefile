@@ -26,9 +26,9 @@ lint-syntax:
 
 # === Test targets ===
 
-.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-nvm-resolution test-local-llm test-tailscale
+.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-nvm-resolution test-local-llm test-tailscale test-statusline
 
-test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-clipboard-shim test-nvm-resolution test-local-llm test-tailscale
+test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-clipboard-shim test-nvm-resolution test-local-llm test-tailscale test-statusline
 
 test-template-render:
 	@bash $(CI_DIR)/scripts/test-template-render.sh
@@ -76,6 +76,9 @@ test-local-llm:
 
 test-tailscale:
 	@bash $(CI_DIR)/scripts/test-tailscale.sh
+
+test-statusline:
+	@bash $(CI_DIR)/scripts/test-statusline.sh
 
 # === SAST targets ===
 

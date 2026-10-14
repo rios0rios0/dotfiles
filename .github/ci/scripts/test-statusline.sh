@@ -1,0 +1,207 @@
+#!/bin/bash
+set -euo pipefail
+
+# Exercises dot_claude/executable_statusline-command.sh, the status line both Claude Code
+# profiles run: the regular one and claude-local's, which differ in what the script finds
+# through CLAUDE_CONFIG_DIR -- a claude.ai login, or none.
+#
+# The script reads the JSON Claude Code pipes to a status line, with CLAUDE_CONFIG_DIR at a
+# scratch profile, so nothing here touches the developer's real credentials or usage cache.
+# curl and mkdir are shadowed by recording stubs: curl's prove the OAuth token reaches it on
+# stdin and never in its arguments, which any local user can read in /proc/<pid>/cmdline,
+# and mkdir's prove that a profile without a login takes no refresh lock -- the one step a
+# refresh takes in the foreground before it forks and detaches.
+
+REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
+SCRIPT="$REPO_ROOT/dot_claude/executable_statusline-command.sh"
+EXIT_CODE=0
+
+echo "[test-statusline] testing the Claude Code status line..." >&2
+
+if ! command -v jq >/dev/null 2>&1; then
+    echo "[test-statusline] SKIP: needs jq, which the status line itself requires" >&2
+    exit 0
+fi
+
+# The script measures widths in characters, which bash counts only under a UTF-8 locale.
+export LC_ALL=C.UTF-8
+
+SANDBOX=$(mktemp -d)
+trap 'rm -rf "$SANDBOX"' EXIT
+LOG="$SANDBOX/log"
+
+# A repository found the way the script finds any: by its .git/HEAD, with no git binary.
+PROJECT="$SANDBOX/work/project"
+mkdir -p "$PROJECT/.git" "$PROJECT/src"
+printf 'ref: refs/heads/feat/look\n' > "$PROJECT/.git/HEAD"
+
+STUBS="$SANDBOX/bin"
+mkdir -p "$STUBS"
+printf '#!/bin/bash\nprintf "%%s\\n" "$@" > "$STATUSLINE_TEST_LOG/curl.argv"\ncat > "$STATUSLINE_TEST_LOG/curl.stdin"\ncat "$STATUSLINE_TEST_LOG/response.json"\n' \
+    > "$STUBS/curl"
+printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "$STATUSLINE_TEST_LOG/mkdir.calls"\nexec %q "$@"\n' "$(command -v mkdir)" \
+    > "$STUBS/mkdir"
+chmod +x "$STUBS/curl" "$STUBS/mkdir"
+
+# claude-local's profile: no .credentials.json, as ollama launch leaves it.
+LOCAL_PROFILE="$SANDBOX/claude-local"
+mkdir -p "$LOCAL_PROFILE"
+printf '{"numStartups": 1}\n' > "$LOCAL_PROFILE/.claude.json"
+
+# The regular profile, logged in with a token that has an hour left.
+REGULAR_PROFILE="$SANDBOX/claude"
+mkdir -p "$REGULAR_PROFILE"
+printf '{"oauthAccount": {"emailAddress": "someone@example.com"}}\n' > "$REGULAR_PROFILE/.claude.json"
+printf '{"claudeAiOauth": {"accessToken": "fixture-token-placeholder", "expiresAt": %s}}\n' \
+    "$(( ($(date +%s) + 3600) * 1000 ))" > "$REGULAR_PROFILE/.credentials.json"
+
+reset_log() {
+    rm -rf "$LOG"
+    mkdir -p "$LOG"
+}
+
+# A cache fetched just now, so a redraw of the regular profile starts no refresh in the
+# background, where it would write to the log after its case has moved on.
+fresh_cache() {
+    printf 'fetched=%s\naccount=someone@example.com\nscoped=Fable:43:0\n' "$(date +%s)" \
+        > "$REGULAR_PROFILE/statusline-usage.cache"
+}
+
+# payload <cwd> <model display name> [rate_limits object]
+payload() {
+    jq -nc --arg cwd "$1" --arg model "$2" --argjson limits "${3:-null}" '
+        {workspace: {current_dir: $cwd}, model: {display_name: $model},
+         context_window: {remaining_percentage: 83, total_input_tokens: 21800, context_window_size: 131072}}
+        + (if $limits == null then {} else {rate_limits: $limits} end)'
+}
+
+# render <profile> <payload> [COLUMNS]: the two lines, colours stripped
+render() {
+    printf '%s' "$2" |
+        CLAUDE_CONFIG_DIR="$1" COLUMNS="${3:-200}" PATH="$STUBS:$PATH" STATUSLINE_TEST_LOG="$LOG" bash "$SCRIPT" |
+        sed 's/\x1b\[[0-9;]*m//g'
+}
+
+run_case() {
+    local description="$1"
+    shift
+    if "$@"; then
+        echo "[test-statusline] PASS: $description" >&2
+    else
+        echo "[test-statusline] FAIL: $description" >&2
+        EXIT_CODE=1
+    fi
+}
+
+local_session_shows_the_model_and_no_limits() {
+    # given claude-local's profile, in a subdirectory of a repository
+    reset_log
+
+    # when
+    local out line1 line2
+    out=$(render "$LOCAL_PROFILE" "$(payload "$PROJECT/src" "qwen3.8:27b")") || return 1
+    line1=$(sed -n 1p <<<"$out")
+    line2=$(sed -n 2p <<<"$out")
+
+    # then: the directory, the branch, the model and its window -- and no plan limits
+    [[ "$line1" == *"project/src"* && "$line1" == *"feat/look"* ]] &&
+        [[ "$line2" == *"qwen3.8:27b"* && "$line2" == *"ctx 83% left (21k/131k)"* ]] &&
+        [[ "$out" != *"5h "* && "$out" != *"7d "* ]]
+}
+
+local_session_starts_no_refresh() {
+    # given claude-local's profile, whose usage cache never exists, so it is always stale
+    reset_log
+
+    # when
+    render "$LOCAL_PROFILE" "$(payload "$PROJECT" "qwen3.8:27b")" >/dev/null || return 1
+
+    # then: no lock was taken, so no refresh forked, and curl never ran
+    [ ! -s "$LOG/mkdir.calls" ] && [ ! -e "$LOG/curl.argv" ]
+}
+
+refresh_sends_the_token_on_stdin_only() {
+    # given the regular profile, logged in, and the usage endpoint's answer
+    reset_log
+    rm -f "$REGULAR_PROFILE/statusline-usage.cache"
+    cat > "$LOG/response.json" <<'EOF'
+{"five_hour": {"utilization": 20.4, "resets_at": "2026-10-14T23:50:00+00:00"},
+ "seven_day": {"utilization": 83, "resets_at": "2026-10-20T22:00:00+00:00"},
+ "limits": [{"kind": "weekly_scoped", "scope": {"model": {"display_name": "Fable"}},
+             "percent": 43, "resets_at": "2026-10-20T22:00:00+00:00"}]}
+EOF
+
+    # when: the refresh a redraw forks, run in the foreground
+    CLAUDE_CONFIG_DIR="$REGULAR_PROFILE" PATH="$STUBS:$PATH" STATUSLINE_TEST_LOG="$LOG" \
+        bash "$SCRIPT" --refresh-usage </dev/null || return 1
+
+    # then: the header arrived on stdin, the arguments never held the token, and the
+    # answer reached the cache
+    ! grep -q 'fixture-token-placeholder' "$LOG/curl.argv" &&
+        grep -qx 'Authorization: Bearer fixture-token-placeholder' "$LOG/curl.stdin" &&
+        grep -qx 'five=20' "$REGULAR_PROFILE/statusline-usage.cache" &&
+        grep -qx 'account=someone@example.com' "$REGULAR_PROFILE/statusline-usage.cache" &&
+        grep -q '^scoped=Fable:43:' "$REGULAR_PROFILE/statusline-usage.cache"
+}
+
+logged_in_session_shows_its_limits() {
+    # given the regular profile with a fresh cache and a payload carrying both windows
+    reset_log
+    fresh_cache
+    local limits='{"five_hour": {"used_percentage": 20, "resets_at": 1791500000},
+                   "seven_day": {"used_percentage": 83, "resets_at": 1791900000}}'
+
+    # when
+    local out line1 line2
+    out=$(render "$REGULAR_PROFILE" "$(payload "$PROJECT" "Opus 5 (1M context)" "$limits")") || return 1
+    line1=$(sed -n 1p <<<"$out")
+    line2=$(sed -n 2p <<<"$out")
+
+    # then: the account, the model without its window suffix, both windows and the cap
+    [[ "$line1" == *"someone@example.com"* ]] &&
+        [[ "$line2" == *"Opus 5 ❯"* && "$line2" == *"5h 20%"* && "$line2" == *"7d 83%"* ]] &&
+        [[ "$line2" == *"Fable 43%"* ]] &&
+        [ ! -s "$LOG/mkdir.calls" ]
+}
+
+draws_no_private_use_area_glyph() {
+    # given both profiles' lines
+    reset_log
+    fresh_cache
+    local out
+    out=$(render "$LOCAL_PROFILE" "$(payload "$PROJECT/src" "qwen3.8:27b")") || return 1
+    out+=$(render "$REGULAR_PROFILE" "$(payload "$PROJECT" "Opus 5")") || return 1
+
+    # when / then: Claude Code strips U+E000-U+F8FF, every Nerd Font glyph, so none may be
+    # drawn (matched as UTF-8 bytes, so the check needs no locale)
+    ! LC_ALL=C grep -qP '\xEE[\x80-\xBF][\x80-\xBF]|\xEF[\x80-\xA3][\x80-\xBF]' <<<"$out"
+}
+
+fits_a_narrow_terminal() {
+    # given a terminal far narrower than either line
+    reset_log
+    fresh_cache
+    local out line
+    out=$(render "$REGULAR_PROFILE" "$(payload "$PROJECT/src" "Opus 5")" 40) || return 1
+
+    # when / then: each line sheds detail until it fits
+    while IFS= read -r line; do
+        [ "${#line}" -le 40 ] || return 1
+    done <<<"$out"
+}
+
+run_case "a local session shows the model and its window, and no plan limits" \
+    local_session_shows_the_model_and_no_limits
+run_case "a local session, which has no login, takes no refresh lock and forks nothing" \
+    local_session_starts_no_refresh
+run_case "a refresh hands the OAuth token to curl on stdin, never in its arguments" \
+    refresh_sends_the_token_on_stdin_only
+run_case "a logged-in session shows its account, both windows and the model cap" \
+    logged_in_session_shows_its_limits
+run_case "no line draws a private-use-area glyph" draws_no_private_use_area_glyph
+run_case "every line fits a 40-column terminal" fits_a_narrow_terminal
+
+if [ "$EXIT_CODE" -eq 0 ]; then
+    echo "[test-statusline] all status line tests passed" >&2
+fi
+exit "$EXIT_CODE"
