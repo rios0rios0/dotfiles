@@ -154,8 +154,9 @@ How the two machines meet:
    installs and logs in.
 2. A machine with the local model shares its server on the tailnet's port 11434, unless
    `shareOnTailnet` in `.chezmoidata/local-llm.yaml` says otherwise. It is `tailscale serve`, never
-   Funnel; on WSL, Windows' client forwards to Windows' loopback, which WSL hands on to Ollama;
-   run `tailscale-up` in WSL once Windows is logged in. Ollama listens on all interfaces for LAN
+   Funnel; on WSL, Windows' client forwards to Windows' `localhost`, which WSL hands on to Ollama
+   (not to `127.0.0.1`, where WSL relays nothing since Ollama listens on every interface); run
+   `tailscale-up` in WSL once Windows is logged in. Ollama listens on all interfaces for LAN
    access and has no authentication, so firewall rules and the tailnet policy define who can run,
    pull and delete models. WSL 2 may need mirrored networking or a Windows port proxy for LAN
    clients; see [When it is installed](#when-it-is-installed).

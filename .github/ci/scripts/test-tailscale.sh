@@ -5,10 +5,11 @@ set -euo pipefail
 # and sudo: the pass every interactive zsh runs, which must never wait or ask for a password, and
 # the direct call, which logs in, sets the two preferences and shares the local model's server. On
 # WSL, against a stub of Windows' client: nothing waits, nothing runs as root, and the model's
-# server is shared through Windows. Also checks the wrapper that gives WSL Windows' CLI, that the
-# installer runs again when what the machine shares changes and installs nothing on WSL, that WSL
-# removes the Linux client an older revision installed, and that only bare metal's zsh runs the
-# quiet pass.
+# server is shared through Windows to `localhost`, never to the `127.0.0.1` where WSL's relay no
+# longer listens, moving a share an older revision left there. Also checks the wrapper that gives
+# WSL Windows' CLI, that the installer runs again when what the machine shares changes and installs
+# nothing on WSL, that WSL removes the Linux client an older revision installed, and that only bare
+# metal's zsh runs the quiet pass.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -140,7 +141,8 @@ exit 1
 EOF
 chmod +x "$WSL_STUBS"/*
 
-# reset <state> [down] [enabled] [failed] [operator] [shared] [win-down] [win-missing] [linux-tailscaled]
+# reset <state> [down] [enabled] [failed] [operator] [shared=<forward target>] [win-down]
+#       [win-missing] [linux-tailscaled]
 reset() {
     rm -f "$TMP/calls" "$TMP/ts-down" "$TMP/ts-enabled" "$TMP/ts-failed" "$TMP/ts-operator" "$TMP/ts-serve.json" \
         "$TMP/win-down" "$TMP/win-missing" "$TMP/linux-tailscaled"
@@ -154,7 +156,7 @@ reset() {
             enabled) touch "$TMP/ts-enabled" ;;
             failed) touch "$TMP/ts-failed" ;;
             operator) touch "$TMP/ts-operator" ;;
-            shared) echo '{"TCP":{"11434":{"TCPForward":"127.0.0.1:11434"}}}' > "$TMP/ts-serve.json" ;;
+            shared=*) printf '{"TCP":{"11434":{"TCPForward":"%s"}}}\n' "${flag#shared=}" > "$TMP/ts-serve.json" ;;
             win-down) touch "$TMP/win-down" ;;
             win-missing) touch "$TMP/win-missing" ;;
             linux-tailscaled) touch "$TMP/linux-tailscaled" ;;
@@ -271,7 +273,7 @@ else
 fi
 
 # given a node already on the tailnet and already sharing
-reset Running operator shared
+reset Running operator shared=127.0.0.1:11434
 # when
 output="$(helper gpu)" && status=0 || status=$?
 # then: nothing to log in and nothing to share again
@@ -303,20 +305,32 @@ output="$(helper gpu)" && status=0 || status=$?
 reset Running
 # when: the pass the apply runs
 output="$(wsl gpu --no-login)" && status=0 || status=$?
-# then: the model's server is shared through Windows' client, to Windows' loopback
+# then: the model's server is shared through Windows' client, to Windows' localhost, which names
+# the ::1 that WSL's relay listens on for Ollama's dual-stack socket
 [[ "$status" -eq 0 && "$output" == *"sharing Ollama"* && "$output" == *"on the tailnet as 100.64.0.7"* ]] &&
-    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434' "$TMP/calls" && ! grep -q ' up' "$TMP/calls" &&
+    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://localhost:11434' "$TMP/calls" && ! grep -q ' up' "$TMP/calls" &&
     pass "on WSL the apply shares the model's server through Windows' client" ||
     fail "WSL sharing: status=$status output=$output calls=$(calls)"
 
 # given Windows on the tailnet and already sharing
-reset Running shared
+reset Running shared=localhost:11434
 # when
 output="$(wsl gpu)" && status=0 || status=$?
 # then
 [[ "$status" -eq 0 ]] && ! grep -q 'serve --bg\| up' "$TMP/calls" &&
     pass "on WSL tailscale-up leaves a share that is in place as it is" ||
     fail "WSL already sharing: status=$status calls=$(calls)"
+
+# given the share an older revision set, to Windows' 127.0.0.1, where WSL's relay no longer listens
+# since Ollama listens on every interface
+reset Running shared=127.0.0.1:11434
+# when: the pass the apply runs, which the installer repeats whenever tailscale-up changes
+output="$(wsl gpu --no-login)" && status=0 || status=$?
+# then: the share is moved to localhost
+[[ "$status" -eq 0 && "$output" == *"sharing Ollama"* ]] &&
+    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://localhost:11434' "$TMP/calls" &&
+    pass "on WSL the apply moves a share an older revision left on 127.0.0.1 to localhost" ||
+    fail "WSL share on 127.0.0.1: status=$status output=$output calls=$(calls)"
 
 # given Windows not logged in
 reset NeedsLogin
@@ -342,7 +356,7 @@ reset Stopped
 output="$(wsl gpu)" && status=0 || status=$?
 # then: a bare `tailscale up` switches it back on, and the server is shared
 [[ "$status" -eq 0 ]] && grep -qx 'tailscale up' "$TMP/calls" &&
-    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434' "$TMP/calls" &&
+    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://localhost:11434' "$TMP/calls" &&
     pass "on WSL tailscale-up switches Windows' client back on" ||
     fail "WSL switched off: status=$status output=$output calls=$(calls)"
 
@@ -383,7 +397,7 @@ output="$(HOME="$TMP/home" PATH="$TMP/tools" "$TMP/tailscale-up-wsl-gpu" --no-lo
     fail "WSL without the wrapper: status=$status output=$output"
 
 # given the Linux client an older revision installed, still running
-reset Running shared linux-tailscaled
+reset Running shared=localhost:11434 linux-tailscaled
 # when
 output="$(wsl gpu --no-login)" && status=0 || status=$?
 # then
