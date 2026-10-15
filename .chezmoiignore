@@ -46,11 +46,14 @@ AppData
 
 {{- /* WSL-exclusive files. The SSH agent bridge relays a Windows named pipe, so it is
      meaningless on bare-metal Linux -- there is no Windows agent to reach, and the unit would
-     point at an npiperelay.exe that is never installed. Gated on the kernel rather than the OS
-     because "linux" alone does not distinguish WSL from bare metal. */ -}}
+     point at an npiperelay.exe that is never installed. The tailscale wrapper runs Windows'
+     Tailscale CLI, which is WSL's tailnet client; on bare metal it would shadow tailscaled's own
+     CLI. Gated on the kernel rather than the OS because "linux" alone does not distinguish WSL
+     from bare metal. */ -}}
 {{- if not $wsl }}
 .config/systemd/user/ssh-agent-bridge.socket
 .config/systemd/user/ssh-agent-bridge@.service
+.local/bin/tailscale
 {{- end }}
 
 {{- /* The local model for Claude Code (claude-local): Linux with an NVIDIA driver, unless

@@ -131,7 +131,8 @@ $requirements = @(
     "JanDeDobbeleer.OhMyPosh",      # Oh My Posh
     "Microsoft.PowerShell"
     "Microsoft.WSL",                # Windows Subsystem for Linux
-    "Microsoft.WindowsTerminal"     # My default terminal
+    "Microsoft.WindowsTerminal",    # My default terminal
+    "Tailscale.Tailscale"           # the tailnet client for this machine and its WSL (see CLAUDE.md, "Tailscale")
 )
 Install-PackageList $requirements
 # =========================================================================================================

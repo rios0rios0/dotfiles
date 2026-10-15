@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'moved the tailnet client of WSL machines to Windows: Windows'' Tailscale client is now the machine''s, WSL reaches its CLI through a `tailscale` wrapper, and `tailscale-up` shares the local model''s server through Windows'' `tailscale serve`, which also puts Windows'' own services and Docker Desktop''s containers on the tailnet; bare-metal Linux keeps `tailscaled`'
+time: '2026-10-15T15:18:09.546012294Z'

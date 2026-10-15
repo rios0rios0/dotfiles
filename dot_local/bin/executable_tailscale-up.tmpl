@@ -1,7 +1,24 @@
 {{- $llm := includeTemplate "lib-local-llm.tmpl" . | fromJson -}}
+{{- $wsl := and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
 #!/bin/bash
 
 # tailscale-up: put this machine on the tailnet and keep it there. See CLAUDE.md, "Tailscale".
+{{- if $wsl }}
+#
+#   tailscale-up             checks that Windows has this machine on the tailnet, switching its
+#                            client back on if it was switched off, and shares what this machine
+#                            shares on the tailnet.
+#   tailscale-up --no-login  what `chezmoi apply` runs: the same, except that it switches nothing
+#                            on, and anything missing is a hint rather than an error.
+#
+# On WSL the machine's tailnet client is Windows', and `tailscale` is the wrapper in ~/.local/bin
+# for its CLI. One client puts the whole machine on the tailnet -- Windows' own services, and
+# Docker Desktop's containers, whose traffic leaves through Windows -- and none runs inside WSL,
+# where Tailscale's WSL guide says a second client breaks WSL's traffic through the first. That
+# client is a service that starts with Windows and rejoins by itself, and its app owns the login,
+# so nothing here waits for a browser, needs root, or runs in every shell. What is left to do here
+# is sharing this machine's Ollama with the tailnet, when .chezmoidata/local-llm.yaml says so.
+{{- else }}
 #
 #   tailscale-up             starts tailscaled if it is off; logs in if needed, printing the login
 #                            URL and waiting until it is used; and shares what this machine shares
@@ -10,24 +27,27 @@
 #                            after a `tailscale down`, and otherwise only says what is missing. It
 #                            never waits, never asks for a password, and is silent when all is well.
 #
-# tailscaled is a system service (Tailscale's apt package, installed and enabled by
-# run_onchange_after_linux-010-setup-tailscale.sh), so with systemd it starts with the machine --
-# for WSL, with the first terminal -- and a logged-in node rejoins by itself. What it cannot do
-# alone is done here:
+# This is the bare-metal render; on WSL the machine's client is Windows'. tailscaled is a system
+# service (Tailscale's apt package, installed and enabled by
+# run_onchange_after_linux-010-setup-tailscale.sh), so with systemd it starts with the machine and
+# a logged-in node rejoins by itself. What it cannot do alone is done here:
 #   - the first login, which needs a person at a browser;
 #   - two preferences, set once with sudo, after which nothing here needs root again:
 #       * --operator lets this user run `tailscale up` and `tailscale serve` without sudo, which is
 #         what lets a new shell bring the node back up;
-#       * --accept-dns=false keeps tailscaled away from /etc/resolv.conf. WSL writes that file
-#         itself, and with no DNS manager running tailscaled would replace it with MagicDNS, so
-#         every lookup would fail while tailscaled is down. Peers are reached by address instead:
-#         `tailscale ip -4 <name>`, or `tailscale status --json`.
+#       * --accept-dns=false keeps tailscaled away from /etc/resolv.conf, which it replaces with
+#         MagicDNS when no DNS manager runs, so every lookup would fail while tailscaled is down.
+#         Peers are reached by address instead: `tailscale ip -4 <name>`, or
+#         `tailscale status --json`.
 #   - sharing this machine's Ollama with the tailnet, when .chezmoidata/local-llm.yaml says so.
+{{- end }}
 
 set -euo pipefail
 
 prefix="tailscale"
+{{- if not $wsl }}
 prefs=(--operator="$USER" --accept-dns=false)
+{{- end }}
 
 mode="${1:-}"
 if [[ -n "$mode" && "$mode" != "--no-login" ]]; then
@@ -35,8 +55,8 @@ if [[ -n "$mode" && "$mode" != "--no-login" ]]; then
     exit 2
 fi
 
-# A shell's pass treats anything missing as a hint and lets the shell go on; asked for directly,
-# it is an error.
+# --no-login treats anything missing as a hint and lets its caller go on; asked for directly, it
+# is an error.
 stop() {
     if [[ "$mode" == "--no-login" ]]; then
         echo "[$prefix] $1" >&2
@@ -49,13 +69,61 @@ stop() {
 backend_state() {
     tailscale status --json 2>/dev/null | jq -r '.BackendState // empty' 2>/dev/null || true
 }
+{{- if $wsl }}
+
+# The wrapper lives next to this script, and the first apply's bash can run this before
+# ~/.local/bin is on PATH.
+PATH="$HOME/.local/bin:$PATH"
+
+command -v tailscale >/dev/null 2>&1 || stop "the tailscale wrapper is missing; run 'chezmoi apply'"
+tailscale version >/dev/null 2>&1 ||
+    stop "Tailscale is not installed on Windows; 'chezmoi apply' on Windows installs it"
+
+# A client that an older revision installed inside WSL. The dependency-removal script removes it
+# when sudo needs no password; otherwise a person has to.
+if systemctl is-active --quiet tailscaled 2>/dev/null; then
+    echo "[$prefix] WARN: tailscaled still runs inside WSL, beside Windows' client; remove it with 'sudo apt-get purge -y tailscale'" >&2
+fi
+
+on_tailnet() {
+    :
+}
+
+# A bare `tailscale up` only switches a logged-in client back on. Asked for directly, that is the
+# point; the apply's pass leaves a client someone switched off in its app as it is.
+switched_off() {
+    [[ "$mode" != "--no-login" ]] ||
+        stop "Tailscale is switched off on Windows; switch it on in its app, or run 'tailscale-up'"
+    timeout 30 tailscale up >/dev/null 2>&1 || stop "could not switch Tailscale back on; use its app on Windows"
+}
+
+logged_out() {
+    stop "Windows is not logged in to the tailnet; log in with the Tailscale app there, then run 'tailscale-up'"
+}
+
+awaiting_approval() {
+    stop "this machine waits for approval: https://login.tailscale.com/admin/machines"
+}
+
+declare -A on_state=(
+    [Running]=on_tailnet
+    [Starting]=on_tailnet
+    [Stopped]=switched_off
+    [NeedsLogin]=logged_out
+    [NoState]=logged_out
+    [NeedsMachineAuth]=awaiting_approval
+)
+state="$(backend_state)"
+[[ -n "$state" ]] || stop "Tailscale is not running on Windows; start it from the Start menu, then run 'tailscale-up'"
+"${on_state[$state]:-on_tailnet}"
+{{- else }}
 
 command -v tailscale >/dev/null 2>&1 || stop "tailscale is not installed; run 'chezmoi apply'"
 
 # --- a new shell's pass -------------------------------------------------------------------------
 
-# WSL boots with the first terminal, so that terminal's zsh can get here before tailscaled answers;
-# only a service that is switched off or has failed is worth a word.
+# A machine's first terminal can get here before tailscaled answers; only a service that is
+# switched off or has failed is worth a word.
 daemon_down() {
     if systemctl is-enabled --quiet tailscaled 2>/dev/null && ! systemctl is-failed --quiet tailscaled 2>/dev/null; then
         exit 0
@@ -121,14 +189,22 @@ fi
 # A node logged in some other way gets the same preferences. `tailscale set` changes only what it
 # names, so preferences set by hand since survive.
 tailscale set "${prefs[@]}" 2>/dev/null || sudo tailscale set "${prefs[@]}"
+{{- end }}
 {{- if and $llm.enabled $llm.shareOnTailnet }}
 
 # This machine's Ollama, on the tailnet's port 11434: the address claude-remote looks for. Serve
-# keeps the forward in tailscaled's state, so it comes back with the service; it is only set here
+# keeps the forward in the client's state, so it comes back with the service; it is only set here
 # when it is missing.
 if [[ "$(tailscale serve status --json 2>/dev/null | jq -r '.TCP["11434"].TCPForward // empty' 2>/dev/null)" != "127.0.0.1:11434" ]]; then
+{{- if $wsl }}
+    # Windows' own loopback: WSL's localhost forwarding hands each connection on to Ollama here,
+    # and while WSL is stopped nothing answers behind it.
+    tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434 >/dev/null ||
+        stop "could not share Ollama through Windows' Tailscale client"
+{{- else }}
     tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434 >/dev/null 2>&1 ||
         sudo tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434 >/dev/null
+{{- end }}
     echo "[$prefix] sharing Ollama with the tailnet on port 11434" >&2
 fi
 {{- end }}

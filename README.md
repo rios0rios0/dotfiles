@@ -47,7 +47,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 - **Claude Code**, **Codex CLI** and **GitHub Copilot CLI** (AI coding assistants)
 - **`claude-local`**: Claude Code on a local **Ollama** model, on Linux machines with an NVIDIA GPU; see the [local model guide](.docs/local-coding-model.md)
-- **Tailscale** (Linux/WSL): installed and logged in by `chezmoi apply`, and rejoined by every interactive zsh; `claude-remote` uses another machine's GPU across it
+- **Tailscale**: Windows' client on Windows and its WSL, which reaches it through a `tailscale` wrapper; `tailscaled` on bare-metal Linux, installed and logged in by `chezmoi apply` and rejoined by every interactive zsh; `claude-remote` uses another machine's GPU across it
 - **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm)
 - **Neovim** with AstroVim (Android)
 
@@ -258,7 +258,9 @@ The optional [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway fo
 
 ## Tailscale
 
-On Linux (WSL or bare metal), `chezmoi apply` installs Tailscale from its signed apt repository -- the key checked by fingerprint -- and enables `tailscaled`. Run from a terminal, it then prints the login URL and waits until you have used it; otherwise run `tailscale-up` later, which every new shell points at until the machine is logged in. After that the machine rejoins by itself, and every interactive zsh brings it back up after a `tailscale down`, never waiting or asking for a password. MagicDNS stays off (`--accept-dns=false`), because WSL writes `/etc/resolv.conf` itself and tailscaled would otherwise replace it.
+Each machine runs one Tailscale client. On Windows, and so for its WSL, that is Windows' own: the Windows dependency installer installs it, you log in with its app, and WSL reaches its CLI through the `tailscale` wrapper in `~/.local/bin`. No client runs inside WSL -- Tailscale's WSL guide warns that one there breaks WSL's traffic through the Windows one -- and an apply removes the one older revisions installed (with `sudo apt-get purge -y tailscale` by hand when sudo asks for a password). Windows' client puts the whole machine on the tailnet: Windows' own services, and Docker Desktop's containers, whose traffic leaves through Windows. Once Windows is logged in, run `tailscale-up` in WSL to share the local model's server through it.
+
+On bare-metal Linux, `chezmoi apply` installs Tailscale from its signed apt repository -- the key checked by fingerprint -- and enables `tailscaled`. Run from a terminal, it then prints the login URL and waits until you have used it; otherwise run `tailscale-up` later, which every new shell points at until the machine is logged in. After that the machine rejoins by itself, and every interactive zsh brings it back up after a `tailscale down`, never waiting or asking for a password. MagicDNS stays off (`--accept-dns=false`), because without a DNS manager tailscaled would replace `/etc/resolv.conf`.
 
 ## Chezmoi Conventions
 

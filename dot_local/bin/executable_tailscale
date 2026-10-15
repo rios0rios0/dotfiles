@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# tailscale: the CLI of Windows' Tailscale client, for WSL. See CLAUDE.md, "Tailscale".
+#
+# On WSL the machine's tailnet client is Windows', so nothing inside WSL runs one: Tailscale's WSL
+# guide says a second client there breaks WSL's traffic through the Windows one. This puts that
+# client's CLI under the usual name, so `tailscale status`, tailscale-up and claude-remote work in
+# WSL as they do elsewhere. Shipped to WSL only (.chezmoiignore): on bare metal it would shadow
+# the real CLI.
+#
+# TAILSCALE_EXE names another tailscale.exe, for an install outside the default directory.
+
+exe="${TAILSCALE_EXE:-/mnt/c/Program Files/Tailscale/tailscale.exe}"
+if [[ ! -x "$exe" ]]; then
+    echo "[tailscale] ERROR: Tailscale is not installed on Windows ($exe is missing); 'chezmoi apply' on Windows installs it" >&2
+    exit 127
+fi
+exec "$exe" "$@"

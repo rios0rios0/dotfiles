@@ -1,3 +1,4 @@
+{{- $wsl := contains "microsoft" (.chezmoi.kernel | toString) -}}
 #!/bin/bash
 
 # Removes dependencies that this repository used to install on Linux (baremetal/WSL)
@@ -17,6 +18,15 @@ set -euo pipefail
 # converged (a commit hash from the feature branch changes when the branch is
 # rebased before merge).
 TOMBSTONES=(
+{{- if $wsl }}
+    # Tailscale's Linux client, on WSL only: Windows' client replaced it in #229, and
+    # Tailscale's WSL guide says a client inside WSL breaks WSL's traffic through the
+    # Windows one. Bare metal keeps tailscaled. Root owns what this leaves behind --
+    # the apt source and its keyring, and /var/lib/tailscale, which a purge removes:
+    #   sudo apt-get purge -y tailscale
+    #   sudo rm -f /etc/apt/sources.list.d/tailscale.list /usr/share/keyrings/tailscale-archive-keyring.gpg
+    "apt:tailscale"
+{{ end }}
     # OCI CLI installed from Oracle's own install.sh, superseded by the pipx route
     # in this repository's `install_oci_cli`. The venv is ~750 MB of dead weight
     # once pipx owns `~/.local/bin/oci`, and the launcher it left there was what
