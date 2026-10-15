@@ -22,6 +22,11 @@
 # `run_onchange_` rather than `run_once_`: existing machines already ran every `run_once_`
 # script, so a new installer there would never reach them. This runs when its own content
 # changes, which covers the machines that predate the bridge and the ones built after it.
+#
+# Without systemd it stops early and exits 0, which chezmoi records as done, so the line below
+# carries whether systemd was running: it changes when systemd starts, and the first apply after
+# that runs this again (see CLAUDE.md, "systemd on WSL"):
+#   systemd {{ if stat "/run/systemd/system" }}running{{ else }}not running{{ end }}
 
 set -euo pipefail
 
@@ -51,9 +56,16 @@ if ! grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null; then
     exit 0
 fi
 
-if ! command -v systemctl >/dev/null 2>&1 || ! systemctl --user show-environment >/dev/null 2>&1; then
-    echo "[$prefix] WARN: no systemd user session; enable systemd in /etc/wsl.conf to use the bridge" >&2
+# Without systemd the bridge waits and exits 0: the systemd line above changes once systemd
+# starts, and that runs this again. A user manager out of reach while systemd runs changes no
+# line, so it fails instead, which is what makes chezmoi retry it rather than record it as done.
+if [[ ! -d /run/systemd/system ]]; then
+    echo "[$prefix] WARN: systemd is not running, so the bridge waits for it; the first apply after it starts sets the bridge up ('wsl.exe --shutdown' restarts WSL with it)" >&2
     exit 0
+fi
+if ! systemctl --user show-environment >/dev/null 2>&1; then
+    echo "[$prefix] ERROR: systemd is running, but this session reaches no systemd user manager; check 'systemctl --user status'" >&2
+    exit 1
 fi
 
 install_relay() {

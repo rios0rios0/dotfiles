@@ -10,6 +10,12 @@
 # tailnet is decided:
 #   tailscale-up {{ includeTemplate "dot_local/bin/executable_tailscale-up.tmpl" . | sha256sum }}
 #
+# On bare metal, without systemd it stops early and exits 0, which chezmoi records as done, so the
+# line below carries whether systemd was running: it changes when systemd starts, and the first
+# apply after that runs this again (see CLAUDE.md, "systemd on WSL"). On WSL nothing here needs
+# systemd, and the line only costs one more run of tailscale-up's quiet pass:
+#   systemd {{ if stat "/run/systemd/system" }}running{{ else }}not running{{ end }}
+#
 # See CLAUDE.md, "Tailscale".
 
 set -euo pipefail
@@ -45,7 +51,7 @@ if ! command -v apt-get >/dev/null 2>&1; then
 fi
 
 if [[ ! -d /run/systemd/system ]]; then
-    echo "[$prefix] WARN: systemd is not running, so tailscaled cannot run as a service" >&2
+    echo "[$prefix] WARN: systemd is not running, so tailscaled cannot run as a service; the first apply after systemd starts installs it" >&2
     exit 0
 fi
 

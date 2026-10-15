@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed systemd never starting on WSL distributions that ship no `/etc/wsl.conf`, such as Kali, which left the SSH agent bridge and Ollama for `claude-local` unconfigured: `chezmoi apply` now sets `systemd=true` under `[boot]` and says when to restart WSL, the installers that wait for systemd run again by themselves on the first apply after systemd starts instead of staying recorded as done, and with systemd running an unreachable user manager now fails the bridge and Ollama installers so that the next apply retries them; `claude-local` now reports that systemd is not running instead of pointing at a `systemctl` command that fails the same way'
+time: '2026-10-15T15:03:26.213424852Z'

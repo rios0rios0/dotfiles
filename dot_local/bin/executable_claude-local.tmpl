@@ -60,7 +60,13 @@ if ! server_up; then
         done
     fi
     if ! server_up; then
-        echo "[$prefix] ERROR: no Ollama server answers at $host; check 'systemctl --user status ollama'" >&2
+        # Without systemd the start above failed on a D-Bus error, and the usual pointer would
+        # fail the same way, so say what is missing instead.
+        if [[ "$host" == "http://127.0.0.1:11434" && ! -d /run/systemd/system ]]; then
+            echo "[$prefix] ERROR: no Ollama server answers at $host, and systemd, which runs it, is not running; run 'chezmoi apply', which turns systemd on in WSL and says how to restart, then apply again once it runs" >&2
+        else
+            echo "[$prefix] ERROR: no Ollama server answers at $host; check 'systemctl --user status ollama'" >&2
+        fi
         exit 1
     fi
 fi

@@ -29,6 +29,7 @@ make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image p
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
 make test-local-llm                 # claude-local, claude-remote and claude-local-task: one context window, the launchers, the audit, the capacity hint
 make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server
+make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
 ```
@@ -57,6 +58,7 @@ chezmoi doctor                      # diagnose installation issues
 | `dot_`              | Becomes `.` in target (e.g., `dot_zshrc` → `~/.zshrc`) |
 | `.tmpl`             | Processed as Go template before deployment             |
 | `encrypted_*.age`   | Age-encrypted file, decrypted on apply                 |
+| `run_before_*`      | Script runs before file application, on every apply    |
 | `run_once_before_*` | Script runs once before file application               |
 | `run_after_*`       | Script runs after every application                    |
 | `run_onchange_after_*` | Script runs after application, only when its own content changes |
@@ -210,7 +212,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `wsl-systemd`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -857,6 +859,50 @@ take its name.
 `make test-tailscale` covers 1 to 6 and 9 against stubs of both clients, `systemctl` and `sudo`,
 and the removal on WSL alone; `make test-chezmoiignore` covers the gates.
 
+## systemd on WSL (Turned On by chezmoi)
+
+The SSH agent bridge and Ollama run as systemd user units, and WSL boots a distribution with
+systemd only when `/etc/wsl.conf` has `systemd=true` under `[boot]`. Kali's WSL image ships no
+`/etc/wsl.conf`, so PID 1 is WSL's own `init`. `systemctl --user` then fails with `Failed to connect
+to user scope bus via local transport: No such file or directory` -- the socket it looks for in
+`$XDG_RUNTIME_DIR`, WSLg's `/mnt/wslg/runtime-dir`, does not exist -- and `claude-local` finds no
+server.
+
+Two halves make the fix automatic, and both are needed:
+
+| Half | Mechanism |
+|------|-----------|
+| Turn it on | `.chezmoiscripts/run_before_linux-000-enable-wsl-systemd.sh.tmpl` sets `systemd=true` under `[boot]` through sudo and says to restart WSL. It renders to nothing unless the kernel is WSL's and systemd is not PID 1, so it runs on every apply until WSL boots with systemd, and never after |
+| Finish what waited | Each installer that calls `systemctl` -- the bridge, Ollama, and Tailscale's bare-metal half -- renders `systemd running` or `systemd not running` into a comment. Without systemd it stopped early and exited 0, which chezmoi records as done; the line changing is what runs it again on the first apply after the restart |
+
+On a machine that boots without systemd: `chezmoi apply` writes the file and the installers warn;
+`wsl.exe --shutdown` and a new terminal start systemd; the next `chezmoi apply` sets up the bridge
+and Ollama, pulling the model. Tailscale does not wait: on WSL its client is Windows' (see
+"Tailscale").
+
+**Keep these:**
+
+1. **Every `run_once_` or `run_onchange_` script that calls `systemctl` carries the systemd line**,
+   rendered from `stat "/run/systemd/system"`, the same test the script makes at run time. That
+   directory exists exactly when systemd is PID 1; it is what `sd_booted()` checks.
+2. **Wait for systemd with exit 0 only when it is not PID 1**, the one state the line records.
+   With systemd running, a user manager the session cannot reach changes no line, so it is an
+   error: only a non-zero exit makes chezmoi retry the script instead of recording it as done.
+3. **The restart is the user's.** `wsl.exe --shutdown` ends every WSL process, the apply that would
+   call it among them. The script tells a restart still due from one that did not take by comparing
+   the file's mtime with PID 1's start, and points a WSL older than 0.67.6, which ignores the
+   setting, at `wsl.exe --update`.
+4. **The file is merged, never replaced.** Every other line of `/etc/wsl.conf` stays. A file that
+   already asks for systemd is not rewritten, and a changed one is renamed over the old from a
+   sibling, because WSL reads it at every boot.
+5. **Expected failures are warnings.** A refused sudo or a distribution without systemd installed
+   exits 0: this runs before every installer, where a non-zero exit would stop the whole apply.
+
+`make test-wsl-systemd` covers the render gate, the merge, both restart messages, and the systemd
+line in every installer that calls `systemctl`, which also catches a new one that lacks it.
+`make test-local-llm` covers `claude-local` naming the missing systemd instead of pointing at
+`systemctl --user status ollama`.
+
 ## Claude Code Voice Input (WSL)
 
 Voice input (push-to-talk on the spacebar) shells out to a recorder binary, probing three options in order:
@@ -945,8 +991,9 @@ which would query the Windows agent directly and prove nothing about the bridge:
 systemctl --user status ssh-agent-bridge.socket  # should be active (listening)
 ```
 
-The bridge needs systemd in WSL (`systemd=true` under `[boot]` in `/etc/wsl.conf`). Without
-it the installer warns and exits 0, leaving `SSH_AUTH_SOCK` pointing at nothing.
+The bridge needs systemd in WSL, which `chezmoi apply` turns on (see "systemd on WSL"). Until
+WSL boots with it, the installer warns and exits 0, leaving `SSH_AUTH_SOCK` pointing at nothing,
+and the first apply after the restart sets the bridge up.
 
 ## Windows Package Detection (winget list, Not export)
 
