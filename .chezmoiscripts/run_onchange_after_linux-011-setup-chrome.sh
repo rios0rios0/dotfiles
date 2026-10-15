@@ -47,7 +47,9 @@ fi
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT
 
-curl -fsSL "$key_url" -o "$tmp/key.asc"
+# HTTPS only, redirects included. The fingerprint check below already refuses a key that is not
+# Google's; this keeps the download from being sent off HTTPS in the first place.
+curl -fsSL --proto '=https' --proto-redir '=https' "$key_url" -o "$tmp/key.asc"
 # One key, and Google's: a keyring that carried a second key would have apt trust it too.
 keys="$(gpg --show-keys --with-colons "$tmp/key.asc" 2>/dev/null | grep -c '^pub:' || true)"
 primary="$(gpg --show-keys --with-colons "$tmp/key.asc" 2>/dev/null |
