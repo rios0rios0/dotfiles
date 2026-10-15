@@ -22,14 +22,14 @@
 # Gemini CLI -- removed in 601cbeb (2026-07-21)
 .gemini
 
-# `claude-local` and `claude-remote` -- removed in #PR_NUMBER (2026-10-15), replaced by
+# `claude-local` and `claude-remote` -- removed in #233 (2026-10-15), replaced by
 # `claude-omni`, which reaches both GPUs and the cloud providers through OmniRoute.
 # `claude-local-task` became `claude-omni-task` in the same change.
 .local/bin/claude-local
 .local/bin/claude-remote
 .local/bin/claude-local-task
 
-# The OmniRoute Compose file -- deployed to ~/local-services by mistake until #PR_NUMBER
+# The OmniRoute Compose file -- deployed to ~/local-services by mistake until #233
 # (2026-10-15), which ignores `local-services`: the stack runs from the dotfiles checkout,
 # where its `.env` lives, and this copy only drifted from it.
 local-services/omniroute/compose.yaml
