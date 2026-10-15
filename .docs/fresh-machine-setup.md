@@ -39,10 +39,9 @@ means `Device: my-laptop`. On Windows and WSL the hostname is fine. On Termux th
 `localhost`, so `CHEZMOI_DEVICE` has to be exported before the first apply (Phase 5).
 
 The MCP servers in `~/.claude.json` are not a render-time dependency: `modify_dot_claude.json`
-writes `${GITHUB_PERSONAL_ACCESS_TOKEN}`, `${ADO_PERSONAL_ACCESS_TOKEN}`, `${ADO_ORGANIZATION_NAME}`,
-`${SONARQUBE_URL}` and `${SONARQUBE_TOKEN}` placeholders that Claude Code expands from the environment,
-so those names need `cred:` fields on the device note. Nothing about them blocks the first apply.
-[mcp-1password-setup.md](mcp-1password-setup.md) still describes the older per-item layout.
+writes a `${CONTEXT7_API_KEY}` placeholder that Claude Code expands from the environment, so that
+name needs a `cred:` field on the device note. Nothing about it blocks the first apply.
+[mcp-1password-setup.md](mcp-1password-setup.md) describes the field.
 
 The age identity is only needed where an encrypted file is applied: `.aws` and `.azure` on
 Windows; `.kube`, `.histdb`, `.john`, `.sqlmap` and `.npmrc` on Linux. Nothing encrypted is applied
@@ -203,6 +202,7 @@ Phase 3 is what authenticates every template here.
 | 12   | `run_after_linux-005-install-jetbrains-themes.sh`             | `[partial]`   | Same as Windows: needs the IDE config directories to exist first.                                                                                                                                            |
 | 13   | `run_onchange_after_linux-006-remove-dependencies.sh.tmpl`    | `[automated]` | Tombstones; silent on a fresh machine.                                                                                                                                                                       |
 | 14   | `run_onchange_after_linux-007-setup-sentry-cli.sh`           | `[automated]` | `sentry cli setup --no-modify-path`: the zsh completion into `~/.local/share/zsh/site-functions`, and the Claude Code skill once `~/.claude` exists (the next `sentry cli upgrade` adds it otherwise). |
+| 15   | `run_onchange_after_linux-011-setup-chrome.sh`               | `[automated]` | Google Chrome from Google's apt repository, for the Chrome DevTools MCP server; asks for the sudo password. Its key is trusted for that repository only, and only once its fingerprint proves it Google's. |
 
 ### What the dependency installer provides
 

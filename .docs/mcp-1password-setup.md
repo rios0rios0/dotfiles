@@ -1,67 +1,36 @@
-# MCP 1Password Setup Guide
+# MCP Credentials in 1Password
 
-This document describes the 1Password items that need to be created to support the MCP configuration template.
+The MCP servers that `modify_dot_claude.json` merges into `~/.claude.json` never hold a secret.
+Each one names an environment variable as `${NAME}`, and Claude Code fills it in when it starts
+the server. On Linux and Android those variables come from `cred:NAME` fields on the machine's
+device note, which `dot_scripts/linux-engineering-shell-credentials.sh` exports at shell start and
+caches for non-interactive shells (see "Runtime Credential Lifecycle" in `CLAUDE.md`). Which
+servers each platform gets, and why each has the shape it has, is in "MCP Servers" in `CLAUDE.md`.
 
-## Required 1Password Items
+## The field to add
 
-The following items need to be created in the "Private" vault in 1Password:
+On the `Device: <deviceName>` Secure Note in the `personal` vault, add one concealed (password)
+field per variable a server on that machine needs, labelled `cred:` followed by the variable name:
 
-### API Keys and Tokens
-- **GitHub Personal Access Token** - credential field containing GitHub PAT
-- **Anthropic API Key** - credential field containing Anthropic/Claude API key
-- **Browserbase API Key** - credential field containing Browserbase API key
-- **Browserbase Project ID** - credential field containing Browserbase project ID
-- **Smithery API Key** - credential field containing Smithery API key
-- **Smithery Profile** - credential field containing Smithery profile name
-- **EXA Search API Key** - credential field containing EXA Search API key
-- **EXA Search Profile** - credential field containing EXA Search profile name
+| Field label             | Server   | Platforms               |
+|-------------------------|----------|-------------------------|
+| `cred:CONTEXT7_API_KEY` | Context7 | Linux, Windows, Android |
 
-### Azure Configuration
-- **Azure Client ID** - credential field containing Azure client ID
-- **Azure Client Secret** - credential field containing Azure client secret
-- **Azure Tenant ID** - credential field containing Azure tenant ID
-- **Azure Subscription ID** - credential field containing Azure subscription ID
+Chrome DevTools needs no credential, so it has no field.
 
-### Azure DevOps
-- **Azure DevOps Organization** - credential field containing ADO organization name
+Then run `reload-credentials` and restart Claude Code. A server whose variable is still unset gets
+the literal `${NAME}` text instead of a value, and `claude mcp list` reports it as
+`Missing environment variables: NAME`. For Context7 that means every call fails with
+`Invalid API key` rather than falling back to the anonymous tier.
 
-### Search Services
-- **OpenSearch Hosts** - credential field containing OpenSearch host URLs
-- **OpenSearch Username** - credential field containing OpenSearch username
-- **OpenSearch Password** - credential field containing OpenSearch password
-- **Elasticsearch Hosts** - credential field containing Elasticsearch host URLs
-- **Elasticsearch Username** - credential field containing Elasticsearch username
-- **Elasticsearch Password** - credential field containing Elasticsearch password
+Until 2026-10-14 this repository also configured GitHub, Azure DevOps and SonarQube servers, which
+read `cred:GITHUB_PERSONAL_ACCESS_TOKEN`, `cred:ADO_ORGANIZATION_NAME`,
+`cred:ADO_PERSONAL_ACCESS_TOKEN`, `cred:SONARQUBE_URL` and `cred:SONARQUBE_TOKEN`. Those servers
+were retired in favour of their CLIs, so keep those fields only where a CLI or script still reads
+them.
 
-## Template Features
+## Windows
 
-### OS Detection
-The template detects the operating system using `{{ .chezmoi.os }}` and provides different configurations:
-
-- **Android (Termux)**: Uses `npx` commands since Docker is not available
-- **Linux/Windows**: Uses Docker commands for better isolation
-
-### Affected Servers
-The following MCP servers have Android-specific npx alternatives:
-
-1. **Azure Cloud**: 
-   - Docker: `mcr.microsoft.com/azure-sdk/azure-mcp:latest`
-   - NPX: `@azure/mcp-server@latest`
-
-2. **GitHub**:
-   - Docker: `ghcr.io/github/github-mcp-server`
-   - NPX: `@modelcontextprotocol/server-github@latest`
-
-3. **Context7**:
-   - Docker: `context7-mcp`
-   - NPX: `@upstash/context7-mcp@latest`
-
-4. **OpenSearch**:
-   - Docker/UV: `opensearch-mcp-server-py`
-   - NPX: `opensearch-mcp-server@latest`
-
-5. **ElasticSearch**:
-   - Docker/UV: `uv` with specific args
-   - NPX: `elasticsearch-mcp-server@latest`
-
-Note: Some NPX package names are estimated and may need verification/correction based on actual availability.
+Windows has no runtime loader for `cred:` fields. Set the variables a server needs as user
+environment variables in System Properties, Environment Variables, which keeps the values out of
+shell history, and restart Claude Code.

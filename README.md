@@ -67,7 +67,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 | Scripts | `.sh` (bash) | `.ps1` (PowerShell) | `.sh` (bash) |
 | 1Password | `op` wrapper (calls `op.exe` from WSL) | Native `op.exe` | `op` wrapper (proot Alpine) |
 | Docker | Native | Docker Desktop | N/A (proot wrappers) |
-| MCP Config | `~/.claude.json` (Docker) | `~/.claude.json` (Docker) | `~/.config/mcphub/servers.json` (npx) |
+| MCP Config | `~/.claude.json` (Context7, Chrome DevTools) | `~/.claude.json` (Context7) | `~/.claude.json` and `~/.config/mcphub/servers.json` (Context7) |
 | Editor | Any | JetBrains Toolbox, Visual Studio | Neovim (AstroVim) |
 
 ## Installation
@@ -208,7 +208,7 @@ This repository manages six Claude Code configuration files. Each targets a diff
 | `dot_claude/executable_statusline-command.sh` | `~/.claude/statusline-command.sh` | The status line both Claude Code profiles run (Linux) |
 | `dot_claude/modify_dot_claude.json` | `~/.claude/.claude.json` | Auto-trusts project directories to skip the trust dialog |
 | `dot_claude-local/modify_settings.json` | `~/.claude-local/settings.json` | The same look for `claude-local` and `claude-remote` |
-| `modify_dot_claude.json` (root) | `~/.claude.json` | User-scoped MCP servers (GitHub, Azure DevOps, SonarQube, Kubernetes) |
+| `modify_dot_claude.json` (root) | `~/.claude.json` | User-scoped MCP servers (see [MCP Servers](#mcp-servers)) |
 
 The `modify_*` files are chezmoi [modify-templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file): chezmoi evaluates them itself, with the file's current content in `.chezmoi.stdin`, and writes back the merged result, so they need neither bash nor Python and run on Windows too. This preserves any user-added configuration while ensuring defaults are always present, and a file that already holds every default is left byte for byte untouched.
 
@@ -224,6 +224,17 @@ Both CLIs keep their look across machines and profiles: Claude Code in the `dark
 | Codex | `dot_codex/modify_private_config.toml` | `~/.codex/config.toml` | Linux, Windows, Android |
 
 Only those keys are managed; everything else in the files stays as each tool wrote it. To change the look, edit it there and run `chezmoi apply`: a change made with `/theme` or `/statusline` lasts until the next apply, which sets the managed keys back and prints which. Rewriting `config.toml` keeps every Codex setting but drops its comments, and happens only when a managed key differs. See "Claude Code and Codex Look" in `CLAUDE.md` for why Claude Code's look stays on Linux.
+
+### MCP Servers
+
+Every machine gets the same user-scope MCP servers in `~/.claude.json`, less what its platform cannot run:
+
+| Server | Linux | Windows | Android | Needs |
+|--------|-------|---------|---------|-------|
+| Context7 (current library docs) | HTTP | HTTP | HTTP | `CONTEXT7_API_KEY` |
+| Chrome DevTools (drives a browser, reads console and network errors) | npx | | | Google Chrome, which `chezmoi apply` installs on Linux |
+
+`CONTEXT7_API_KEY` comes from a `cred:CONTEXT7_API_KEY` field on the device note in 1Password (see [MCP credentials](.docs/mcp-1password-setup.md)), and Claude Code fills it in from the environment, so no secret is written to `~/.claude.json`. Windows has no loader for those fields; set it there as a user environment variable. Chrome DevTools runs Chrome headless with a throwaway profile per session, redacts request credentials, and sends nothing to Google. GitHub, Azure DevOps, SonarQube and Kubernetes are used through their CLIs; the next apply deletes the MCP servers this repository used to configure for them. "MCP Servers" in `CLAUDE.md` explains each of those choices, how to watch the browser in one project, and why DBHub and Serena were evaluated and left out.
 
 ### Gitignore Design
 
