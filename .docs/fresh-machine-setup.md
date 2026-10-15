@@ -236,7 +236,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | OCI CLI                                           | `install_oci_cli`                     | `[automated]`  | pip, inside the pyenv Python.                                                                                                    |
 | ggshield                                         | `install_ggshield`                   | `[automated]` | pipx; its auth config is rendered from 1Password by `dot_config/ggshield/private_auth_config.yaml.tmpl`.                         |
 | ruff                                             | `install_ruff`                       | `[automated]` | Astral install script.                                                                                                          |
-| aisync                                           | `install_aisync`                     | `[partial]`   | Installed here; the AI rules are pulled by hand (below).                                                                        |
+| aisync                                           | `install_aisync`                     | `[partial]`   | Installed here; the key, the `aifiles` clone and the first pull are done by hand (below).                                       |
 | Atlassian CLI                                    | `install_acli`                       | `[automated]` |                                                                                                                                 |
 | Speedtest CLI                                    | `install_speedtest_cli`              | `[automated]` | Ookla apt repository.                                                                                                           |
 
@@ -249,9 +249,10 @@ place in `~/Development/Tools/Cyclonedx` yourself).
 
 ```sh
 exec zsh                                   # first zsh: ZINIT clones Powerlevel10k and the plugins
-aisync init
+mkdir -p ~/.config/aisync && (umask 077 && op read "op://Private/aisync.age/private key" > ~/.config/aisync/key.txt)
+aisync --use-system-git init rios0rios0    # clones aifiles; a bare `init` makes a new key and an empty repo
 aisync source add guide --source-repo rios0rios0/guide --branch generated
-aisync pull
+aisync pull                                # personal files and the last 14 days of conversations
 claude                                     # /login, then: ccswitch enroll
 codex login                                # browser flow; `codex login --device-auth` prints a code instead
 sentry auth login                          # device code entered at a URL; `--token <API token>` skips OAuth
