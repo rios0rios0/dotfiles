@@ -37,7 +37,8 @@ marketplace="claude-plugins-official"
 marketplace_repo="anthropics/claude-plugins-official"
 
 # ~/.zshenv puts GVM's newest Go and NVM's default Node on PATH, but the first `chezmoi init
-# --apply` runs this from bash, where neither was loaded.
+# --apply` runs this from bash, where neither was loaded. `npm` may already resolve to a system
+# install or Windows' npm through WSL PATH interop, so select NVM's default whenever it exists.
 if ! command -v go >/dev/null 2>&1; then
     go_bin="$(printf '%s\n' "$HOME"/.gvm/gos/go*/bin | sort -V | tail -n 1)"
     if [[ -x "$go_bin/go" ]]; then
@@ -45,30 +46,38 @@ if ! command -v go >/dev/null 2>&1; then
     fi
 fi
 nvm_script="${NVM_DIR:-$HOME/.nvm}/nvm.sh"
-if ! command -v npm >/dev/null 2>&1 && [[ -s "$nvm_script" ]]; then
+if [[ -s "$nvm_script" ]]; then
     # nvm.sh neither survives `set -u` nor promises `set -e`
     set +eu
     # shellcheck source=/dev/null
+    nvm_status=0
     source "$nvm_script"
-    nvm use default >/dev/null 2>&1
+    nvm use default >/dev/null 2>&1 || nvm_status=$?
     set -eu
+    if (( nvm_status != 0 )); then
+        echo "[$prefix] ERROR: could not select NVM's default Node.js; refusing to install with another npm" >&2
+        exit 1
+    fi
 fi
 
 # gopls goes to ~/.local/bin, not GVM's per-version pkgset: ~/.zshenv puts only the newest Go's
 # pkgset on PATH, so a binary installed there would vanish at the next Go upgrade.
 install_gopls() {
-    GOBIN="$HOME/.local/bin" go install "golang.org/x/tools/gopls@$gopls_version"
+    GOBIN="$HOME/.local/bin" go install "golang.org/x/tools/gopls@$gopls_version" || return 1
+    [[ -x "$HOME/.local/bin/gopls" ]]
 }
 
-# npm installs into NVM's default Node, whose global packages `install_nvm` carries to the next
-# LTS. None of these packages has an install script to run.
+# npm installs into the active Node version's tree, so verify each server resolves after selecting
+# NVM's default. None of these packages has an install script to run.
 install_typescript_language_server() {
     npm install -g --ignore-scripts \
-        "typescript-language-server@$typescript_language_server_version" "typescript@$typescript_version"
+        "typescript-language-server@$typescript_language_server_version" "typescript@$typescript_version" || return 1
+    command -v typescript-language-server >/dev/null 2>&1
 }
 
 install_pyright() {
-    npm install -g --ignore-scripts "pyright@$pyright_version"
+    npm install -g --ignore-scripts "pyright@$pyright_version" || return 1
+    command -v pyright-langserver >/dev/null 2>&1
 }
 
 mkdir -p "$HOME/.local/bin"
