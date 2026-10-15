@@ -227,14 +227,14 @@ else
     fail "a failed NVM default selection did not stop the run (status $STATUS): $(cat "$calls")"
 fi
 
-# given a CLAUDE_CONFIG_DIR inherited from a claude-local session
+# given a CLAUDE_CONFIG_DIR inherited from a claude-omni session
 
 # when
-run_case profile CLAUDE_CONFIG_DIR="$TMP/profile/claude-local"
+run_case profile CLAUDE_CONFIG_DIR="$TMP/profile/claude-omni"
 
 # then
 if [[ "$(grep -c '^claude ' "$TMP/profile/calls")" -eq 4 ]] &&
-    ! grep -q -F "CLAUDE_CONFIG_DIR=$TMP/profile/claude-local" "$TMP/profile/calls"; then
+    ! grep -q -F "CLAUDE_CONFIG_DIR=$TMP/profile/claude-omni" "$TMP/profile/calls"; then
     pass "the plugins land in the regular profile, not an inherited CLAUDE_CONFIG_DIR"
 else
     fail "claude ran with the inherited CLAUDE_CONFIG_DIR: $(grep '^claude ' "$TMP/profile/calls")"

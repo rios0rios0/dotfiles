@@ -3,7 +3,7 @@
   Keeps one of two sets of keys in ~/.claude/settings.json, by platform:
 
   - Linux gets Claude Code's look -- theme, renderer and status line -- from
-    lib-claude-look.tmpl, the same keys claude-local's profile gets. A key whose value
+    lib-claude-look.tmpl, the same keys claude-omni's profile gets. A key whose value
     differs is set back, so change the look in that library, not with /theme.
   - Windows and Android get this repository's permission rules, and effortLevel when it
     is missing. Rules already present, including ones added by hand, keep their place;

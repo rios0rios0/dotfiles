@@ -175,60 +175,72 @@ check_platform "windows" --kernel "6.18.33.2-microsoft-standard-WSL2" \
 check_platform "android" --kernel "6.18.33.2-microsoft-standard-WSL2" \
     --ignore-line ".config/systemd"
 
-# The local model for Claude Code (claude-local) ships wherever Linux has an NVIDIA driver, WSL
-# or bare metal, and nowhere else. A machine without the bridge still needs .config/systemd for
-# the Ollama unit.
+# The local model server (Ollama) ships wherever Linux has an NVIDIA driver, WSL or bare metal, and
+# nowhere else. A machine without the bridge still needs .config/systemd for the Ollama unit.
 check_platform "linux" --kernel "6.11.0-generic" --gpu \
     --ignore "ssh-agent-bridge" \
     --include "ollama.service" \
-    --include "claude-local" \
     --include-line ".config/systemd"
 
 check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
     --include "ssh-agent-bridge" \
-    --include "ollama.service" \
-    --include "claude-local" \
-    --include-line ".claude-local"
+    --include "ollama.service"
 
-# The look of claude-local's profile, in ~/.claude-local, ships with claude-local and no further.
 check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" \
-    --ignore "ollama.service" \
-    --ignore ".local/bin/claude-local" \
-    --ignore-line ".claude-local"
+    --ignore "ollama.service"
+
+# claude-omni, its task runner and the look of its profile ship on every Linux machine, GPU or
+# not: OmniRoute reaches a GPU on the tailnet or a cloud provider without one here.
+check_platform "linux" --kernel "6.11.0-generic" \
+    --include "claude-omni" \
+    --include-line ".claude-omni"
+
+check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
+    --include "claude-omni" \
+    --include-line ".claude-omni"
 
 # A Windows machine with an NVIDIA card has nvidia-smi on PATH as well, so the OS check, not the
 # driver, has to keep the Linux unit and launcher off it.
 check_platform "windows" --gpu \
     --ignore "ollama.service" \
-    --ignore ".local/bin/claude-local" \
-    --ignore-line ".claude-local" \
+    --ignore-line ".local/bin/claude-omni" \
+    --ignore-line ".local/bin/claude-omni-task" \
+    --ignore-line ".claude-omni" \
     --ignore-line ".config/systemd"
 
-# Tailscale reaches every Linux machine, GPU or not. claude-remote and claude-local-task drive
-# claude-local, so they ship only where it does. The tailscale wrapper runs Windows' CLI, which is
-# WSL's client, so it ships to WSL alone: on bare metal it would shadow tailscaled's own CLI.
+check_platform "android" \
+    --ignore-line ".local/bin/claude-omni" \
+    --ignore-line ".local/bin/claude-omni-task" \
+    --ignore-line ".claude-omni"
+
+# The OmniRoute stack runs from the dotfiles checkout, where its .env lives; chezmoi deploys none
+# of it, on any platform.
+check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
+    --ignore-line "local-services"
+
+check_platform "windows" \
+    --ignore-line "local-services"
+
+check_platform "android" \
+    --ignore-line "local-services"
+
+# Tailscale reaches every Linux machine, GPU or not. The tailscale wrapper runs Windows' CLI, which
+# is WSL's client, so it ships to WSL alone: on bare metal it would shadow tailscaled's own CLI.
 check_platform "linux" --kernel "6.11.0-generic" \
     --include-line ".local/bin/tailscale-up" \
-    --ignore-line ".local/bin/tailscale" \
-    --ignore-line ".local/bin/claude-remote" \
-    --ignore-line ".local/bin/claude-local-task"
+    --ignore-line ".local/bin/tailscale"
 
 check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
     --include-line ".local/bin/tailscale-up" \
-    --include-line ".local/bin/tailscale" \
-    --include-line ".local/bin/claude-remote" \
-    --include-line ".local/bin/claude-local-task"
+    --include-line ".local/bin/tailscale"
 
 check_platform "windows" --gpu \
     --ignore-line ".local/bin/tailscale-up" \
-    --ignore-line ".local/bin/tailscale" \
-    --ignore-line ".local/bin/claude-remote" \
-    --ignore-line ".local/bin/claude-local-task"
+    --ignore-line ".local/bin/tailscale"
 
 check_platform "android" \
     --ignore-line ".local/bin/tailscale-up" \
-    --ignore-line ".local/bin/tailscale" \
-    --ignore-line ".local/bin/claude-remote"
+    --ignore-line ".local/bin/tailscale"
 
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-chezmoiignore] all platform logic tests passed" >&2

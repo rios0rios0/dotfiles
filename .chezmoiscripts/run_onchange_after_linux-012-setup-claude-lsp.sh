@@ -94,8 +94,8 @@ for entry in "${plugins[@]}"; do
     fi
 done
 
-# A CLAUDE_CONFIG_DIR inherited from a claude-local session would put the plugins in that
-# deliberately lean profile instead of the regular one.
+# A CLAUDE_CONFIG_DIR inherited from a claude-omni session would put the plugins in that
+# deliberately separate profile instead of the regular one.
 unset CLAUDE_CONFIG_DIR
 
 claude="$(command -v claude || true)"

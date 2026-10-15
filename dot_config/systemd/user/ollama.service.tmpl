@@ -1,5 +1,5 @@
 {{- $llm := includeTemplate "lib-local-llm.tmpl" . | fromJson -}}
-# Ollama, the local model server behind `claude-local`.
+# Ollama, the local model server: one of OmniRoute's providers, which `claude-omni` reaches.
 #
 # A user unit, where Ollama's own installer writes a system one: the binary, the models and this
 # file all live under $HOME, so installing and reconfiguring the server needs no root, and its
@@ -7,10 +7,10 @@
 # tracks. run_onchange_after_linux-009-setup-ollama.sh installs the binary behind ExecStart and
 # restarts this unit whenever the rendered file changes.
 #
-# See CLAUDE.md, "Local Model for Claude Code".
+# See CLAUDE.md, "Local Model Server (Ollama)".
 
 [Unit]
-Description=Ollama local model server (claude-local)
+Description=Ollama local model server (an OmniRoute provider)
 Documentation=https://docs.ollama.com/faq
 
 [Service]
@@ -18,11 +18,11 @@ ExecStart=%h/.local/bin/ollama serve
 # Listen on every interface so LAN clients and Tailscale Serve can reach the API.
 # The API has no authentication; restrict access with the machine's network firewall.
 Environment=OLLAMA_HOST=0.0.0.0:11434
-# Must equal CLAUDE_CODE_MAX_CONTEXT_TOKENS in claude-local; both are rendered from one value.
+# Must equal the window claude-omni declares for this GPU; both are rendered from one value.
 Environment=OLLAMA_CONTEXT_LENGTH={{ int $llm.contextTokens }}
 Environment=OLLAMA_KV_CACHE_TYPE={{ $llm.kvCacheType }}
 Environment=OLLAMA_KEEP_ALIVE={{ $llm.keepAlive }}
-# One model in VRAM at a time: claude-local maps every Claude Code tier to the same model, and
+# One model in VRAM at a time: claude-omni maps every Claude Code tier to the same model, and
 # a second one would only evict it on a GPU this size.
 Environment=OLLAMA_MAX_LOADED_MODELS=1
 Restart=on-failure

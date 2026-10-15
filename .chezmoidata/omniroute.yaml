@@ -1,0 +1,76 @@
+# Claude Code through OmniRoute: `claude-omni`, `claude-omni-task` and the status line read these
+# settings through .chezmoitemplates/lib-omniroute.tmpl. See .docs/omniroute-local.md and
+# CLAUDE.md, "Claude Code Through OmniRoute (claude-omni)".
+#
+# chezmoi reads this file on every apply, so an edit reaches the wrapper on the next apply without
+# `chezmoi init`. OmniRoute's own state -- providers, keys, hidden models, window overrides -- lives
+# in its database, not here.
+omniroute:
+  # The gateway. Its API key is the `cred:OMNIROUTE_API_KEY` field of this device's 1Password note,
+  # which the shell exports as OMNIROUTE_API_KEY; it never appears in this repository.
+  baseUrl: 'http://127.0.0.1:20128'
+  # OmniRoute's Ollama providers, by the prefix of their model ids. A GPU model is the `model` of
+  # local-llm.yaml on that provider, and its window is local-llm.yaml's `contextTokens`: what the
+  # server allocates. OmniRoute cannot see that value and advertises its 128000 fallback instead,
+  # which would let Claude Code run past the point where Ollama truncates the prompt.
+  #   machine: 'local'    this machine; claude-omni starts its user unit on demand
+  #   machine: 'tailnet'  another machine on the tailnet; claude-omni finds it the way
+  #                       `claude-remote` did, loads the model, and checks the window it serves
+  gpus:
+    ollama-laptop:
+      machine: 'local'
+      label: 'laptop GPU'
+    ollama:
+      machine: 'tailnet'
+      label: 'desktop GPU'
+  # The models the launch picker and Claude Code's /model offer, in this order. The first one
+  # OmniRoute serves is the default when the profile has no saved choice.
+  #   gpu:     a key of `gpus` above: local-llm.yaml's model on that GPU
+  #   id:      an OmniRoute model id, with `label` naming it in the picker and the status line
+  #   window:  overrides the window OmniRoute reports, but only downward: OmniRoute enforces its
+  #            own, so declaring more trades compaction for a 400
+  #   effort:  Claude Code's effort level for this model (low, medium, high, xhigh)
+  # The NVIDIA NIM entries are the fast ones that answered a tool call in a probe of all 55 NIM chat
+  # models on 2026-10-15; `claude-omni --probe nvidia/` repeats it. Their windows read `128K?`:
+  # OmniRoute reports its fallback for every NIM model.
+  models:
+    - gpu: 'ollama-laptop'
+    - gpu: 'ollama'
+    - id: 'nvidia/z-ai/glm-5.3'
+      label: 'GLM 5.3 · NVIDIA NIM'
+    - id: 'nvidia/nvidia/nemotron-3-super-120b-a12b'
+      label: 'Nemotron 3 Super · NVIDIA NIM'
+    - id: 'nvidia/deepseek-ai/deepseek-v4.1-flash'
+      label: 'DeepSeek V4.1 Flash · NVIDIA NIM'
+    - id: 'nvidia/stepfun-ai/step-5-preview'
+      label: 'Step 5 Preview · NVIDIA NIM'
+    - id: 'openrouter/z-ai/glm-5.3'
+      label: 'GLM 5.3 · OpenRouter'
+    - id: 'openrouter/moonshotai/kimi-k2.7-code'
+      label: 'Kimi K2.7 Code · OpenRouter'
+    - id: 'openrouter/poolside/laguna-s-2.1:free'
+      label: 'Laguna S 2.1 · OpenRouter free'
+    - id: 'auto/coding'
+      label: 'Auto coding · OmniRoute picks'
+  # The window a session on an `auto/*` combo compacts at. OmniRoute advertises the largest window
+  # in the combo's pool (2,000,000) and routes a request to a model that holds it, so this one only
+  # decides how large the conversation may grow before Claude Code summarizes it.
+  autoWindow: 200000
+  # The GPUs a delegated run (`claude-omni-task` without -m) tries, in order: the first one free and
+  # serving takes the run. A cloud model runs only when the caller names it with -m.
+  taskGpus: ['ollama-laptop', 'ollama']
+  # A session on a small window has to fit what Claude Code loads before the first prompt, so up to
+  # `maxWindow` it gets a lean profile (measured in .docs/omniroute-local.md, "The profile"):
+  #   rules  the global rules it keeps; the rest of ~/.claude/rules (~30K tokens) is excluded
+  #   tools  the tools it gets; for a model it does not recognise, Claude Code sends every schema
+  #          with every request (27K tokens) instead of deferring the rarely used ones (5.8K)
+  # Above it, a session gets every rule and every tool.
+  lean:
+    maxWindow: 131072
+    rules: ['code-style', 'git-flow', 'testing']
+    tools: ['Bash', 'Read', 'Edit', 'Write', 'Glob', 'Grep']
+  # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
+  #   devices:
+  #     some-desktop:
+  #       taskGpus: ['ollama']
+  devices: {}
