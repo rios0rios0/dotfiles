@@ -193,17 +193,27 @@ tailscale set "${prefs[@]}" 2>/dev/null || sudo tailscale set "${prefs[@]}"
 {{- if and $llm.enabled $llm.shareOnTailnet }}
 
 # This machine's Ollama, on the tailnet's port 11434: the address claude-remote looks for. Serve
-# keeps the forward in the client's state, so it comes back with the service; it is only set here
-# when it is missing.
-if [[ "$(tailscale serve status --json 2>/dev/null | jq -r '.TCP["11434"].TCPForward // empty' 2>/dev/null)" != "127.0.0.1:11434" ]]; then
+# keeps the forward in the client's state, so it comes back with the service; it is set here when
+# it is missing or forwards anywhere else, as the one an older revision set does.
 {{- if $wsl }}
-    # Windows' own loopback: WSL's localhost forwarding hands each connection on to Ollama here,
-    # and while WSL is stopped nothing answers behind it.
-    tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434 >/dev/null ||
+#
+# Windows' client forwards to Windows' loopback, where WSL's localhost relay hands each connection
+# on to Ollama, and while WSL is stopped nothing answers behind it. The relay listens on the
+# loopback of the family Ollama listens on, and Go makes Ollama's 0.0.0.0 a dual-stack IPv6
+# socket, so that is ::1 alone and 127.0.0.1 refuses every connection. `localhost` names both, and
+# the client tries each; WSL's own address would answer too, but it changes whenever WSL starts.
+target="localhost:11434"
+{{- else }}
+target="127.0.0.1:11434"
+{{- end }}
+
+if [[ "$(tailscale serve status --json 2>/dev/null | jq -r '.TCP["11434"].TCPForward // empty' 2>/dev/null)" != "$target" ]]; then
+{{- if $wsl }}
+    tailscale serve --bg --tcp=11434 "tcp://$target" >/dev/null ||
         stop "could not share Ollama through Windows' Tailscale client"
 {{- else }}
-    tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434 >/dev/null 2>&1 ||
-        sudo tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434 >/dev/null
+    tailscale serve --bg --tcp=11434 "tcp://$target" >/dev/null 2>&1 ||
+        sudo tailscale serve --bg --tcp=11434 "tcp://$target" >/dev/null
 {{- end }}
     echo "[$prefix] sharing Ollama with the tailnet on port 11434" >&2
 fi

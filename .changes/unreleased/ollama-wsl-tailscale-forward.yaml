@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed the tailnet share of a WSL machine''s Ollama dropping every connection since Ollama began listening on every interface: Go opens that as a dual-stack IPv6 socket, which WSL relays to Windows'' `::1` alone, so Windows'' Tailscale Serve now forwards to `localhost` instead of `127.0.0.1`, and the next `chezmoi apply` moves an existing share'
+time: '2026-10-15T19:12:49Z'
