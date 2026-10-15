@@ -7,7 +7,7 @@
     differs is set back, so change the look in that library, not with /theme.
   - Windows and Android get this repository's permission rules, and effortLevel when it
     is missing. Rules already present, including ones added by hand, keep their place;
-    missing ones are appended in the order below.
+    missing ones are appended in the order below, and retired ones are taken out.
 
   Neither crosses over: Linux never had the rules, and the look's status line forks bash
   and jq on every redraw, which on Termux counts against Android's phantom-process budget
@@ -41,7 +41,12 @@
         "Bash(git:*)" "Bash(chezmoi:*)" "Bash(ls:*)" "Bash(cat:*)" "Bash(head:*)"
         "Bash(tail:*)" "Bash(find:*)" "Bash(grep:*)" "Bash(rg:*)" "Bash(gh:*)"
         "Bash(test:*)" "Bash(echo:*)" "Bash(chmod:*)" "Bash(mkdir:*)" "Bash(cp:*)"
-        "Bash(mv:*)" "Read" "Edit" "Write" "Glob" "Grep" "WebSearch" "mcp__github__*" -}}
+        "Bash(mv:*)" "Read" "Edit" "Write" "Glob" "Grep" "WebSearch" -}}
+{{- /* Rules this repository used to append and has retired, taken out wherever they are
+       still found, since the append never removes anything. mcp__github__* granted the
+       GitHub MCP server's tools; the server was retired on 2026-10-14 (see "MCP Servers" in
+       CLAUDE.md), and the rule would otherwise pre-approve any later server of that name. */ -}}
+{{-   $retiredRules := list "mcp__github__*" -}}
 {{-   if not (hasKey $settings "effortLevel") -}}
 {{-     $_ := set $settings "effortLevel" "high" -}}
 {{-     $changed = true -}}
@@ -51,8 +56,15 @@
 {{-     $permissions = get $settings "permissions" -}}
 {{-   end -}}
 {{-   $allow := list -}}
+{{-   $retiredFound := list -}}
 {{-   if kindIs "slice" (get $permissions "allow") -}}
-{{-     $allow = get $permissions "allow" -}}
+{{-     range get $permissions "allow" -}}
+{{-       if has . $retiredRules -}}
+{{-         $retiredFound = append $retiredFound . -}}
+{{-       else -}}
+{{-         $allow = append $allow . -}}
+{{-       end -}}
+{{-     end -}}
 {{-   end -}}
 {{-   $missing := list -}}
 {{-   range $rules -}}
@@ -60,13 +72,13 @@
 {{-       $missing = append $missing . -}}
 {{-     end -}}
 {{-   end -}}
-{{-   if $missing -}}
+{{-   if or $missing $retiredFound -}}
 {{-     $_ := set $permissions "allow" (concat $allow $missing) -}}
 {{-     $_ := set $settings "permissions" $permissions -}}
 {{-     $changed = true -}}
 {{-   end -}}
 {{-   if $changed -}}
-{{-     warnf "[claude-settings] updated ~/.claude/settings.json (%d permission rules added)" (len $missing) -}}
+{{-     warnf "[claude-settings] updated ~/.claude/settings.json (%d permission rules added, %d retired)" (len $missing) (len $retiredFound) -}}
 {{-   end -}}
 {{- end -}}
 {{- if $changed -}}

@@ -77,7 +77,7 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 | Shell      | Zsh + Oh My Zsh + p10k       | PowerShell + Oh My Posh | Zsh + Oh My Zsh + p10k           |
 | Scripts    | `.sh`                        | `.ps1`                  | `.sh`                            |
 | Docker     | Native                       | N/A                     | `termux-etc-seccomp` wrapper     |
-| MCP config | `modify_dot_claude.json` (Docker-based) | `modify_dot_claude.json` (Docker-based) | `dot_config/mcphub/` (npx-based) |
+| MCP config | `modify_dot_claude.json` (Context7 over HTTP, Chrome DevTools through npx) | `modify_dot_claude.json` (Context7 over HTTP) | `modify_dot_claude.json` and `dot_config/mcphub/` (Context7 over HTTP) |
 | 1Password  | Native `op` CLI              | Native `op` CLI         | `termux-etc-seccomp` wrapper at `.local/bin/op` |
 
 ## Key Files
@@ -209,7 +209,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`, `codex-config`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`, `codex-config`, `chrome`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -259,6 +259,85 @@ and Codex Look").
 
 `make test-modify-scripts` runs each one through `chezmoi cat` in a sandbox, and fails when
 any `modify_` file that chezmoi resolves for Windows is not a modify-template.
+
+## MCP Servers
+
+`.chezmoitemplates/lib-modify-mcp-servers.tmpl` declares the user-scope MCP servers once, and
+`modify_dot_claude.json` and mcp-hub's `dot_config/mcphub/modify_servers.json` merge them in.
+They come in groups, and `$groupsByOs` names the groups each platform gets:
+
+| Group | Servers | Linux | Windows | Android |
+|-------|---------|-------|---------|---------|
+| `remote` | `context7` (HTTP) | yes | yes | yes |
+| `browser` | `chrome-devtools` (npx) | yes | | |
+
+**Keep these:**
+
+1. **A placeholder is a bare `${NAME}`.** Claude Code also expands `${NAME:-default}`, but
+   mcp-hub reads the same list and looks that form up as a variable named `NAME:-default`, which
+   in its default strict mode keeps the server from starting even when `NAME` is set. An unset
+   `${NAME}` reaches the server as literal text, and `claude mcp list` reports `Missing
+   environment variables`. For Context7 that means `Invalid API key` on every call until the
+   `cred:CONTEXT7_API_KEY` field exists -- never a silent fall back to the anonymous tier, which
+   is where Upstash appended instructions to install its CLI to query results in May 2026
+   (upstash/context7#2663).
+2. **No placeholder on a command line.** A value in `command` or `args` is readable by any local
+   user in `/proc/<pid>/cmdline`, so tokens go in `env` (stdio) or `headers` (HTTP), which Claude
+   Code fills in itself. Context7's README puts its key in `--api-key`; its local server reads
+   `CONTEXT7_API_KEY` from the environment too.
+3. **Prefer a vendor's remote server.** It starts no process -- a stdio server is spawned per
+   Claude Code session, and on Termux each one counts against the phantom-process budget -- and
+   runs no npm code on the machine. Context7's local server sends the same queries to the same
+   backend, so it would buy no privacy.
+4. **An npx server is pinned when its releases carry provenance.** `chrome-devtools-mcp` is
+   published from GitHub Actions with SLSA provenance and bundles every dependency, so a pinned
+   version is one attested tarball, while `@latest` runs whatever was published last at each
+   session start. Bump the pin by hand; the next apply prints `[mcp-servers] set chrome-devtools`.
+5. **Chrome DevTools runs a throwaway, headless browser.** Each flag answers a failure or a leak:
+
+   | Flag | Why |
+   |------|-----|
+   | `--isolated` | A temporary profile per session. The default profile admits one browser, so a second concurrent session would fail, and logins would carry across projects |
+   | `--headless` | No display needed, so tmux, SSH and the tailnet work as a WSLg desktop does |
+   | `--executable-path /opt/google/chrome/chrome` | Google's package, from `run_onchange_after_linux-011-setup-chrome.sh`. Left to search, Puppeteer on WSL goes on to Windows' Chrome through `cmd.exe` and cannot drive it |
+   | `--redact-network-headers` | Every header outside DevTools' allowlist reads `<redacted>` -- `Authorization` and cookies, but custom `X-` headers too -- so the app's credentials stay out of the transcript. Response bodies are not redacted |
+   | `--no-usage-statistics`, `--no-performance-crux`, `CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS` | Its three calls home: usage statistics to Google (on by default), page URLs to the CrUX API, and a daily npm check that a pin turns into noise |
+
+   It is Linux only: native Windows has no Chrome here, and Termux has no supported one. It drives
+   Google's package rather than Kali's `chromium`, which trailed the stable channel by five
+   releases when this was written -- this is the browser Claude points at pages nobody vetted.
+6. **Removing a server is explicit.** The merge never touches a server it does not manage, so a
+   server deleted from its group would stay in every existing file. Its name goes into
+   `$retiredByOs` for the platforms it was set on, and the next apply deletes it, printing
+   `[mcp-servers] removed …`. Any entry under that name on those platforms was overwritten on
+   every apply, so it is the repository's to delete; the same name elsewhere belongs to the user
+   and stays. `github`, `azure-devops`, `sonarqube` and `kubernetes` were retired this way on
+   2026-10-14 in favour of their CLIs, and `dot_claude/modify_settings.json` retires the
+   `mcp__github__*` rule that pre-approved the first one's tools on Windows and Android.
+
+To watch the browser or read the redacted headers in one project, add a server of the same name
+at local scope there, keeping the rest of the flags:
+`claude mcp add --scope local chrome-devtools -- npx -y chrome-devtools-mcp@1.10.1 --executable-path /opt/google/chrome/chrome --isolated --no-usage-statistics --no-performance-crux`.
+Local scope replaces the user-scope entry whole, and it lives under the project's key in
+`~/.claude.json`, which the merge never writes. `/mcp` switches a server off per project, a
+choice Claude Code also keeps there, so an apply leaves it alone.
+
+**Evaluated and left out** (2026-10-14), so that neither comes back without a new reason:
+
+- **DBHub** (`@bytebase/dbhub`). Databases are per project, so a user-scope server fails at
+  startup in every other session -- or, finding a DSN in the project's `.env`, connects
+  read-write. Its read-only mode is a keyword filter over a per-transaction read-only mode, and it
+  had three CVEs in 2026, two of them read-only bypasses. Let Claude use the database's own CLI as
+  a read-only role, or commit a pinned server to that project's `.mcp.json`.
+- **Serena** (`oraios/serena`). 2.0.0 defaults to an unsandboxed Python REPL that a repository's
+  own `project.yml` can select, four code-execution fixes landed in four months (one still
+  unreleased), it reports usage home at every start, and it writes `.serena/` into each
+  repository; its language-server setup raises `Unknown platform` on Termux. Claude Code's LSP
+  plugins (`gopls-lsp`, `pyright-lsp`, `typescript-lsp`, `jdtls-lsp`) cover the navigation it
+  offers.
+
+`make test-modify-scripts` covers what each platform gets, that mcp-hub receives the same list,
+invariants 1 and 2 across every platform, and the retirements in 6.
 
 ## Shared Install Library
 
