@@ -205,24 +205,29 @@ check_platform "windows" --gpu \
     --ignore-line ".config/systemd"
 
 # Tailscale reaches every Linux machine, GPU or not. claude-remote and claude-local-task drive
-# claude-local, so they ship only where it does.
+# claude-local, so they ship only where it does. The tailscale wrapper runs Windows' CLI, which is
+# WSL's client, so it ships to WSL alone: on bare metal it would shadow tailscaled's own CLI.
 check_platform "linux" --kernel "6.11.0-generic" \
     --include-line ".local/bin/tailscale-up" \
+    --ignore-line ".local/bin/tailscale" \
     --ignore-line ".local/bin/claude-remote" \
     --ignore-line ".local/bin/claude-local-task"
 
 check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
     --include-line ".local/bin/tailscale-up" \
+    --include-line ".local/bin/tailscale" \
     --include-line ".local/bin/claude-remote" \
     --include-line ".local/bin/claude-local-task"
 
 check_platform "windows" --gpu \
     --ignore-line ".local/bin/tailscale-up" \
+    --ignore-line ".local/bin/tailscale" \
     --ignore-line ".local/bin/claude-remote" \
     --ignore-line ".local/bin/claude-local-task"
 
 check_platform "android" \
     --ignore-line ".local/bin/tailscale-up" \
+    --ignore-line ".local/bin/tailscale" \
     --ignore-line ".local/bin/claude-remote"
 
 if [ "$EXIT_CODE" -eq 0 ]; then

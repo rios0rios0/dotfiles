@@ -130,13 +130,16 @@ CLAUDE_REMOTE_HOST=desktop claude-remote       # a machine named explicitly
 
 How the two machines meet:
 
-1. Both run Tailscale (see "Tailscale" in [CLAUDE.md](../CLAUDE.md)): `chezmoi update` installs it
-   and waits for the login, and every interactive zsh keeps the machine on the tailnet.
+1. Both are on the tailnet (see "Tailscale" in [CLAUDE.md](../CLAUDE.md)). A WSL machine is on it
+   through Windows' Tailscale client, logged in once with its app; WSL reaches that client's CLI
+   through the `tailscale` wrapper. A bare-metal machine runs `tailscaled`, which `chezmoi update`
+   installs and logs in.
 2. A machine with the local model shares its server on the tailnet's port 11434, unless
    `shareOnTailnet` in `.chezmoidata/local-llm.yaml` says otherwise. It is `tailscale serve`, so
-   Ollama itself stays on loopback and nothing reaches it from outside the tailnet. The API has
-   no authentication, so the tailnet is the whole boundary: every device on it can use, pull and
-   delete models.
+   Ollama itself stays on loopback and nothing reaches it from outside the tailnet; on WSL,
+   Windows' client forwards to Windows' loopback, which WSL hands on to Ollama; run `tailscale-up`
+   in WSL once Windows is logged in. The API has no authentication, so the tailnet is the whole
+   boundary: every device on it can use, pull and delete models.
 3. `claude-remote` picks the first online machine that answers there, or the one
    `CLAUDE_REMOTE_HOST` names.
 
@@ -150,7 +153,9 @@ Before handing over, it loads the model on that machine and reads back how the s
 
 **A WSL machine serves only while its WSL runs**, and Windows stops WSL a few seconds after the
 last WSL terminal closes. To use a desktop's GPU from the laptop, open a WSL terminal on the
-desktop (RustDesk will do) and leave it open: Tailscale and Ollama start with it.
+desktop (RustDesk will do) and leave it open: Ollama starts with it. The desktop stays on the
+tailnet meanwhile, because the client is Windows'; `tailscale set --unattended=true` there keeps
+it on after its user signs out, and before the first sign-in after a reboot.
 
 The other machine's GPU has the same 24 GB as this one, so it runs the same model, not a bigger
 one: it is a second worker, useful while this GPU is busy, on battery, or already serving a run.
@@ -193,4 +198,5 @@ Measured on this machine: a two-file Go change with tests, 6 turns, 46 seconds.
 - [Claude Code: environment variables](https://code.claude.com/docs/en/env-vars)
 - [Claude Code: model configuration](https://code.claude.com/docs/en/model-config)
 - [Tailscale: `tailscale serve`](https://tailscale.com/docs/reference/tailscale-cli/serve)
+- [Tailscale: Windows with WSL 2](https://tailscale.com/kb/1295/install-windows-wsl2)
 - [Tailscale: why resolv.conf gets overwritten](https://tailscale.com/docs/reference/faq/dns-resolv-conf)

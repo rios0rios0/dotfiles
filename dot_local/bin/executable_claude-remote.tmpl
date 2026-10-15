@@ -42,14 +42,15 @@ done
 
 if [[ -n "${CLAUDE_REMOTE_HOST:-}" ]]; then
     name="$CLAUDE_REMOTE_HOST"
-    # A tailnet machine name resolves without MagicDNS, which tailscale-up leaves off; anything
-    # else is taken as an address or a name the system resolves.
+    # `tailscale ip -4` resolves a tailnet machine name whether or not MagicDNS is on (bare metal
+    # leaves it off); anything else is taken as an address or a name the system resolves.
     address="$(tailscale ip -4 "$name" 2>/dev/null | head -1 || true)"
     address="${address:-$name}"
     answers "$address" || die "no Ollama server answers on $name:$port"
 else
     command -v tailscale >/dev/null 2>&1 || die "tailscale is not installed; run 'chezmoi apply'"
-    status="$(tailscale status --json 2>/dev/null)" || die "tailscaled is not running; run 'tailscale-up'"
+    # On WSL, `tailscale` is the wrapper for Windows' client; tailscale-up says which part is missing.
+    status="$(tailscale status --json 2>/dev/null)" || die "Tailscale is not running; run 'tailscale-up'"
     [[ "$(jq -r '.BackendState' <<<"$status")" == "Running" ]] ||
         die "this machine is not on the tailnet; run 'tailscale-up'"
     address=""

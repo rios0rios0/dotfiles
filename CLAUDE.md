@@ -28,7 +28,7 @@ make test-shell-credentials         # 1Password credential/workspace loading and
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
 make test-local-llm                 # claude-local, claude-remote and claude-local-task: one context window, the launchers, the audit, the capacity hint
-make test-tailscale                 # tailscale-up: the quiet pass every zsh runs, the login, sharing the model's server
+make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
 ```
@@ -787,25 +787,75 @@ The same guard asks `ccswitch capacity` (no network) whether any enrolled accoun
 
 ## Tailscale
 
-Every Linux machine (WSL or bare metal) joins the tailnet. Three files carry it:
+Every Linux machine joins the tailnet, through one client per machine: on WSL that client is
+Windows', on bare metal `tailscaled`. `dot_local/bin/executable_tailscale-up.tmpl` and the
+installer render one way or the other from the kernel, as `.chezmoiignore` does.
 
-| Part | Where |
-|------|-------|
-| Install from Tailscale's apt repository, enable `tailscaled`, log in | `.chezmoiscripts/run_onchange_after_linux-010-setup-tailscale.sh.tmpl` |
-| Login, preferences, sharing the model's server; the quiet pass every shell runs | `dot_local/bin/executable_tailscale-up.tmpl` (`tailscale-up`, `tailscale-up --no-login`) |
-| The shell hook | `dot_zshrc.tmpl`, "Tailscale" |
+| Part | WSL | Bare metal |
+|------|-----|------------|
+| Client | Windows', `Tailscale.Tailscale` in `run_once_before_windows-001-install-dependencies.ps1` | `tailscaled`, from Tailscale's apt repository |
+| `tailscale` in a shell | `dot_local/bin/executable_tailscale`, a wrapper for `tailscale.exe` | the package's |
+| Login | the Tailscale app on Windows | `tailscale-up`, which waits for the browser |
+| Sharing the model's server | `tailscale-up`, through Windows' `tailscale serve` | `tailscale-up`, through `tailscale serve` |
+| `.chezmoiscripts/run_onchange_after_linux-010-setup-tailscale.sh.tmpl` | runs `tailscale-up --no-login`, nothing else | installs, enables `tailscaled`, logs in |
+| Shell hook (`dot_zshrc.tmpl`, "Tailscale") | none | `tailscale-up --no-login` in every interactive zsh |
 
 **Keep these:**
 
-1. **The shell's pass never waits and never asks for a password.** It runs in every interactive zsh, so a logged-out machine gets a one-line hint pointing at `tailscale-up`, not a login that blocks the prompt, and a failed daemon gets a hint, not `sudo systemctl`. A daemon that is enabled and not failed is still starting -- WSL boots with the first terminal -- and gets nothing at all.
-2. **The operator is set once, through sudo, at the first login.** `--operator=$USER` is what lets the shell's pass bring a node back up, and `tailscale serve` run, without root.
-3. **The shell's pass uses a bare `tailscale up`.** Only the bare form is the "just switch it back on" special case; any flag, even `--timeout`, makes `tailscale up` re-check every non-default preference and fail with `requires mentioning all non-default flags`. The direct call spells out both preferences for the same reason, and `tailscale set` re-applies them to a node logged in some other way without touching the rest.
-4. **MagicDNS stays off (`--accept-dns=false`).** WSL writes `/etc/resolv.conf` itself and runs no DNS manager, so tailscaled would replace the file, and every lookup would fail while tailscaled is down. Peers are reached by address: `tailscale ip -4 <name>`, or `tailscale status --json`, as `claude-remote` does.
-5. **The repository key is checked before apt trusts it:** exactly one key, with Tailscale's fingerprint. A keyring carrying a second key would make apt trust that one too. Upstream's `install.sh` maps every Kali release since 2021 to the Debian bullseye suite; the package is the same static build for every release.
-6. **The installer tracks `tailscale-up`'s rendered digest**, so switching `shareOnTailnet` or the local model on or off re-runs it, and the share follows.
-7. **A WSL machine serves only while its WSL runs.** Windows stops WSL a few seconds after the last WSL terminal closes, and `tailscaled` and the Ollama unit with it. Nothing here keeps it running, by choice: whoever wants the desktop's GPU opens a terminal there (RustDesk) and leaves it open.
+1. **On WSL the client is Windows', and nothing runs one inside WSL.** Tailscale's WSL guide says
+   that with clients in both, WSL's traffic through the Windows one fails, because of "Tailscale
+   packets not being able to fit in Tailscale packets". Windows' client also reaches what one in
+   WSL cannot: Windows' own services, and Docker Desktop's containers, whose traffic leaves
+   through Windows -- with the client in WSL, a container timed out on this machine's own tailnet
+   address, because Windows had no route into the tailnet. The Linux removal script drops the
+   Linux client from WSL machines that had it (an `apt` tombstone, which needs passwordless sudo),
+   and `tailscale-up` warns while a `tailscaled` still runs there.
+2. **Nothing on WSL waits for a login, needs root or runs per shell.** Windows' client is a service
+   that starts with Windows and rejoins by itself, and its app owns the login. Asking it from
+   every shell would launch a Windows process each time (130-330 ms measured), so WSL has no
+   hook: the apply runs `tailscale-up --no-login`, which shares the model's server once Windows is
+   on the tailnet and otherwise only hints. It leaves a client switched off in the app as it is;
+   `tailscale-up` asked directly switches it back on with a bare `tailscale up`.
+3. **WSL's share is Windows' `tailscale serve`, to Windows' own `127.0.0.1:11434`**, which WSL's
+   localhost forwarding hands to Ollama, still bound to loopback. The wrapper's path is fixed, as
+   `op-ssh-sign-wsl`'s is in `dot_gitconfig.tmpl`; `TAILSCALE_EXE` names another.
+4. **Bare metal: the shell's pass never waits and never asks for a password.** It runs in every
+   interactive zsh, so a logged-out machine gets a one-line hint pointing at `tailscale-up`, not a
+   login that blocks the prompt, and a failed daemon gets a hint, not `sudo systemctl`. A daemon
+   that is enabled and not failed is still starting, and gets nothing at all.
+5. **Bare metal: the operator is set once, through sudo, at the first login.** `--operator=$USER`
+   is what lets the shell's pass bring a node back up, and `tailscale serve` run, without root.
+6. **Bare metal: the shell's pass uses a bare `tailscale up`.** Only the bare form is the "just
+   switch it back on" special case; any flag, even `--timeout`, makes `tailscale up` re-check every
+   non-default preference and fail with `requires mentioning all non-default flags`. The direct
+   call spells out both preferences for the same reason, and `tailscale set` re-applies them to a
+   node logged in some other way without touching the rest.
+7. **Bare metal: MagicDNS stays off (`--accept-dns=false`).** Without a DNS manager, tailscaled
+   replaces `/etc/resolv.conf`, and every lookup fails while it is down. Peers are reached by
+   address: `tailscale ip -4 <name>`, or `tailscale status --json`, as `claude-remote` does. WSL
+   can leave MagicDNS on: it resolves through Windows (DNS tunneling, `nameserver
+   10.255.255.254`), whose client answers tailnet names without touching `/etc/resolv.conf`.
+8. **Bare metal: the repository key is checked before apt trusts it:** exactly one key, with
+   Tailscale's fingerprint. A keyring carrying a second key would make apt trust that one too.
+   Upstream's `install.sh` maps every Kali release since 2021 to the Debian bullseye suite; the
+   package is the same static build for every release.
+9. **The installer tracks `tailscale-up`'s rendered digest**, so switching `shareOnTailnet` or the
+   local model on or off re-runs it, and the share follows.
+10. **A WSL machine serves only while its WSL runs.** Windows stops WSL a few seconds after the
+    last WSL terminal closes, and the Ollama unit with it; Windows' share then forwards to a port
+    nothing listens on. Nothing here keeps WSL running, by choice: whoever wants the desktop's GPU
+    opens a terminal there (RustDesk) and leaves it open. Windows' client keeps the machine on the
+    tailnet meanwhile, and `tailscale set --unattended=true` keeps it there after its user signs
+    out and before the first sign-in after a reboot.
 
-`make test-tailscale` covers 1 to 3 and 6 against a stubbed `tailscale`, `systemctl` and `sudo`, and `make test-chezmoiignore` the gate.
+What the Linux client leaves behind on WSL is root's, so no tombstone reaches it:
+`sudo apt-get purge -y tailscale` also removes `/var/lib/tailscale`, and
+`sudo rm -f /etc/apt/sources.list.d/tailscale.list /usr/share/keyrings/tailscale-archive-keyring.gpg`
+drops the repository. Delete that machine in the admin console too, so that Windows' node can
+take its name.
+
+`make test-tailscale` covers 1 to 6 and 9 against stubs of both clients, `systemctl` and `sudo`,
+and the removal on WSL alone; `make test-chezmoiignore` covers the gates.
 
 ## Claude Code Voice Input (WSL)
 

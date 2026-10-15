@@ -38,7 +38,8 @@ localLLM:
   keepAlive: '15m'
   # Share this machine's server with the other machines on the tailnet, so that their
   # `claude-remote` can use this GPU: tailscale-up forwards the tailnet's port 11434 to it
-  # (`tailscale serve`, never Funnel). The tailnet is the only boundary -- Ollama's API has no
+  # (`tailscale serve`, never Funnel; on WSL, Windows' client forwards to Windows' loopback, which
+  # WSL hands on to Ollama). The tailnet is the only boundary -- Ollama's API has no
   # authentication, so every device on it can run, pull and delete models here.
   shareOnTailnet: true
   # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.

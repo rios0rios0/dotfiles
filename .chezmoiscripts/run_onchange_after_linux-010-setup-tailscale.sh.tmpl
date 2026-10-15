@@ -1,12 +1,9 @@
+{{- $wsl := and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
 #!/bin/bash
 
-# Installs Tailscale from its apt repository, enables tailscaled, and logs this machine in.
-#
-# The login is the one step that needs a person. When the apply runs in a terminal, tailscale-up
-# prints the login URL and waits until it is used; otherwise the login waits for the next
-# `tailscale-up`, which every interactive zsh points at until it happens. From then on the node
-# rejoins by itself, because tailscaled starts with systemd, and each new zsh brings it back up
-# after a `tailscale down`.
+# Puts this machine on the tailnet: on bare metal, installs Tailscale from its apt repository,
+# enables tailscaled and logs the machine in; on WSL, where Windows runs the machine's client,
+# installs nothing and only has tailscale-up share what this machine shares.
 #
 # `run_onchange_` rather than `run_once_`, so that it reaches machines that predate it, and so that
 # it runs again when tailscale-up changes, since that is where what this machine shares on the
@@ -16,6 +13,20 @@
 # See CLAUDE.md, "Tailscale".
 
 set -euo pipefail
+{{- if $wsl }}
+
+# Windows' client is this machine's, and its app owns the login, so the apply never waits for it:
+# --no-login shares the model's server once Windows is on the tailnet, and otherwise only says
+# what is missing. The Linux client an older revision installed here is removed by
+# run_onchange_after_linux-006-remove-dependencies, which runs before this.
+"$HOME/.local/bin/tailscale-up" --no-login
+{{- else }}
+
+# The login is the one step that needs a person. When the apply runs in a terminal, tailscale-up
+# prints the login URL and waits until it is used; otherwise the login waits for the next
+# `tailscale-up`, which every interactive zsh points at until it happens. From then on the node
+# rejoins by itself, because tailscaled starts with systemd, and each new zsh brings it back up
+# after a `tailscale down`.
 
 prefix="tailscale"
 
@@ -34,7 +45,7 @@ if ! command -v apt-get >/dev/null 2>&1; then
 fi
 
 if [[ ! -d /run/systemd/system ]]; then
-    echo "[$prefix] WARN: systemd is not running, so tailscaled cannot run as a service; on WSL, set systemd=true under [boot] in /etc/wsl.conf and restart WSL" >&2
+    echo "[$prefix] WARN: systemd is not running, so tailscaled cannot run as a service" >&2
     exit 0
 fi
 
@@ -74,3 +85,4 @@ if [[ -t 0 ]]; then
 else
     echo "[$prefix] WARN: not run from a terminal, so the login is left for later: run 'tailscale-up'" >&2
 fi
+{{- end }}

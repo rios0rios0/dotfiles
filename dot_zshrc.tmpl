@@ -518,14 +518,19 @@ if command -v ccswitch >/dev/null 2>&1; then
         command claude "$@"
     }
 fi
+{{- /* On WSL the tailnet client is Windows', a service that rejoins by itself and whose app owns
+     the login, so a shell has nothing to do there, and asking it would cost a Windows process
+     launch in every shell. See CLAUDE.md, "Tailscale". */ -}}
+{{- if not (contains "microsoft" (.chezmoi.kernel | toString)) }}
 
 ###### Tailscale ###################################################################
-# Join the tailnet with every interactive shell. tailscaled starts with the machine (for WSL,
-# with the first terminal) and a logged-in node rejoins by itself, so this stays silent unless
-# something needs attention: it brings the node back up after a `tailscale down`, and points at
-# `tailscale-up` while the machine is logged out. It never waits and never asks for a password.
+# Join the tailnet with every interactive shell. tailscaled starts with the machine and a
+# logged-in node rejoins by itself, so this stays silent unless something needs attention: it
+# brings the node back up after a `tailscale down`, and points at `tailscale-up` while the
+# machine is logged out. It never waits and never asks for a password.
 if [[ -o interactive ]] && command -v tailscale-up >/dev/null 2>&1; then
     tailscale-up --no-login
 fi
+{{- end }}
 {{- end }}
 
