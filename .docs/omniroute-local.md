@@ -33,6 +33,22 @@ Open `http://127.0.0.1:20128`. The initial dashboard setup may ask for a bootstr
 
 The Compose file uses a pinned OmniRoute `v3.8.51` `linux/amd64` image digest. Both services use `restart: always`, so Docker starts them automatically when its daemon starts. All published ports bind to `127.0.0.1`; Redis has no host-published port. `docker compose down` preserves the named data volumes. `docker compose down -v` deletes the database, Redis data, and configured provider credentials.
 
+## Connect to Ollama running in WSL
+
+OmniRoute runs in a Docker container while Ollama runs directly in WSL. In OmniRoute's **Providers**
+page, add the Ollama provider with this OpenAI-compatible base URL:
+
+```text
+http://host.docker.internal:11434/v1
+```
+
+Docker Desktop provides `host.docker.internal` for containers to reach Windows, and WSL forwards
+localhost ports to Windows. The Compose file leaves that built-in hostname intact. With this
+setup, OmniRoute can reach Ollama at `host.docker.internal:11434` while Ollama remains bound to
+loopback inside WSL. Do not add a `host-gateway` mapping here: with Docker Desktop it would point
+at the Docker VM's bridge rather than the Windows host. The Ollama API has no authentication, and
+its existing Tailscale Serve configuration remains the path for tailnet access.
+
 ### Fix Redis snapshot permission errors
 
 If Redis logs `Failed opening the temp RDB file ... /data ... Permission denied`, recreate Redis after updating the Compose file. Do not override Redis capabilities in Compose: the image needs `CHOWN`, `SETUID` and `SETGID` to repair the data volume ownership, then drop to its unprivileged user before starting the server.
