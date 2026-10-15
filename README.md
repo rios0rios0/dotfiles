@@ -255,7 +255,7 @@ On Linux with an NVIDIA driver, `chezmoi apply` installs Ollama as a user servic
 
 ## Multi-Provider Routing with OmniRoute
 
-The optional [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway for Claude Code with providers such as NVIDIA NIM, OpenRouter and Baseten. Its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes.
+The optional [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway for Claude Code with providers such as NVIDIA NIM, OpenRouter, Baseten and WSL-hosted Ollama. Its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes.
 
 ## Tailscale
 

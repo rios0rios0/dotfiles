@@ -5,7 +5,7 @@
     {"id": "username", "label": "ssh username", "value": "testuser"},
     {"id": "email", "label": "ssh email", "value": "test@example.com"},
     {"id": "public_key", "label": "public key", "value": "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAITestPublicKeyStubForCITesting test@example.com"},
-    {"id": "private_key", "label": "private key", "value": "-----BEGIN OPENSSH PRIVATE KEY-----\nstub-private-key-for-ci-testing\n-----END OPENSSH PRIVATE KEY-----"},
+    {"id": "private_key", "label": "private key", "value": "stub-private-key-for-ci-testing"},
     {"id": "host", "label": "host", "value": "github.com"},
     {"id": "hostname", "label": "hostname", "value": "github.com"},
     {"id": "user", "label": "user", "value": "git"},
