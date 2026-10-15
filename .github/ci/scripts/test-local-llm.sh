@@ -149,8 +149,13 @@ fi
 
 # --- launcher ----------------------------------------------------------------------------------
 
-render gpu "$LAUNCHER" > "$TMP/claude-local"
-chmod +x "$TMP/claude-local"
+# Whether systemd runs is read from /run/systemd/system, so the launcher is rendered with that path
+# pointing at a directory that exists, and once more at one that does not: the host running this
+# suite, with systemd or without, never decides a result.
+mkdir -p "$TMP/systemd"
+render gpu "$LAUNCHER" | sed "s|/run/systemd/system|$TMP/systemd|g" > "$TMP/claude-local"
+render gpu "$LAUNCHER" | sed "s|/run/systemd/system|$TMP/no-systemd|g" > "$TMP/claude-local-nosystemd"
+chmod +x "$TMP/claude-local" "$TMP/claude-local-nosystemd"
 
 # Stubs: ollama records the arguments and environment it was handed; curl answers once the
 # "server" is up; systemctl starting the unit brings it up unless told it never will; sleep is
@@ -244,10 +249,24 @@ touch "$TMP/server-never-up"
 # when
 if output="$(run_launcher "$TMP/claude-local" -p hi 2>&1)"; then status=0; else status=$?; fi
 # then
-if [[ "$status" -ne 0 && "$output" == *"no Ollama server answers"* && ! -e "$TMP/ollama.args" ]]; then
+if [[ "$status" -ne 0 && "$output" == *"no Ollama server answers"* && "$output" == *"systemctl --user status ollama"* &&
+    ! -e "$TMP/ollama.args" ]]; then
     pass "claude-local stops when no server answers"
 else
     fail "claude-local with no server: status=$status output=$output"
+fi
+
+# given a machine where systemd is not running, as on WSL before /etc/wsl.conf turns it on
+reset_stubs
+touch "$TMP/server-never-up"
+# when
+if output="$(run_launcher "$TMP/claude-local-nosystemd" -p hi 2>&1)"; then status=0; else status=$?; fi
+# then: it says what is missing, rather than pointing at a systemctl that fails the same way
+if [[ "$status" -ne 0 && "$output" == *"systemd, which runs it, is not running"* && "$output" == *"chezmoi apply"* &&
+    "$output" != *"systemctl --user status"* && ! -e "$TMP/ollama.args" ]]; then
+    pass "claude-local says systemd is not running instead of pointing at systemctl"
+else
+    fail "claude-local without systemd: status=$status output=$output"
 fi
 
 # given a remote server that is down

@@ -17,6 +17,11 @@
 # that is not there yet:
 #   unit {{ includeTemplate "dot_config/systemd/user/ollama.service.tmpl" . | sha256sum }}
 #
+# Without systemd it stops early and exits 0, which chezmoi records as done, so the line below
+# carries whether systemd was running: it changes when systemd starts, and the first apply after
+# that runs this again (see CLAUDE.md, "systemd on WSL"):
+#   systemd {{ if stat "/run/systemd/system" }}running{{ else }}not running{{ end }}
+#
 # Rendered only on Linux with an NVIDIA driver, and empty otherwise, which chezmoi never runs
 # (see lib-local-llm.tmpl). See CLAUDE.md, "Local Model for Claude Code".
 
@@ -183,9 +188,16 @@ install_release || exit 1
 mkdir -p "$(dirname "$link")"
 ln -sfn "$install_dir/bin/ollama" "$link"
 
-if ! command -v systemctl >/dev/null 2>&1 || ! systemctl --user show-environment >/dev/null 2>&1; then
-    echo "[$prefix] WARN: no systemd user session; enable systemd in /etc/wsl.conf, or run 'ollama serve' by hand" >&2
+# Without systemd the setup waits and exits 0: the systemd line above changes once systemd
+# starts, and that runs this again. A user manager out of reach while systemd runs changes no
+# line, so it fails instead, which is what makes chezmoi retry it rather than record it as done.
+if [[ ! -d /run/systemd/system ]]; then
+    echo "[$prefix] WARN: systemd is not running, so $unit cannot start and $model is not pulled yet; the first apply after systemd starts finishes this (on WSL, 'wsl.exe --shutdown' restarts WSL with it)" >&2
     exit 0
+fi
+if ! systemctl --user show-environment >/dev/null 2>&1; then
+    echo "[$prefix] ERROR: systemd is running, but this session reaches no systemd user manager; check 'systemctl --user status'" >&2
+    exit 1
 fi
 
 # A system-wide server left by Ollama's own installer holds the same port, and this one would

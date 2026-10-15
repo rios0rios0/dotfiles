@@ -18,7 +18,10 @@ unless `.chezmoidata/local-llm.yaml` sets `enabled: false`, globally or for one 
    -- see [Troubleshooting](#troubleshooting) for why that check exists. A GPU that a game or
    the desktop has filled only warns.
 
-It runs again whenever the pinned version, the model or the unit's settings change.
+It runs again whenever the pinned version, the model or the unit's settings change, and once
+systemd starts. A WSL distribution can boot without systemd -- Kali's does until `chezmoi apply`
+turns it on in `/etc/wsl.conf` -- and the installer then stops after step 1, to finish on the first
+apply after WSL restarts with it.
 
 ## Usage
 
@@ -112,7 +115,10 @@ shows the split.
   and reinstalls when one no longer matches. To run it now:
   `chezmoi execute-template < "$(chezmoi source-path)/.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.sh.tmpl" | bash`
 - **The server is not running.** `claude-local` starts the user unit on demand; otherwise
-  `systemctl --user status ollama`.
+  `systemctl --user status ollama`. When systemd itself is not running, `claude-local` says so,
+  and `systemctl` fails with `Failed to connect to user scope bus via local transport`: on WSL,
+  `chezmoi apply` turns systemd on in `/etc/wsl.conf`, then `wsl.exe --shutdown` and a second
+  apply start it and finish the setup, model download included.
 - **Exit status.** `ollama launch` keeps running as the parent of `claude`, and reports any
   non-zero exit as `Error: exit status N` with status 1. Ctrl+C is unaffected: Claude Code reads it
   as input, so it interrupts a reply as usual.

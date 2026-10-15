@@ -1,0 +1,95 @@
+{{- $wsl := and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
+{{- if and $wsl (not (stat "/run/systemd/system")) -}}
+#!/bin/bash
+
+# Turns systemd on in a WSL distribution that boots without it. See CLAUDE.md, "systemd on WSL".
+#
+# Rendered only on WSL while systemd is not PID 1, and empty otherwise, which chezmoi never runs.
+# /run/systemd/system exists exactly when systemd is PID 1 -- it is what sd_booted() checks -- so
+# this runs on every apply until WSL boots with systemd, and never after.
+#
+# The SSH agent bridge and Ollama run as systemd user units, and WSL starts systemd only when
+# /etc/wsl.conf has `systemd=true` under [boot]. Kali's WSL image ships no /etc/wsl.conf, so
+# its PID 1 is WSL's own init, every `systemctl --user` fails with `Failed to connect to user scope
+# bus via local transport`, and each of those installers skips its setup.
+#
+# This sets the value and says when WSL has to restart. It cannot restart WSL itself: `wsl.exe
+# --shutdown` ends every WSL process, this apply among them. The installers it serves render
+# whether systemd was running into their own text, so the first apply after the restart runs them
+# again and finishes what they skipped.
+
+set -euo pipefail
+
+prefix="wsl-systemd"
+conf="/etc/wsl.conf"
+systemd_bin="/usr/lib/systemd/systemd"
+
+if [[ ! -x "$systemd_bin" ]]; then
+    echo "[$prefix] WARN: systemd is not installed, so WSL cannot start it; install the systemd and systemd-sysv packages, then apply again" >&2
+    exit 0
+fi
+
+# The value WSL reads: `systemd` under [boot], the last one when the key repeats.
+systemd_value() {
+    [[ -f "$conf" ]] || return 0
+    awk '
+        /^[[:space:]]*\[/ { boot = (tolower($0) ~ /^[[:space:]]*\[boot\][[:space:]]*$/); next }
+        boot && tolower($0) ~ /^[[:space:]]*systemd[[:space:]]*=/ {
+            value = tolower($0)
+            sub(/^[^=]*=[[:space:]]*/, "", value)
+            sub(/[[:space:]]+$/, "", value)
+        }
+        END { print value }
+    ' "$conf"
+}
+
+# The file with `systemd=true` right under its first [boot] header, in place of any systemd line a
+# [boot] section had, or in a [boot] section appended when there is none. Every other line stays
+# as it is: the file can carry other settings, such as the distribution's default user.
+with_systemd() {
+    awk '
+        { last = $0 }
+        /^[[:space:]]*\[/ {
+            boot = (tolower($0) ~ /^[[:space:]]*\[boot\][[:space:]]*$/)
+            print
+            if (boot && !done) { print "systemd=true"; done = 1 }
+            next
+        }
+        boot && tolower($0) ~ /^[[:space:]]*systemd[[:space:]]*=/ { next }
+        { print }
+        END {
+            if (!done) {
+                if (NR > 0 && last !~ /^[[:space:]]*$/) print ""
+                print "[boot]"
+                print "systemd=true"
+            }
+        }
+    ' "$1"
+}
+
+if [[ "$(systemd_value)" != "true" ]]; then
+    tmp="$(mktemp)"
+    trap 'rm -f "$tmp"' EXIT
+    if [[ -f "$conf" ]]; then
+        with_systemd "$conf" > "$tmp"
+    else
+        with_systemd /dev/null > "$tmp"
+    fi
+    # Renamed over the file from a sibling, so a failure partway never leaves WSL a truncated one
+    # to boot from.
+    if ! sudo sh -c 'install -m 0644 "$1" "$2.new" && mv -f "$2.new" "$2"' sh "$tmp" "$conf"; then
+        echo "[$prefix] WARN: could not write $conf, so systemd stays off; the next apply tries again" >&2
+        exit 0
+    fi
+    echo "[$prefix] enabled systemd in $conf" >&2
+fi
+
+# A file changed after this WSL started is waiting for a restart. One that already asked for
+# systemd when it started did not take, which is what a WSL too old to know the setting does.
+age="$(ps -o etimes= -p 1 2>/dev/null | tr -d '[:space:]')"
+if [[ "$age" =~ ^[0-9]+$ ]] && (( $(stat -c %Y "$conf") < $(date +%s) - age )); then
+    echo "[$prefix] WARN: $conf asked for systemd before this WSL started, yet systemd is not running; it needs WSL 0.67.6 or later: check 'wsl.exe --version', and update with 'wsl.exe --update'" >&2
+else
+    echo "[$prefix] WARN: systemd starts with the next WSL boot: run 'wsl.exe --shutdown', which closes every WSL terminal, then apply again from a new one to finish the setups that need systemd" >&2
+fi
+{{- end }}
