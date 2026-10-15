@@ -236,6 +236,10 @@ Every machine gets the same user-scope MCP servers in `~/.claude.json`, less wha
 
 `CONTEXT7_API_KEY` comes from a `cred:CONTEXT7_API_KEY` field on the device note in 1Password (see [MCP credentials](.docs/mcp-1password-setup.md)), and Claude Code fills it in from the environment, so no secret is written to `~/.claude.json`. Windows has no loader for those fields; set it there as a user environment variable. Chrome DevTools runs Chrome headless with a throwaway profile per session, redacts request credentials, and sends nothing to Google. GitHub, Azure DevOps, SonarQube and Kubernetes are used through their CLIs; the next apply deletes the MCP servers this repository used to configure for them. "MCP Servers" in `CLAUDE.md` explains each of those choices, how to watch the browser in one project, and why DBHub and Serena were evaluated and left out.
 
+### Code Intelligence (LSP)
+
+On Linux, `chezmoi apply` installs pinned `gopls`, `typescript-language-server` and `pyright`, and the official `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins that start them, so Claude Code's LSP tool can jump to definitions, find references and report type errors after each edit in Go, TypeScript/JavaScript and Python. Restart Claude Code after the first apply to load them. "Claude Code Language Servers" in `CLAUDE.md` explains the pins and why Termux, Windows and Java are left out.
+
 ### Gitignore Design
 
 The global `~/.gitignore` (managed via `dot_gitignore`) ignores `.claude/` by default to prevent accidentally committing Claude Code's internal files (caches, memory, `settings.local.json`) across all repositories. However, `.claude/settings.json` is explicitly un-ignored because Claude Code designates it as team-shared project configuration — meant to be committed alongside the codebase. Personal or machine-specific settings belong in `.claude/settings.local.json`, which remains ignored.

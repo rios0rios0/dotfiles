@@ -203,6 +203,7 @@ Phase 3 is what authenticates every template here.
 | 13   | `run_onchange_after_linux-006-remove-dependencies.sh.tmpl`    | `[automated]` | Tombstones; silent on a fresh machine.                                                                                                                                                                       |
 | 14   | `run_onchange_after_linux-007-setup-sentry-cli.sh`           | `[automated]` | `sentry cli setup --no-modify-path`: the zsh completion into `~/.local/share/zsh/site-functions`, and the Claude Code skill once `~/.claude` exists (the next `sentry cli upgrade` adds it otherwise). |
 | 15   | `run_onchange_after_linux-011-setup-chrome.sh`               | `[automated]` | Google Chrome from Google's apt repository, for the Chrome DevTools MCP server; asks for the sudo password. Its key is trusted for that repository only, and only once its fingerprint proves it Google's. |
+| 16   | `run_onchange_after_linux-012-setup-claude-lsp.sh`           | `[automated]` | Pinned `gopls` (into `~/.local/bin`), `typescript-language-server` and `pyright`, and the `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins at user scope. Claude Code loads them at its next start. |
 
 ### What the dependency installer provides
 
