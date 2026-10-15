@@ -46,8 +46,8 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 ### Development Tools
 
 - **Claude Code**, **Codex CLI** and **GitHub Copilot CLI** (AI coding assistants)
-- **`claude-local`**: Claude Code on a local **Ollama** model, on Linux machines with an NVIDIA GPU; see the [local model guide](.docs/local-coding-model.md)
-- **Tailscale**: Windows' client on Windows and its WSL, which reaches it through a `tailscale` wrapper; `tailscaled` on bare-metal Linux, installed and logged in by `chezmoi apply` and rejoined by every interactive zsh; `claude-remote` uses another machine's GPU across it
+- **`claude-omni`**: Claude Code through **OmniRoute**, on a GPU's Ollama model or a cloud provider such as NVIDIA NIM or OpenRouter, with each model's window in the picker and the status line; see the [OmniRoute guide](.docs/omniroute-local.md)
+- **Tailscale**: Windows' client on Windows and its WSL, which reaches it through a `tailscale` wrapper; `tailscaled` on bare-metal Linux, installed and logged in by `chezmoi apply` and rejoined by every interactive zsh; OmniRoute reaches another machine's GPU across it
 - **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm)
 - **Neovim** with AstroVim (Android)
 
@@ -121,7 +121,7 @@ chezmoi init --apply rios0rios0
 .chezmoiremove           # Target paths deleted from $HOME on every apply (see Dependency Lifecycle)
 .chezmoitemplates/       # Shared template fragments (shared install functions, font installer, dependency removal, MCP server logic, Claude Code look, username)
 dot_claude/              # Claude Code config (settings, permissions, trust; the status line on Linux) -> ~/.claude/
-dot_claude-local/        # Claude Code look for claude-local and claude-remote (Linux with an NVIDIA GPU) -> ~/.claude-local/
+dot_claude-omni/         # Claude Code look for claude-omni's profile (Linux) -> ~/.claude-omni/
 dot_codex/               # Codex CLI status line, merged into its config -> ~/.codex/
 dot_config/              # XDG config (mcphub MCP servers for Android; systemd user units for the WSL SSH agent bridge) -> ~/.config/
 dot_docker/              # Docker daemon config -> ~/.docker/
@@ -208,7 +208,7 @@ This repository manages six Claude Code configuration files. Each targets a diff
 | `dot_claude/modify_settings.json` | `~/.claude/settings.json` | Linux: the look (theme, renderer, status line). Windows and Android: default permission rules (`allow` list) and effort level |
 | `dot_claude/executable_statusline-command.sh` | `~/.claude/statusline-command.sh` | The status line both Claude Code profiles run (Linux) |
 | `dot_claude/modify_dot_claude.json` | `~/.claude/.claude.json` | Auto-trusts project directories to skip the trust dialog |
-| `dot_claude-local/modify_settings.json` | `~/.claude-local/settings.json` | The same look for `claude-local` and `claude-remote` |
+| `dot_claude-omni/modify_settings.json` | `~/.claude-omni/settings.json` | The same look for `claude-omni` |
 | `modify_dot_claude.json` (root) | `~/.claude.json` | User-scoped MCP servers (see [MCP Servers](#mcp-servers)) |
 
 The `modify_*` files are chezmoi [modify-templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file): chezmoi evaluates them itself, with the file's current content in `.chezmoi.stdin`, and writes back the merged result, so they need neither bash nor Python and run on Windows too. This preserves any user-added configuration while ensuring defaults are always present, and a file that already holds every default is left byte for byte untouched.
@@ -221,7 +221,7 @@ Both CLIs keep their look across machines and profiles: Claude Code in the `dark
 
 | Tool | Declared in | Applied to | Platforms |
 |------|-------------|------------|-----------|
-| Claude Code | `.chezmoitemplates/lib-claude-look.tmpl`, and the script in `dot_claude/` | `~/.claude/settings.json`, and `~/.claude-local/settings.json` for `claude-local` and `claude-remote` | Linux |
+| Claude Code | `.chezmoitemplates/lib-claude-look.tmpl`, and the script in `dot_claude/` | `~/.claude/settings.json`, and `~/.claude-omni/settings.json` for `claude-omni` | Linux |
 | Codex | `dot_codex/modify_private_config.toml` | `~/.codex/config.toml` | Linux, Windows, Android |
 
 Only those keys are managed; everything else in the files stays as each tool wrote it. To change the look, edit it there and run `chezmoi apply`: a change made with `/theme` or `/statusline` lasts until the next apply, which sets the managed keys back and prints which. Rewriting `config.toml` keeps every Codex setting but drops its comments, and happens only when a managed key differs. See "Claude Code and Codex Look" in `CLAUDE.md` for why Claude Code's look stays on Linux.
@@ -247,15 +247,24 @@ The global `~/.gitignore` (managed via `dot_gitignore`) ignores `.claude/` by de
 
 It also ignores `.cache_ggshield`, which ggshield's global pre-commit hook writes to a repository's root when it finds a secret. On its next run ggshield appends `# Added by ggshield` and `.cache_ggshield` to that repository's own `.gitignore` unless `git check-ignore` already matches the file, so the global entry is what keeps the hook from editing the `.gitignore` of every repository it flags.
 
-## Local Model for Claude Code
+## Local Model Server
 
-On Linux with an NVIDIA driver, `chezmoi apply` installs Ollama as a user service -- pinned, checksum-verified, no root -- pulls the model named in `.chezmoidata/local-llm.yaml`, and checks that it runs on the GPU. `claude-local` then starts Claude Code on that model, in a lean profile of its own, without touching the regular `claude`, its login or ccswitch's rotation. When ccswitch reports that no account has capacity left, `claude` points at `claude-local` before launching. The [local model guide](.docs/local-coding-model.md) covers settings, measurements on this hardware and troubleshooting.
+On Linux with an NVIDIA driver, `chezmoi apply` installs Ollama as a user service -- pinned, checksum-verified, no root -- pulls the model named in `.chezmoidata/local-llm.yaml`, and checks that it runs on the GPU. Each GPU machine also shares its server on the tailnet with `tailscale serve`. The [local model guide](.docs/local-coding-model.md) covers settings, measurements on this hardware and troubleshooting.
 
-`claude-remote` runs the same session on another machine's GPU across the tailnet: each GPU machine shares its server there with `tailscale serve`, and `claude-remote` finds it, checks that it gives the model the same context window, and warns when part of the model ended up on that machine's CPU. `claude-local-task` runs one unattended task on either and hands back an audit of the run -- every action with its result, the change it made measured against a snapshot of the working tree, and one command that undoes it -- which is what the `ollama-local` and `ollama-remote` agents use.
+## Claude Code Through OmniRoute
 
-## Multi-Provider Routing with OmniRoute
+The [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway with providers such as both GPUs' Ollama, NVIDIA NIM and OpenRouter; its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes. `claude-omni` starts Claude Code through it, on a model picked from the list in `.chezmoidata/omniroute.yaml` or named with `-m`, in a profile of its own, without touching the regular `claude`, its login or ccswitch's rotation:
 
-The optional [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway for Claude Code with providers such as NVIDIA NIM, OpenRouter, Baseten and WSL-hosted Ollama. Its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes.
+```bash
+claude-omni                      # pick a model; each line shows its context window
+claude-omni -m nvidia/z-ai/glm-5.3 -p "explain this repository"
+claude-omni -c -m openrouter/moonshotai/kimi-k2.7-code   # switch model, keep the conversation
+claude-omni --list               # the listed models, their windows and where they run
+```
+
+It gives Claude Code each model's real context window -- for a GPU model the one the Ollama server allocates, which OmniRoute cannot see -- and `/model` in the session offers the listed models that hold at least that window. The status line shows the model and its window. When ccswitch reports that no account has capacity left, `claude` points at `claude-omni` before launching.
+
+`claude-omni-task` runs one unattended task on the first free GPU, or on a model named with `-m`, and hands back an audit of the run -- every action with its result, the change it made measured against a snapshot of the working tree, and one command that undoes it -- which is what the `omniroute-general` agent uses.
 
 ## Tailscale
 
@@ -347,7 +356,7 @@ See **[.docs/dependency-lifecycle.md](.docs/dependency-lifecycle.md)** for the f
 
 10. **`map has no entry for key "deviceName"`, or `[chezmoi-config] ERROR: the chezmoi config has no "deviceName"`**: the machine's `~/.config/chezmoi/chezmoi.yaml` was generated by `chezmoi init` from an older `.chezmoi.yaml.tmpl`. Only `chezmoi init` re-renders that file (`chezmoi apply` and `chezmoi update` never do), so a data key added to the template later does not exist there. Fix: run `chezmoi init` with no arguments, which regenerates the config and changes nothing else, then apply again. chezmoi's own hint, `config file template has changed, run chezmoi init to regenerate config file`, prints at the top of every apply and is easy to miss above a long installer run.
 
-11. **`Failed to connect to user scope bus via local transport: No such file or directory` (WSL)**, with `claude-local` reporting that no Ollama server answers and `~/.ssh/agent.sock` missing: systemd is not running, because WSL boots a distribution with it only when `/etc/wsl.conf` has `systemd=true` under `[boot]`, and Kali's WSL image ships no such file. `chezmoi apply` sets it (through `sudo`) and prints `[wsl-systemd] WARN: systemd starts with the next WSL boot`. Fix: run `wsl.exe --shutdown`, which closes every WSL terminal, open a new one, and run `chezmoi apply` again. That apply finishes the SSH agent bridge and Ollama (including the model download), which had to wait for systemd. `ps -p 1 -o comm=` prints `systemd` once it runs. See "systemd on WSL" in `CLAUDE.md`.
+11. **`Failed to connect to user scope bus via local transport: No such file or directory` (WSL)**, with `claude-omni` reporting that no Ollama server answers on this machine and `~/.ssh/agent.sock` missing: systemd is not running, because WSL boots a distribution with it only when `/etc/wsl.conf` has `systemd=true` under `[boot]`, and Kali's WSL image ships no such file. `chezmoi apply` sets it (through `sudo`) and prints `[wsl-systemd] WARN: systemd starts with the next WSL boot`. Fix: run `wsl.exe --shutdown`, which closes every WSL terminal, open a new one, and run `chezmoi apply` again. That apply finishes the SSH agent bridge and Ollama (including the model download), which had to wait for systemd. `ps -p 1 -o comm=` prints `systemd` once it runs. See "systemd on WSL" in `CLAUDE.md`.
 
 ## References
 

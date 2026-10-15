@@ -27,7 +27,8 @@ make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR s
 make test-shell-credentials         # 1Password credential/workspace loading and removal
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
-make test-local-llm                 # claude-local, claude-remote and claude-local-task: one context window, the launchers, the audit, the capacity hint
+make test-local-llm                 # the local model server: its settings, one context window with claude-omni, the installer's gate
+make test-claude-omni               # claude-omni and claude-omni-task: windows, the environment, the /model lineup, GPU guards, the audit, the capacity hint
 make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
@@ -212,7 +213,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `wsl-systemd`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-omni`, `claude-omni-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `wsl-systemd`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -240,7 +241,7 @@ See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-ma
 ## JSON Patching (Modify-Templates, Not Scripts)
 
 `~/.claude.json`, `~/.claude/.claude.json`, `~/.claude/settings.json`,
-`~/.claude-local/settings.json` and mcphub's `servers.json` (and, in TOML,
+`~/.claude-omni/settings.json` and mcphub's `servers.json` (and, in TOML,
 `~/.codex/config.toml`) are merged into, never overwritten, by `modify_` files that are chezmoi
 **modify-templates**: chezmoi evaluates them itself, with the file's current content in
 `.chezmoi.stdin`, and writes back what they output. They used to be bash scripts that
@@ -374,7 +375,7 @@ installs both halves:
 5. **No `-y` and no terminal.** None of these plugins runs a command to install; one that started
    to fails here instead of running unattended.
 6. **The regular profile only.** The script unsets `CLAUDE_CONFIG_DIR`, so an apply run from inside
-   a `claude-local` session cannot put plugins into that deliberately lean profile.
+   a `claude-omni` session cannot put plugins into that deliberately separate profile.
 7. **A failure fails the apply.** A server that does not install keeps its plugin out, and the run
    exits non-zero so the next apply retries it; a machine without `claude` fails the same way.
 8. **aifiles mirrors the result.** Where aisync runs, `aisync pull` rewrites `settings.json` from
@@ -687,20 +688,20 @@ modify-templates, which set a managed key whose value differs and leave every ot
 
 | Look | Declared in | Merged into |
 |------|-------------|-------------|
-| Claude Code: `theme` `dark-ansi`, `tui` `fullscreen`, `statusLine` | `.chezmoitemplates/lib-claude-look.tmpl` | `~/.claude/settings.json` on Linux, and `~/.claude-local/settings.json` wherever `claude-local` ships |
+| Claude Code: `theme` `dark-ansi`, `tui` `fullscreen`, `statusLine` | `.chezmoitemplates/lib-claude-look.tmpl` | `~/.claude/settings.json` and `~/.claude-omni/settings.json`, Linux only |
 | Claude Code's status line | `dot_claude/executable_statusline-command.sh` | `~/.claude/statusline-command.sh`, Linux only |
 | Codex: `tui.status_line`, `tui.status_line_use_colors` | `dot_codex/modify_private_config.toml` | `~/.codex/config.toml`, every platform |
 
 **Change the look here, never with `/theme` or `/statusline`.** Those write the same keys, so
-the next apply sets them back, with a `[claude-settings]`, `[claude-local]` or `[codex-config]`
+the next apply sets them back, with a `[claude-settings]`, `[claude-omni]` or `[codex-config]`
 line naming each one.
 
-1. **One declaration for both Claude Code profiles.** `claude-local` and `claude-remote` run
-   under `CLAUDE_CONFIG_DIR=~/.claude-local`, which reads nothing from `~/.claude/settings.json`:
-   a local session used to keep the theme its onboarding picked, with no status line. Both
+1. **One declaration for both Claude Code profiles.** `claude-omni` runs under
+   `CLAUDE_CONFIG_DIR=~/.claude-omni`, which reads nothing from `~/.claude/settings.json`:
+   a session there would keep the theme its onboarding picked, with no status line. Both
    modify-templates read `lib-claude-look.tmpl`, so the profiles cannot drift apart, and one
    script serves both -- it finds its credentials, usage cache and account through
-   `CLAUDE_CONFIG_DIR`, so a local session shows no plan limits. Without a login it also
+   `CLAUDE_CONFIG_DIR`, so a session through OmniRoute shows no plan limits. Without a login it also
    starts no usage refresh: one that cannot succeed never writes the cache, and would fork on
    every redraw.
 2. **The OAuth token never reaches an argument list.** The refresh hands it to `curl` on
@@ -755,37 +756,59 @@ Keep `claudex` a **function**, not an alias: zsh refuses to define a function wh
 
 **Note:** if `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set, Claude Code ignores the rotated OAuth credentials; `ccswitch` warns when it detects this.
 
-The same guard asks `ccswitch capacity` (no network) whether any enrolled account has capacity left, and when it exits `3` -- none -- points at `claude-local` before launching. Only exit `3` counts: `1` is any failure, including a ccswitch too old to know the command, so a stale binary stays silent rather than misleading.
+The same guard asks `ccswitch capacity` (no network) whether any enrolled account has capacity left, and when it exits `3` -- none -- points at `claude-omni` before launching. Only exit `3` counts: `1` is any failure, including a ccswitch too old to know the command, so a stale binary stays silent rather than misleading.
 
-## Local Model for Claude Code (claude-local)
+## Local Model Server (Ollama)
 
-`claude-local` runs Claude Code on an Ollama model served from the local NVIDIA GPU. User-facing setup, measurements and troubleshooting are in `.docs/local-coding-model.md`; these are the invariants:
+Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NVIDIA GPU. It is one of OmniRoute's providers, and Claude Code reaches it through `claude-omni` (next section). Setup, measurements and troubleshooting are in `.docs/local-coding-model.md`; these are the invariants:
 
 | Part | Where |
 |------|-------|
-| Settings (model, window, cache, rules, tools, per-device overrides) | `.chezmoidata/local-llm.yaml`, read through `.chezmoitemplates/lib-local-llm.tmpl` |
+| Settings (model, window, cache, keep-alive, tailnet share, per-device overrides) | `.chezmoidata/local-llm.yaml`, read through `.chezmoitemplates/lib-local-llm.tmpl` |
 | Install, restart on change, model pull, GPU check | `.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.sh.tmpl` |
 | Server | `dot_config/systemd/user/ollama.service.tmpl` (a user unit) |
-| Launcher | `dot_local/bin/executable_claude-local.tmpl` |
-| Another machine's GPU | `dot_local/bin/executable_claude-remote.tmpl`, and the share in `dot_local/bin/executable_tailscale-up.tmpl` |
-| Delegated, audited runs | `dot_local/bin/executable_claude-local-task` |
-| Look (theme, renderer, status line) | `dot_claude-local/modify_settings.json`, from `.chezmoitemplates/lib-claude-look.tmpl`; see "Claude Code and Codex Look" |
+| Share on the tailnet, for another machine's OmniRoute | `dot_local/bin/executable_tailscale-up.tmpl` |
 | Gate | `.chezmoiignore`: Linux **and** `nvidia-smi` on `PATH`, not WSL |
 
 **Keep these, each prevents a failure that was observed or measured:**
 
-1. **One window, rendered twice.** `contextTokens` becomes both `OLLAMA_CONTEXT_LENGTH` (what the server allocates) and `CLAUDE_CODE_MAX_CONTEXT_TOKENS` (what Claude Code budgets against). Claude Code cannot read the window from Ollama and assumes 200K for an unrecognised model, so a mismatch means nothing compacts before the server truncates. Never hard-code either side.
-2. **Nothing is exported beyond the launched process.** An `ANTHROPIC_AUTH_TOKEN` in the shell outranks the claude.ai login and would silently disable ccswitch's rotation for every session.
-3. **The provider environment comes from `ollama launch`.** It sets the base URL, token and model tiers for the one process, plus `CLAUDE_CODE_TOTAL_TOKENS_REMINDER=off`, without which the reminder rewrites the prompt on every request and Ollama re-reads all of it each turn. Anthropic does not support Claude Code on other models, so Ollama maintaining that list as Claude Code changes is the point; the launcher adds only the window and the lean profile. It must check for `claude` first, because `ollama launch --yes` would otherwise accept its own offer to pipe Claude Code's installer into bash.
-4. **The session is lean, by three separate mechanisms.** Measured with `/context`, the regular profile starts at 50.7-72.8K tokens, which no local window holds. `CLAUDE_CONFIG_DIR=~/.claude-local` drops plugins, skills, agents and MCP servers and keeps `/model` choices out of the shared settings; `claudeMdExcludes` drops the global rules, which a separate config directory alone does **not** -- for a project under `$HOME`, Claude Code reads `~/.claude/rules` as the rules of the ancestor `~`; and `--tools` cuts the schemas Claude Code sends unconditionally for an unrecognised model (27K tokens) to 5.8K. `--tools` is variadic, so `--settings` must follow it before the caller's arguments, or a prompt given first is swallowed as a tool name.
-5. **The marker is a commit record.** The installer writes the release marker only after `sync`, and re-verifies every unpacked file against a digest manifest each time it runs. A WSL VM that went down after an install once left both `libcublasLt` libraries truncated under a valid marker; CUDA discovery then died with `SIGBUS` on every start, and Ollama served from the CPU without a visible error.
-6. **The installer proves GPU placement.** It loads the model once and reads `size_vram` from `/api/ps`: none on the GPU while it has room fails the apply; partial or no placement while Windows or a game holds the VRAM warns, with the free VRAM in the message. A CPU fallback is otherwise silent -- every request still succeeds, ten times slower.
-7. **Gate on the driver and the OS, not on WSL.** Nothing here depends on Windows, so bare-metal Linux with a GPU qualifies; but `lookPath` finds `nvidia-smi.exe` on Windows too, so `.chezmoiignore` pairs the driver check with `eq .chezmoi.os "linux"`.
-8. **Device overrides are laid over key by key.** sprig's `merge` and `mergeOverwrite` both count `false` as empty, so a device's `enabled: false` would lose to the default `true`; `lib-local-llm.tmpl` uses `set` per key instead.
-9. **Invariant 1 crosses machines, so `claude-remote` checks it.** The other machine's server renders its window from *its* checkout of the data file, which can be older or carry a per-device override, and nothing on the wire says so. `claude-remote` loads the model there the way the first request would, reads `context_length` back from `/api/ps`, and refuses a mismatch; partial GPU placement only warns. Claude Code still runs locally under `claude-remote` -- only inference is remote -- so tools, files and the transcript stay on this machine.
-10. **A delegated run is returned, not restricted.** `claude-local-task` runs the model with permissions off, as the caller's own session runs, and hands back every action with its result, the change measured between two working-tree snapshots, an undo command and the transcript. The snapshots go through a **scratch copy of the index** (`GIT_INDEX_FILE`), never the caller's: the caller's staged work stays as it was, and edits already in the tree are never attributed to the run. What an audit cannot reach -- commits, pushes, requests, writes outside the repository -- is listed, not prevented; say so wherever a delegation is offered.
+1. **One window, rendered twice.** `contextTokens` becomes both `OLLAMA_CONTEXT_LENGTH` (what the server allocates) and the window `claude-omni` declares for every GPU model (`CLAUDE_CODE_MAX_CONTEXT_TOKENS`, what Claude Code budgets against). Neither Claude Code nor OmniRoute can read it from Ollama -- OmniRoute advertises a 128000 fallback -- so a mismatch means nothing compacts before the server truncates. Never hard-code either side.
+2. **The marker is a commit record.** The installer writes the release marker only after `sync`, and re-verifies every unpacked file against a digest manifest each time it runs. A WSL VM that went down after an install once left both `libcublasLt` libraries truncated under a valid marker; CUDA discovery then died with `SIGBUS` on every start, and Ollama served from the CPU without a visible error.
+3. **The installer proves GPU placement.** It loads the model once and reads `size_vram` from `/api/ps`: none on the GPU while it has room fails the apply; partial or no placement while Windows or a game holds the VRAM warns, with the free VRAM in the message. A CPU fallback is otherwise silent -- every request still succeeds, ten times slower.
+4. **Gate on the driver and the OS, not on WSL.** Nothing here depends on Windows, so bare-metal Linux with a GPU qualifies; but `lookPath` finds `nvidia-smi.exe` on Windows too, so `.chezmoiignore` pairs the driver check with `eq .chezmoi.os "linux"`.
+5. **Device overrides are laid over key by key.** sprig's `merge` and `mergeOverwrite` both count `false` as empty, so a device's `enabled: false` would lose to the default `true`; `lib-local-llm.tmpl` uses `set` per key instead.
 
-`make test-local-llm` covers 1, 3 (argument order and environment), 7 to 10, the installer's render gate, and the capacity hint; `make test-chezmoiignore` covers the gate per platform. Ollama, its models and `~/.claude-local` live under `$HOME`, so removing the feature means `path:` tombstones for `.local/share/ollama`, `.ollama` and `.claude-local`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service`, `~/.local/bin/claude-local`, `~/.local/bin/claude-remote`, `~/.local/bin/claude-local-task` and `~/.local/bin/ollama`.
+`make test-local-llm` covers 1, 5 and the installer's render gate; `make test-chezmoiignore` covers the gate per platform. Ollama and its models live under `$HOME`, so removing the server means `path:` tombstones for `.local/share/ollama` and `.ollama`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service` and `~/.local/bin/ollama`.
+
+## Claude Code Through OmniRoute (claude-omni)
+
+`claude-omni` runs Claude Code through OmniRoute -- the gateway in `local-services/omniroute/` -- on the provider and model it is given: a GPU's Ollama, NVIDIA NIM, OpenRouter, or an `auto/*` combo. It replaced `claude-local` and `claude-remote`. Setup and usage are in `.docs/omniroute-local.md`.
+
+| Part | Where |
+|------|-------|
+| Settings (base URL, GPUs, listed models, task GPUs, lean profile, per-device overrides) | `.chezmoidata/omniroute.yaml`, read through `.chezmoitemplates/lib-omniroute.tmpl`, which includes `lib-local-llm.tmpl` for the GPU model and window |
+| Launcher | `dot_local/bin/executable_claude-omni.tmpl` |
+| Delegated, audited runs | `dot_local/bin/executable_claude-omni-task.tmpl` |
+| Status line | `dot_claude/executable_statusline-command.sh`; see "Claude Code and Codex Look" |
+| Look of its profile | `dot_claude-omni/modify_settings.json`, from `.chezmoitemplates/lib-claude-look.tmpl` |
+| The old profile, carried over | `.chezmoiscripts/run_once_before_linux-006-move-claude-local-profile.sh` |
+| Gateway | `local-services/omniroute/compose.yaml`, run from the checkout, where its `.env` lives; chezmoi deploys none of it |
+| Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported as `OMNIROUTE_API_KEY` |
+| Gate | `.chezmoiignore`: Linux, GPU or not |
+
+**Keep these, each prevents a failure that was observed or measured:**
+
+1. **One window per process: the smaller of OmniRoute's and the repository's.** Claude Code reads no window from a gateway -- gateway discovery reads only `id`, `display_name` and `description` -- and takes one `CLAUDE_CODE_MAX_CONTEXT_TOKENS` for the whole process, `/model` switches included. OmniRoute enforces the window it resolves (a 400 past it), so declaring more trades compaction for an error. For Ollama it advertises its 128000 fallback, which is why a GPU's window comes from `local-llm.yaml`; a window with no `max_input_tokens` behind it is that fallback, and the launch warns.
+2. **Every tier is pinned, and the 1M variants are off.** `ANTHROPIC_MODEL`, the Opus, Sonnet, Haiku and **Fable** defaults and `CLAUDE_CODE_SUBAGENT_MODEL` all name the one model. Without `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`, `/model`'s Default row turns the id into `<id>[1m]`, which Claude Code sizes at 1,000,000 tokens (measured; `claude-local` had the same hole).
+3. **`/model` offers only models whose window is at least the session's.** A `modelPicker` with `replaceBuiltInOptions`, passed in `--settings`, lists the served models, each labelled with its window; the label also becomes `display_name` in the status line. A smaller model would overflow before the session compacts, and OmniRoute's over-window 400 is OpenAI-shaped, which Claude Code does not compact on (filed upstream). `claude-omni -c -m ID` reaches any model and keeps the conversation. Gateway discovery stays off: the catalog has over 1,500 entries, and its filter keeps only ids containing `claude`.
+4. **The prompt stays as Claude Code wrote it.** The list `ollama launch` sets for a non-Anthropic model (`CLAUDE_CODE_ATTRIBUTION_HEADER=0`, `CLAUDE_CODE_TOTAL_TOKENS_REMINDER=off`, `CLAUDE_CODE_AUTO_MODE_SERVER=0`, `DISABLE_ERROR_REPORTING`, `DISABLE_FEEDBACK_COMMAND`, `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`) is now this script's to keep current, and `ANTHROPIC_CUSTOM_HEADERS` adds `x-omniroute-compression: off` and `x-omniroute-no-memory: true`, so OmniRoute neither compresses the prompt (one engine is lossy) nor injects memory. Measured: an 11K-token prefix read back from Ollama's cache through OmniRoute in 1.15 s against 5.53 s cold, as direct.
+5. **Nothing is exported beyond the launched process, and the key never reaches an argument list.** An `ANTHROPIC_AUTH_TOKEN` in the shell outranks the claude.ai login and would silently disable ccswitch's rotation; the key reaches curl on stdin (`-H @-`), because `/proc/<pid>/cmdline` is readable by any local user.
+6. **The GPU guards of the old launchers stay.** This machine's server is started on demand, and a machine without systemd is told so. A tailnet GPU is found the way OmniRoute reaches it, the model is loaded there, a `context_length` other than this machine's is refused, and partial GPU placement warns -- the other machine renders its window from *its* checkout, and nothing on the wire says so.
+7. **A separate profile, lean only on a small window.** `CLAUDE_CONFIG_DIR=~/.claude-omni` keeps `/model` choices, which Claude Code saves to the profile's settings, out of the regular profile, which would send them to Anthropic. Up to `lean.maxWindow` the session also gets `claudeMdExcludes` -- a separate config directory alone does **not** drop `~/.claude/rules`, which Claude Code reads as the rules of the ancestor `~` -- and `--tools`, which cuts the schemas sent to an unrecognised model from 27K tokens to 5.8K. `--tools` is variadic, so `--settings` follows it before the caller's arguments.
+8. **A delegated run is returned, not restricted.** `claude-omni-task` runs the model with permissions off and hands back every action with its result, the change measured between two working-tree snapshots taken through a **scratch copy of the index** (`GIT_INDEX_FILE`, never the caller's), an undo command and the transcript. Without `-m` it takes the first free, serving GPU in `taskGpus`, under a `flock` per GPU, since a GPU serves one request at a time; a cloud model runs only when named, and the audit says which provider received the files the model read. What an audit cannot reach -- commits, pushes, requests, writes outside the repository -- is listed, not prevented.
+9. **The status line keeps the session's window.** After `/model` it appends the new model's own, from the `omniroute-windows.tsv` the launch writes into the profile, and turns red when that window is smaller than the session's.
+
+`make test-claude-omni` covers 1 to 8 and the capacity hint against stubbed `curl`, `claude`, `systemctl` and `tailscale`; `make test-statusline` covers 9; `make test-chezmoiignore` covers the gate. Removing the feature means `.chezmoiremove` entries for `~/.local/bin/claude-omni` and `~/.local/bin/claude-omni-task` and a `path:` tombstone for `.claude-omni`.
 
 ## Tailscale
 
@@ -838,7 +861,7 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
    node logged in some other way without touching the rest.
 7. **Bare metal: MagicDNS stays off (`--accept-dns=false`).** Without a DNS manager, tailscaled
    replaces `/etc/resolv.conf`, and every lookup fails while it is down. Peers are reached by
-   address: `tailscale ip -4 <name>`, or `tailscale status --json`, as `claude-remote` does. WSL
+   address: `tailscale ip -4 <name>`, or `tailscale status --json`, as `claude-omni` does. WSL
    can leave MagicDNS on: it resolves through Windows (DNS tunneling, `nameserver
    10.255.255.254`), whose client answers tailnet names without touching `/etc/resolv.conf`.
 8. **Bare metal: the repository key is checked before apt trusts it:** exactly one key, with
@@ -869,8 +892,8 @@ The SSH agent bridge and Ollama run as systemd user units, and WSL boots a distr
 systemd only when `/etc/wsl.conf` has `systemd=true` under `[boot]`. Kali's WSL image ships no
 `/etc/wsl.conf`, so PID 1 is WSL's own `init`. `systemctl --user` then fails with `Failed to connect
 to user scope bus via local transport: No such file or directory` -- the socket it looks for in
-`$XDG_RUNTIME_DIR`, WSLg's `/mnt/wslg/runtime-dir`, does not exist -- and `claude-local` finds no
-server.
+`$XDG_RUNTIME_DIR`, WSLg's `/mnt/wslg/runtime-dir`, does not exist -- and `claude-omni` finds no
+server for this machine's GPU.
 
 Two halves make the fix automatic, and both are needed:
 
@@ -904,7 +927,7 @@ and Ollama, pulling the model. Tailscale does not wait: on WSL its client is Win
 
 `make test-wsl-systemd` covers the render gate, the merge, both restart messages, and the systemd
 line in every installer that calls `systemctl`, which also catches a new one that lacks it.
-`make test-local-llm` covers `claude-local` naming the missing systemd instead of pointing at
+`make test-claude-omni` covers `claude-omni` naming the missing systemd instead of pointing at
 `systemctl --user status ollama`.
 
 ## Claude Code Voice Input (WSL)

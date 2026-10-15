@@ -1,0 +1,47 @@
+{{- /*
+  Claude Code through OmniRoute, as JSON: .omniroute from .chezmoidata/omniroute.yaml with
+  .omniroute.devices.<deviceName> laid over it, plus `gpuModel`, `gpuWindow` and `gpuKeepAlive`:
+  local-llm.yaml's model, the window its server allocates, and how long it stays loaded. Every `gpu:` entry of `models` is expanded into the
+  OmniRoute id of that model on that GPU, a label, the GPU's `machine`, and that window.
+
+  claude-omni and claude-omni-task read it the same way,
+      includeTemplate "lib-omniroute.tmpl" . | fromJson
+  so a GPU model's window is rendered from the same value as the Ollama unit's
+  OLLAMA_CONTEXT_LENGTH, and the two cannot disagree.
+*/ -}}
+{{- /* deviceName is read with `get`, as lib-local-llm.tmpl does and for the same reason: a config
+       that predates it must render with the defaults, so run_before_000-verify-chezmoi-config can
+       report the stale config instead of the apply dying on a template error. */ -}}
+{{- $omni := .omniroute -}}
+{{- $deviceName := get . "deviceName" -}}
+{{- $device := dict -}}
+{{- if hasKey $omni.devices $deviceName -}}
+{{-   $device = get $omni.devices $deviceName -}}
+{{- end -}}
+{{- /* Laid over key by key with `set`, never with sprig's merge, which drops false and 0. */ -}}
+{{- $settings := deepCopy (omit $omni "devices") -}}
+{{- range $key, $value := $device -}}
+{{-   $_ := set $settings $key $value -}}
+{{- end -}}
+{{- $llm := includeTemplate "lib-local-llm.tmpl" . | fromJson -}}
+{{- $models := list -}}
+{{- range $settings.models -}}
+{{-   if hasKey . "gpu" -}}
+{{-     if not (hasKey $settings.gpus .gpu) -}}
+{{-       fail (printf "omniroute.models: gpu %q is not a key of omniroute.gpus" .gpu) -}}
+{{-     end -}}
+{{-     $gpu := get $settings.gpus .gpu -}}
+{{-     $entry := dict "id" (printf "%s/%s" .gpu $llm.model) "label" (printf "%s · %s" $llm.model $gpu.label) "gpu" .gpu "machine" $gpu.machine "window" (int $llm.contextTokens) -}}
+{{-     if hasKey . "effort" -}}
+{{-       $_ := set $entry "effort" .effort -}}
+{{-     end -}}
+{{-     $models = append $models $entry -}}
+{{-   else -}}
+{{-     $models = append $models . -}}
+{{-   end -}}
+{{- end -}}
+{{- $_ := set $settings "models" $models -}}
+{{- $_ := set $settings "gpuModel" $llm.model -}}
+{{- $_ := set $settings "gpuWindow" (int $llm.contextTokens) -}}
+{{- $_ := set $settings "gpuKeepAlive" $llm.keepAlive -}}
+{{- toJson $settings -}}

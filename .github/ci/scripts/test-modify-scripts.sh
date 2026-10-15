@@ -370,12 +370,12 @@ settings_passes_a_linux_file_with_the_look_through() {
     cmp -s "$SANDBOX/look.json" "$SANDBOX/look.out"
 }
 
-# --- claude-local's profile ----------------------------------------------------
-# claude-local and claude-remote run in ~/.claude-local, which reads nothing from
-# ~/.claude/settings.json, so the look has to reach it on its own -- and has to be the same.
+# --- claude-omni's profile -----------------------------------------------------
+# claude-omni runs in ~/.claude-omni, which reads nothing from ~/.claude/settings.json,
+# so the look has to reach it on its own -- and has to be the same.
 
 local_profile_gets_the_regular_look() {
-    # given no ~/.claude-local/settings.json, and the regular profile's look on the same machine
+    # given no ~/.claude-omni/settings.json, and the regular profile's look on the same machine
     local home="$SANDBOX/local-home"
     mkdir -p "$home"
     local regular
@@ -384,7 +384,7 @@ local_profile_gets_the_regular_look() {
 
     # when
     local out
-    out=$(CASE_HOME="$home" apply_modify_template dot_claude-local/modify_settings.json .claude-local/settings.json "") ||
+    out=$(CASE_HOME="$home" apply_modify_template dot_claude-omni/modify_settings.json .claude-omni/settings.json "") ||
         return 1
 
     # then: the same three keys, and nothing else
@@ -394,16 +394,16 @@ local_profile_gets_the_regular_look() {
 
 local_profile_keeps_its_own_keys() {
     # given the theme onboarding picked and a model chosen with /model
-    local input='{"model": "qwen3.8:27b", "theme": "dark"}'
+    local input='{"model": "ollama/qwen3.8:27b", "theme": "dark"}'
 
     # when
     local out
-    out=$(apply_modify_template dot_claude-local/modify_settings.json .claude-local/settings.json "$input") || return 1
+    out=$(apply_modify_template dot_claude-omni/modify_settings.json .claude-omni/settings.json "$input") || return 1
 
     # then
     [ "$(jq -r '.theme' <<<"$out")" = "dark-ansi" ] &&
         [ "$(jq -r '.statusLine.type' <<<"$out")" = "command" ] &&
-        [ "$(jq -r '.model' <<<"$out")" = "qwen3.8:27b" ]
+        [ "$(jq -r '.model' <<<"$out")" = "ollama/qwen3.8:27b" ]
 }
 
 local_profile_passes_a_matching_file_through() {
@@ -415,7 +415,7 @@ local_profile_passes_a_matching_file_through() {
         > "$SANDBOX/local.json"
 
     # when
-    CASE_HOME="$home" apply_modify_template dot_claude-local/modify_settings.json .claude-local/settings.json \
+    CASE_HOME="$home" apply_modify_template dot_claude-omni/modify_settings.json .claude-omni/settings.json \
         "$(cat "$SANDBOX/local.json")"$'\n' > "$SANDBOX/local.out" || return 1
 
     # then
@@ -595,10 +595,10 @@ else
     run_case "settings.json: gives Linux the look and none of the rules" settings_gives_linux_the_look_only
     run_case "settings.json: passes a Linux file that has the look through byte for byte" \
         settings_passes_a_linux_file_with_the_look_through
-    run_case "claude-local settings.json: gets the regular profile's look and nothing else" \
+    run_case "claude-omni settings.json: gets the regular profile's look and nothing else" \
         local_profile_gets_the_regular_look
-    run_case "claude-local settings.json: sets the look back and keeps the profile's keys" local_profile_keeps_its_own_keys
-    run_case "claude-local settings.json: passes a matching file through byte for byte" \
+    run_case "claude-omni settings.json: sets the look back and keeps the profile's keys" local_profile_keeps_its_own_keys
+    run_case "claude-omni settings.json: passes a matching file through byte for byte" \
         local_profile_passes_a_matching_file_through
     run_case "codex config.toml: creates only the look when the file is missing" codex_creates_only_the_look
     run_case "codex config.toml: passes a matching file through byte for byte" codex_passes_a_matching_file_through

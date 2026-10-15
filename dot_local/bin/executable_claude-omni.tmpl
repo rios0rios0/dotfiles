@@ -1,0 +1,454 @@
+{{- $omni := includeTemplate "lib-omniroute.tmpl" . | fromJson -}}
+#!/bin/bash
+
+# claude-omni: Claude Code through OmniRoute, on the provider and model you pick.
+# See .docs/omniroute-local.md and CLAUDE.md, "Claude Code Through OmniRoute (claude-omni)".
+#
+#   claude-omni [-m ID] [claude arguments...]   pick a model (or take -m), then start Claude Code
+#   claude-omni -c -m ID                        switch to any model, keeping the conversation
+#   claude-omni --list [--all] [--json]         the models it offers, with their windows
+#   claude-omni --check -m ID                   only the checks a launch makes; the exit status says
+#   claude-omni --probe PREFIX                  one tool-call request to every model under PREFIX
+#
+# OmniRoute speaks Claude Code's API and routes every request to the provider behind the model id,
+# so this script only tells Claude Code what it cannot learn on its own:
+#
+#   - The context window. Claude Code reads no window from a gateway: it assumes 200K for a model
+#     it does not recognise, and takes one CLAUDE_CODE_MAX_CONTEXT_TOKENS for the whole process.
+#     The window is the smaller of OmniRoute's, which it enforces, and this repository's. For a GPU
+#     model that is local-llm.yaml's contextTokens, what the Ollama server allocates: OmniRoute
+#     advertises a 128000 fallback there, past which Ollama would truncate the prompt silently.
+#   - Which model every tier means. All of them, Fable and subagents included, are pinned to the
+#     one model, so nothing in the session reaches a model the window was not set for, and
+#     CLAUDE_CODE_DISABLE_1M_CONTEXT keeps /model's Default row from turning the id into `<id>[1m]`,
+#     which Claude Code would size at 1,000,000 tokens.
+#   - What keeps the prompt intact. The variables `ollama launch` sets for a non-Anthropic model
+#     keep the prompt cacheable and the client quiet; two headers keep OmniRoute from compressing
+#     the prompt or injecting memory into it.
+#
+# In the session, /model offers the listed models whose window is at least the session's: the
+# window cannot change once Claude Code runs, and a smaller model would overflow before the
+# session compacts. `claude-omni -c -m ID` reaches the others and keeps the conversation.
+#
+# Nothing is exported beyond the claude process: an ANTHROPIC_AUTH_TOKEN in the shell would
+# override the regular claude's claude.ai login and silently disable ccswitch's rotation.
+
+set -euo pipefail
+
+prefix="claude-omni"
+config={{ $omni | toJson | replace "'" "'\\''" | printf "'%s'" }}
+home_dir={{ .chezmoi.homeDir | quote }}
+base="${OMNIROUTE_BASE_URL:-$(jq -r '.baseUrl' <<<"$config")}"
+base="${base%/}"
+profile="${CLAUDE_OMNI_CONFIG_DIR:-$HOME/.claude-omni}"
+ollama_port=11434
+
+die() {
+    echo "[$prefix] ERROR: $1" >&2
+    exit 1
+}
+
+warn() {
+    echo "[$prefix] WARN: $1" >&2
+}
+
+note() {
+    echo "[$prefix] $1" >&2
+}
+
+need() {
+    command -v "$1" >/dev/null 2>&1 || die "$1 is not installed; run 'chezmoi apply'"
+}
+
+usage() {
+    sed -n '6,10s/^# \{0,1\}//p' "$0" >&2
+}
+
+# --- arguments ----------------------------------------------------------------------------------
+# The commands come first; -m/--model is taken from anywhere, so `-c -m ID` works, and everything
+# else goes to Claude Code in its original order.
+
+mode="launch"
+list_all=0
+list_json=0
+probe_prefix=""
+model=""
+args=()
+case "${1:-}" in
+    --list) mode="list"; shift ;;
+    --check) mode="check"; shift ;;
+    --probe)
+        mode="probe"
+        probe_prefix="${2:-}"
+        [[ -n "$probe_prefix" ]] || die "--probe needs a model id prefix, such as nvidia/"
+        shift 2
+        ;;
+    -h|--help) usage; exit 0 ;;
+esac
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -m|--model)
+            [[ $# -ge 2 ]] || die "$1 needs a model id"
+            model="$2"
+            shift 2
+            ;;
+        --model=*) model="${1#--model=}"; shift ;;
+        --all) if [[ "$mode" == "list" ]]; then list_all=1; else args+=("$1"); fi; shift ;;
+        --json) if [[ "$mode" == "list" ]]; then list_json=1; else args+=("$1"); fi; shift ;;
+        *) args+=("$1"); shift ;;
+    esac
+done
+
+need curl
+need jq
+
+key="${OMNIROUTE_API_KEY:-}"
+[[ -n "$key" ]] ||
+    die "OMNIROUTE_API_KEY is not set: add a field labelled cred:OMNIROUTE_API_KEY, holding an OmniRoute API key, to this device's 1Password note, then run 'reload-credentials'"
+
+# --- the catalog --------------------------------------------------------------------------------
+# The key reaches curl on stdin (-H @-), never on its command line, which any local user can read
+# in /proc/<pid>/cmdline.
+
+mkdir -p "$profile"
+catalog="$profile/omniroute-models.json"
+fetched="$(mktemp "$profile/.omniroute-models.XXXXXX")"
+trap 'rm -f "$fetched" "${windows:-}"' EXIT
+status="$(curl -sS --max-time 15 -o "$fetched" -w '%{http_code}' -H @- "$base/v1/models?prefix=alias" \
+    <<<"Authorization: Bearer $key" 2>/dev/null)" || status="000"
+case "$status" in
+    200) mv -f "$fetched" "$catalog" ;;
+    000) die "OmniRoute does not answer at $base: is Docker Desktop running? Start the stack with 'docker compose up -d' in local-services/omniroute of the dotfiles checkout" ;;
+    401|403) die "OmniRoute refused OMNIROUTE_API_KEY (HTTP $status): check the cred:OMNIROUTE_API_KEY field against its dashboard's API keys" ;;
+    *) die "OmniRoute answered HTTP $status for its model list" ;;
+esac
+
+# Every listed model, or the one -m names, resolved against the catalog. The window is the smaller
+# of OmniRoute's (`context_length`, and `max_input_tokens` when it sets one) and the repository's:
+# a GPU's from local-llm.yaml, a declared one, or autoWindow for an auto/* combo. `source` says
+# which: `server` (a GPU), `repo` (declared here), `omniroute`, or `fallback` -- OmniRoute's
+# catalog without `max_input_tokens`, which is its 128000 default rather than the provider's word.
+# shellcheck disable=SC2016
+resolve_jq='
+def positive: if type == "number" and . > 0 then . else null end;
+def human:
+  if . == null then "?"
+  elif . % 1048576 == 0 then "\(. / 1048576)M"
+  elif . % 1000000 == 0 then "\(. / 1000000)M"
+  elif . % 1000 == 0 then "\(. / 1000)K"
+  elif . % 1024 == 0 then "\(. / 1024)K"
+  else "\(. / 1000 | floor)K" end;
+def entry_for($id):
+  ($id | split("/")[0]) as $provider
+  | if $cfg.gpus[$provider] then
+      {id: $id, label: "\($id | split("/")[1:] | join("/")) · \($cfg.gpus[$provider].label)",
+       gpu: $provider, machine: $cfg.gpus[$provider].machine, window: $cfg.gpuWindow}
+    else {id: $id, label: $id} end;
+def resolve($c):
+  (.id | split("/")[0]) as $provider
+  | ([$c.context_length, $c.max_input_tokens] | map(positive) | map(select(. != null))
+     | if length == 0 then null else min end) as $served
+  | (if .window != null then (.window | positive)
+     elif (.id | startswith("auto/")) then $cfg.autoWindow
+     else null end) as $declared
+  | ([$served, $declared] | map(select(. != null)) | if length == 0 then null else min end) as $window
+  | . + {
+      provider: $provider,
+      where: (if .gpu then $cfg.gpus[.gpu].label else $provider end),
+      served: ($c != null),
+      window: $window,
+      source: (if $window == null then null
+               elif .gpu and $window == $declared then "server"
+               elif $declared != null and $window == $declared then
+                 (if (.id | startswith("auto/")) and .window == null then "auto" else "repo" end)
+               elif $c.max_input_tokens != null then "omniroute"
+               else "fallback" end),
+      output: (if $window == null then null
+               else ([([($window / 8 | floor), 8192] | max), 32000, ($c.max_output_tokens | positive)]
+                     | map(select(. != null)) | min) end)
+    }
+  | . + {shown: "\(.window | human)\(if .source == "fallback" then "?" else "" end)"};
+($catalog[0].data // [] | map({key: .id, value: .}) | from_entries) as $byId
+| ($cfg.models | map(.id)) as $listedIds
+| [ ($cfg.models[]), (if $want != "" and ($listedIds | any(.[]; . == $want) | not) then entry_for($want) else empty end)
+    | resolve($byId[.id]) ]
+'
+resolved="$(jq -c --argjson cfg "$config" --arg want "$model" --slurpfile catalog "$catalog" \
+    -n "$resolve_jq")"
+
+# --- --list ---------------------------------------------------------------------------------------
+
+if [[ "$mode" == "list" ]]; then
+    if (( list_all )); then
+        # shellcheck disable=SC2016
+        all_jq='[.data[] | select(.type == null)
+                 | {id, window: ([.context_length, .max_input_tokens]
+                                 | map(select(type == "number" and . > 0)) | if length == 0 then null else min end),
+                    verified: (.max_input_tokens != null)}]'
+        if (( list_json )); then
+            jq -c "$all_jq" "$catalog"
+        else
+            jq -r "$all_jq | .[] | [.id, (.window // \"?\" | tostring) + (if .verified then \"\" else \"?\" end)] | @tsv" "$catalog" |
+                column -t -s $'\t'
+        fi
+    elif (( list_json )); then
+        jq -c '[.[] | select(.id != "")]' <<<"$resolved"
+    else
+        jq -r '.[] | [(if .served then " " else "-" end), .label, .shown, .where, .id] | @tsv' <<<"$resolved" |
+            column -t -s $'\t'
+        if jq -e 'any(.[]; .served | not)' <<<"$resolved" >/dev/null; then
+            note "models marked - are listed in .chezmoidata/omniroute.yaml but not served by OmniRoute"
+        fi
+    fi
+    exit 0
+fi
+
+# --- --probe --------------------------------------------------------------------------------------
+# One short tool-call request per chat model under the prefix, four at a time: the HTTP status,
+# the seconds it took, and whether the model called the tool, which Claude Code cannot work
+# without. A provider that bills per token bills each of these requests.
+
+probe_one() {
+    local id="$1" out status seconds verdict
+    out="$(mktemp)"
+    read -r status seconds < <(curl -sS --max-time 150 -o "$out" -w '%{http_code} %{time_total}' \
+        "$base/v1/messages" -H 'content-type: application/json' -H 'anthropic-version: 2023-06-01' \
+        -H 'X-OmniRoute-No-Cache: true' -H @- \
+        -d "$(jq -nc --arg m "$id" '{model: $m, max_tokens: 256,
+              tools: [{name: "echo", description: "Echo text back.",
+                       input_schema: {type: "object", properties: {text: {type: "string"}}, required: ["text"]}}],
+              messages: [{role: "user", content: "Call the echo tool with text \"ok\". Do not answer in prose."}]}')" \
+        <<<"Authorization: Bearer $OMNIROUTE_API_KEY" 2>/dev/null || echo "000 150")
+    if [[ "$status" == "200" ]]; then
+        if jq -e 'any(.content[]?; .type == "tool_use")' "$out" >/dev/null 2>&1; then
+            verdict="ok"
+        else
+            verdict="answered without calling the tool"
+        fi
+    elif [[ "$status" == "000" ]]; then
+        verdict="no answer within 150 s"
+    else
+        verdict="HTTP $status: $(jq -r '.error.message? // .message? // "no message"' "$out" 2>/dev/null | tr '\t\n' '  ' | cut -c1-100)"
+    fi
+    rm -f "$out"
+    printf '%s\t%s\t%s\n' "$id" "${seconds%.*}" "$verdict"
+}
+
+if [[ "$mode" == "probe" ]]; then
+    ids="$(jq -r --arg p "$probe_prefix" '.data[] | select(.type == null and (.id | startswith($p))) | .id' "$catalog")"
+    [[ -n "$ids" ]] || die "OmniRoute lists no chat model under $probe_prefix"
+    note "probing $(wc -l <<<"$ids") models under $probe_prefix: one short request each, four at a time"
+    export -f probe_one
+    export base OMNIROUTE_API_KEY="$key"
+    # shellcheck disable=SC2016 # $1 is expanded by the bash that xargs starts
+    results="$(xargs -P 4 -I{} bash -c 'probe_one "$1"' _ {} <<<"$ids")"
+    # The models that work first, fastest first; then the rest, grouped by what went wrong.
+    {
+        awk -F '\t' '$3 == "ok"' <<<"$results" | sort -t $'\t' -k2,2n
+        awk -F '\t' '$3 != "ok"' <<<"$results" | sort -t $'\t' -k3,3 -k1,1
+    } | column -t -s $'\t'
+    note "$(awk -F '\t' '$3 == "ok"' <<<"$results" | wc -l) of $(wc -l <<<"$results") models answered with a tool call"
+    exit 0
+fi
+
+# --- the model ------------------------------------------------------------------------------------
+
+served_count="$(jq '[.[] | select(.served)] | length' <<<"$resolved")"
+interactive=0
+if [[ -t 0 && -t 2 ]]; then
+    interactive=1
+    for arg in "${args[@]}"; do
+        [[ "$arg" == "-p" || "$arg" == "--print" ]] && interactive=0
+    done
+fi
+
+if [[ -z "$model" ]]; then
+    (( served_count > 0 )) || die "OmniRoute serves none of the models listed in .chezmoidata/omniroute.yaml; 'claude-omni --list' shows them"
+    saved="$(jq -r '.model // empty' "$profile/settings.json" 2>/dev/null || true)"
+    default="$(jq -r --arg saved "$saved" '[.[] | select(.served)] as $s
+        | (if $saved != "" and ($s | any(.id == $saved)) then $saved else $s[0].id end)' <<<"$resolved")"
+    model="$default"
+    if (( interactive )); then
+        mapfile -t choices < <(jq -r '.[] | select(.served) | .id' <<<"$resolved")
+        echo "[$prefix] models through OmniRoute (Enter takes the one marked *):" >&2
+        jq -r --arg default "$default" '[.[] | select(.served)] | to_entries[]
+            | [(if .value.id == $default then "*" else " " end) + " \(.key + 1)", .value.label, .value.shown, .value.where] | @tsv' \
+            <<<"$resolved" | column -t -s $'\t' >&2
+        while true; do
+            read -r -p "model: " answer
+            if [[ -z "$answer" ]]; then
+                break
+            elif [[ "$answer" =~ ^[0-9]+$ ]] && (( answer >= 1 && answer <= ${#choices[@]} )); then
+                model="${choices[answer - 1]}"
+                break
+            fi
+            echo "[$prefix] answer with a number from 1 to ${#choices[@]}, or Enter" >&2
+        done
+    fi
+    resolved="$(jq -c --argjson cfg "$config" --arg want "$model" --slurpfile catalog "$catalog" -n "$resolve_jq")"
+fi
+
+entry="$(jq -c --arg id "$model" 'map(select(.id == $id)) | .[-1] // empty' <<<"$resolved")"
+[[ -n "$entry" && "$(jq -r '.served' <<<"$entry")" == "true" ]] ||
+    die "OmniRoute does not serve $model; 'claude-omni --list --all' shows what it does"
+window="$(jq -r '.window // empty' <<<"$entry")"
+[[ -n "$window" ]] || die "no context window is known for $model; set one for it in .chezmoidata/omniroute.yaml"
+if [[ "$(jq -r '.source' <<<"$entry")" == "fallback" ]]; then
+    warn "OmniRoute knows no window for $model and reports its ${window}-token fallback; if the provider allows less, set a smaller window for it in .chezmoidata/omniroute.yaml"
+fi
+output="$(jq -r '.output' <<<"$entry")"
+gpu="$(jq -r '.gpu // empty' <<<"$entry")"
+
+# --- a GPU model: the server it runs on -----------------------------------------------------------
+
+local_server_up() {
+    curl -fsS --max-time 2 "http://127.0.0.1:$ollama_port/api/version" >/dev/null 2>&1
+}
+
+# This machine's server: the user unit starts with the session but may have been stopped to give
+# the GPU back, so it is started on demand. Without systemd the start fails on a D-Bus error, and
+# pointing at systemctl would fail the same way, so the message names what is missing instead.
+check_local_gpu() {
+    local_server_up && return 0
+    if systemctl --user start ollama.service 2>/dev/null; then
+        for _ in $(seq 1 30); do
+            local_server_up && return 0
+            sleep 1
+        done
+    fi
+    if [[ ! -d /run/systemd/system ]]; then
+        die "no Ollama server answers on this machine, and systemd, which runs it, is not running; run 'chezmoi apply', which turns systemd on in WSL and says how to restart, then apply again once it runs"
+    fi
+    die "no Ollama server answers on this machine; check 'systemctl --user status ollama'"
+}
+
+answers() {
+    curl -fsS --max-time 2 "http://$1:$ollama_port/api/version" >/dev/null 2>&1
+}
+
+# Another machine's server, found the way OmniRoute reaches it: on the tailnet's port 11434, where
+# tailscale-up shares each GPU machine's Ollama. CLAUDE_OMNI_GPU_HOST names one -- a tailnet machine
+# name or an address -- instead of taking the first online machine that answers. Loading the model
+# there, as the first request would, shows how the server holds it: a window other than this
+# machine's would let Ollama truncate prompts that Claude Code expects to compact, and a GPU busy
+# with a game leaves part of the model on that machine's CPU, where every request still succeeds,
+# many times slower.
+check_tailnet_gpu() {
+    local name address peers held served size vram
+    if [[ -n "${CLAUDE_OMNI_GPU_HOST:-}" ]]; then
+        name="$CLAUDE_OMNI_GPU_HOST"
+        address="$(tailscale ip -4 "$name" 2>/dev/null | head -1 || true)"
+        address="${address:-$name}"
+        answers "$address" || die "no Ollama server answers on $name:$ollama_port"
+    else
+        need tailscale
+        peers="$(tailscale status --json 2>/dev/null)" || die "Tailscale is not running; run 'tailscale-up'"
+        [[ "$(jq -r '.BackendState' <<<"$peers")" == "Running" ]] || die "this machine is not on the tailnet; run 'tailscale-up'"
+        address=""
+        while read -r ip peer; do
+            if answers "$ip"; then
+                address="$ip"
+                name="$peer"
+                break
+            fi
+        done < <(jq -r '.Peer // {} | .[] | select(.Online) | [((.TailscaleIPs // [])[] | select(test("^[0-9.]+$"))), .HostName] | @tsv' <<<"$peers")
+        # WSL stops a few seconds after its last terminal closes, and the server with it.
+        [[ -n "$address" ]] ||
+            die "no machine on the tailnet shares Ollama on port $ollama_port; on the one with the GPU, keep a WSL terminal open and run 'tailscale-up' there once"
+    fi
+    note "using $name ($address) for $model"
+    curl -fsS --max-time 300 "http://$address:$ollama_port/api/generate" \
+        -d "$(jq -nc --arg model "$gpu_model" --arg keep "$(jq -r '.gpuKeepAlive' <<<"$config")" '{model: $model, keep_alive: $keep}')" >/dev/null ||
+        die "$name could not load $gpu_model; check 'ollama list' there"
+    held="$(curl -fsS --max-time 5 "http://$address:$ollama_port/api/ps" | jq -r --arg model "$gpu_model" \
+        '([.models[]? | select(.name == $model or .model == $model)][0] // {}) | "\(.context_length // 0) \(.size // 0) \(.size_vram // 0)"')" ||
+        die "$name loaded $gpu_model but did not say how it holds it"
+    read -r served size vram <<<"$held"
+    (( served != 0 )) || die "$name loaded $gpu_model but does not list it as running"
+    (( served == window )) ||
+        die "$name gives $gpu_model a ${served}-token window where this machine declares $window: run 'chezmoi update' there, or give both machines the same contextTokens"
+    if (( size > 0 && vram < size )); then
+        warn "$(( (size - vram) * 100 / size ))% of $gpu_model runs on the CPU of $name, whose GPU is busy; expect it to be much slower"
+    fi
+}
+
+if [[ -n "$gpu" ]]; then
+    gpu_model="${model#*/}"
+    case "$(jq -r '.machine' <<<"$entry")" in
+        local) check_local_gpu ;;
+        tailnet) check_tailnet_gpu ;;
+        *) die "omniroute.gpus.$gpu has no machine of 'local' or 'tailnet'" ;;
+    esac
+fi
+
+if [[ "$mode" == "check" ]]; then
+    note "$model: ${window}-token window ($(jq -r '.source' <<<"$entry")), $(jq -r '.where' <<<"$entry")"
+    exit 0
+fi
+
+need claude
+
+# --- the session ----------------------------------------------------------------------------------
+# One --settings value carries the /model lineup, each listed model's effort, and, on a small
+# window, the rules the lean profile keeps. claudeMdExcludes drops the other global rules: a
+# separate config directory alone does not, because for any project under $HOME Claude Code reads
+# ~/.claude/rules as the rules of the ancestor directory ~.
+
+lean="$(jq -r --argjson window "$window" '.lean.maxWindow >= $window' <<<"$config")"
+# shellcheck disable=SC2016
+settings="$(jq -c --argjson cfg "$config" --argjson window "$window" --arg home "$home_dir" --argjson lean "$lean" '
+    {modelPicker: {replaceBuiltInOptions: true,
+                   options: [.[] | select(.served and .window != null and .window >= $window)
+                             | {model: .id, label: .label, description: "\(.shown) context · \(.where)"}]},
+     modelSettings: ([.[] | select(.effort) | {key: .id, value: {effortLevel: .effort}}] | from_entries)}
+    + (if $lean then {claudeMdExcludes: ["\($home)/.claude/rules/!(\($cfg.lean.rules | join("|"))).md",
+                                         "\($home)/.claude/CLAUDE.md"]}
+       else {} end)' <<<"$resolved")"
+tools=()
+if [[ "$lean" == "true" ]]; then
+    tools=(--tools "$(jq -r '.lean.tools | join(",")' <<<"$config")")
+fi
+
+# The window of every model OmniRoute serves, for the status line: after /model, the window it
+# shows stays the session's, and this is where it finds the new model's own. Each is sized as a
+# launch would size it: a GPU prefix at the server's window, an auto/* combo at autoWindow.
+windows="$(mktemp "$profile/.omniroute-windows.XXXXXX")"
+# shellcheck disable=SC2016
+jq -r --argjson listed "$resolved" --argjson cfg "$config" '
+    ([.data[] | select(.type == null)
+      | (.id | split("/")[0]) as $provider
+      | {key: .id, value: ([.context_length, .max_input_tokens,
+                            (if $cfg.gpus[$provider] then $cfg.gpuWindow else null end),
+                            (if .id | startswith("auto/") then $cfg.autoWindow else null end)]
+                           | map(select(type == "number" and . > 0)) | if length == 0 then null else min end)}]
+     | from_entries)
+    + ($listed | map(select(.window != null) | {key: .id, value: .window}) | from_entries)
+    | to_entries[] | select(.value != null) | "\(.key)\t\(.value)"' "$catalog" >"$windows"
+mv -f "$windows" "$profile/omniroute-windows.tsv"
+
+export ANTHROPIC_BASE_URL="$base"
+export ANTHROPIC_AUTH_TOKEN="$key"
+unset ANTHROPIC_API_KEY
+export ANTHROPIC_MODEL="$model"
+export ANTHROPIC_DEFAULT_OPUS_MODEL="$model"
+export ANTHROPIC_DEFAULT_SONNET_MODEL="$model"
+export ANTHROPIC_DEFAULT_HAIKU_MODEL="$model"
+export ANTHROPIC_DEFAULT_FABLE_MODEL="$model"
+export CLAUDE_CODE_SUBAGENT_MODEL="$model"
+export CLAUDE_CODE_MAX_CONTEXT_TOKENS="$window"
+export CLAUDE_CODE_MAX_OUTPUT_TOKENS="$output"
+export CLAUDE_CODE_DISABLE_1M_CONTEXT=1
+export CLAUDE_CODE_ATTRIBUTION_HEADER=0
+export CLAUDE_CODE_TOTAL_TOKENS_REMINDER=off
+export CLAUDE_CODE_AUTO_MODE_SERVER=0
+export DISABLE_ERROR_REPORTING=1
+export DISABLE_FEEDBACK_COMMAND=1
+export CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY=1
+export ANTHROPIC_CUSTOM_HEADERS=$'x-omniroute-compression: off\nx-omniroute-no-memory: true'
+export CLAUDE_CONFIG_DIR="$profile"
+export CLAUDE_OMNI_MODEL="$model"
+export CLAUDE_OMNI_WINDOW="$window"
+
+# --tools takes a variadic list, so --settings goes between it and the caller's arguments: an
+# option ends the list, where a prompt given as the first argument would join it as a tool name.
+exec claude --model "$model" "${tools[@]}" --settings "$settings" "${args[@]}"

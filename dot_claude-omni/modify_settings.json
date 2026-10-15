@@ -1,12 +1,13 @@
 {{- /* chezmoi:modify-template */ -}}
 {{- /*
-  Gives claude-local and claude-remote the look of the regular claude: the keys from
-  lib-claude-look.tmpl, merged into ~/.claude-local/settings.json. Their profile is a
-  CLAUDE_CONFIG_DIR of its own, so Claude Code reads nothing from ~/.claude/settings.json
-  there, and a local session would otherwise keep whatever its onboarding picked, with no
-  status line. Every other key belongs to the profile: /model choices, for one, land here.
+  Gives claude-omni the look of the regular claude: the keys from lib-claude-look.tmpl,
+  merged into ~/.claude-omni/settings.json. Its profile is a CLAUDE_CONFIG_DIR of its own,
+  so Claude Code reads nothing from ~/.claude/settings.json there, and a session through
+  OmniRoute would otherwise keep whatever its onboarding picked, with no status line. Every
+  other key belongs to the profile: /model choices, for one, land here, and claude-omni's
+  picker starts from the one saved last.
 
-  Shipped with claude-local, under the same gate in .chezmoiignore. A key whose value
+  Shipped with claude-omni, under the same gate in .chezmoiignore. A key whose value
   differs is set back; when none does, the current content is returned byte for byte. A
   real change re-serialises the file, and toPrettyJson then sorts its keys. Invalid JSON
   fails the template instead of replacing the file.
@@ -23,7 +24,7 @@
 {{-   end -}}
 {{- end -}}
 {{- if $updated -}}
-{{-   warnf "[claude-local] set %s in ~/.claude-local/settings.json" (join ", " $updated) -}}
+{{-   warnf "[claude-omni] set %s in ~/.claude-omni/settings.json" (join ", " $updated) -}}
 {{-   toPrettyJson $settings -}}
 {{- else -}}
 {{-   .chezmoi.stdin -}}

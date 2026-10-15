@@ -10,6 +10,7 @@ LICENSE
 Makefile
 README.md
 docs
+local-services
 
 {{- /* Windows-specific files – these are only useful on Windows. When not on Windows, ignore them. */ -}}
 {{- if ne .chezmoi.os "windows" }}
@@ -56,18 +57,14 @@ AppData
 .local/bin/tailscale
 {{- end }}
 
-{{- /* The local model for Claude Code (claude-local): Linux with an NVIDIA driver, unless
+{{- /* The local model server (Ollama): Linux with an NVIDIA driver, unless
      .chezmoidata/local-llm.yaml switches it off. Gated on the GPU rather than on WSL, because
      nothing in it depends on Windows and a bare-metal machine with a GPU runs it the same way.
      The OS check lives here, not in lib-local-llm.tmpl, because lookPath finds nvidia-smi.exe on
-     a Windows machine with an NVIDIA card too. .claude-local carries the look claude-local's
-     profile shares with the regular claude. */ -}}
+     a Windows machine with an NVIDIA card too. claude-omni, which reaches it through OmniRoute,
+     ships on every Linux machine below: a GPU on the tailnet or a cloud provider needs none here. */ -}}
 {{- if not $localLLM }}
-.claude-local
 .config/systemd/user/ollama.service
-.local/bin/claude-local
-.local/bin/claude-local-task
-.local/bin/claude-remote
 {{- end }}
 
 {{- if not (or $wsl $localLLM) }}
@@ -78,6 +75,9 @@ AppData
 {{- if ne .chezmoi.os "linux" }}
 .chezmoiscripts/linux-*.sh
 .local/bin/tailscale-up
+.claude-omni
+.local/bin/claude-omni
+.local/bin/claude-omni-task
 .config/ggshield
 .docker
 .histdb

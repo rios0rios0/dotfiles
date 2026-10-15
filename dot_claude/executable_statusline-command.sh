@@ -46,9 +46,17 @@
 # reads as a grey box against the Claude Code transcript.
 #
 # chezmoi deploys this from dot_claude/executable_statusline-command.sh, and both
-# Claude Code profiles run it: the regular one and claude-local's. CFG follows
+# Claude Code profiles run it: the regular one and claude-omni's. CFG follows
 # CLAUDE_CONFIG_DIR, so each profile reads its own credentials, usage cache and
-# account; a local session, which has no claude.ai login, shows no plan limits.
+# account; a session through OmniRoute, which has no claude.ai login, shows no
+# plan limits.
+#
+# A session through OmniRoute holds one context window for its whole life:
+# Claude Code takes one CLAUDE_CODE_MAX_CONTEXT_TOKENS per process. After /model,
+# the window on stdin stays the session's, so the new model's own window comes
+# from the table claude-omni writes at launch, and ctx names it when it differs.
+# A model whose window is smaller than the session's overflows before the
+# session compacts; ctx turns red then.
 
 CFG=${CLAUDE_CONFIG_DIR:-$HOME/.claude}
 USAGE_CACHE="$CFG/statusline-usage.cache"
@@ -142,6 +150,7 @@ input=$(cat)
 {
     IFS= read -r raw_cwd
     IFS= read -r model
+    IFS= read -r model_id
     IFS= read -r ctx_left
     IFS= read -r ctx_tokens
     IFS= read -r ctx_size
@@ -152,6 +161,7 @@ input=$(cat)
 } < <(printf '%s' "$input" | jq -r '
         (.workspace.current_dir // .cwd // ""),
         (.model.display_name // .model.id // ""),
+        (.model.id // ""),
         (.context_window.remaining_percentage // -1 | floor),
         (.context_window.total_input_tokens // 0),
         (.context_window.context_window_size // 0),
@@ -193,7 +203,7 @@ fi
 
 now=$EPOCHSECONDS
 usage_age=$(( now - usage_fetched ))
-# A profile without a claude.ai login -- claude-local's -- has nothing to fetch,
+# A profile without a claude.ai login -- claude-omni's -- has nothing to fetch,
 # and a refresh that cannot succeed never writes the cache, so trying anyway
 # would fork one on every redraw.
 if [ "$usage_age" -ge "$USAGE_TTL" ] && [ -r "$CFG/.credentials.json" ]; then
@@ -459,15 +469,37 @@ seg_model=""
 seg_venv=""
 [ -n "$VIRTUAL_ENV" ] && seg_venv="${C_DIM}${VIRTUAL_ENV##*/}"
 
+# The active model's own window, when /model has switched away from the one
+# claude-omni started the session on (0 otherwise). Read without a subprocess;
+# the table only exists in claude-omni's profile.
+model_window=0
+if [ -n "${CLAUDE_OMNI_MODEL:-}" ] && [ -n "$model_id" ] && [ "$model_id" != "$CLAUDE_OMNI_MODEL" ] &&
+    [ -r "$CFG/omniroute-windows.tsv" ]; then
+    while IFS=$'\t' read -r _id _window; do
+        if [ "$_id" = "$model_id" ]; then
+            model_window=$_window
+            break
+        fi
+    done < "$CFG/omniroute-windows.tsv"
+fi
+
 ctx_segment() {  # ctx_segment <level 0|1>
     local level=$1 out
     if [ "${ctx_left:--1}" -lt 0 ]; then
         printf '%s' "${C_DIM}ctx n/a"
         return
     fi
+    if [ "${model_window:-0}" -gt 0 ] && [ "$model_window" -lt "${ctx_size:-0}" ]; then
+        printf '%s' "${C_CRIT}ctx ${ctx_left}% left · model holds $(human "$model_window")"
+        return
+    fi
     out="$(usage_color $(( 100 - ctx_left )))ctx ${ctx_left}% left"
     if [ "$level" -eq 0 ] && [ "${ctx_size:-0}" -gt 0 ]; then
-        out+="${C_DIM} ($(human "${ctx_tokens:-0}")/$(human "$ctx_size"))"
+        out+="${C_DIM} ($(human "${ctx_tokens:-0}")/$(human "$ctx_size")"
+        if [ "${model_window:-0}" -gt 0 ] && [ "$model_window" -ne "$ctx_size" ]; then
+            out+=" · model $(human "$model_window")"
+        fi
+        out+=")"
     fi
     printf '%s' "$out"
 }

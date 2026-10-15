@@ -1,3 +1,3 @@
 kind: 'Added'
-body: 'added the terminal look of Claude Code (the `dark-ansi` theme, the fullscreen renderer and a status line styled after the p10k prompt) and of Codex (its status line items and colours) to the managed files: modify-templates keep only those keys in `~/.claude/settings.json` on Linux, in `~/.claude-local/settings.json`, so `claude-local` and `claude-remote` look like the regular `claude`, and in `~/.codex/config.toml` on every platform'
+body: 'added the terminal look of Claude Code (the `dark-ansi` theme, the fullscreen renderer and a status line styled after the p10k prompt) and of Codex (its status line items and colours) to the managed files: modify-templates keep only those keys in `~/.claude/settings.json` on Linux, in `~/.claude-omni/settings.json`, so `claude-omni` looks like the regular `claude`, and in `~/.codex/config.toml` on every platform'
 time: '2026-10-14T20:15:08.887293329Z'

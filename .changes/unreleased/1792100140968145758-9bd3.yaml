@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'stopped deploying the OmniRoute Compose file to `~/local-services`, where it only drifted from the copy in the dotfiles checkout that the stack runs from'
+time: '2026-10-15T21:35:40.968037448Z'

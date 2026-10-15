@@ -31,6 +31,12 @@ services:
       ALLOW_API_KEY_REVEAL: 'false'
       OMNIROUTE_MEMORY_MB: '2048'
       NODE_EXTRA_CA_CERTS: '/run/omniroute-ca/ca-bundle.pem'
+      # How long the first, pooled attempt at a cloud provider may wait for its response to start
+      # before OmniRoute retries it on a fresh socket. The 30-second default re-queues requests
+      # NVIDIA NIM is still holding in its queue: z-ai/glm-5.3-flash started answering after
+      # 30-35 seconds, so the abort and retry turned that into 61-65 seconds (measured 2026-10-15).
+      # OmniRoute raises it to 180 seconds on its own only for requests that ask for high effort.
+      OMNIROUTE_DIRECT_HEADERS_TIMEOUT_MS: '120000'
     ports:
       - '127.0.0.1:20128:20128'
       - '127.0.0.1:20129:20129'

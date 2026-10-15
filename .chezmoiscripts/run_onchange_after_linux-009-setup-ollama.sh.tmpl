@@ -2,7 +2,7 @@
 {{- if $llm.enabled -}}
 #!/bin/bash
 
-# Installs Ollama as a systemd user service and pulls the model `claude-local` runs.
+# Installs Ollama as a systemd user service and pulls the model OmniRoute serves from this GPU.
 #
 # Ollama's own installer is a root script: it streams the release into /usr/local without
 # checking a digest, creates an `ollama` system user, and leaves its settings to a drop-in under

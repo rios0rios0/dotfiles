@@ -1,9 +1,17 @@
+{{- $omni := includeTemplate "lib-omniroute.tmpl" . | fromJson -}}
 #!/bin/bash
 
-# claude-local-task: runs one task on the local model, unattended, and returns an audit of the run.
-# See .docs/local-coding-model.md, "Delegating a task".
+# claude-omni-task: runs one task through claude-omni, unattended, and returns an audit of the run.
+# See .docs/omniroute-local.md, "Delegating a task".
 #
-#   claude-local-task [--remote] BRIEF_FILE
+#   claude-omni-task [-m ID] BRIEF_FILE
+#
+# Without -m, the run takes the first GPU in omniroute.taskGpus that is free and serving. Free means
+# no other claude-omni-task holds its lock: a GPU serves one request at a time, so a second run would
+# only queue behind the first until both time out. Serving means `claude-omni --check` passes: the
+# server answers, and on another machine it holds the model at this machine's window. -m names any
+# model claude-omni can start, a cloud one included, and then every file the model reads goes to
+# that provider; the audit says so.
 #
 # The model works as the caller's own session does, with every permission check off: nothing is
 # prompted and nothing is refused, so it can run whatever the task needs. Nobody watches it
@@ -13,40 +21,97 @@
 #     the run in a scratch index -- untracked files included, the caller's own index untouched --
 #     so changes that were already there are never attributed to it;
 #   - one command that undoes exactly that change;
-#   - the full transcript, which Claude Code keeps under the local profile.
-# The audit is printed in short and saved in full under ~/.claude-local/audits.
+#   - the full transcript, which Claude Code keeps under claude-omni's profile.
+# The audit is printed in short and saved in full under ~/.claude-omni/audits.
 #
 # An audit cannot take back what left the working tree: a commit, a push, a request to a server,
 # a write somewhere else. Those show up in the action list and as a moved HEAD, and nowhere else.
-#
-# --remote runs the model on another machine's GPU through claude-remote; the tools still run here.
 
 set -euo pipefail
 
-prefix="claude-local-task"
-launcher="claude-local"
+prefix="claude-omni-task"
+launcher="claude-omni"
 max_turns=40
 # A little under the 10 minutes a calling agent's shell allows, so that the audit is still
 # written when a run is cut short.
 time_limit=570
-config_dir="${CLAUDE_LOCAL_CONFIG_DIR:-$HOME/.claude-local}"
+config_dir="${CLAUDE_OMNI_CONFIG_DIR:-$HOME/.claude-omni}"
+gpu_model={{ $omni.gpuModel | quote }}
+task_gpus=({{ range $omni.taskGpus }}{{ . | quote }} {{ end }})
+gpu_prefixes=({{ range $gpu, $_ := $omni.gpus }}{{ $gpu | quote }} {{ end }})
 
 usage() {
-    echo "usage: $prefix [--remote] BRIEF_FILE" >&2
+    echo "usage: $prefix [-m ID] BRIEF_FILE" >&2
     exit 2
 }
 
-if [[ "${1:-}" == "--remote" ]]; then
-    launcher="claude-remote"
-    shift
+die() {
+    echo "[$prefix] ERROR: $1" >&2
+    exit "${2:-1}"
+}
+
+model=""
+if [[ "${1:-}" == "-m" || "${1:-}" == "--model" ]]; then
+    [[ $# -ge 2 ]] || usage
+    model="$2"
+    shift 2
 fi
 [[ $# -eq 1 && "$1" != -* ]] || usage
 brief="$1"
-[[ -r "$brief" ]] || { echo "[$prefix] ERROR: cannot read the brief $brief" >&2; exit 2; }
+[[ -r "$brief" ]] || die "cannot read the brief $brief" 2
 
-for tool in "$launcher" jq git; do
-    command -v "$tool" >/dev/null 2>&1 || { echo "[$prefix] ERROR: $tool is not installed" >&2; exit 1; }
+for tool in "$launcher" jq git flock; do
+    command -v "$tool" >/dev/null 2>&1 || die "$tool is not installed"
 done
+
+# The caller's effort level is the caller's; the run takes the one omniroute.yaml sets for its model.
+unset CLAUDE_EFFORT
+
+is_gpu() {
+    local gpu
+    for gpu in "${gpu_prefixes[@]}"; do
+        [[ "$1" == "$gpu" ]] && return 0
+    done
+    return 1
+}
+
+# Holds the GPU's lock until this process exits; fails when another run holds it.
+lock_gpu() {
+    mkdir -p "$config_dir/locks"
+    exec {lock_fd}>"$config_dir/locks/$1.lock"
+    flock -n "$lock_fd" && return 0
+    exec {lock_fd}>&-
+    return 1
+}
+
+checks="$(mktemp)"
+trap 'rm -f "$checks"' EXIT
+if [[ -z "$model" ]]; then
+    for gpu in "${task_gpus[@]}"; do
+        if ! lock_gpu "$gpu"; then
+            echo "[$prefix] $gpu is running another task" >>"$checks"
+            continue
+        fi
+        if check="$("$launcher" --check -m "$gpu/$gpu_model" 2>&1 >/dev/null)"; then
+            printf '%s\n' "$check" >>"$checks"
+            model="$gpu/$gpu_model"
+            break
+        fi
+        echo "[$prefix] skipped $gpu: $(tail -1 <<<"$check" | sed 's/^\[claude-omni\] \(ERROR: \)\{0,1\}//')" >>"$checks"
+        exec {lock_fd}>&-
+    done
+    if [[ -z "$model" ]]; then
+        cat "$checks" >&2
+        die "no GPU in omniroute.taskGpus is free and serving; name another model with -m"
+    fi
+elif is_gpu "${model%%/*}"; then
+    lock_gpu "${model%%/*}" || die "${model%%/*} is running another task; wait for it, or name another model with -m"
+fi
+if is_gpu "${model%%/*}"; then
+    where="the GPU behind ${model%%/*}"
+else
+    where="${model%%/*}, a cloud provider that receives every file the model reads"
+fi
 
 # Every action the model took, read from the stream-json events: one line each with $format
 # "line", or one section each with "markdown", which adds the output of every command. Lines that
@@ -115,12 +180,12 @@ fi
 
 stream="$(mktemp)"
 errors="$(mktemp)"
-trap 'rm -f "$stream" "$errors"' EXIT
+trap 'rm -f "$checks" "$stream" "$errors"' EXIT
 
 started="$(date '+%Y-%m-%d %H:%M:%S')"
 start=$SECONDS
 code=0
-timeout --kill-after=10 "$time_limit" "$launcher" -p --dangerously-skip-permissions \
+timeout --kill-after=10 "$time_limit" "$launcher" -m "$model" -p --dangerously-skip-permissions \
     --output-format stream-json --verbose --max-turns "$max_turns" \
     <"$brief" >"$stream" 2>"$errors" || code=$?
 elapsed=$(( SECONDS - start ))
@@ -139,7 +204,7 @@ transcript=""
 if [[ -n "$session" && -d "$config_dir/projects" ]]; then
     transcript="$(find "$config_dir/projects" -name "$session.jsonl" -print -quit 2>/dev/null)"
 fi
-server="$(grep -E '^\[claude-(remote|local)\]' "$errors" || true)"
+server="$(grep -hE '^\[(claude-omni|claude-omni-task)\]' "$checks" "$errors" | awk '!seen[$0]++' || true)"
 
 if (( code == 124 || code == 137 )); then
     outcome="cut short after ${time_limit} s, with the model still working"
@@ -175,6 +240,7 @@ audit="$config_dir/audits/$(date '+%Y%m%d-%H%M%S')-${session:0:8}.md"
     echo "# $prefix audit"
     echo
     echo "- started: $started, with \`$launcher\` in \`$PWD\`"
+    echo "- model: \`$model\`, on $where"
     echo "- outcome: $outcome"
     echo "- transcript: \`${transcript:-not found}\`"
     [[ -z "$server" ]] || echo "- ${server//$'\n'/$'\n'- }"
@@ -207,6 +273,7 @@ audit="$config_dir/audits/$(date '+%Y%m%d-%H%M%S')-${session:0:8}.md"
 } >"$audit"
 
 echo "[$prefix] full audit: $audit"
+echo "model: $model, on $where"
 echo "outcome: $outcome"
 [[ -z "$server" ]] || echo "$server"
 echo "actions:"

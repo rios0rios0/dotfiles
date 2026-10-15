@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `claude-omni`, which starts Claude Code through OmniRoute on a model picked at launch, with each one''s context window on its line, or named with `-m`: it gives Claude Code the model''s real window (for a GPU model the one the Ollama server allocates, which OmniRoute cannot see), pins every tier to that model, offers `/model` the listed models that hold the session''s window, keeps the GPU checks of the launchers it replaces, and adds `--list` and `--probe`; the status line names a switched model''s own window, in red when it is smaller than the session''s'
+time: '2026-10-15T21:35:40.941723306Z'
