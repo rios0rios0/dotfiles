@@ -252,6 +252,10 @@ On Linux with an NVIDIA driver, `chezmoi apply` installs Ollama as a user servic
 
 `claude-remote` runs the same session on another machine's GPU across the tailnet: each GPU machine shares its server there with `tailscale serve`, and `claude-remote` finds it, checks that it gives the model the same context window, and warns when part of the model ended up on that machine's CPU. `claude-local-task` runs one unattended task on either and hands back an audit of the run -- every action with its result, the change it made measured against a snapshot of the working tree, and one command that undoes it -- which is what the `ollama-local` and `ollama-remote` agents use.
 
+## Multi-Provider Routing with OmniRoute
+
+The optional [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway for Claude Code with providers such as NVIDIA NIM, OpenRouter and Baseten. Its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes.
+
 ## Tailscale
 
 On Linux (WSL or bare metal), `chezmoi apply` installs Tailscale from its signed apt repository -- the key checked by fingerprint -- and enables `tailscaled`. Run from a terminal, it then prints the login URL and waits until you have used it; otherwise run `tailscale-up` later, which every new shell points at until the machine is logged in. After that the machine rejoins by itself, and every interactive zsh brings it back up after a `tailscale down`, never waiting or asking for a password. MagicDNS stays off (`--accept-dns=false`), because WSL writes `/etc/resolv.conf` itself and tailscaled would otherwise replace it.

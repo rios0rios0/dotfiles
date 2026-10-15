@@ -37,3 +37,6 @@ build/reports/
 
 # SAST, lint, and test reports written by `make sast` / `make lint`
 build/
+
+# Local OmniRoute credentials; `.env.example` remains tracked.
+.env

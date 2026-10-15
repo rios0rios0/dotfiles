@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added a loopback-only OmniRoute Compose deployment with persistent local data, required encryption secrets and Claude Code routing instructions for NVIDIA NIM, OpenRouter and Baseten'
+time: '2026-10-15T03:11:54Z'
