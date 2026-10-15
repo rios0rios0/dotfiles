@@ -30,6 +30,7 @@ make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
 make test-local-llm                 # claude-local, claude-remote and claude-local-task: one context window, the launchers, the audit, the capacity hint
 make test-tailscale                 # tailscale-up: the quiet pass every zsh runs, the login, sharing the model's server
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
+make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
 ```
 
 ## Essential Commands
@@ -209,7 +210,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`, `codex-config`, `chrome`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-local`, `claude-remote`, `claude-local-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -338,6 +339,55 @@ choice Claude Code also keeps there, so an apply leaves it alone.
 
 `make test-modify-scripts` covers what each platform gets, that mcp-hub receives the same list,
 invariants 1 and 2 across every platform, and the retirements in 6.
+
+## Claude Code Language Servers
+
+Claude Code's `LSP` tool -- definitions, references, hover, symbols, call hierarchy, and the type
+errors it reports after each edit -- does nothing until a plugin names a language server and the
+server is on `PATH`. On Linux, `.chezmoiscripts/run_onchange_after_linux-012-setup-claude-lsp.sh`
+installs both halves:
+
+| Plugin (`claude-plugins-official`) | Server it starts | Installed as |
+|------------------------------------|------------------|--------------|
+| `gopls-lsp` | `gopls` | `go install` into `~/.local/bin` |
+| `typescript-lsp` | `typescript-language-server --stdio`, with `typescript` 6.x | `npm install -g` into NVM's default Node |
+| `pyright-lsp` | `pyright-langserver --stdio` | `npm install -g` into NVM's default Node |
+
+**Keep these:**
+
+1. **The plugins are installed, not just enabled.** An `enabledPlugins` entry alone installs
+   nothing -- on a fresh profile `claude plugin list` stays empty -- so the script runs
+   `claude plugin install … --scope user`, which writes the entry too. A fresh profile knows only
+   the built-in directory, so the script adds the `claude-plugins-official` marketplace first. The
+   ids are that marketplace's because aifiles' `settings.json` and earlier project-scope installs
+   use them, and two ids for one plugin would start two copies of its server.
+2. **`gopls` lives in `~/.local/bin`.** `dot_zshenv.tmpl` puts only the newest Go's GVM pkgset on
+   `PATH`, so a plain `go install` would vanish at the next Go upgrade.
+3. **TypeScript stays on 6.x.** typescript-language-server drives tsserver, and TypeScript 7 --
+   the native port, npm's `latest` since July 2026 -- ships none. A project's own
+   `node_modules/typescript` still wins; the global one is the fallback.
+4. **Every server is pinned** at the top of the script, so bumping one is an edit there, which is
+   also what reruns the script on the next apply. npm runs with `--ignore-scripts`: none of these
+   packages has an install script.
+5. **No `-y` and no terminal.** None of these plugins runs a command to install; one that started
+   to fails here instead of running unattended.
+6. **The regular profile only.** The script unsets `CLAUDE_CONFIG_DIR`, so an apply run from inside
+   a `claude-local` session cannot put plugins into that deliberately lean profile.
+7. **A failure fails the apply.** A server that does not install keeps its plugin out, and the run
+   exits non-zero so the next apply retries it; a machine without `claude` fails the same way.
+8. **aifiles mirrors the result.** Where aisync runs, `aisync pull` rewrites `settings.json` from
+   aifiles' copy, asking first when the live file differs, and accepting drops whatever only the live
+   file has. That copy therefore lists the same three plugins and the marketplace: add a plugin in
+   both places.
+
+It is Linux only. Windows work happens inside WSL. On Termux, Claude Code starts a server itself,
+not through a shell, with `LD_PRELOAD` parked (see "Android Performance"), so the two servers that
+are `#!/usr/bin/env node` scripts would hit the `bad interpreter` failure described there --
+unverified on a device, which is why it is not attempted. Java's `jdtls-lsp` is left out: Eclipse
+JDT LS needs a Java 21 runtime and starts a JVM in every session that opens a `.java` file.
+
+`make test-claude-lsp` covers 1 and 3 to 7 against stubbed `go`, `npm` and `claude`, and the first
+apply's bash, which has to find GVM's newest Go and NVM's default Node on its own.
 
 ## Shared Install Library
 

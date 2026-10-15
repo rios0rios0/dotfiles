@@ -277,6 +277,14 @@ jobs:
       - name: 'Test the status line in both Claude Code profiles'
         run: 'make test-statusline'
 
+  test-claude-lsp:
+    name: 'Test (Claude Code language servers)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Test the language servers and the plugins that start them'
+        run: 'make test-claude-lsp'
+
   sast:
     name: SAST
     runs-on: ubuntu-latest
