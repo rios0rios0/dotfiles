@@ -819,8 +819,8 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
    on the tailnet and otherwise only hints. It leaves a client switched off in the app as it is;
    `tailscale-up` asked directly switches it back on with a bare `tailscale up`.
 3. **WSL's share is Windows' `tailscale serve`, to Windows' own `127.0.0.1:11434`**, which WSL's
-   localhost forwarding hands to Ollama, still bound to loopback. The wrapper's path is fixed, as
-   `op-ssh-sign-wsl`'s is in `dot_gitconfig.tmpl`; `TAILSCALE_EXE` names another.
+   localhost forwarding hands to Ollama, bound to all interfaces for LAN access. The wrapper's
+   path is fixed, as `op-ssh-sign-wsl`'s is in `dot_gitconfig.tmpl`; `TAILSCALE_EXE` names another.
 4. **Bare metal: the shell's pass never waits and never asks for a password.** It runs in every
    interactive zsh, so a logged-out machine gets a one-line hint pointing at `tailscale-up`, not a
    login that blocks the prompt, and a failed daemon gets a hint, not `sudo systemctl`. A daemon

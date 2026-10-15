@@ -23,6 +23,18 @@ systemd starts. A WSL distribution can boot without systemd -- Kali's does until
 turns it on in `/etc/wsl.conf` -- and the installer then stops after step 1, to finish on the first
 apply after WSL restarts with it.
 
+Ollama listens on `0.0.0.0:11434` so clients on the local network can connect to the machine's LAN
+address, and so Tailscale Serve can forward requests without Ollama rejecting the remote `Host`
+header. The API has no authentication: any device allowed through the host firewall can run
+inference, pull models and delete models. Keep port `11434` restricted to networks and devices you
+trust.
+
+On WSL 2, binding to `0.0.0.0` does not by itself make the service reachable from the LAN. WSL's
+default NAT mode requires a Windows port proxy and firewall rule; Windows 11 mirrored networking
+can expose WSL directly, with an inbound Hyper-V firewall rule. See Microsoft's [WSL networking
+guide](https://learn.microsoft.com/windows/wsl/networking) for the setup that matches the Windows
+version and networking mode.
+
 ## Usage
 
 ```bash
@@ -141,11 +153,12 @@ How the two machines meet:
    through the `tailscale` wrapper. A bare-metal machine runs `tailscaled`, which `chezmoi update`
    installs and logs in.
 2. A machine with the local model shares its server on the tailnet's port 11434, unless
-   `shareOnTailnet` in `.chezmoidata/local-llm.yaml` says otherwise. It is `tailscale serve`, so
-   Ollama itself stays on loopback and nothing reaches it from outside the tailnet; on WSL,
-   Windows' client forwards to Windows' loopback, which WSL hands on to Ollama; run `tailscale-up`
-   in WSL once Windows is logged in. The API has no authentication, so the tailnet is the whole
-   boundary: every device on it can use, pull and delete models.
+   `shareOnTailnet` in `.chezmoidata/local-llm.yaml` says otherwise. It is `tailscale serve`, never
+   Funnel; on WSL, Windows' client forwards to Windows' loopback, which WSL hands on to Ollama;
+   run `tailscale-up` in WSL once Windows is logged in. Ollama listens on all interfaces for LAN
+   access and has no authentication, so firewall rules and the tailnet policy define who can run,
+   pull and delete models. WSL 2 may need mirrored networking or a Windows port proxy for LAN
+   clients; see [When it is installed](#when-it-is-installed).
 3. `claude-remote` picks the first online machine that answers there, or the one
    `CLAUDE_REMOTE_HOST` names.
 

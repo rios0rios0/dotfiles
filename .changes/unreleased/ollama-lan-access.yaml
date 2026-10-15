@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'made the local Ollama API listen on all interfaces so clients on the LAN can connect; documented that the unauthenticated API must be protected by network firewall rules and that WSL 2 needs mirrored networking or a Windows port proxy for LAN access'
+time: '2026-10-15T19:00:00Z'
