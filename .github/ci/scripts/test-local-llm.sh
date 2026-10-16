@@ -112,6 +112,33 @@ fi
 
 # --- one window, two consumers ---------------------------------------------------------------
 
+# The machines share this checkout but not their local/remote topology. The persistent deviceName
+# selects the right provider map; otherwise the desktop would try to reach its own GPU via tailnet.
+for device in alien-a51 mxhero-z790; do
+    config="$(PATH="$TMP/bin-gpu" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
+        --override-data "{\"deviceName\":\"$device\"}" \
+        '{{ includeTemplate "lib-omniroute.tmpl" . }}')"
+    if [[ "$device" == alien-a51 ]]; then local_gpu=ollama-laptop; remote_gpu=ollama; local_label='laptop GPU'; remote_label='desktop GPU'
+    else local_gpu=ollama; remote_gpu=ollama-laptop; local_label='desktop GPU'; remote_label='laptop GPU'; fi
+    if [[ "$(jq -r --arg gpu "$local_gpu" '.gpus[$gpu].machine + " " + .gpus[$gpu].label' <<<"$config")" == "local $local_label" &&
+        "$(jq -r --arg gpu "$remote_gpu" '.gpus[$gpu].machine + " " + .gpus[$gpu].label' <<<"$config")" == "tailnet $remote_label" &&
+        "$(jq -r '[.models[] | select(has("gpu")) | .gpu] | join(" ")' <<<"$config")" == "$local_gpu $remote_gpu" &&
+        "$(jq -r '.taskGpus | join(" ")' <<<"$config")" == "$local_gpu $remote_gpu" ]]; then
+        pass "$device maps its local GPU directly and the other device through the tailnet"
+    else
+        fail "$device GPU routing is wrong: $(jq -c '{gpus, models, taskGpus}' <<<"$config")"
+    fi
+done
+
+# Ollama binds to all interfaces so Tailscale Serve can expose it to the tailnet; Docker Desktop
+# reaches it through host.docker.internal. The API has no authentication, so restrict access with
+# the firewall.
+if render gpu "$UNIT" | grep -qx 'Environment=OLLAMA_HOST=0.0.0.0:11434'; then
+    pass "Ollama binds all interfaces for Tailscale Serve"
+else
+    fail "Ollama must bind 0.0.0.0:11434 for Tailscale Serve to expose it"
+fi
+
 for override in "" '{"localLLM":{"devices":{"testdevice":{"contextTokens":32768}}}}'; do
     # given the same settings
     # when: the window the server allocates, and the one claude-omni declares for every GPU model
