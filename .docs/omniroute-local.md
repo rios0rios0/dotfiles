@@ -50,13 +50,23 @@ knows a model runs on a GPU and which one:
 | `ollama-laptop` | `http://host.docker.internal:11434` | this machine |
 | `ollama` | `http://<the other machine's 100.x address>:11434` | another machine on the tailnet; `tailscale ip -4 <name>` prints the address |
 
-Docker Desktop provides `host.docker.internal` for containers to reach Windows, and WSL forwards
-localhost ports to Windows, so OmniRoute reaches this machine's Ollama there while Ollama stays bound
-inside WSL. Do not add a `host-gateway` mapping here: with Docker Desktop it would point at the Docker
-VM's bridge rather than the Windows host. A container's traffic leaves through Windows, so it reaches
-the other machine through Windows' Tailscale client. Use the `100.x` address rather than a MagicDNS
-name: OmniRoute counts that range as private and gives such a host five minutes to start answering,
-enough for a cold model load, where a name gets thirty seconds. The Ollama API has no authentication.
+Docker Desktop provides `host.docker.internal` for containers to reach host services. Ollama binds
+to `0.0.0.0` so Tailscale Serve can expose it to the tailnet; Docker Desktop still reaches it at
+`host.docker.internal` through WSL's localhost forwarding to Windows. No extra proxy, `socat`, or
+systemd bridge is needed. The API has no authentication, so restrict access with the firewall.
+
+The dotfiles checkout is shared by two machines, so the local/remote roles come from chezmoi's
+`deviceName`, not from a machine guess at runtime. On the laptop (`alien-a51`), `ollama-laptop` is
+local and `ollama` is the desktop. On the desktop (`mxhero-z790`), a per-device override swaps those
+roles: `ollama` is local and `ollama-laptop` is the laptop. Check the value on each machine with
+`chezmoi data | jq -r .deviceName`; `CHEZMOI_DEVICE` can override the hostname when set before
+`chezmoi init`.
+
+Do not add a `host-gateway` mapping: with Docker Desktop it points at the Docker VM's bridge rather
+than the Windows host. Container traffic to the remote GPU leaves through Windows and traverses its
+Tailscale client. Use the remote machine's `100.x` address rather than a MagicDNS name: OmniRoute
+counts that range as private and gives such a host five minutes to start answering, enough for a cold
+model load, where a name gets thirty seconds.
 
 Give each Ollama model a manual context window of `contextTokens` from `.chezmoidata/local-llm.yaml`
 (65536). OmniRoute cannot see the window an Ollama server allocates and assumes its 128000 fallback;
@@ -99,15 +109,17 @@ Test each connection, then enable the providers and models you want the router t
 | Result | Models |
 |--------|--------|
 | HTTP 404 from NIM | 39 (among them `moonshotai/kimi-k2.6`, `mistralai/mistral-large`, `mistralai/codestral-22b-instruct-v0.1`, `meta/llama2-70b`) |
-| HTTP 500 or no answer | 2 |
+| HTTP 500 or no answer | 2 (one 500, one timeout) |
 | Answered without calling the tool | 1 |
 | Called the tool | 13; the fast ones, under 6 s: `z-ai/glm-5.3`, `nvidia/nemotron-3-super-120b-a12b`, `openai/gpt-oss-20b`, `stepfun-ai/step-5-preview` |
 
-Hide the failing ones on the provider's page, so neither the catalog nor an `auto/*` combo offers them,
-and keep `models` in `.chezmoidata/omniroute.yaml` to ones that work. `claude-omni --probe nvidia/`
-repeats the probe and lists the models that work first, fastest first; a provider that bills per token
-bills each of its requests. OmniRoute reports its 128000 fallback as the window of every NIM model, so
-`claude-omni` marks them `128K?`.
+Following that probe, OmniRoute hides 68 of its 81 NIM chat entries; the 13 that called the tool in
+the latest probe remain visible. Three models that were visible after an older probe were hidden
+because they were not confirmed by this run: one was absent from the current catalog, one timed out,
+and one returned HTTP 500. This visibility is stored in OmniRoute's database, not in this checkout.
+`models` in `.chezmoidata/omniroute.yaml` is only the preferred picker subset. `claude-omni --probe
+nvidia/` repeats the probe; each request may incur provider charges. OmniRoute reports no authoritative
+NIM context window, so the picker shows `?` rather than presenting its generic 128000 fallback as fact.
 
 **Why the first answer can take a minute.** NIM queues requests: `z-ai/glm-5.3-flash` started answering
 after 30-35 seconds. OmniRoute aborted that first attempt at its 30-second default and retried on a

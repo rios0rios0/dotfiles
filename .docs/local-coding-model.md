@@ -24,17 +24,11 @@ systemd starts. A WSL distribution can boot without systemd -- Kali's does until
 turns it on in `/etc/wsl.conf` -- and the installer then stops after step 1, to finish on the first
 apply after WSL restarts with it.
 
-Ollama listens on `0.0.0.0:11434` so clients on the local network can connect to the machine's LAN
-address, and so Tailscale Serve can forward requests without Ollama rejecting the remote `Host`
-header. The API has no authentication: any device allowed through the host firewall can run
-inference, pull models and delete models. Keep port `11434` restricted to networks and devices you
-trust.
-
-On WSL 2, binding to `0.0.0.0` does not by itself make the service reachable from the LAN. WSL's
-default NAT mode requires a Windows port proxy and firewall rule; Windows 11 mirrored networking
-can expose WSL directly, with an inbound Hyper-V firewall rule. See Microsoft's [WSL networking
-guide](https://learn.microsoft.com/windows/wsl/networking) for the setup that matches the Windows
-version and networking mode.
+Ollama listens on `0.0.0.0:11434` so Tailscale Serve can expose it to the tailnet and so Docker
+Desktop can reach it through `host.docker.internal`. WSL's localhost forwarding exposes the listener
+to Windows, and Windows' Tailscale client can forward tailnet traffic to it with `tailscale serve`.
+The API has no authentication: any device allowed through the host firewall can run inference, pull
+models and delete models. Restrict port `11434` to networks and devices you trust.
 
 ## Settings
 
@@ -88,10 +82,8 @@ it runs stays there, and only inference happens on the other one.
    client's CLI through the `tailscale` wrapper. A bare-metal machine runs `tailscaled`, which
    `chezmoi update` installs and logs in.
 2. The share is `tailscale serve`, never Funnel; on WSL, Windows' client forwards to Windows'
-   `localhost`, which WSL hands on to Ollama (not to `127.0.0.1`, where WSL relays nothing since
-   Ollama listens on every interface). Run `tailscale-up` in WSL once Windows is logged in. Ollama
-   listens on all interfaces for LAN access and has no authentication, so firewall rules and the
-   tailnet policy define who can run, pull and delete models.
+   `localhost`, which WSL hands on to Ollama. Run `tailscale-up` in WSL once Windows is logged in.
+   Docker Desktop uses `host.docker.internal` to reach Ollama directly, without Tailscale.
 3. OmniRoute's provider for that machine points at its tailnet address -- the `100.x` one, which
    OmniRoute counts as private and gives five minutes to start answering; a MagicDNS name gets
    thirty seconds, too little for a cold model load. See [OmniRoute for Claude Code](omniroute-local.md).

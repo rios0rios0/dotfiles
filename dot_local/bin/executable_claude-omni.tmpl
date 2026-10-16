@@ -326,15 +326,28 @@ answers() {
     curl -fsS --max-time 2 "http://$1:$ollama_port/api/version" >/dev/null 2>&1
 }
 
-# Another machine's server, found the way OmniRoute reaches it: on the tailnet's port 11434, where
-# tailscale-up shares each GPU machine's Ollama. CLAUDE_OMNI_GPU_HOST names one -- a tailnet machine
-# name or an address -- instead of taking the first online machine that answers. Loading the model
-# there, as the first request would, shows how the server holds it: a window other than this
-# machine's would let Ollama truncate prompts that Claude Code expects to compact, and a GPU busy
-# with a game leaves part of the model on that machine's CPU, where every request still succeeds,
-# many times slower.
+check_gpu_serving() {
+    # Probes a GPU server at $1 and verifies the model loads with the right window.
+    # Used for both the local bridge and the tailnet. $1 = address, $2 = display name.
+    local address="$1" name="$2" held served size vram
+    note "using $name ($address) for $model"
+    curl -fsS --max-time 300 "http://$address:$ollama_port/api/generate" \
+        -d "$(jq -nc --arg model "$gpu_model" --arg keep "$(jq -r '.gpuKeepAlive' <<<"$config")" '{model: $model, keep_alive: $keep}')" >/dev/null ||
+        die "$name could not load $gpu_model; check 'ollama list' there"
+    held="$(curl -fsS --max-time 5 "http://$address:$ollama_port/api/ps" | jq -r --arg model "$gpu_model" \
+        '([.models[]? | select(.name == $model or .model == $model)][0] // {}) | "\(.context_length // 0) \(.size // 0) \(.size_vram // 0)"')" ||
+        die "$name loaded $gpu_model but did not say how it holds it"
+    read -r served size vram <<<"$held"
+    (( served != 0 )) || die "$name loaded $gpu_model but does not list it as running"
+    (( served == window )) ||
+        die "$name gives $gpu_model a ${served}-token window where this machine declares $window: run 'chezmoi update' there, or give both machines the same contextTokens"
+    if (( size > 0 && vram < size )); then
+        warn "$(( (size - vram) * 100 / size ))% of $gpu_model runs on the CPU of $name, whose GPU is busy; expect it to be much slower"
+    fi
+}
+
 check_tailnet_gpu() {
-    local name address peers held served size vram
+    local name address peers
     if [[ -n "${CLAUDE_OMNI_GPU_HOST:-}" ]]; then
         name="$CLAUDE_OMNI_GPU_HOST"
         address="$(tailscale ip -4 "$name" 2>/dev/null | head -1 || true)"
@@ -356,20 +369,7 @@ check_tailnet_gpu() {
         [[ -n "$address" ]] ||
             die "no machine on the tailnet shares Ollama on port $ollama_port; on the one with the GPU, keep a WSL terminal open and run 'tailscale-up' there once"
     fi
-    note "using $name ($address) for $model"
-    curl -fsS --max-time 300 "http://$address:$ollama_port/api/generate" \
-        -d "$(jq -nc --arg model "$gpu_model" --arg keep "$(jq -r '.gpuKeepAlive' <<<"$config")" '{model: $model, keep_alive: $keep}')" >/dev/null ||
-        die "$name could not load $gpu_model; check 'ollama list' there"
-    held="$(curl -fsS --max-time 5 "http://$address:$ollama_port/api/ps" | jq -r --arg model "$gpu_model" \
-        '([.models[]? | select(.name == $model or .model == $model)][0] // {}) | "\(.context_length // 0) \(.size // 0) \(.size_vram // 0)"')" ||
-        die "$name loaded $gpu_model but did not say how it holds it"
-    read -r served size vram <<<"$held"
-    (( served != 0 )) || die "$name loaded $gpu_model but does not list it as running"
-    (( served == window )) ||
-        die "$name gives $gpu_model a ${served}-token window where this machine declares $window: run 'chezmoi update' there, or give both machines the same contextTokens"
-    if (( size > 0 && vram < size )); then
-        warn "$(( (size - vram) * 100 / size ))% of $gpu_model runs on the CPU of $name, whose GPU is busy; expect it to be much slower"
-    fi
+    check_gpu_serving "$address" "$name"
 }
 
 if [[ -n "$gpu" ]]; then

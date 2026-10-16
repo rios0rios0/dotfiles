@@ -16,6 +16,9 @@ omniroute:
   #   machine: 'local'    this machine; claude-omni starts its user unit on demand
   #   machine: 'tailnet'  another machine on the tailnet; claude-omni finds it the way
   #                       `claude-remote` did, loads the model, and checks the window it serves
+  # Defaults are for alien-a51 (laptop). The desktop's WSL config uses deviceName mxhero-z790 and
+  # swaps the local/remote GPU roles below. Set CHEZMOI_DEVICE before `chezmoi init` if its
+  # normalized hostname differs from the device note.
   gpus:
     ollama-laptop:
       machine: 'local'
@@ -30,9 +33,9 @@ omniroute:
   #   window:  overrides the window OmniRoute reports, but only downward: OmniRoute enforces its
   #            own, so declaring more trades compaction for a 400
   #   effort:  Claude Code's effort level for this model (low, medium, high, xhigh)
-  # The NVIDIA NIM entries are the fast ones that answered a tool call in a probe of all 55 NIM chat
-  # models on 2026-10-15; `claude-omni --probe nvidia/` repeats it. Their windows read `128K?`:
-  # OmniRoute reports its fallback for every NIM model.
+  # NIM models are filtered in OmniRoute itself; this list intentionally picks only four preferred
+  # entries. `claude-omni --probe nvidia/` tests the current catalog, without changing visibility.
+  # NIM context is provider-defined; OmniRoute's 128000 fallback is not authoritative.
   models:
     - gpu: 'ollama-laptop'
     - gpu: 'ollama'
@@ -73,4 +76,32 @@ omniroute:
   #   devices:
   #     some-desktop:
   #       taskGpus: ['ollama']
-  devices: {}
+  devices:
+    mxhero-z790:
+      gpus:
+        ollama:
+          machine: 'local'
+          label: 'desktop GPU'
+        ollama-laptop:
+          machine: 'tailnet'
+          label: 'laptop GPU'
+      models:
+        - gpu: 'ollama'
+        - gpu: 'ollama-laptop'
+        - id: 'nvidia/z-ai/glm-5.3'
+          label: 'GLM 5.3 · NVIDIA NIM'
+        - id: 'nvidia/nvidia/nemotron-3-super-120b-a12b'
+          label: 'Nemotron 3 Super · NVIDIA NIM'
+        - id: 'nvidia/deepseek-ai/deepseek-v4.1-flash'
+          label: 'DeepSeek V4.1 Flash · NVIDIA NIM'
+        - id: 'nvidia/stepfun-ai/step-5-preview'
+          label: 'Step 5 Preview · NVIDIA NIM'
+        - id: 'openrouter/z-ai/glm-5.3'
+          label: 'GLM 5.3 · OpenRouter'
+        - id: 'openrouter/moonshotai/kimi-k2.7-code'
+          label: 'Kimi K2.7 Code · OpenRouter'
+        - id: 'openrouter/poolside/laguna-s-2.1:free'
+          label: 'Laguna S 2.1 · OpenRouter free'
+        - id: 'auto/coding'
+          label: 'Auto coding · OmniRoute picks'
+      taskGpus: ['ollama', 'ollama-laptop']
