@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added the OpenCode V2 global configuration under `dot_config/opencode/`: OmniRoute as the primary provider, discovering the models the API key allows from the gateway itself (`omniroute/auto/coding` by default), the context7 and Chrome DevTools (Linux only) MCP servers, the Claude Code permission set as V2 ordered entries, a `dotfiles` reference to the chezmoi source, and a `cli.json` mirroring the existing terminal look; the key reaches OpenCode as `{env:OMNIROUTE_API_KEY}`, its own load-time substitution, never as a literal, and `make test-opencode` renders the template for both platforms, parses it, and checks every field, the MCP server shape and the absence of shell-style placeholders'
+time: '2026-10-15T20:00:00Z'
