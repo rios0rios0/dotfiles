@@ -35,6 +35,13 @@ config), like the equivalent `~/.claude` and `~/.codex` trees; chezmoi renders o
 `OPENCODE_DISABLE_CLAUDE_CODE_*` variables, anomalyco/opencode#36990), so skills load only from
 `~/.config/opencode/skills`.
 
+Upstream's restore of those variables (sst/opencode#51888) was closed unmerged; the gate now
+lives on the personal fork `rios0rios0/opencode`, branch `feat/provider-omniroute` (commit
+"feat(core): restore OPENCODE_DISABLE_CLAUDE_CODE for compatibility roots"), which gates the
+`~/.claude` compatibility roots at discovery. Until a build from that branch runs on this
+machine, the plugin is the stopgap; afterwards, delete the plugin and export
+`OPENCODE_DISABLE_CLAUDE_CODE=1` from `dot_zshenv.tmpl`.
+
 ## Using it
 
 ```bash
