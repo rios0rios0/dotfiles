@@ -42,6 +42,19 @@ lives on the personal fork `rios0rios0/opencode`, branch `feat/provider-omnirout
 machine, the plugin is the stopgap; afterwards, delete the plugin and export
 `OPENCODE_DISABLE_CLAUDE_CODE=1` from `dot_zshenv.tmpl`.
 
+## Where the CLI comes from
+
+`opencode` itself is provisioned by the Linux dependency script: `install_opencode()` runs
+upstream's V2 installer with `--no-modify-path`, which drops the binary and its `opencode2`
+shim under `~/.opencode/bin` and leaves every shell rc file alone. `dot_zshenv.tmpl` is what
+puts `~/.opencode/bin` on PATH, and only off Android -- the released binary is a glibc build,
+which Termux's bionic cannot start. The block lives there because the installer's default is
+to append `export PATH=$HOME/.opencode/bin:$PATH` to the first rc file it finds, `~/.zshrc`
+under zsh: a `chezmoi apply` rewrote that file without the appended line and took `opencode`
+off PATH once, which is exactly what this arrangement prevents. Updates after the first
+install are the CLI's own (`opencode upgrade`), not an apply. `make test-opencode-cli` guards
+the skip, the flag and the PATH block on each platform.
+
 ## Using it
 
 ```bash

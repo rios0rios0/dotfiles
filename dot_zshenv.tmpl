@@ -137,6 +137,16 @@ fi
 if [[ -d "$HOME/.fly/bin" ]]; then
     export PATH="$HOME/.fly/bin:$PATH"
 fi
+
+# OpenCode V2 CLI (`opencode`, plus the `opencode2` shim the installer writes beside it): the
+# upstream installer puts it under ~/.opencode and would otherwise append this export to the
+# rc files chezmoi owns (`install_opencode` runs it with `--no-modify-path` for that reason;
+# the apply that rewrote ~/.zshrc without the appended line is what took `opencode` off PATH
+# and prompted this block). Deliberately NOT on Android: the binary is a glibc build and
+# bionic cannot start it, so no Android machine installs it.
+if [[ -d "$HOME/.opencode/bin" ]]; then
+    export PATH="$HOME/.opencode/bin:$PATH"
+fi
 {{- end }}
 
 ###### Version Managers PATH Setup #######################################################################################
