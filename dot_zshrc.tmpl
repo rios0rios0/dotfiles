@@ -244,9 +244,31 @@ if [[ -o interactive ]]; then
   (nohup "$HOME/.scripts/linux-toolbox-watch-compress-folders.sh" &>/dev/null &)
 fi
 {{- end }}
-
+# The biggest entries under a directory, largest first, hidden ones included:
+# `top-size [count] [depth: 1-3] [dir]`, by default 5 entries one level below the current directory.
+# Sizes are read as root wherever sudo exists, so what only root can read counts too (Termux has none).
+top-size() {
+  local count="${1:-5}" depth="${2:-1}" dir="${3:-.}"
+  if (( $# > 3 )) || [[ ! "$count" =~ ^[1-9][0-9]*$ || ! "$depth" =~ ^[1-3]$ ]]; then
+    echo "[top-size] ERROR: usage: top-size [count] [depth: 1-3] [dir]" >&2
+    return 1
+  fi
+  local -a elevate
+  if (( EUID != 0 && $+commands[sudo] )); then
+    # authenticate up front: du's errors are discarded below, and a refused sudo would vanish with them
+    sudo -v || return 1
+    elevate=(sudo)
+  fi
+  if ! "${elevate[@]}" test -d "$dir"; then
+    echo "[top-size] ERROR: not a directory: $dir" >&2
+    return 1
+  fi
+  # -x stays on the directory's file system (from / on WSL, du would walk all of /mnt/c too), -D follows a
+  # symlinked directory such as Termux's ~/storage/shared, and sed drops the last line, where du prints the
+  # directory's own total
+  "${elevate[@]}" du -ahxD --max-depth="$depth" -- "$dir" 2>/dev/null | sed '$d' | sort -rh | head -n "$count"
+}
 {{- if eq .chezmoi.os "android" }}
-alias top5size='du -hs * | sort -rh | head -5'
 
 # upload file(s)/dir(s) to the OneDrive "Downloads" folder via rclone (see .docs/rclone-onedrive-setup.md)
 send() {
@@ -285,8 +307,6 @@ send() {
   done
   echo "[send] done" >&2
 }
-{{- else }}
-alias top5size='sudo du -hs * | sort -rh | head -5'
 {{- end }}
 clear-h() {
   rm -rf ~/.bash_history
@@ -332,6 +352,20 @@ alias replay="asciinema play"
 ###### Cloud #######################################################################
 aws-prof() { export AWS_PROFILE=$1 }
 azm-subs() { az account set --subscription $1 }
+# Sentry CLI on the work (DarkSense) account. Its login lives in a store of its own beside the personal one
+# in ~/.config/sentry/ (`SENTRY_CONFIG_DIR`, sentry CLI 0.47+), and an exported token is dropped: the CLI
+# prefers a stored login but falls back to such a token while the store holds none. The path is built on
+# each call, not kept in a variable, because Claude Code's tool calls get this file's functions but not its
+# variables, and an empty SENTRY_CONFIG_DIR is the personal store. Completion reads slugs from the same store.
+unalias sentry-ds 2>/dev/null
+sentry-ds() {
+  env -u SENTRY_AUTH_TOKEN -u SENTRY_TOKEN \
+    SENTRY_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/sentry-darksense" sentry "$@"
+}
+_sentry-ds() { SENTRY_CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/sentry-darksense" _sentry "$@" }
+if (( $+functions[compdef] && $+functions[_sentry] )); then
+  compdef _sentry-ds sentry-ds
+fi
 {{- if eq .chezmoi.os "android" }}
 alias terraw="termux-etc-seccomp terra"            # runs terra with /etc/ redirect + SIGSYS suppression
 alias terraformw="termux-etc-seccomp terraform"    # useful when needed to call alone

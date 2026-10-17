@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `make test-zshrc-functions`, covering `top-size` and `sentry-ds` on both platforms: the ranking, the depth, a named and a symlinked directory, rejected arguments, `sudo` authenticating first or refusing, the work store with and without `XDG_CONFIG_HOME`, the dropped tokens, and completion'
+time: '2026-10-17T20:01:08.51011306Z'
