@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added the OpenCode V2 CLI to the machines the dotfiles provision: `install_opencode()` runs the upstream V2 installer with `--no-modify-path` and `dot_zshenv.tmpl` carries the `~/.opencode/bin` PATH block, restoring `opencode` after a `chezmoi apply` had stripped the PATH line the installer appended to `~/.zshrc`'
+time: '2026-10-17T21:49:25.629954062Z'

@@ -32,6 +32,7 @@ make test-sentry-setup              # the Sentry CLI setup scripts: the version 
 make test-local-llm                 # the local model server: its settings, one context window with claude-omni, the installer's gate
 make test-claude-omni               # claude-omni and claude-omni-task: windows, the environment, the /model lineup, GPU guards, the audit, the capacity hint
 make test-opencode                  # OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference
+make test-opencode-cli              # the OpenCode CLI install: the skip, `--no-modify-path`, the failures, the PATH block per platform
 make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
@@ -852,6 +853,7 @@ OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencod
 | Part | Where |
 |------|-------|
 | Global config | `dot_config/opencode/opencode.json.tmpl`, applied on every platform that gets a shell |
+| CLI | `install_opencode()` in the Linux dependency script runs the V2 installer with `--no-modify-path`; `dot_zshenv.tmpl` puts `~/.opencode/bin` on PATH, off Android only |
 | Look | `dot_config/opencode/cli.json` |
 | Rules | `~/.config/opencode/AGENTS.md` and `rules/`, synced by aisync, not chezmoi; each project's `CLAUDE.md` arrives through `instructions` |
 | Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported by the credential loader and read at config load as `{env:OMNIROUTE_API_KEY}` |
@@ -863,8 +865,9 @@ OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencod
 3. **The MCP field is `environment`.** V2 reads `environment` on a local MCP server; an `env` key is ignored with no diagnostic, and the variable silently never reaches the server. `make test-opencode` asserts `environment` and the absence of `env` on every server.
 4. **The `dotfiles` reference is absolute on purpose.** A local reference path resolves against the config document's directory unless absolute; the template renders `{{ .chezmoi.sourceDir }}`, so a session reads the actual dotfiles checkout (usually `~/.local/share/chezmoi`).
 5. **Permissions are V2 ordered entries** (`{action, resource, effect}`), the same allowances as the Claude Code side; what the list does not allow, the TUI still asks for.
+6. **The CLI's PATH line is chezmoi's, never the installer's.** The V2 installer appends `export PATH=$HOME/.opencode/bin:$PATH` to the first shell rc it finds -- `~/.zshrc` here, a file chezmoi owns and rewrites -- so that line survives exactly until the next apply: one apply stripped it and took `opencode` off PATH. `install_opencode` therefore runs the installer with `--no-modify-path` (the `install_fly_cli` reasoning) and the block in `dot_zshenv.tmpl` owns the PATH entry. Android gets neither: the released binary is a glibc build, which bionic cannot start.
 
-`make test-opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json` and `cli.json` -- not for the directory itself, where OpenCode keeps files of its own, including the aisync-synced rules, agents, commands and skills.
+`make test-opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. `make test-opencode-cli` covers the CLI half the same way: the skip when the binary exists, the installer call carrying `--no-modify-path`, the failed download and the failed installer, and the PATH block rendering on Linux and macOS but not Android. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json` and `cli.json` -- not for the directory itself, where OpenCode keeps files of its own, including the aisync-synced rules, agents, commands and skills.
 
 ### The Fork Build (`ocode`)
 
