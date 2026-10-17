@@ -203,7 +203,7 @@ fi
 {{- end }}
 
 # Completions that tools drop into the XDG data directory (`sentry cli setup` writes `_sentry`
-# here, from run_onchange_after_*-setup-sentry-cli.sh). This has to come before Oh My Zsh loads
+# here, from run_onchange_after_*-setup-sentry-cli.sh.tmpl). This has to come before Oh My Zsh loads
 # below, where compinit runs. The directory is rendered as an absolute path on purpose: the
 # Sentry CLI looks for that quoted absolute path in ~/.zshrc and, when it is missing, appends an
 # `fpath` line of its own -- which the next `chezmoi apply` would then revert. A `$HOME`-based
@@ -353,10 +353,11 @@ alias replay="asciinema play"
 aws-prof() { export AWS_PROFILE=$1 }
 azm-subs() { az account set --subscription $1 }
 # Sentry CLI on the work (DarkSense) account. Its login lives in a store of its own beside the personal one
-# in ~/.config/sentry/ (`SENTRY_CONFIG_DIR`, sentry CLI 0.47+), and an exported token is dropped: the CLI
-# prefers a stored login but falls back to such a token while the store holds none. The path is built on
-# each call, not kept in a variable, because Claude Code's tool calls get this file's functions but not its
-# variables, and an empty SENTRY_CONFIG_DIR is the personal store. Completion reads slugs from the same store.
+# in ~/.config/sentry/ (`SENTRY_CONFIG_DIR`, sentry CLI 0.47+, which the Sentry setup scripts enforce), and
+# an exported token is dropped: the CLI prefers a stored login but falls back to such a token while the
+# store holds none. The path is built on each call, not kept in a variable, because Claude Code's tool
+# calls get this file's functions but not its variables, and an empty SENTRY_CONFIG_DIR is the personal
+# store. Completion reads slugs from the same store.
 unalias sentry-ds 2>/dev/null
 sentry-ds() {
   env -u SENTRY_AUTH_TOKEN -u SENTRY_TOKEN \

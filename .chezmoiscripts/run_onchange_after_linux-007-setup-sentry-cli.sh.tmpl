@@ -1,10 +1,15 @@
 #!/bin/bash
 
-# Installs the Sentry CLI's zsh completion and its agent skill once the managed files are in
-# place. `npm install -g sentry` (`install_sentry_cli` in lib-install-deps.sh) ships neither;
-# `sentry cli setup` writes both, and the binary re-runs that same setup after every
-# `sentry cli upgrade`, so one pass per machine is enough -- hence `run_onchange_`: it runs
-# when this file changes and stays quiet otherwise.
+# Holds the Sentry CLI at the version `sentry-ds` needs, then installs its zsh completion and its
+# agent skill once the managed files are in place. `npm install -g sentry` (`install_sentry_cli` in
+# lib-install-deps.sh) ships neither; `sentry cli setup` writes both, and the binary re-runs that
+# same setup after every `sentry cli upgrade`, so one pass per machine is enough -- hence
+# `run_onchange_`: it runs when this file or lib-sentry-cli.sh changes and stays quiet otherwise.
+#
+# The installer never upgrades a CLI that is already there, so an older one is raised to
+# SENTRY_CLI_MIN_VERSION (lib-sentry-cli.sh) first. Staying below it fails the script, unlike a
+# failed `cli setup`: on such a CLI `sentry-ds` runs on the personal login, so chezmoi has to
+# re-run this on the next apply instead of recording it as done.
 #
 # This is an after-script rather than a call inside the installer on purpose.
 # `--no-modify-path` only skips the PATH edit; the zsh completion step still appends an
@@ -24,6 +29,8 @@ set -euo pipefail
 
 prefix="sentry-setup"
 
+{{ template "lib-sentry-cli.sh" }}
+
 # ~/.zshenv puts npm's global bin directory on PATH in every zsh, but this script may run
 # from the bash that started the first `chezmoi init --apply`, where NVM was never loaded.
 # Look for the binary under the installed Node versions before giving up.
@@ -38,6 +45,10 @@ fi
 if ! command -v sentry >/dev/null 2>&1; then
     echo "[$prefix] WARN: sentry is not installed; skipping completions and the agent skill" >&2
     exit 0
+fi
+
+if ! ensure_sentry_cli_version "$prefix"; then
+    exit 1
 fi
 
 echo "[$prefix] running sentry cli setup --no-modify-path..." >&2
