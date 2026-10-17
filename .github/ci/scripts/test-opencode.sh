@@ -35,7 +35,8 @@ TEMPLATE="$REPO_ROOT/dot_config/opencode/opencode.json.tmpl"
 # render <os>: the configuration as that platform receives it, with JSONC comments stripped
 # (they are for editors; jq cannot read them).
 render() {
-    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "{\"chezmoi\":{\"os\":\"$1\"}}" < "$TEMPLATE" |
+    local os="$1"
+    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "{\"chezmoi\":{\"os\":\"$os\"}}" < "$TEMPLATE" |
         awk 'BEGIN { in_comment = 0 }
              {
                line = $0; out = ""
@@ -162,7 +163,7 @@ else
     fail "unexpected permissions: $(jq -c '.permissions' "$TMP/linux.json")"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-opencode] all OpenCode configuration tests passed" >&2
 fi
 
