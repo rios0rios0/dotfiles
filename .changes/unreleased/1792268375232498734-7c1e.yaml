@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed `sentry-ds` quietly running on the personal login on machines whose Sentry CLI predates `0.47.0`, which ignores `SENTRY_CONFIG_DIR`: the dependency installers never upgrade an existing CLI, so the Sentry CLI setup scripts now raise an older one with `sentry cli upgrade`, through whichever method installed it, and fail until it reaches `0.47.0`, so that the next apply retries'
+time: '2026-10-17T20:19:35.232376417Z'

@@ -28,6 +28,7 @@ make test-shell-credentials         # 1Password credential/workspace loading and
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
 make test-zshrc-functions           # top-size and sentry-ds in dot_zshrc: arguments, sudo, the work store, completion
+make test-sentry-setup              # the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds
 make test-local-llm                 # the local model server: its settings, one context window with claude-omni, the installer's gate
 make test-claude-omni               # claude-omni and claude-omni-task: windows, the environment, the /model lineup, GPU guards, the audit, the capacity hint
 make test-opencode                  # OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference
@@ -94,7 +95,7 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 - **`dot_zshrc.tmpl`** — Shell config: ZINIT plugins, version managers (GVM/NVM/Pyenv/SDKMAN/Cargo), Docker aliases, Kubernetes tools
 - **`dot_zshenv.tmpl`** — PATH setup for version managers (critical for IDE integration)
 - **`.chezmoiignore`** — Platform-conditional file exclusion rules
-- **`.chezmoitemplates/`** — Shared template fragments (shared install functions, font installer, dependency removal, MCP server merge logic, username)
+- **`.chezmoitemplates/`** — Shared template fragments (shared install functions, font installer, dependency removal, the Sentry CLI version floor, MCP server merge logic, username)
 
 ## Template Variables
 
@@ -672,14 +673,22 @@ binary, the verification commands, and why termux-x11 and Termux:API were both r
 
 Log in with `sentry auth login`: the OAuth flow is a device code entered at a URL, so it works on the phone as-is, and `--token` accepts an API token instead.
 
-**`sentry-ds` runs the CLI on the work (DarkSense) account.** `dot_zshrc.tmpl` defines it on both platforms, pointing `SENTRY_CONFIG_DIR` (CLI 0.47+) at `${XDG_CONFIG_HOME:-~/.config}/sentry-darksense`, a store of its own beside the default one, so neither login ever replaces the other. Log in once with `sentry-ds auth login`. Two details keep the accounts apart:
+**`sentry-ds` runs the CLI on the work (DarkSense) account.** `dot_zshrc.tmpl` defines it on both platforms, pointing `SENTRY_CONFIG_DIR` at `${XDG_CONFIG_HOME:-~/.config}/sentry-darksense`, a store of its own beside the default one, so neither login ever replaces the other. Log in once with `sentry-ds auth login`. The variable needs CLI 0.47.0 or newer, which the setup scripts below hold every machine at. Two details keep the accounts apart:
 
 - **A token in the environment is dropped** (`SENTRY_AUTH_TOKEN`, `SENTRY_TOKEN`). The CLI prefers a stored login, but falls back to such a token whenever the store holds no valid one, so a fresh or logged-out work store would quietly run as whoever owns the token (verified: against an empty store, `sentry auth token` prints the exported one).
 - **The path is built inside the function, never kept in a variable.** Claude Code's tool calls get `.zshrc`'s functions but not its variables, and an empty `SENTRY_CONFIG_DIR` selects the default store, so a variable would turn `sentry-ds` into the personal account in exactly those calls.
 
 Its completion, `_sentry-ds`, runs Sentry's own `_sentry` with the same store: `_sentry` asks `sentry __complete` for org and project slugs, which would otherwise come from the personal account. `make test-zshrc-functions` covers all three.
 
-npm installs ship neither shell completions nor the agent skill, so `run_onchange_after_linux-007-setup-sentry-cli.sh` and `run_onchange_after_android-006-setup-sentry-cli.sh` run `sentry cli setup --no-modify-path` after the managed files are applied, with `SHELL` pinned to zsh (the CLI installs completions for the shell `SHELL` names, and the first Linux apply runs under bash). Three things about that command are easy to get wrong:
+**The setup scripts hold the CLI at the floor `sentry-ds` needs.** An older CLI ignores `SENTRY_CONFIG_DIR` without a word, so `sentry-ds` would run on the personal login and `sentry-ds auth login` would replace it, and the dependency installers install the CLI only where none exists, never upgrading it. Both setup scripts therefore include `.chezmoitemplates/lib-sentry-cli.sh` and, before anything else, raise a CLI older than its `SENTRY_CLI_MIN_VERSION` (`0.47.0`), or one that reports no version, with `sentry cli upgrade`:
+
+- **`sentry cli upgrade`, not `npm install`.** It upgrades through whichever method installed the CLI. A standalone binary from the curl installer (`~/.local/bin/sentry`) sits ahead of npm's on PATH, so an npm upgrade would leave the CLI that actually runs where it was; the version is checked again afterwards for the same reason. Its own setup step passes `--no-modify-path`, so an upgrade never edits the managed `~/.zshrc`.
+- **A CLI that stays older fails the script**, unlike a failed `cli setup`, so chezmoi runs it again on the next apply instead of recording it as done. A machine with no CLI at all only gets a warning: `sentry-ds` then fails outright, on no account.
+- **Raising the floor is one edit.** It changes both rendered scripts, and that re-runs them on every machine. Do not move the check into `install_sentry_cli`: `lib-install-deps.sh` is rendered into both `run_once_` installers, so any edit there re-runs the whole 45-120 minute install on every machine.
+
+`make test-sentry-setup` covers the comparison, the upgrade and both failures on both platforms, plus the Linux script finding the CLI under NVM.
+
+npm installs ship neither shell completions nor the agent skill, so `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl` and `run_onchange_after_android-006-setup-sentry-cli.sh.tmpl` run `sentry cli setup --no-modify-path` after the managed files are applied, with `SHELL` pinned to zsh (the CLI installs completions for the shell `SHELL` names, and the first Linux apply runs under bash). Three things about that command are easy to get wrong:
 
 - **`--no-modify-path` only skips the PATH edit.** The zsh completion step still appends `fpath=("<dir>" $fpath)` to `~/.zshrc` unless the file already contains the completion directory as a quoted absolute path. `dot_zshrc.tmpl` therefore renders `"{{ .chezmoi.homeDir }}/.local/share/zsh/site-functions"` into its own `fpath` line before Oh My Zsh runs compinit. A `$HOME`-based line would not satisfy the check, and the CLI's appended line is exactly what the next apply reverts (observed on a device: a manual run appended it, and `chezmoi diff` wanted it gone).
 - **The setup runs after the files on purpose.** From `run_once_before` it would edit the previous `~/.zshrc` first, and the file application that follows would stop to ask about an externally modified target.
