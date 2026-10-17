@@ -3,8 +3,9 @@
   "session": {
     "sidebar": "auto",
     "scrollbar": true,
-    "thinking": "show",
-    "permissions": "prompt"
+    "thinking": "hide",
+    "permissions": "prompt",
+    "verbosity": "low"
   },
   "terminal": {
     "copy": "manual"
