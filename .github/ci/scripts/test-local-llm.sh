@@ -2,8 +2,8 @@
 set -euo pipefail
 
 # Tests the local model server: the settings every consumer reads, the Ollama unit and claude-omni,
-# which must agree on one context window, and the installer's render gate. claude-omni itself, its
-# GPU guards and claude-omni-task are covered by test-claude-omni.sh.
+# which must agree on one context window, and the installer's render gate plus a stubbed end-to-end
+# run of it. claude-omni itself, its GPU guards and claude-omni-task are covered by test-claude-omni.sh.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -11,6 +11,9 @@ EXIT_CODE=0
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
+# The end-to-end installer run below uses stubs that record into $TMP at run time, under an
+# environment built from scratch, so the variable must survive into them.
+export TMP
 
 echo "[test-local-llm] testing the local model setup..." >&2
 
@@ -183,6 +186,141 @@ if [[ -n "$digest_a" && "$digest_a" != "$digest_b" ]]; then
     pass "a change to the unit changes the installer, so it re-runs"
 else
     fail "the installer's unit digest did not follow the unit ('$digest_a' vs '$digest_b')"
+fi
+
+# --- installer, end to end ----------------------------------------------------------------------
+#
+# The installer is run for real against stubs: the release directory passes its digest gate, the
+# server answers, and journalctl serves the start-up log the GPU check reads. What matters here is
+# that the check loads no model -- no /api/generate, no /api/ps -- that it reads this start's
+# lines through the invocation id, that a log whose only backend is the CPU fails the run, that a
+# log with no discovery line at all fails it too, and that free VRAM smaller than the model warns.
+
+mkdir -p "$TMP/systemd" "$TMP/runbin"
+# Two poll loops bound the run (server readiness and GPU discovery); shorten both for the test.
+render gpu "$INSTALLER" | sed -e "s|/run/systemd/system|$TMP/systemd|g" -e 's|seq 1 30|seq 1 3|g' > "$TMP/installer.sh"
+bash -n "$TMP/installer.sh" || fail "the rendered installer is not a valid script"
+checksum="$(sed -n 's/^checksum="\(.*\)"/\1/p' "$TMP/installer.sh")"
+llm_model="$(PATH="$TMP/bin-gpu" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
+    '{{ (includeTemplate "lib-local-llm.tmpl" . | fromJson).model }}')"
+
+RUNHOME="$TMP/run-home"
+release_dir="$RUNHOME/.local/share/ollama/0.40.3"
+mkdir -p "$release_dir/bin" "$RUNHOME/.local/bin"
+# The managed `ollama` behind the symlink: `show <model>` says the model is pulled.
+cat > "$release_dir/bin/ollama" <<EOF
+#!/bin/bash
+echo "\$*" >> "$TMP/ollama.args"
+[[ "\$1" == show ]] && exit 0
+exit 1
+EOF
+chmod +x "$release_dir/bin/ollama"
+echo "$checksum" > "$release_dir/.archive-sha256"
+(cd "$release_dir" && find . -type f ! -name .files.sha256 -print0 | sort -z | xargs -0 sha256sum > .files.sha256)
+
+cat > "$TMP/runbin/nvidia-smi" <<'STUB'
+#!/bin/bash
+echo "NVIDIA Test GPU, 24576 MiB"
+STUB
+cat > "$TMP/runbin/systemctl" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$TMP/systemctl.args"
+case "$*" in
+    *InvocationID*) echo "fake-invocation" ;;
+    is-active*) exit 1 ;;
+esac
+STUB
+cat > "$TMP/runbin/journalctl" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$TMP/journalctl.args"
+cat "$TMP/journal.log" 2>/dev/null || true
+STUB
+cat > "$TMP/runbin/curl" <<'STUB'
+#!/bin/bash
+printf '%s\n' "$*" >> "$TMP/curl.args"
+url=""
+for arg in "$@"; do
+    case "$arg" in
+        http*) url="$arg" ;;
+    esac
+done
+case "$url" in
+    */api/version) echo '{"version":"0.0.0-test"}' ;;
+    */api/tags) cat "$TMP/tags.json" ;;
+    *) exit 22 ;;
+esac
+STUB
+chmod +x "$TMP/runbin/"*
+
+run_installer() {
+    local rc=0
+    : > "$TMP/curl.args"
+    : > "$TMP/ollama.args"
+    : > "$TMP/journalctl.args"
+    (cd "$TMP" && HOME="$RUNHOME" PATH="$TMP/runbin:/usr/bin:/bin" bash "$TMP/installer.sh") > "$TMP/installer.out" 2>&1 || rc=$?
+    echo "$rc" > "$TMP/installer.rc"
+}
+
+# given a log whose backend is the GPU, and a pulled model far smaller than the free VRAM
+# when
+printf '%s\n' 'time=2026-01-01T00:00:02.000+00:00 level=INFO source=types.go:32 msg="inference compute" id=0 filter_id=0 library=CUDA compute=12.0 name=CUDA0 description="NVIDIA Test GPU" libdirs=ollama,cuda_v13 driver=13.4 pci_id=0000:01:00.0 type=discrete total="23.9 GiB" available="22.6 GiB"' > "$TMP/journal.log"
+jq -n --arg model "$llm_model" '{models: [{name: $model, size: 17741872154}]}' > "$TMP/tags.json"
+run_installer
+# then
+if [[ "$(cat "$TMP/installer.rc")" -eq 0 ]] &&
+    grep -q 'NVIDIA Test GPU is available to the server (22.6 GiB of VRAM free)' "$TMP/installer.out" &&
+    grep -q 'the model loads on the first request' "$TMP/installer.out" &&
+    ! grep -q 'api/generate' "$TMP/curl.args" &&
+    ! grep -q 'api/ps' "$TMP/curl.args" &&
+    ! grep -q 'WARN' "$TMP/installer.out"; then
+    pass "a healthy log passes without loading anything"
+else
+    fail "the installer on a GPU log: $(cat "$TMP/installer.rc") | $(grep -c . "$TMP/curl.args") curl calls | $(tail -3 "$TMP/installer.out" | tr '\n' ' ')"
+fi
+
+# then: the check read this start's lines, not the journal's whole history
+if grep -q '_SYSTEMD_INVOCATION_ID=fake-invocation' "$TMP/journalctl.args"; then
+    pass "the GPU check filters the journal by this start's invocation id"
+else
+    fail "the GPU check read the journal without an invocation filter: $(head -1 "$TMP/journalctl.args")"
+fi
+
+# given a GPU that is too full to hold the model
+# when
+printf '%s\n' 'time=2026-01-01T00:00:02.000+00:00 level=INFO source=types.go:32 msg="inference compute" id=0 filter_id=0 library=CUDA compute=12.0 name=CUDA0 description="NVIDIA Test GPU" libdirs=ollama,cuda_v13 driver=13.4 pci_id=0000:01:00.0 type=discrete total="23.9 GiB" available="10.0 GiB"' > "$TMP/journal.log"
+run_installer
+# then
+if [[ "$(cat "$TMP/installer.rc")" -eq 0 ]] &&
+    grep -q 'only 10.0 GiB of VRAM is free, less than' "$TMP/installer.out"; then
+    pass "free VRAM smaller than the model warns without loading it"
+else
+    fail "the installer on a busy GPU: $(cat "$TMP/installer.rc") | $(tail -3 "$TMP/installer.out" | tr '\n' ' ')"
+fi
+
+# given a start-up log whose only backend is the CPU -- the damaged-CUDA failure
+# when
+printf '%s\n' 'time=2026-01-01T00:00:03.000+00:00 level=INFO source=types.go:50 msg="inference compute" id=cpu library=cpu compute="" name=cpu description=cpu libdirs=ollama driver="" pci_id="" type="" total="31.1 GiB" available="23.7 GiB"' > "$TMP/journal.log"
+run_installer
+# then: it fails the run, and does not pull a model first
+if [[ "$(cat "$TMP/installer.rc")" -ne 0 ]] &&
+    grep -q 'found no usable GPU' "$TMP/installer.out" &&
+    ! grep -q 'pull' "$TMP/installer.out" &&
+    ! grep -q . "$TMP/ollama.args"; then
+    pass "a CPU-only log fails the run before the pull"
+else
+    fail "the installer on a CPU-only log: $(cat "$TMP/installer.rc") | $(tail -3 "$TMP/installer.out" | tr '\n' ' ')"
+fi
+
+# given a server that logs nothing about GPUs
+# when
+: > "$TMP/journal.log"
+run_installer
+# then
+if [[ "$(cat "$TMP/installer.rc")" -ne 0 ]] &&
+    grep -q 'logged no GPU discovery' "$TMP/installer.out"; then
+    pass "a start-up log with no discovery line fails the run"
+else
+    fail "the installer without a discovery line: $(cat "$TMP/installer.rc") | $(tail -3 "$TMP/installer.out" | tr '\n' ' ')"
 fi
 
 if [ "$EXIT_CODE" -eq 0 ]; then

@@ -78,9 +78,19 @@ User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a build-stamped
 1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview version is; the channel
 keeps the fork's service registration, port and database its own, and the stamp makes each
 rebuild replace the background service on the next launch. bun, its build runtime, comes from
-`install_bun` into `~/.bun`
-(PATH block in `dot_zshenv.tmpl`), and the builder falls back to `~/.bun/bin/bun` itself, so the
-first apply after the install builds without waiting for a new shell.
+`install_bun` into `~/.bun` (PATH block in `dot_zshenv.tmpl`), and the builder falls back to
+`~/.bun/bin/bun` itself, so the first apply after the install builds without waiting for a new
+shell.
+
+A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, and
+overwriting a file that is being executed fails with `Text file busy`, which would take the whole
+apply down with it. The builder therefore looks for processes running **that** file (through
+`/proc/<pid>/exe`, so an `ocode` started from another path is left alone) and asks before killing
+them, because they are somebody's session. Answering no, or applying unattended where nothing
+answers, skips the build and leaves the marker: the next apply tries again. The install itself goes
+through a temporary name beside the target and a rename, so an `ocode` started *while* the build
+runs cannot fail it either. `make test-ocode` covers both answers, the unattended skip, and the
+mid-build race.
 
 ## When models are missing
 

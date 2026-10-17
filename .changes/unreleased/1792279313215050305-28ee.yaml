@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'left the local model unloaded after an apply: the Ollama installer now proves GPU discovery from the start-up log of the server it just restarted (`library=cpu` alone fails the run) instead of loading the model and reading where it landed, so the ~17 GB of weights and the cold start move to the first request that asks for them, and a busy GPU is reported as a forecast from the log''s free VRAM before the model pull'
+time: '2026-10-17T23:21:53.214977513Z'

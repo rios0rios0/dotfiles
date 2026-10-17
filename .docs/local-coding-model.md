@@ -14,10 +14,13 @@ unless `.chezmoidata/local-llm.yaml` sets `enabled: false`, globally or for one 
 1. downloads the pinned Ollama release, checks it against the digest upstream publishes, and
    unpacks it into `~/.local/share/ollama/<version>` (no root, no system user);
 2. starts `ollama.service` as a **user** unit, rendered from the same data file;
-3. pulls the model (about 18 GB the first time; Ollama itself is 1.4 GB);
-4. loads the model once and fails the apply if it landed on the CPU although the GPU had room
-   -- see [Troubleshooting](#troubleshooting) for why that check exists. A GPU that a game or
-   the desktop has filled only warns.
+3. reads the server's start-up log -- one `inference compute` line per backend, `library=cpu`
+   alone meaning no accelerator answered -- and fails the apply when no other backend is there:
+   see [Troubleshooting](#troubleshooting) for why that check exists. Loading a model to see
+   where it landed is **not** how this is done anymore: an apply loads nothing, and the model
+   loads on the first request that needs it, a cold start of about 20 seconds. A GPU a game has
+   filled only warns, forecast from the free VRAM the log reports against the model's size;
+4. pulls the model (about 18 GB the first time; Ollama itself is 1.4 GB).
 
 It runs again whenever the pinned version, the model or the unit's settings change, and once
 systemd starts. A WSL distribution can boot without systemd -- Kali's does until `chezmoi apply`
@@ -61,11 +64,16 @@ Measured on 2026-10-12: RTX 5090 Laptop GPU (24 GB, also driving the display), O
 | Measure | Result |
 |---------|--------|
 | Placement | 100% GPU, 21.8 GB of VRAM in use at peak (about 1.2 GB of it the Windows desktop) |
+| Cold start | ~17 s to load the model on the first request after the VRAM was given back |
 | Prompt processing | 1,194 tokens/s (9,866 tokens in 8.3 s) |
 | Generation | 27.9 tokens/s |
 | Between turns | the prompt cache is reused; only new tokens are processed |
 | End to end | a 9-turn edit-test-run task in 45 s |
 | On the CPU instead | 55 s for a one-word reply |
+
+An apply no longer loads the model, so the GPU stays free after one: the load happens on the first
+request that needs it (a `claude-omni` session on this GPU starts its server on demand and lets
+Ollama load the model), and `keepAlive` gives the VRAM back 15 minutes after the last request.
 
 Through OmniRoute the cache is reused the same way: on 2026-10-15 an 11K-token prefix took 5.53 s
 the first time and 1.15 s the second, against 5.50 s and 1.03 s sent to Ollama directly.
@@ -119,7 +127,8 @@ one: it is a second worker, useful while this GPU is busy, on battery, or alread
   truncated under a marker that said the install was complete, and CUDA discovery then crashed on
   every start while Ollama quietly served from the CPU. The installer now writes the marker only
   after the files are on disk, re-verifies every file against a digest manifest whenever it runs,
-  and reinstalls when one no longer matches. To run it now:
+  and reinstalls when one no longer matches. It also makes this same check itself, against the log
+  lines of the run it just restarted: only `library=cpu` there fails the apply. To run it now:
   `chezmoi execute-template < "$(chezmoi source-path)/.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.sh.tmpl" | bash`
 - **The server is not running.** `claude-omni` starts the user unit on demand when a session picks
   this machine's GPU; otherwise `systemctl --user status ollama`. When systemd itself is not

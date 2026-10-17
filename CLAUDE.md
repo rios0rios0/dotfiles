@@ -802,7 +802,7 @@ Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NV
 | Part | Where |
 |------|-------|
 | Settings (model, window, cache, keep-alive, tailnet share, per-device overrides) | `.chezmoidata/local-llm.yaml`, read through `.chezmoitemplates/lib-local-llm.tmpl` |
-| Install, restart on change, model pull, GPU check | `.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.sh.tmpl` |
+| Install, restart on change, model pull, GPU-discovery check | `.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.sh.tmpl` |
 | Server | `dot_config/systemd/user/ollama.service.tmpl` (a user unit) |
 | Share on the tailnet, for another machine's OmniRoute | `dot_local/bin/executable_tailscale-up.tmpl` |
 | Gate | `.chezmoiignore`: Linux **and** `nvidia-smi` on `PATH`, not WSL |
@@ -811,12 +811,12 @@ Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NV
 
 1. **One window, rendered twice.** `contextTokens` becomes both `OLLAMA_CONTEXT_LENGTH` (what the server allocates) and the window `claude-omni` declares for every GPU model (`CLAUDE_CODE_MAX_CONTEXT_TOKENS`, what Claude Code budgets against). Neither Claude Code nor OmniRoute can read it from Ollama -- OmniRoute advertises a 128000 fallback -- so a mismatch means nothing compacts before the server truncates. Never hard-code either side.
 2. **The marker is a commit record.** The installer writes the release marker only after `sync`, and re-verifies every unpacked file against a digest manifest each time it runs. A WSL VM that went down after an install once left both `libcublasLt` libraries truncated under a valid marker; CUDA discovery then died with `SIGBUS` on every start, and Ollama served from the CPU without a visible error.
-3. **The installer proves GPU placement.** It loads the model once and reads `size_vram` from `/api/ps`: none on the GPU while it has room fails the apply; partial or no placement while Windows or a game holds the VRAM warns, with the free VRAM in the message. A CPU fallback is otherwise silent -- every request still succeeds, ten times slower.
+3. **The installer proves GPU *discovery*, and loads nothing.** It reads the server's own start-up log, filtered to the invocation it just restarted -- one `inference compute` line per backend, `library=cpu` alone meaning no accelerator answered -- and fails the apply when no other backend is there. Loading the model to inspect where Ollama placed it, which this used to do, put ~17 GB of weights in VRAM at every apply and paid a ~17 s cold start that the first real request would otherwise have re-used; the model now stays out of VRAM until something asks for it, and `keepAlive` gives the VRAM back afterwards. The failure it catches is unchanged: a damaged CUDA install (a WSL VM once went down mid-install, leaving the two `libcublasLt` libraries truncated) makes discovery crash, `cpu` becomes the only backend, and Ollama then serves every request from the CPU -- an order of magnitude slower -- with no error. What used to be an observed partial placement is now a forecast: the free VRAM the log's GPU line reports, against the model's size, warns when even the weights cannot fit.
 4. **Gate on the driver and the OS, not on WSL.** Nothing here depends on Windows, so bare-metal Linux with a GPU qualifies; but `lookPath` finds `nvidia-smi.exe` on Windows too, so `.chezmoiignore` pairs the driver check with `eq .chezmoi.os "linux"`.
 5. **Device overrides are laid over key by key.** sprig's `merge` and `mergeOverwrite` both count `false` as empty, so a device's `enabled: false` would lose to the default `true`; `lib-local-llm.tmpl` uses `set` per key instead.
 6. **Ollama binds IPv4 loopback, and the specific address is load-bearing on WSL.** The family of the listening socket decides the family WSL's localhost forwarding publishes on the Windows side: a dual-stack `0.0.0.0` bind appears there on `::1` alone, and Docker Desktop -- which reaches this machine as `host.docker.internal`, dialing Windows' IPv4 loopback -- gets connection refused, surfacing as a 502 on every local GPU request through OmniRoute. `127.0.0.1` publishes Windows' `127.0.0.1`, so the container connects. Tailscale needs no change either way: Windows' client forwards to `localhost:11434`, which names both families. The API has no authentication, so on WSL every Windows-side process can run inference and pull or delete models; keep the tailnet share to devices you trust. `.chezmoidata/omniroute.yaml` uses `deviceName` to map the laptop (`alien-a51`) and desktop (`mxhero-z790`) local/remote GPU roles separately, and its `gpus` keys are the gateway's provider prefixes (`ollama-laptop`, `ollama-desktop`) -- a renamed key silently drops that GPU from the lineup.
 
-`make test-local-llm` covers 1, 5 and the installer's render gate; `make test-chezmoiignore` covers the gate per platform. Ollama and its models live under `$HOME`, so removing the server means `path:` tombstones for `.local/share/ollama` and `.ollama`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service` and `~/.local/bin/ollama`.
+`make test-local-llm` covers 1, 3, 5, the installer's render gate and a stubbed end-to-end run of it (nothing loaded, the invocation filter, the busy-GPU warning, and both failure logs); `make test-chezmoiignore` covers the gate per platform. Ollama and its models live under `$HOME`, so removing the server means `path:` tombstones for `.local/share/ollama` and `.ollama`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service` and `~/.local/bin/ollama`.
 
 ## Claude Code Through OmniRoute (claude-omni)
 
@@ -884,10 +884,19 @@ reads from the User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a bu
 `OPENCODE_VERSION` (`2.0.<%y%m%d%H%M>`) -- because the free tier refuses client versions below
 1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview version is; the stamp also
 makes each rebuild replace the background service on the next launch. The marker
-`~/.cache/ocode-built-commit` makes an
-unchanged apply a no-op, which is why this is a `run_after` script that runs on every apply;
-`OCODE_SOURCE` names another checkout. No checkout and no `bun` are skips, never failures -- a
-failed build is an error, retried by the next apply.
+`~/.cache/ocode-built-commit` makes an unchanged apply a no-op, which is why this is a `run_after`
+script that runs on every apply; `OCODE_SOURCE` names another checkout. No checkout and no `bun`
+are skips, never failures -- a failed build is an error, retried by the next apply.
+
+A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, and
+overwriting a file that is being executed fails with `Text file busy`, which took the whole apply
+down with it. The builder therefore looks for the processes executing **that file** (through
+`/proc/<pid>/exe`, not by name: an `ocode` started from another path holds no file of ours) and,
+when it finds any, asks whether to kill them, because they are somebody's session and killing one
+ends it. An answer of yes kills them before the build; no -- or an unattended run, where stdin
+answers nothing -- skips the build and leaves the marker, so the next apply tries again. The
+install itself goes through a temporary name beside the target and a rename, so an `ocode` started
+*while* the build runs cannot fail it either.
 
 bun, the build's runtime, comes from `install_bun` (shared library, called by the Linux
 installer) as `~/.bun/bin/bun`. The upstream `bun.sh/install` script would append its own PATH
@@ -898,8 +907,9 @@ resolves bun from PATH and falls back to `~/.bun/bin/bun`, so the first apply af
 builds even though the running shell's PATH predates the export; only when neither answers is
 the build skipped. `make test-ocode` covers the skip paths, the first build (including the
 channel and release-grade version it carries), the no-op and the rebuilds against stubbed
-`git` and `bun`, and the installer's skip, its `SHELL`-empty call, both failures, the Linux
-wiring and the PATH block per platform.
+`git` and `bun`, the running-`ocode` prompt with both answers, the process started mid-build,
+and the installer's skip, its `SHELL`-empty call, both failures, the Linux wiring and the PATH
+block per platform.
 
 ## Tailscale
 
