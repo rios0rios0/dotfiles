@@ -1,0 +1,20 @@
+{
+  "$schema": "https://opencode.ai/v2/cli.json",
+  "session": {
+    "sidebar": "auto",
+    "scrollbar": true,
+    "thinking": "show",
+    "permissions": "prompt"
+  },
+  "terminal": {
+    "copy": "manual"
+  },
+  "theme": {
+    "mode": "dark",
+    "name": "orng"
+  },
+  "animations": true,
+  "attention": {
+    "notifications": true
+  }
+}

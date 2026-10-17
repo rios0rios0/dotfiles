@@ -5,7 +5,8 @@ this machine's or another machine's Ollama, NVIDIA NIM, OpenRouter, Baseten. `cl
 Code through it. Its Compose stack and local environment files live in `local-services/omniroute/` and
 run from the dotfiles checkout; chezmoi deploys none of it. The dashboard and API run locally, with Redis
 available only on the internal Docker network. Compose keeps the existing `dotfiles` project name so
-moving the files does not switch to new named data volumes.
+moving the files does not switch to new named data volumes. OpenCode V2 is the gateway's second
+client: see [OpenCode V2 through OmniRoute](opencode-local.md).
 
 ## Start OmniRoute
 

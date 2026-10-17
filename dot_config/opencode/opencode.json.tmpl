@@ -1,0 +1,83 @@
+{{- /* OpenCode V2 global configuration. Managed by chezmoi alongside ~/.config/opencode.
+       OpenCode reads V1 shapes too, but these are the native V2 names. */ -}}
+{{- /* Audience: every platform this repository targets, including Linux, where Claude Code
+       gets the terminal look from lib-claude-look.tmpl; OpenCode's look lives in cli.json. */ -}}
+{
+  "$schema": "https://opencode.ai/config.json",
+  /* OmniRoute is OpenCode's primary provider: the gateway routes between the GPU-bound
+     Ollama models (laptop and tailnet desktop), the NVIDIA NIM / OpenRouter cloud models,
+     and an `auto/*` combo that picks its own upstream. OpenCode discovers the catalog from
+     the gateway's own /v1/models, scoped to what the key allows, so pointing a new server
+     at OmniRoute needs no change here. See .docs/opencode-local.md. */
+  "model": "omniroute/auto/coding",
+  "default_agent": "build",
+  "providers": {
+    "omniroute": {
+      "package": "aisdk:@ai-sdk/openai-compatible",
+      "settings": {
+        "baseURL": "{{ .omniroute.baseUrl }}/v1",
+        /* {env:...} is OpenCode's own substitution, resolved when it loads this file; a
+           literal key here would land in the repository. The shell exports the name from
+           the same credential loader as claude-omni. */
+        "apiKey": "{env:OMNIROUTE_API_KEY}"
+      },
+      "env": ["OMNIROUTE_API_KEY"]
+    }
+  },
+  /* AGENTS.md already reaches OpenCode by discovery, globally and per project; listing it
+     with CLAUDE.md is what carries a project's Claude Code guidance into sessions too. */
+  "instructions": [
+    "AGENTS.md",
+    "CLAUDE.md"
+  ],
+  "mcp": {
+    "servers": {
+{{- if eq .chezmoi.os "linux" }}
+      "chrome-devtools": {
+        "type": "local",
+        "command": ["npx", "-y", "chrome-devtools-mcp@1.10.1", "--executable-path", "/opt/google/chrome/chrome", "--headless", "--isolated", "--redact-network-headers", "--no-usage-statistics", "--no-performance-crux"],
+        "environment": { "CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS": "1" },
+        "disabled": false
+      },
+{{- end }}
+      "context7": {
+        "type": "remote",
+        "url": "https://mcp.context7.com/mcp",
+        "headers": {
+          "Authorization": "Bearer {env:CONTEXT7_API_KEY}"
+        },
+        "disabled": false
+      }
+    }
+  },
+  "permissions": [
+    { "action": "shell", "resource": "git *", "effect": "allow" },
+    { "action": "shell", "resource": "chezmoi *", "effect": "allow" },
+    { "action": "shell", "resource": "ls *", "effect": "allow" },
+    { "action": "shell", "resource": "cat *", "effect": "allow" },
+    { "action": "shell", "resource": "head *", "effect": "allow" },
+    { "action": "shell", "resource": "tail *", "effect": "allow" },
+    { "action": "shell", "resource": "find *", "effect": "allow" },
+    { "action": "shell", "resource": "grep *", "effect": "allow" },
+    { "action": "shell", "resource": "rg *", "effect": "allow" },
+    { "action": "shell", "resource": "gh *", "effect": "allow" },
+    { "action": "shell", "resource": "test *", "effect": "allow" },
+    { "action": "shell", "resource": "echo *", "effect": "allow" },
+    { "action": "shell", "resource": "chmod *", "effect": "allow" },
+    { "action": "shell", "resource": "mkdir *", "effect": "allow" },
+    { "action": "shell", "resource": "cp *", "effect": "allow" },
+    { "action": "shell", "resource": "mv *", "effect": "allow" },
+    { "action": "read", "resource": "*", "effect": "allow" },
+    { "action": "edit", "resource": "*", "effect": "allow" },
+    { "action": "websearch", "resource": "*", "effect": "allow" }
+  ],
+  /* A reference path resolves against the config document's directory unless absolute, so
+     this one names the chezmoi source directly: a session can then read the dotfiles that
+     rendered this file. */
+  "references": {
+    "dotfiles": {
+      "path": "{{ .chezmoi.sourceDir }}",
+      "description": "The chezmoi source checkout behind this machine's dotfiles"
+    }
+  }
+}

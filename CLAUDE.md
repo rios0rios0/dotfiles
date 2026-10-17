@@ -29,6 +29,7 @@ make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image p
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
 make test-local-llm                 # the local model server: its settings, one context window with claude-omni, the installer's gate
 make test-claude-omni               # claude-omni and claude-omni-task: windows, the environment, the /model lineup, GPU guards, the audit, the capacity hint
+make test-opencode                  # OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference
 make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
@@ -825,6 +826,27 @@ Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NV
 9. **The status line keeps the session's window.** After `/model` it appends the new model's own, from the `omniroute-windows.tsv` the launch writes into the profile, and turns red when that window is smaller than the session's.
 
 `make test-claude-omni` covers 1 to 8 and the capacity hint against stubbed `curl`, `claude`, `systemctl` and `tailscale`; `make test-statusline` covers 9; `make test-chezmoiignore` covers the gate. Removing the feature means `.chezmoiremove` entries for `~/.local/bin/claude-omni` and `~/.local/bin/claude-omni-task` and a `path:` tombstone for `.claude-omni`.
+
+## OpenCode V2 Through OmniRoute
+
+OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencode.json.tmpl` renders to `~/.config/opencode/opencode.json`, with OmniRoute as the primary provider and `omniroute/auto/coding` as the default model. Its model list is the gateway's own `/v1/models`, not `.chezmoidata/omniroute.yaml` -- that list drives `claude-omni`, and OpenCode needs none. Setup and usage are in `.docs/opencode-local.md`.
+
+| Part | Where |
+|------|-------|
+| Global config | `dot_config/opencode/opencode.json.tmpl`, applied on every platform that gets a shell |
+| Look | `dot_config/opencode/cli.json` |
+| Rules | `dot_config/opencode/AGENTS.md`, applied to `~/.config/opencode/AGENTS.md`; each project's `CLAUDE.md` arrives through `instructions` |
+| Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported by the credential loader and read at config load as `{env:OMNIROUTE_API_KEY}` |
+
+**Keep these, each prevents a failure that was observed or measured:**
+
+1. **`{env:VAR}` is load-time substitution; a `${VAR}` key is a silent 401.** OpenCode expands `{env:...}` and `{file:...}` anywhere in the document when it loads it, and `${...}` only inside a provider's `settings.baseURL`. Measured against the live gateway: with `${OMNIROUTE_API_KEY}` as the apiKey, discovery returns no models at all; with `{env:OMNIROUTE_API_KEY}`, the key's whole catalog.
+2. **The model list is discovered, and the key policy is the source of truth.** `/v1/models` serves the ids the key's rules allow, so the repository holds no list to drift; allow a model in OmniRoute's dashboard, never here. The plugin drops `type: "image"` rows, keeps `context_length` as the window and `capabilities.tool_calling` as tool support; measured: 158 chat models of the key's 162 rows.
+3. **The MCP field is `environment`.** V2 reads `environment` on a local MCP server; an `env` key is ignored with no diagnostic, and the variable silently never reaches the server. `make test-opencode` asserts `environment` and the absence of `env` on every server.
+4. **The `dotfiles` reference is absolute on purpose.** A local reference path resolves against the config document's directory unless absolute; the template renders `{{ .chezmoi.sourceDir }}`, so a session reads the actual dotfiles checkout (usually `~/.local/share/chezmoi`).
+5. **Permissions are V2 ordered entries** (`{action, resource, effect}`), the same allowances as the Claude Code side; what the list does not allow, the TUI still asks for.
+
+`make test-opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json`, `cli.json` and `AGENTS.md` -- not for the directory itself, where OpenCode keeps files of its own.
 
 ## Tailscale
 

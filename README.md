@@ -47,6 +47,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 - **Claude Code**, **Codex CLI** and **GitHub Copilot CLI** (AI coding assistants)
 - **`claude-omni`**: Claude Code through **OmniRoute**, on a GPU's Ollama model or a cloud provider such as NVIDIA NIM or OpenRouter, with each model's window in the picker and the status line; see the [OmniRoute guide](.docs/omniroute-local.md)
+- **OpenCode**: the same **OmniRoute** gateway as its primary provider, discovering the models the API key allows from the gateway itself, with the Claude Code permission set, the context7 and Chrome DevTools (Linux) MCP servers and the terminal look; see the [OpenCode guide](.docs/opencode-local.md)
 - **Tailscale**: Windows' client on Windows and its WSL, which reaches it through a `tailscale` wrapper; `tailscaled` on bare-metal Linux, installed and logged in by `chezmoi apply` and rejoined by every interactive zsh; OmniRoute reaches another machine's GPU across it
 - **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm)
 - **Neon CLI** (`neon`, the [Neon Serverless Postgres](https://neon.com) CLI; Linux/WSL and Android, installed from npm — fresh installs take the `neon` package, not the legacy `neonctl` compatibility shim)
@@ -266,6 +267,12 @@ claude-omni --list               # the listed models, their windows and where th
 It gives Claude Code each model's real context window -- for a GPU model the one the Ollama server allocates, which OmniRoute cannot see -- and `/model` in the session offers the listed models that hold at least that window. The status line shows the model and its window. When ccswitch reports that no account has capacity left, `claude` points at `claude-omni` before launching.
 
 `claude-omni-task` runs one unattended task on the first free GPU, or on a model named with `-m`, and hands back an audit of the run -- every action with its result, the change it made measured against a snapshot of the working tree, and one command that undoes it -- which is what the `omniroute-general` agent uses.
+
+## OpenCode Through OmniRoute
+
+OpenCode runs on the same [OmniRoute](.docs/omniroute-local.md) gateway: the [global configuration](dot_config/opencode/opencode.json.tmpl) makes it the primary provider and defaults to `auto/coding`. Its model list is not written down -- OpenCode discovers it from the gateway's `/v1/models`, which serves exactly what the API key allows, so a model, or a whole provider, added in OmniRoute's dashboard appears here by itself.
+
+The same configuration wires the context7 and Chrome DevTools (Linux only) MCP servers, the Claude Code permission set, the `AGENTS.md` rules and a `dotfiles` reference to the chezmoi source, and reuses the `OMNIROUTE_API_KEY` the credential loader already exports. The [OpenCode guide](.docs/opencode-local.md) covers usage and troubleshooting.
 
 ## Tailscale
 
