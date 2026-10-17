@@ -857,6 +857,19 @@ OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencod
 
 `make test-opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json` and `cli.json` -- not for the directory itself, where OpenCode keeps files of its own, including the aisync-synced rules, agents, commands and skills.
 
+### The Fork Build (`ocode`)
+
+`ocode` is the personal fork's build of OpenCode, carrying the custom features the official binary
+lacks: the OmniRoute provider plugin and the `OPENCODE_DISABLE_CLAUDE_CODE` gate, both on branch
+`feat/provider-omniroute` of `rios0rios0/opencode`. `run_after_linux-006-build-ocode.sh` keeps it
+current: when the checkout at `~/Development/github.com/opencode/opencode` exists, it runs the
+fork's own single-platform build whenever the checkout's HEAD moved past the last one, and
+installs the result as `~/.local/bin/ocode`. The marker `~/.cache/ocode-built-commit` makes an
+unchanged apply a no-op, which is why this is a `run_after` script that runs on every apply;
+`OCODE_SOURCE` names another checkout. No checkout and no `bun` are skips, never failures -- a
+failed build is an error, retried by the next apply. `make test-ocode` covers the skip paths, the
+first build, the no-op and the rebuild, against stubbed `git` and `bun`.
+
 ## Tailscale
 
 Every Linux machine joins the tailnet, through one client per machine: on WSL that client is

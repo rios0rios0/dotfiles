@@ -383,6 +383,14 @@ jobs:
       - name: 'Test the backup script, its retention and the installer gate'
         run: 'make test-omniroute-backup'
 
+  test-ocode:
+    name: 'Test (ocode fork build)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Test the ocode fork-builder'
+        run: 'make test-ocode'
+
   sast:
     name: SAST
     runs-on: ubuntu-latest
