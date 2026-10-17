@@ -96,6 +96,9 @@ export FAKE_CONTAINER PATH="$TMP/stub:$PATH"
 export OMNIROUTE_BACKUP_DIR="$TMP/backups"
 export OMNIROUTE_BACKUP_KEEP=2
 
+# What a produced archive is called, named once so the counting around it cannot drift.
+ARCHIVE_GLOB='omniroute-*.tar.age'
+
 if [[ -x "$SCRIPT" ]]; then
     pass "the backup script is executable"
 else
@@ -119,7 +122,7 @@ else
     fail "a first backup failed: $(cat "$TMP/run1.log")"
 fi
 
-first="$(find "$OMNIROUTE_BACKUP_DIR" -maxdepth 1 -name 'omniroute-*.tar.age' | head -n 1)"
+first="$(find "$OMNIROUTE_BACKUP_DIR" -maxdepth 1 -name "$ARCHIVE_GLOB" | head -n 1)"
 if [[ -n "$first" ]]; then
     pass "an archive appeared"
 else
@@ -164,7 +167,7 @@ if "$SCRIPT" >/dev/null 2>&1; then
 else
     fail "a third backup failed"
 fi
-count="$(find "$OMNIROUTE_BACKUP_DIR" -maxdepth 1 -name 'omniroute-*.tar.age' | wc -l)"
+count="$(find "$OMNIROUTE_BACKUP_DIR" -maxdepth 1 -name "$ARCHIVE_GLOB" | wc -l)"
 if [[ "$count" -eq 2 ]]; then
     pass "retention keeps the newest 2"
 else
@@ -177,7 +180,7 @@ else
 fi
 
 # A stopped stack or an unreachable daemon skips with a warning, not a failure.
-before="$(find "$OMNIROUTE_BACKUP_DIR" -maxdepth 1 -name 'omniroute-*.tar.age' | wc -l)"
+before="$(find "$OMNIROUTE_BACKUP_DIR" -maxdepth 1 -name "$ARCHIVE_GLOB" | wc -l)"
 if FAKE_RUNNING=false "$SCRIPT" 2>"$TMP/down.log"; then
     pass "a stopped stack skips with exit 0"
 else
@@ -193,7 +196,7 @@ if FAKE_INSPECT_FAIL=true "$SCRIPT" >/dev/null 2>&1; then
 else
     fail "an unreachable Docker daemon does not skip cleanly"
 fi
-after="$(find "$OMNIROUTE_BACKUP_DIR" -maxdepth 1 -name 'omniroute-*.tar.age' | wc -l)"
+after="$(find "$OMNIROUTE_BACKUP_DIR" -maxdepth 1 -name "$ARCHIVE_GLOB" | wc -l)"
 if [[ "$before" -eq "$after" ]]; then
     pass "skip runs write nothing"
 else
@@ -250,8 +253,10 @@ EOF
 # /run/systemd/system, $2 the file that stands in for /proc/version, since no CI runner has a
 # WSL kernel.
 render_installer() {
-    sed -e "s|/run/systemd/system|$1|g" \
-        -e "s|/proc/version|$2|g" \
+    local systemd_dir="$1"
+    local proc_version="$2"
+    sed -e "s|/run/systemd/system|$systemd_dir|g" \
+        -e "s|/proc/version|$proc_version|g" \
         "$INSTALLER" \
         | chezmoi execute-template --config "$TMP/chezmoi.yaml"
 }
@@ -357,7 +362,7 @@ else
     fail "the timer is not enabled at the timers target"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-omniroute-backup] all checks passed" >&2
 fi
 exit "$EXIT_CODE"
