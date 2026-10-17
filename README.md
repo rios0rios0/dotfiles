@@ -49,7 +49,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 - **`claude-omni`**: Claude Code through **OmniRoute**, on a GPU's Ollama model or a cloud provider such as NVIDIA NIM or OpenRouter, with each model's window in the picker and the status line; see the [OmniRoute guide](.docs/omniroute-local.md)
 - **OpenCode**: the same **OmniRoute** gateway as its primary provider, discovering the models the API key allows from the gateway itself, with the Claude Code permission set, the context7 and Chrome DevTools (Linux) MCP servers and the terminal look; see the [OpenCode guide](.docs/opencode-local.md)
 - **Tailscale**: Windows' client on Windows and its WSL, which reaches it through a `tailscale` wrapper; `tailscaled` on bare-metal Linux, installed and logged in by `chezmoi apply` and rejoined by every interactive zsh; OmniRoute reaches another machine's GPU across it
-- **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm)
+- **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm); `sentry-ds` runs it on the work account, from a login store of its own (log in once with `sentry-ds auth login`)
 - **Neon CLI** (`neon`, the [Neon Serverless Postgres](https://neon.com) CLI; Linux/WSL and Android, installed from npm — fresh installs take the `neon` package, not the legacy `neonctl` compatibility shim)
 - **Neovim** with AstroVim (Android)
 
@@ -60,6 +60,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 ### Utilities
 
 - eza (ls replacement), bat (syntax highlighting), ripgrep, jq/yq, ffmpeg, SoX (audio recording, backs Claude Code voice input on WSL), pdftk (Windows and baremetal Linux only), asciinema, Speedtest CLI, rclone (Android/Termux only; see the [OneDrive setup guide](.docs/rclone-onedrive-setup.md))
+- **`top-size [count] [depth: 1-3] [dir]`**: the biggest entries under a directory, largest first and hidden ones included (by default 5 entries one level below the current directory), read through `sudo` where it exists so that what only root can read counts too
 
 ## Platform Matrix
 
