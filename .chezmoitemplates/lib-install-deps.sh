@@ -226,3 +226,62 @@ install_sentry_cli() {
         echo "[install-deps] WARN: the Sentry CLI was installed but 'sentry' is not on PATH; check 'npm prefix -g'" >&2
     fi
 }
+
+# =========================================================================================================
+# https://neon.com/docs/cli/install
+# Neon CLI (binary `neon`, npm package `neon`, from neondatabase/neon-pkgs -- Neon Serverless
+# Postgres). Fresh installs take the `neon` package, never `neonctl`: since the two-package
+# split, `neon` holds the CLI and its executable, while `neonctl` is a compatibility shim whose
+# only executable imports `neon/cli` in-process, kept for Homebrew and for callers of the
+# legacy command name. Same body on both platforms because the package is the whole CLI as a
+# plain JavaScript ESM bundle: `bin` links `neon` to `dist/cli.js` (`#!/usr/bin/env node`), no
+# platform package of its own, no lifecycle script. Its native optional dependencies degrade
+# to nothing where they have no build: `@napi-rs/keyring` (the opt-in `--keyring` credential
+# storage) ships no android-arm64 target and the CLI's `tryLoadKeyring` returns null there,
+# leaving the default file-based credentials, and `esbuild` (only for its bundling commands,
+# `NEON_ESBUILD_PATH` overrides) ships `@esbuild/android-arm64` as a plain optional
+# dependency, so skipping its postinstall changes nothing. Under Termux the shebang resolves
+# only through termux-exec in the calling process, exactly like the Sentry CLI's.
+install_neon_cli() {
+    if command_exists neon; then
+        echo "[install-deps] Neon CLI is already installed, skipping" >&2
+        return
+    fi
+
+    if ! command_exists npm || ! command_exists node; then
+        echo "[install-deps] ERROR: npm is not available; install_nvm must run before install_neon_cli" >&2
+        return 1
+    fi
+
+    # The package declares `engines.node >= 20.19.0`, and the CLI's install docs say it
+    # neither runs nor upgrades below that; npm's engine check is only a warning, so skip
+    # early instead of installing a launcher that fails on every run. Both skips are
+    # deliberate best-effort outcomes, so they return success like install_sentry_cli's
+    # own skips; only a failed install is reported as a failure.
+    local node_version node_major node_minor
+    node_version="$(node --version 2>/dev/null)"
+    node_major="$(printf '%s' "$node_version" | sed -E 's/^v([0-9]+).*/\1/')"
+    node_minor="$(printf '%s' "$node_version" | sed -E 's/^v[0-9]+\.([0-9]+).*/\1/')"
+    if [[ ! "$node_major" =~ ^[0-9]+$ || ! "$node_minor" =~ ^[0-9]+$ ]]; then
+        echo "[install-deps] WARN: could not determine the Node.js version, skipping the Neon CLI" >&2
+        return 0
+    fi
+    if [[ "$node_major" -lt 20 || ( "$node_major" -eq 20 && "$node_minor" -lt 19 ) ]]; then
+        echo "[install-deps] WARN: the Neon CLI needs Node.js 20.19.0+, found $node_version; skipping" >&2
+        return 0
+    fi
+
+    # The package ships no lifecycle scripts, so `--ignore-scripts` costs nothing and keeps a
+    # compromised registry response from running code at install time (as for corepack and
+    # sentry). The skipped esbuild postinstall is the fallback for installers that disable
+    # optional dependencies: with npm's default, the platform binary arrives through
+    # `@esbuild/<platform>` as a package of its own.
+    if ! npm install -g --ignore-scripts neon; then
+        echo "[install-deps] ERROR: npm install -g neon failed" >&2
+        return 1
+    fi
+
+    if ! command_exists neon; then
+        echo "[install-deps] WARN: the Neon CLI was installed but 'neon' is not on PATH; check 'npm prefix -g'" >&2
+    fi
+}
