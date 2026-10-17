@@ -39,9 +39,9 @@ AppData
 .ssh
 {{- end }}
 
-{{- /* Two Linux features ship systemd user units, and each is gated on what it serves.
-     .config/systemd itself is ignored only when neither applies, so that Windows, Android and a
-     machine with no use for either never get an empty ~/.config/systemd/user. */ -}}
+{{- /* Linux features ship systemd user units, each gated on what it serves. .config/systemd
+     itself is ignored only when none applies, so that Windows, Android and a machine with no use
+     for any of them never get an empty ~/.config/systemd/user. */ -}}
 {{- $wsl := and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
 {{- $localLLM := and (eq .chezmoi.os "linux") (includeTemplate "lib-local-llm.tmpl" . | fromJson).enabled -}}
 
@@ -49,12 +49,16 @@ AppData
      meaningless on bare-metal Linux -- there is no Windows agent to reach, and the unit would
      point at an npiperelay.exe that is never installed. The tailscale wrapper runs Windows'
      Tailscale CLI, which is WSL's tailnet client; on bare metal it would shadow tailscaled's own
-     CLI. Gated on the kernel rather than the OS because "linux" alone does not distinguish WSL
-     from bare metal. */ -}}
+     CLI. The OmniRoute backups serve the local stack, which runs from a checkout on WSL alone.
+     Gated on the kernel rather than the OS because "linux" alone does not distinguish WSL from
+     bare metal. */ -}}
 {{- if not $wsl }}
 .config/systemd/user/ssh-agent-bridge.socket
 .config/systemd/user/ssh-agent-bridge@.service
+.config/systemd/user/omniroute-backup.service
+.config/systemd/user/omniroute-backup.timer
 .local/bin/tailscale
+.local/bin/omniroute-backup
 {{- end }}
 
 {{- /* The local model server (Ollama): Linux with an NVIDIA driver, unless

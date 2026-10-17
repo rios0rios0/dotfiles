@@ -1,0 +1,58 @@
+#!/bin/bash
+
+# Enables the daily encrypted backup of the local OmniRoute stack as a systemd user timer.
+#
+# `run_onchange_` rather than `run_once_`: the digest lines below change whenever the service,
+# the timer or the backup script changes, and the systemd line when systemd starts, so any of
+# those re-runs this script, which reloads systemd and restarts the timer. `include`, not
+# `includeTemplate`: the three deploy verbatim, and the script carries a docker `--format` string
+# that template execution would mistake for syntax:
+#   service {{ include "dot_config/systemd/user/omniroute-backup.service" | sha256sum }}
+#   timer {{ include "dot_config/systemd/user/omniroute-backup.timer" | sha256sum }}
+#   script {{ include "dot_local/bin/executable_omniroute-backup" | sha256sum }}
+#   systemd {{ if stat "/run/systemd/system" }}running{{ else }}not running{{ end }}
+#
+# Without systemd it stops early and exits 0, which chezmoi records as done; the systemd line
+# changing runs it again on the first apply after systemd starts (see CLAUDE.md, "systemd on
+# WSL").
+#
+# The backups use a key of their own -- never the chezmoi identity -- so neither key's loss or
+# rotation touches the other.
+
+set -euo pipefail
+
+prefix="omniroute-backup"
+unit="omniroute-backup.timer"
+identity="$HOME/.ssh/omniroute-backup-key"
+
+# The backups only mean anything on WSL: elsewhere the stack runs from no checkout of this
+# repository, and the unit files are not deployed at all (see .chezmoiignore).
+if ! grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null; then
+    exit 0
+fi
+
+if [[ ! -d /run/systemd/system ]]; then
+    echo "[$prefix] WARN: systemd is not running, so $unit cannot be enabled yet; the first apply after systemd starts finishes this (on WSL, 'wsl.exe --shutdown' restarts WSL with it)" >&2
+    exit 0
+fi
+if ! systemctl --user show-environment >/dev/null 2>&1; then
+    echo "[$prefix] ERROR: systemd is running, but this session reaches no systemd user manager; check 'systemctl --user status'" >&2
+    exit 1
+fi
+
+if [[ ! -f "$identity" ]]; then
+    echo "[$prefix] WARN: $identity is missing, so the timer will start a backup that fails until it exists:" >&2
+    echo "[$prefix] WARN:   age-keygen -o \"$identity\"   (then keep a copy of the file off this machine)" >&2
+fi
+
+systemctl --user daemon-reload
+if ! systemctl --user enable "$unit" >/dev/null 2>&1; then
+    echo "[$prefix] ERROR: could not enable the user unit $unit" >&2
+    exit 1
+fi
+
+# Start rather than restart: enabling a stopped timer is the common case, and restarting a
+# running one would only reset its pending run.
+systemctl --user start "$unit"
+
+echo "[$prefix] enabled $unit; it backs up daily at 03:30 (or at the next boot after that), see 'systemctl --user list-timers omniroute-backup.timer'" >&2

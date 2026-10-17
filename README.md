@@ -268,6 +268,8 @@ It gives Claude Code each model's real context window -- for a GPU model the one
 
 `claude-omni-task` runs one unattended task on the first free GPU, or on a model named with `-m`, and hands back an audit of the run -- every action with its result, the change it made measured against a snapshot of the working tree, and one command that undoes it -- which is what the `omniroute-general` agent uses.
 
+The stack's SQLite state gets a daily encrypted backup: a systemd user timer on WSL takes a `VACUUM INTO` snapshot of the gateway's database inside its container, packs it with the bootstrap's `server.env`, and encrypts the tar with an age key generated for the backups alone, rotated under `~/.local/share/omniroute-backups`. The [OmniRoute guide](.docs/omniroute-local.md) documents restoring and the copy of that key you must keep.
+
 ## OpenCode Through OmniRoute
 
 OpenCode runs on the same [OmniRoute](.docs/omniroute-local.md) gateway: the [global configuration](dot_config/opencode/opencode.json.tmpl) makes it the primary provider and defaults to `auto/coding`. Its model list is not written down -- OpenCode discovers it from the gateway's `/v1/models`, which serves exactly what the API key allows, so a model, or a whole provider, added in OmniRoute's dashboard appears here by itself.

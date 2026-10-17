@@ -1,0 +1,127 @@
+#!/bin/bash
+
+# Backs up the local OmniRoute stack: one age-encrypted archive per run holding a consistent
+# snapshot of the gateway's SQLite database and the bootstrap's server.env.
+#
+# The snapshot is taken inside the container with `VACUUM INTO` over node:sqlite. Copying
+# storage.sqlite out of the volume while the gateway writes it can tear pages -- SQLite runs in
+# WAL mode here -- and the image ships no sqlite3 CLI. The archive is then encrypted with the age
+# identity at ~/.ssh/omniroute-backup-key: a key generated for these backups alone, so losing or
+# rotating the chezmoi identity never strands them, and the other way around. Keep a copy of that
+# key off this machine -- backups without it are unrecoverable.
+#
+# The newest archives are kept; older ones are removed after every successful run. The systemd
+# user timer omniroute-backup.timer runs this daily; run it by hand after any doubt.
+#
+# See CLAUDE.md, "systemd on WSL", and .docs/omniroute-local.md.
+
+set -euo pipefail
+umask 077
+
+prefix="omniroute-backup"
+container="${OMNIROUTE_CONTAINER:-dotfiles-omniroute-1}"
+backup_dir="${OMNIROUTE_BACKUP_DIR:-$HOME/.local/share/omniroute-backups}"
+keep="${OMNIROUTE_BACKUP_KEEP:-14}"
+identity="${OMNIROUTE_BACKUP_IDENTITY:-$HOME/.ssh/omniroute-backup-key}"
+
+log() { echo "[$prefix] $*" >&2; }
+fail() { echo "[$prefix] ERROR: $*" >&2; exit 1; }
+
+if [[ "${1:-}" == "--help" || "${1:-}" == "-h" ]]; then
+    cat >&2 <<EOF
+Usage: omniroute-backup [--help]
+
+Snapshots the local OmniRoute stack and writes an age-encrypted tar.age archive to
+$backup_dir, keeping the newest $keep and removing older ones.
+
+Environment overrides:
+  OMNIROUTE_CONTAINER        the stack's container (default: dotfiles-omniroute-1)
+  OMNIROUTE_BACKUP_DIR       where archives live (default: ~/.local/share/omniroute-backups)
+  OMNIROUTE_BACKUP_KEEP      how many archives to keep (default: 14)
+  OMNIROUTE_BACKUP_IDENTITY  age identity to encrypt with (default: ~/.ssh/omniroute-backup-key)
+
+A missing identity file fails the run on purpose: silently not backing up is worse than a
+failed unit. Docker or the stack being down skips the run with a warning instead.
+EOF
+    exit 0
+fi
+if [[ $# -gt 0 ]]; then
+    fail "unexpected argument '$1'; see --help"
+fi
+
+[[ "$keep" =~ ^[1-9][0-9]*$ ]] || fail "OMNIROUTE_BACKUP_KEEP must be a positive integer, got '$keep'"
+
+command -v docker >/dev/null 2>&1 || {
+    log "WARN: docker is not on PATH; there is no local stack to back up, skipping"
+    exit 0
+}
+command -v age >/dev/null 2>&1 || fail "age is not on PATH; the dependency installer provides it"
+[[ -f "$identity" ]] || fail "no age identity at $identity; create one with 'age-keygen -o \"$identity\"' and keep a copy of it off this machine"
+
+running="$(docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null)" || running="false"
+if [[ "$running" != "true" ]]; then
+    log "WARN: container $container is not running (stack down or Docker daemon unreachable), skipping"
+    exit 0
+fi
+
+mkdir -p "$backup_dir"
+chmod 700 "$backup_dir"
+stage="$(mktemp -d)"
+trap 'rm -rf "$stage"' EXIT
+
+# A consistent copy of the live database, taken inside the container. The path must be
+# single-quoted in the SQL: double quotes are identifiers in SQLite, not strings.
+log "snapshotting $container:/app/data/storage.sqlite"
+if ! docker exec -i "$container" node - <<'MJS'
+const fs = require("node:fs");
+const { DatabaseSync } = require("node:sqlite");
+const snapshot = "/app/data/.omniroute-backup-snapshot.sqlite";
+try { fs.unlinkSync(snapshot); } catch {}
+const source = new DatabaseSync("/app/data/storage.sqlite", { readOnly: true });
+source.exec("VACUUM INTO '" + snapshot + "'");
+source.close();
+const copy = new DatabaseSync(snapshot, { readOnly: true });
+const check = copy.prepare("PRAGMA integrity_check").get().integrity_check;
+copy.close();
+if (check !== "ok") {
+    console.error("integrity check failed: " + check);
+    process.exit(1);
+}
+console.log("integrity ok");
+MJS
+then
+    fail "the in-container snapshot failed; is the stack healthy?"
+fi
+
+docker cp "$container:/app/data/.omniroute-backup-snapshot.sqlite" "$stage/storage.sqlite"
+docker cp "$container:/app/data/server.env" "$stage/server.env"
+# A leftover copy inside the container is harmless: the next run unlinks it before snapshotting.
+docker exec "$container" rm -f /app/data/.omniroute-backup-snapshot.sqlite \
+    || log "WARN: could not remove the in-container snapshot; the next run overwrites it"
+
+timestamp="$(date -u +%Y%m%dT%H%M%SZ)"
+archive="$backup_dir/omniroute-$timestamp.tar.age"
+
+log "encrypting with $identity"
+tar -C "$stage" -cf - storage.sqlite server.env | age -e -i "$identity" -o "$archive.tmp"
+mv "$archive.tmp" "$archive"
+
+# Decrypting the whole archive and listing it proves both that the identity opens it and that the
+# tar is complete; age authenticates the payload as it streams, so a truncated or tampered file
+# fails here rather than on the day of a restore.
+if ! age -d -i "$identity" "$archive" | tar -tf - >/dev/null; then
+    rm -f "$archive"
+    fail "the new archive failed its decryption check; removed $archive"
+fi
+log "wrote $archive ($(du -h "$archive" | cut -f1))"
+
+# Retention: newest first by mtime, everything past $keep goes. The names this script writes
+# contain no whitespace, so an entry's mtime prefix is stripped at its first space.
+while IFS= read -r entry; do
+    old="${entry#* }"
+    rm -f -- "$old"
+    log "removed the old archive $old"
+done < <(find "$backup_dir" -maxdepth 1 -type f -name 'omniroute-*.tar.age' -printf '%T@ %p\n' \
+    | sort -rn | tail -n +"$((keep + 1))")
+
+log "done; the newest $keep archive(s) stay in $backup_dir"

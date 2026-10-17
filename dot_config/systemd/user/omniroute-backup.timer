@@ -1,0 +1,15 @@
+# The daily run of omniroute-backup.service: one encrypted snapshot of the local OmniRoute stack.
+#
+# Persistent=true makes a 03:30 missed while the machine was off run at the next opportunity; WSL
+# is often off overnight, and the archive is a consistent VACUUM INTO snapshot whenever it runs.
+
+[Unit]
+Description=Daily encrypted backup of the local OmniRoute stack
+Documentation=https://github.com/rios0rios0/dotfiles/blob/main/.docs/omniroute-local.md
+
+[Timer]
+OnCalendar=*-*-* 03:30:00
+Persistent=true
+
+[Install]
+WantedBy=timers.target

@@ -239,6 +239,44 @@ It prints the audit in short and saves it in full under `~/.claude-omni/audits`.
 take back is whatever left the working tree -- a commit, a push, a request to a server, a write
 somewhere else. Those show up in the action list and as a moved HEAD, and nowhere else.
 
+## Encrypted backups
+
+The stack's state lives in a Docker volume, where `docker compose down -v`, a corrupted volume or a
+lost machine takes it with them. `omniroute-backup` writes a daily, age-encrypted snapshot of it:
+
+- **What**: a consistent copy of `storage.sqlite`, taken with `VACUUM INTO` inside the running
+  container -- copying a live WAL database file can tear it -- plus the `server.env` the bootstrap
+  wrote, with the storage-key version it records. Call logs are not included.
+- **Where**: `~/.local/share/omniroute-backups/`, the newest 14 kept; `OMNIROUTE_BACKUP_DIR`,
+  `OMNIROUTE_BACKUP_KEEP` and `OMNIROUTE_CONTAINER` adjust that in the environment.
+- **How**: the tar is encrypted with the age identity at `~/.ssh/omniroute-backup-key`, a key of
+  its own -- never the chezmoi one -- so neither key's loss or rotation touches the other. **Keep a
+  copy of it off this machine: without it every backup is unreadable.** A systemd user timer
+  (`omniroute-backup.timer`, enabled by `chezmoi apply` on WSL) runs it daily at 03:30, or at the
+  next boot when 03:30 was missed; run `omniroute-backup` by hand after any doubt.
+
+To restore, pick the archive and unpack it; a restore rolls the database back to that snapshot,
+API keys, settings and usage included:
+
+```bash
+mkdir -p /tmp/omniroute-restore
+age -d -i ~/.ssh/omniroute-backup-key ~/.local/share/omniroute-backups/omniroute-<stamp>.tar.age \
+    | tar -x -C /tmp/omniroute-restore
+cd local-services/omniroute
+docker compose stop omniroute
+docker run --rm -v dotfiles_omniroute-data:/data -v /tmp/omniroute-restore:/restore alpine sh -c \
+    'rm -f /data/storage.sqlite /data/storage.sqlite-wal /data/storage.sqlite-shm &&
+     cp /restore/storage.sqlite /restore/server.env /data/ &&
+     chown 1000:1000 /data/storage.sqlite /data/server.env &&
+     chmod 600 /data/storage.sqlite /data/server.env'
+docker compose start omniroute
+```
+
+The helper container writes into the named volume while the stack is stopped: `docker cp` cannot
+remove the stale `-wal`/`-shm` files beside a replaced database, and a database that mounts next to
+a stale write-ahead log is not the one that was backed up. `make test-omniroute-backup` covers the
+script, its retention and the installer's gate.
+
 ## Privacy boundary
 
 The dashboard, routing API, provider credentials and database remain on this machine. Prompts sent to NVIDIA, OpenRouter or Baseten still leave the machine and are handled under that provider's own retention and usage policies; in a Claude Code session, the prompt includes every file the model reads. Use only providers and models whose data terms fit the work you send. The GPU models never leave your own machines.

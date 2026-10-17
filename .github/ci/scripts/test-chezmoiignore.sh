@@ -5,6 +5,14 @@ REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 IGNORE_FILE="$REPO_ROOT/.chezmoiignore"
 EXIT_CODE=0
 
+# The kernel string and OS name that the platform matrix below repeats, and the stack's three
+# files, each named once here so a rename lands in every row at the same time.
+WSL_KERNEL="6.18.33.2-microsoft-standard-WSL2"
+WINDOWS_OS="windows"
+BACKUP_SCRIPT=".local/bin/omniroute-backup"
+BACKUP_SERVICE=".config/systemd/user/omniroute-backup.service"
+BACKUP_TIMER=".config/systemd/user/omniroute-backup.timer"
+
 echo "[test-chezmoiignore] testing platform file inclusion logic..." >&2
 
 # The local model for Claude Code is gated on nvidia-smi being on PATH, so chezmoi renders with a
@@ -118,7 +126,7 @@ check_platform "linux" \
     --include ".kube"
 
 # Windows assertions
-check_platform "windows" \
+check_platform "$WINDOWS_OS" \
     --ignore "linux-*.sh" \
     --ignore "android-*.sh" \
     --include ".ssh" \
@@ -142,7 +150,7 @@ check_platform "linux" \
     --ignore-line ".claude/.claude.json" \
     --include ".codex"
 
-check_platform "windows" \
+check_platform "$WINDOWS_OS" \
     --include ".claude/settings.json" \
     --include ".claude/CLAUDE.md" \
     --include ".claude/.claude.json" \
@@ -159,7 +167,7 @@ check_platform "android" \
 # WSL vs bare-metal Linux. The SSH agent bridge relays a Windows named pipe, so it must ship
 # on WSL and nowhere else -- on bare metal its unit would point at an npiperelay.exe that is
 # never installed. The only signal separating the two is the kernel release string.
-check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" \
+check_platform "linux" --kernel "$WSL_KERNEL" \
     --include "ssh-agent-bridge" \
     --include-line ".config/systemd"
 
@@ -169,10 +177,10 @@ check_platform "linux" --kernel "6.11.0-generic" \
 
 # The bridge is Linux-only regardless of kernel: the other platforms either are Windows
 # already or have no Windows agent to reach.
-check_platform "windows" --kernel "6.18.33.2-microsoft-standard-WSL2" \
+check_platform "$WINDOWS_OS" --kernel "$WSL_KERNEL" \
     --ignore-line ".config/systemd"
 
-check_platform "android" --kernel "6.18.33.2-microsoft-standard-WSL2" \
+check_platform "android" --kernel "$WSL_KERNEL" \
     --ignore-line ".config/systemd"
 
 # The local model server (Ollama) ships wherever Linux has an NVIDIA driver, WSL or bare metal, and
@@ -182,11 +190,11 @@ check_platform "linux" --kernel "6.11.0-generic" --gpu \
     --include "ollama.service" \
     --include-line ".config/systemd"
 
-check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
+check_platform "linux" --kernel "$WSL_KERNEL" --gpu \
     --include "ssh-agent-bridge" \
     --include "ollama.service"
 
-check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" \
+check_platform "linux" --kernel "$WSL_KERNEL" \
     --ignore "ollama.service"
 
 # claude-omni, its task runner and the look of its profile ship on every Linux machine, GPU or
@@ -195,13 +203,13 @@ check_platform "linux" --kernel "6.11.0-generic" \
     --include "claude-omni" \
     --include-line ".claude-omni"
 
-check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
+check_platform "linux" --kernel "$WSL_KERNEL" --gpu \
     --include "claude-omni" \
     --include-line ".claude-omni"
 
 # A Windows machine with an NVIDIA card has nvidia-smi on PATH as well, so the OS check, not the
 # driver, has to keep the Linux unit and launcher off it.
-check_platform "windows" --gpu \
+check_platform "$WINDOWS_OS" --gpu \
     --ignore "ollama.service" \
     --ignore-line ".local/bin/claude-omni" \
     --ignore-line ".local/bin/claude-omni-task" \
@@ -215,10 +223,10 @@ check_platform "android" \
 
 # The OmniRoute stack runs from the dotfiles checkout, where its .env lives; chezmoi deploys none
 # of it, on any platform.
-check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
+check_platform "linux" --kernel "$WSL_KERNEL" --gpu \
     --ignore-line "local-services"
 
-check_platform "windows" \
+check_platform "$WINDOWS_OS" \
     --ignore-line "local-services"
 
 check_platform "android" \
@@ -230,17 +238,39 @@ check_platform "linux" --kernel "6.11.0-generic" \
     --include-line ".local/bin/tailscale-up" \
     --ignore-line ".local/bin/tailscale"
 
-check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" --gpu \
+check_platform "linux" --kernel "$WSL_KERNEL" --gpu \
     --include-line ".local/bin/tailscale-up" \
     --include-line ".local/bin/tailscale"
 
-check_platform "windows" --gpu \
+check_platform "$WINDOWS_OS" --gpu \
     --ignore-line ".local/bin/tailscale-up" \
     --ignore-line ".local/bin/tailscale"
 
 check_platform "android" \
     --ignore-line ".local/bin/tailscale-up" \
     --ignore-line ".local/bin/tailscale"
+
+# The OmniRoute backups serve the local stack, which runs from the dotfiles checkout on WSL alone;
+# the script and both units ship there and nowhere else.
+check_platform "linux" --kernel "6.11.0-generic" \
+    --ignore-line "$BACKUP_SCRIPT" \
+    --ignore-line "$BACKUP_SERVICE" \
+    --ignore-line "$BACKUP_TIMER"
+
+check_platform "linux" --kernel "$WSL_KERNEL" \
+    --include-line "$BACKUP_SCRIPT" \
+    --include-line "$BACKUP_SERVICE" \
+    --include-line "$BACKUP_TIMER"
+
+check_platform "$WINDOWS_OS" \
+    --ignore-line "$BACKUP_SCRIPT" \
+    --ignore-line "$BACKUP_SERVICE" \
+    --ignore-line "$BACKUP_TIMER"
+
+check_platform "android" \
+    --ignore-line "$BACKUP_SCRIPT" \
+    --ignore-line "$BACKUP_SERVICE" \
+    --ignore-line "$BACKUP_TIMER"
 
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-chezmoiignore] all platform logic tests passed" >&2
