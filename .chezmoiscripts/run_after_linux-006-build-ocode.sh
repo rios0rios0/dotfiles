@@ -9,6 +9,9 @@ set -euo pipefail
 # Without the checkout this script skips: cloning is left to the user
 # (git clone https://github.com/rios0rios0/opencode.git into
 # ~/Development/github.com/opencode/opencode). Set OCODE_SOURCE to name another checkout.
+# bun, the runtime the build needs, comes from `install_bun` into ~/.bun with its PATH line in
+# `dot_zshenv.tmpl`; the script also falls back to ~/.bun/bin/bun itself, and skips only when
+# neither answers.
 # A marker at ~/.cache/ocode-built-commit makes unchanged applies a no-op, which is why this is
 # a run_after script that runs on every apply. A build that fails fails the apply, so the next
 # one retries it.
@@ -22,10 +25,22 @@ if [ ! -d "$source_dir/.git" ]; then
     echo "[ocode] skipped: no fork checkout at $source_dir (clone rios0rios0/opencode there, branch feat/provider-omniroute)" >&2
     exit 0
 fi
-if ! command -v bun >/dev/null 2>&1; then
-    echo "[ocode] skipped: bun is not on PATH" >&2
+
+# bun is resolved from PATH first and from ~/.bun/bin second: `install_bun` puts it there
+# and `dot_zshenv.tmpl` carries the PATH line, but a shell started before that apply still
+# has the old PATH, and this script runs with the apply's environment. That gap is how the
+# build came to be skipped on a machine whose bun was installed all along.
+bun="$(command -v bun || true)"
+if [ -z "$bun" ] && [ -x "$HOME/.bun/bin/bun" ]; then
+    bun="$HOME/.bun/bin/bun"
+fi
+if [ -z "$bun" ]; then
+    echo "[ocode] skipped: bun is not installed (not on PATH, no ~/.bun/bin/bun)" >&2
     exit 0
 fi
+# The build may spawn `bun` itself, so its directory goes on PATH for the duration.
+bun_dir="$(dirname "$bun")"
+export PATH="$bun_dir:$PATH"
 
 head="$(git -C "$source_dir" rev-parse HEAD)"
 if [ "$(cat "$marker" 2>/dev/null || true)" = "$head" ] && [ -x "$target" ]; then
@@ -36,7 +51,7 @@ echo "[ocode] building $(git -C "$source_dir" log -1 --format='%h %s')..." >&2
 # A single, current-platform build; the web UI bundle and the release assets cost minutes each
 # and add nothing to a local binary. The fork's build re-creates the outdir itself and emits
 # <outdir>/cli-<target>/bin/opencode.
-bun run --cwd "$source_dir/packages/cli" build --single --skip-install --skip-web-ui --outdir="$outdir"
+"$bun" run --cwd "$source_dir/packages/cli" build --single --skip-install --skip-web-ui --outdir="$outdir"
 
 built="$(find "$outdir" -path '*/bin/opencode' -type f | head -n 1)"
 if [ -z "$built" ]; then

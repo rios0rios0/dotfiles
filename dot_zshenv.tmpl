@@ -147,6 +147,18 @@ fi
 if [[ -d "$HOME/.opencode/bin" ]]; then
     export PATH="$HOME/.opencode/bin:$PATH"
 fi
+
+# Bun (`bun`), the runtime the ocode fork build runs on
+# (`run_after_linux-006-build-ocode.sh`): the upstream installer puts it under ~/.bun and,
+# when `$SHELL` names a shell it knows, would append this export to the rc files chezmoi
+# owns (`install_bun` runs it with SHELL empty for that reason, which makes its shell
+# detection fall through to printing the manual instruction). Without this block bun sat at
+# ~/.bun/bin while every apply reported "bun is not on PATH" and skipped the build.
+# Deliberately NOT on Android: bun publishes no build bionic can start, so no Android
+# machine installs it and the fork build is Linux-only.
+if [[ -d "$HOME/.bun/bin" ]]; then
+    export PATH="$HOME/.bun/bin:$PATH"
+fi
 {{- end }}
 
 ###### Version Managers PATH Setup #######################################################################################

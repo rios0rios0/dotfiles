@@ -196,11 +196,15 @@ install_terra() {
     # `--force` skips the interactive prompt.
     terra self-update --force || echo "[configure-deps] WARN: terra self-update failed; continuing" >&2
 
-    # `terra update` (alias of `install`) prompts y/N when newer
-    # terraform/terragrunt versions are detected and exposes no auto-answer
-    # flag in the currently installed binary. Pipe `yes` to stdin so the
-    # prompts auto-confirm during unattended `chezmoi apply` runs.
-    yes y | terra update
+    # `terra update` (alias of `install`) auto-answers its y/N prompts for newer
+    # terraform/terragrunt versions only through TERRA_ASSUME_YES=true: since
+    # terra 1.16.10 it skips the prompt whenever stdin is not a terminal -- a
+    # pipe included -- so `yes y` alone made every unattended apply report
+    # "Non-interactive session - skipping update" and download nothing; the
+    # variable the warning names is the answer. The pipe stays for a terra older
+    # than 1.16.10 (self-update above fails on an offline machine), whose prompt
+    # does read stdin.
+    yes y | TERRA_ASSUME_YES=true terra update
 }
 
 # https://github.com/pyenv/pyenv
@@ -933,6 +937,8 @@ install_aws_cli
 verify install_azure_cli
 install_fly_cli
 verify install_opencode
+# The ocode fork build (`run_after_linux-006-build-ocode.sh`) runs on bun.
+verify install_bun
 verify install_oci_cli
 
 install_ggshield

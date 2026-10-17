@@ -38,6 +38,8 @@ make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, t
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
 make test-omniroute-backup          # the OmniRoute stack's encrypted backups: the snapshot flow, retention, the installer's gate
+make test-ocode                     # the ocode fork build: skip paths, rebuilds, the ~/.bun/bin fallback, the bun installer and its PATH block
+make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
 ```
 
 ## Essential Commands
@@ -879,8 +881,18 @@ fork's own single-platform build whenever the checkout's HEAD moved past the las
 installs the result as `~/.local/bin/ocode`. The marker `~/.cache/ocode-built-commit` makes an
 unchanged apply a no-op, which is why this is a `run_after` script that runs on every apply;
 `OCODE_SOURCE` names another checkout. No checkout and no `bun` are skips, never failures -- a
-failed build is an error, retried by the next apply. `make test-ocode` covers the skip paths, the
-first build, the no-op and the rebuild, against stubbed `git` and `bun`.
+failed build is an error, retried by the next apply.
+
+bun, the build's runtime, comes from `install_bun` (shared library, called by the Linux
+installer) as `~/.bun/bin/bun`. The upstream `bun.sh/install` script would append its own PATH
+line to the rc file of whichever shell `$SHELL` names -- `~/.zshrc`, which chezmoi owns and
+rewrites -- so `install_bun` runs it with `SHELL` empty, which falls through to printing the
+manual instruction, and `dot_zshenv.tmpl` carries the `~/.bun/bin` PATH block. The builder
+resolves bun from PATH and falls back to `~/.bun/bin/bun`, so the first apply after the install
+builds even though the running shell's PATH predates the export; only when neither answers is
+the build skipped. `make test-ocode` covers the skip paths, the first build, the no-op and the
+rebuilds against stubbed `git` and `bun`, and the installer's skip, its `SHELL`-empty call,
+both failures, the Linux wiring and the PATH block per platform.
 
 ## Tailscale
 

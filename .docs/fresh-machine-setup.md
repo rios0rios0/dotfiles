@@ -218,11 +218,12 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | Oh My Zsh, login shell switched to zsh           | `install_oh_my_zsh`, then `usermod`  | `[automated]` | Powerlevel10k and the plugins load through ZINIT from `.zshrc`; there is nothing to install for them.                            |
 | Go, via GVM                                      | `install_gvm`                        | `[automated]` | Resolves the latest stable release from go.dev on every run.                                                                    |
 | kubectl (`v1.32` apt channel), krew with `ctx` and `ns` | `install_kubectl`, `install_krew` | `[automated]` |                                                                                                                                 |
-| terra (Terraform and Terragrunt manager)         | `install_terra`                      | `[automated]` | Upstream install script, then `terra self-update` and `terra update`.                                                           |
+| terra (Terraform and Terragrunt manager)         | `install_terra`                      | `[automated]` | Upstream install script, then `terra self-update` and `terra update` with `TERRA_ASSUME_YES=true`, so an unattended run updates instead of reporting "Non-interactive session - skipping update". |
 | Java and Gradle, via SDKMAN                      | `install_sdkman`                     | `[automated]` | Latest candidates, refreshed on every run.                                                                                      |
 | Node.js LTS, via NVM `v0.40.2`, plus corepack    | `install_nvm`                        | `[automated]` |                                                                                                                                 |
 | Python `3.13.2`, via pyenv                       | `install_pyenv`                      | `[automated]` | Also installs the apt build dependencies pyenv needs.                                                                           |
 | Flutter (current stable, with its Dart)          | `install_flutter`                    | `[automated]` | The official Linux x64 tarball, resolved from Flutter's releases manifest and verified against the SHA-256 it publishes, under `~/.local/share/flutter`; `flutter` and `dart` are linked into `~/.local/bin`, so a Dart SDK that was there by hand is repointed (logged). An installed SDK moves to the next stable with `flutter upgrade`. Web artifacts are precached; the Android toolchain, Chrome and the Linux desktop toolchain that `flutter doctor` lists are deliberately not installed. |
+| bun (the `ocode` fork build's runtime)           | `install_bun`                        | `[automated]` | Upstream `bun.sh/install` into `~/.bun`, run with `SHELL` empty so its shell detection cannot append a PATH line to an rc file chezmoi owns; `dot_zshenv.tmpl` adds `~/.bun/bin` to PATH. |
 | Claude Code                                      | `install_claude_cli`                 | `[automated]` | npm package.                                                                                                                    |
 | ccswitch                                         | `install_ccswitch`                   | `[partial]`   | Installed here; every account still has to be enrolled once with `ccswitch enroll` after `claude` and `/login`.                 |
 | GitHub Copilot CLI                               | `install_copilot_cli`                | `[automated]` | Upstream installer into `~/.local/bin`.                                                                                          |
@@ -273,7 +274,7 @@ gvm list && go version
 node --version && corepack --version
 pyenv version
 kubectl version --client && kubectl krew list
-command -v terra terraform terragrunt aws az gh copilot codex sentry neon acli ruff ggshield aisync ccswitch flyctl oci
+command -v terra terraform terragrunt aws az gh copilot codex sentry neon acli ruff ggshield aisync ccswitch flyctl oci bun
 ls ~/.local/share/zsh/site-functions/_sentry
 fc-list | grep -i meslo
 git config --get core.hooksPath

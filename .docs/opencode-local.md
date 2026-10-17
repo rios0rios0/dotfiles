@@ -73,7 +73,9 @@ Model ids are the ones OmniRoute uses, so any id from the picker (`omniroute/aut
 and the `OPENCODE_DISABLE_CLAUDE_CODE` gate. `run_after_linux-006-build-ocode.sh` rebuilds it
 from the checkout at `~/Development/github.com/opencode/opencode` whenever that checkout's HEAD
 moved, and installs it as `~/.local/bin/ocode`; see the "Fork Build (`ocode`)" part of the main
-`CLAUDE.md` for the mechanics.
+`CLAUDE.md` for the mechanics. bun, its build runtime, comes from `install_bun` into `~/.bun`
+(PATH block in `dot_zshenv.tmpl`), and the builder falls back to `~/.bun/bin/bun` itself, so the
+first apply after the install builds without waiting for a new shell.
 
 ## When models are missing
 
