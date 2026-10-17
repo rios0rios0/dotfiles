@@ -4,7 +4,10 @@ set -euo pipefail
 # Builds the local OpenCode fork checkout into ~/.local/bin/ocode whenever the checkout's HEAD
 # differs from the last build, and installs the result as `ocode` -- the personal fork's build,
 # carrying its custom features (the OmniRoute provider plugin and the
-# OPENCODE_DISABLE_CLAUDE_CODE gate, branch feat/provider-omniroute).
+# OPENCODE_DISABLE_CLAUDE_CODE gate, branch feat/provider-omniroute). It builds as a
+# release-grade client on the fork's own channel (see the build-identity note above the build
+# command): the Console refuses the free tier for client versions below 1.18.0, and a bare
+# branch build's `0.0.0-<branch>-<time>` preview version falls below it.
 #
 # Without the checkout this script skips: cloning is left to the user
 # (git clone https://github.com/rios0rios0/opencode.git into
@@ -48,6 +51,15 @@ if [ "$(cat "$marker" 2>/dev/null || true)" = "$head" ] && [ -x "$target" ]; the
 fi
 
 echo "[ocode] building $(git -C "$source_dir" log -1 --format='%h %s')..." >&2
+# Build identity: the binary must report a release-grade version, because the Console's free
+# tier gate reads it from the User-Agent -- `opencode/<channel>/<version>/<name>` -- and
+# refuses clients below 1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview
+# version is. The channel stays the branch, so the fork keeps its own service registration,
+# port and database; the patch tracks the build time so a rebuild replaces the background
+# service on the next launch.
+OPENCODE_CHANNEL="feat-provider-omniroute"
+OPENCODE_VERSION="2.0.$(date -u +%y%m%d%H%M)"
+export OPENCODE_CHANNEL OPENCODE_VERSION
 # A single, current-platform build; the web UI bundle and the release assets cost minutes each
 # and add nothing to a local binary. The fork's build re-creates the outdir itself and emits
 # <outdir>/cli-<target>/bin/opencode.
