@@ -879,7 +879,12 @@ lacks: the OmniRoute provider plugin and the `OPENCODE_DISABLE_CLAUDE_CODE` gate
 `feat/provider-omniroute` of `rios0rios0/opencode`. `run_after_linux-006-build-ocode.sh` keeps it
 current: when the checkout at `~/Development/github.com/opencode/opencode` exists, it runs the
 fork's own single-platform build whenever the checkout's HEAD moved past the last one, and
-installs the result as `~/.local/bin/ocode`. The marker `~/.cache/ocode-built-commit` makes an
+installs the result as `~/.local/bin/ocode`. The build pins the channel and version the Console
+reads from the User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a build-stamped
+`OPENCODE_VERSION` (`2.0.<%y%m%d%H%M>`) -- because the free tier refuses client versions below
+1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview version is; the stamp also
+makes each rebuild replace the background service on the next launch. The marker
+`~/.cache/ocode-built-commit` makes an
 unchanged apply a no-op, which is why this is a `run_after` script that runs on every apply;
 `OCODE_SOURCE` names another checkout. No checkout and no `bun` are skips, never failures -- a
 failed build is an error, retried by the next apply.
@@ -891,9 +896,10 @@ rewrites -- so `install_bun` runs it with `SHELL` empty, which falls through to 
 manual instruction, and `dot_zshenv.tmpl` carries the `~/.bun/bin` PATH block. The builder
 resolves bun from PATH and falls back to `~/.bun/bin/bun`, so the first apply after the install
 builds even though the running shell's PATH predates the export; only when neither answers is
-the build skipped. `make test-ocode` covers the skip paths, the first build, the no-op and the
-rebuilds against stubbed `git` and `bun`, and the installer's skip, its `SHELL`-empty call,
-both failures, the Linux wiring and the PATH block per platform.
+the build skipped. `make test-ocode` covers the skip paths, the first build (including the
+channel and release-grade version it carries), the no-op and the rebuilds against stubbed
+`git` and `bun`, and the installer's skip, its `SHELL`-empty call, both failures, the Linux
+wiring and the PATH block per platform.
 
 ## Tailscale
 

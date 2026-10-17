@@ -6,10 +6,11 @@ set -euo pipefail
 # whose `.git` exists, the build fabricates the artifact the fork's build would emit, and
 # `install_bun` is sourced from the shared dependency library against a `curl` stub that
 # fabricates the upstream installer. Covers the skip paths (no checkout, no bun), the first
-# build, the no-op rebuild, the rebuild on a new head, the rebuild that restores a missing
-# binary, the ~/.bun/bin fallback, the installed skip, the installer call (with SHELL empty, so
-# bun's script cannot edit an rc file chezmoi owns), both installer failures, the Linux wiring
-# and the PATH block rendered on each platform.
+# build (including the fork channel and release-grade version it must carry), the no-op
+# rebuild, the rebuild on a new head, the rebuild that restores a missing binary, the
+# ~/.bun/bin fallback, the installed skip, the installer call (with SHELL empty, so bun's
+# script cannot edit an rc file chezmoi owns), both installer failures, the Linux wiring and
+# the PATH block rendered on each platform.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -46,10 +47,12 @@ case "$*" in
 esac
 STUB
 
-# bun stub: records every invocation and fabricates the artifact under --outdir.
+# bun stub: records every invocation and the build identity it was given, and fabricates the
+# artifact under --outdir.
 cat >"$BUN_STUB/bun" <<'STUB'
 #!/bin/bash
 echo "$*" >>"${BUN_CALLS:?}"
+echo "${OPENCODE_CHANNEL:-unset}/${OPENCODE_VERSION:-unset}" >>"${BUN_ENV:?}"
 for arg in "$@"; do
     case "$arg" in
         --outdir=*) out="${arg#--outdir=}" ;;
@@ -62,7 +65,9 @@ STUB
 chmod +x "$STUB/git" "$BUN_STUB/bun"
 
 export BUN_CALLS="$TMP/bun-calls"
+export BUN_ENV="$TMP/bun-env"
 : >"$BUN_CALLS"
+: >"$BUN_ENV"
 
 run_script() { (cd "$TMP" && PATH="$BUN_STUB:$STUB:$PATH" bash "$SCRIPT") >"$TMP/out" 2>&1; echo $? >"$TMP/rc"; }
 rc() { cat "$TMP/rc"; }
@@ -76,7 +81,9 @@ run_script
 grep -q "no fork checkout" "$TMP/out" || fail "skip must say why"
 pass "no checkout skips"
 
-# 2) First build installs an executable ocode and records the head.
+# 2) First build installs an executable ocode, records the head, and builds as a release-grade
+#    client on the fork's channel -- the Console's free tier refuses client versions below
+#    1.18.0, which a bare branch build's preview version would be.
 mkdir -p "$CHECKOUT/.git"
 printf 'fake0123\n' >"$CHECKOUT/.git/HEAD"
 run_script
@@ -84,7 +91,10 @@ run_script
 [ -x "$HOME/.local/bin/ocode" ] || fail "first build must install an executable ocode"
 [ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake0123" ] || fail "marker must hold the built head"
 [ "$(calls)" -eq 1 ] || fail "first build must invoke bun once"
-pass "first build installs ocode and records the head"
+identity="$(tail -n 1 "$BUN_ENV")"
+[ "${identity%%/*}" = "feat-provider-omniroute" ] || fail "the build must carry the fork's channel: $identity"
+[[ "${identity##*/}" =~ ^2\.0\.[0-9]+$ ]] || fail "the build must carry a release-grade version, not a preview one: $identity"
+pass "first build installs ocode, records the head, and carries the fork's channel and a release-grade version"
 
 # 3) Unchanged head: no rebuild.
 run_script
