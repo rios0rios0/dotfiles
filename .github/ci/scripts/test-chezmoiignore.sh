@@ -242,6 +242,28 @@ check_platform "android" \
     --ignore-line ".local/bin/tailscale-up" \
     --ignore-line ".local/bin/tailscale"
 
+# The OmniRoute backups serve the local stack, which runs from the dotfiles checkout on WSL alone;
+# the script and both units ship there and nowhere else.
+check_platform "linux" --kernel "6.11.0-generic" \
+    --ignore-line ".local/bin/omniroute-backup" \
+    --ignore-line ".config/systemd/user/omniroute-backup.service" \
+    --ignore-line ".config/systemd/user/omniroute-backup.timer"
+
+check_platform "linux" --kernel "6.18.33.2-microsoft-standard-WSL2" \
+    --include-line ".local/bin/omniroute-backup" \
+    --include-line ".config/systemd/user/omniroute-backup.service" \
+    --include-line ".config/systemd/user/omniroute-backup.timer"
+
+check_platform "windows" \
+    --ignore-line ".local/bin/omniroute-backup" \
+    --ignore-line ".config/systemd/user/omniroute-backup.service" \
+    --ignore-line ".config/systemd/user/omniroute-backup.timer"
+
+check_platform "android" \
+    --ignore-line ".local/bin/omniroute-backup" \
+    --ignore-line ".config/systemd/user/omniroute-backup.service" \
+    --ignore-line ".config/systemd/user/omniroute-backup.timer"
+
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-chezmoiignore] all platform logic tests passed" >&2
 fi

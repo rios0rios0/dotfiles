@@ -34,6 +34,7 @@ make test-tailscale                 # tailscale-up on bare metal and on WSL (Win
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
+make test-omniroute-backup          # the OmniRoute stack's encrypted backups: the snapshot flow, retention, the installer's gate
 ```
 
 ## Essential Commands
@@ -214,7 +215,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-omni`, `claude-omni-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `wsl-systemd`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-omni`, `claude-omni-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -926,8 +927,8 @@ and the removal on WSL alone; `make test-chezmoiignore` covers the gates.
 
 ## systemd on WSL (Turned On by chezmoi)
 
-The SSH agent bridge and Ollama run as systemd user units, and WSL boots a distribution with
-systemd only when `/etc/wsl.conf` has `systemd=true` under `[boot]`. Kali's WSL image ships no
+The SSH agent bridge, Ollama and the OmniRoute backups run as systemd user units, and WSL boots a
+distribution with systemd only when `/etc/wsl.conf` has `systemd=true` under `[boot]`. Kali's WSL image ships no
 `/etc/wsl.conf`, so PID 1 is WSL's own `init`. `systemctl --user` then fails with `Failed to connect
 to user scope bus via local transport: No such file or directory` -- the socket it looks for in
 `$XDG_RUNTIME_DIR`, WSLg's `/mnt/wslg/runtime-dir`, does not exist -- and `claude-omni` finds no
@@ -938,7 +939,7 @@ Two halves make the fix automatic, and both are needed:
 | Half | Mechanism |
 |------|-----------|
 | Turn it on | `.chezmoiscripts/run_before_linux-000-enable-wsl-systemd.sh.tmpl` sets `systemd=true` under `[boot]` through sudo and says to restart WSL. It renders to nothing unless the kernel is WSL's and systemd is not PID 1, so it runs on every apply until WSL boots with systemd, and never after |
-| Finish what waited | Each installer that calls `systemctl` -- the bridge, Ollama, and Tailscale's bare-metal half -- renders `systemd running` or `systemd not running` into a comment. Without systemd it stopped early and exited 0, which chezmoi records as done; the line changing is what runs it again on the first apply after the restart |
+| Finish what waited | Each installer that calls `systemctl` -- the bridge, Ollama, the OmniRoute backups, and Tailscale's bare-metal half -- renders `systemd running` or `systemd not running` into a comment. Without systemd it stopped early and exited 0, which chezmoi records as done; the line changing is what runs it again on the first apply after the restart |
 
 On a machine that boots without systemd: `chezmoi apply` writes the file and the installers warn;
 `wsl.exe --shutdown` and a new terminal start systemd; the next `chezmoi apply` sets up the bridge

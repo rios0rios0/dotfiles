@@ -1,0 +1,17 @@
+# The daily backup of the local OmniRoute stack, started by omniroute-backup.timer.
+#
+# The work lives in ~/.local/bin/omniroute-backup: it copies the gateway's storage.sqlite through
+# VACUUM INTO inside its container, packs that copy with the bootstrap's server.env, encrypts the
+# tar with the age identity in ~/.ssh/omniroute-backup-key and rotates
+# ~/.local/share/omniroute-backups. Restoring is documented in .docs/omniroute-local.md.
+#
+# No [Install] on purpose: enabling this unit at boot would only add a second backup on machines
+# that boot daily. The timer is what gets enabled -- it starts this unit.
+
+[Unit]
+Description=Encrypted backup of the local OmniRoute stack
+Documentation=https://github.com/rios0rios0/dotfiles/blob/main/.docs/omniroute-local.md
+
+[Service]
+Type=oneshot
+ExecStart=%h/.local/bin/omniroute-backup
