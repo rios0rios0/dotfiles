@@ -49,19 +49,22 @@ knows a model runs on a GPU and which one:
 | Prefix | Base URL | Where |
 |--------|----------|-------|
 | `ollama-laptop` | `http://host.docker.internal:11434` | this machine |
-| `ollama` | `http://<the other machine's 100.x address>:11434` | another machine on the tailnet; `tailscale ip -4 <name>` prints the address |
+| `ollama-desktop` | `http://<the other machine's 100.x address>:11434` | another machine on the tailnet; `tailscale ip -4 <name>` prints the address |
 
-Docker Desktop provides `host.docker.internal` for containers to reach host services. Ollama binds
-to `0.0.0.0` so Tailscale Serve can expose it to the tailnet; Docker Desktop still reaches it at
-`host.docker.internal` through WSL's localhost forwarding to Windows. No extra proxy, `socat`, or
-systemd bridge is needed. The API has no authentication, so restrict access with the firewall.
+Docker Desktop provides `host.docker.internal` for containers to reach host services. Ollama
+listens on IPv4 loopback (`127.0.0.1:11434`): the container dials Windows' IPv4 loopback, and WSL's
+localhost relay puts an IPv4 listener exactly there — with `0.0.0.0` the listener is a dual-stack
+`[::]` that Windows sees on `::1` alone, and the container's fetch fails with `ECONNREFUSED` while
+the server is up. Tailscale Serve forwards the tailnet's port to this same `localhost:11434`. No
+extra proxy, `socat`, or systemd bridge is needed. The API has no authentication, and loopback
+keeps the network off it directly.
 
 The dotfiles checkout is shared by two machines, so the local/remote roles come from chezmoi's
 `deviceName`, not from a machine guess at runtime. On the laptop (`alien-a51`), `ollama-laptop` is
-local and `ollama` is the desktop. On the desktop (`mxhero-z790`), a per-device override swaps those
-roles: `ollama` is local and `ollama-laptop` is the laptop. Check the value on each machine with
-`chezmoi data | jq -r .deviceName`; `CHEZMOI_DEVICE` can override the hostname when set before
-`chezmoi init`.
+local and `ollama-desktop` is the desktop. On the desktop (`mxhero-z790`), a per-device override
+swaps those roles: `ollama-desktop` is local and `ollama-laptop` is the laptop. Check the value on
+each machine with `chezmoi data | jq -r .deviceName`; `CHEZMOI_DEVICE` can override the hostname
+when set before `chezmoi init`.
 
 Do not add a `host-gateway` mapping: with Docker Desktop it points at the Docker VM's bridge rather
 than the Windows host. Container traffic to the remote GPU leaves through Windows and traverses its
@@ -73,6 +76,21 @@ Give each Ollama model a manual context window of `contextTokens` from `.chezmoi
 (65536). OmniRoute cannot see the window an Ollama server allocates and assumes its 128000 fallback;
 with the override, it rejects an oversized request instead of letting Ollama truncate it.
 `claude-omni` declares the same window itself, so the override is the second guard.
+
+**Known limitation: the tailnet GPU answers 403.** `tailscale-up` shares the server with
+`tailscale serve --tcp=11434`, a raw TCP forward, so a request from another machine keeps its own
+`Host: 100.x:11434` header all the way to Ollama, which refuses a host it does not serve with HTTP
+403. The provider is configured and its port is reachable, yet every request through OmniRoute
+fails. Reproduce on the machine that owns the GPU:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: 100.70.110.25:11434' http://127.0.0.1:11434/api/version
+# 403
+```
+
+The local GPU is unaffected: Docker reaches it through `host.docker.internal`, which Ollama accepts.
+Until the forward is changed to rewrite the header -- an HTTPS-mode `tailscale serve` proxy rather
+than a TCP forward -- use the local GPU or a cloud model.
 
 ### Fix Redis snapshot permission errors
 
@@ -117,10 +135,11 @@ Test each connection, then enable the providers and models you want the router t
 Following that probe, OmniRoute hides 68 of its 81 NIM chat entries; the 13 that called the tool in
 the latest probe remain visible. Three models that were visible after an older probe were hidden
 because they were not confirmed by this run: one was absent from the current catalog, one timed out,
-and one returned HTTP 500. This visibility is stored in OmniRoute's database, not in this checkout.
-`models` in `.chezmoidata/omniroute.yaml` is only the preferred picker subset. `claude-omni --probe
-nvidia/` repeats the probe; each request may incur provider charges. OmniRoute reports no authoritative
-NIM context window, so the picker shows `?` rather than presenting its generic 128000 fallback as fact.
+and one returned HTTP 500. This visibility is stored in OmniRoute's database, not in this checkout,
+and it is the whole of the curation: `claude-omni` lists what `/v1/models` serves, so a model hidden
+here is absent from its picker too. `claude-omni --probe nvidia/` repeats the probe; each request may
+incur provider charges. OmniRoute reports no authoritative NIM context window, so the picker shows `?`
+rather than presenting its generic 128000 fallback as fact.
 
 **Why the first answer can take a minute.** NIM queues requests: `z-ai/glm-5.3-flash` started answering
 after 30-35 seconds. OmniRoute aborted that first attempt at its 30-second default and retried on a
@@ -138,18 +157,23 @@ concealed field labelled `cred:OMNIROUTE_API_KEY`. `reload-credentials` (or a ne
 ```bash
 claude-omni                                    # pick a model; each line shows its context window
 claude-omni -m nvidia/z-ai/glm-5.3             # straight in
-claude-omni -m ollama/qwen3.8:27b -p "add a test for Subtract"   # print mode, like `claude -p`
+claude-omni -m ollama-desktop/qwen3.8:27b -p "add a test for Subtract"   # print mode, like `claude -p`
 claude-omni -c -m openrouter/z-ai/glm-5.3      # switch model, keeping the conversation
-claude-omni --list                             # the listed models, their windows and where they run
+claude-omni --list                             # the models OmniRoute serves, their windows and where they run
 claude-omni --list --all                       # every chat model OmniRoute serves, with its window
 claude-omni --probe nvidia/                    # which models under a prefix answer with a tool call
 ```
 
-The picker lists `models` from `.chezmoidata/omniroute.yaml` that OmniRoute serves, and Enter takes the
-model the profile saved last. Without a terminal -- in print mode, or from a script -- it takes that
-model without asking. The first launch shows Claude Code's onboarding once, because the session runs in
-its own profile (`~/.claude-omni`), and its trust prompt once per project. `chezmoi apply` keeps the
-regular profile's theme, renderer and status line there; see "Claude Code and Codex Look" in
+The picker is the gateway's own catalog: every launch reads OmniRoute's `/v1/models` and lists the
+chat models that can call tools, the GPUs' own model leading and each line showing its context
+window. No model list lives in this repository, so a model is added, hidden or restricted in
+OmniRoute's dashboard and the picker follows -- `efforts` in `.chezmoidata/omniroute.yaml` is the
+one per-model setting kept here (a Claude Code effort level, low to xhigh). Enter takes the model
+the profile saved last; if that one is no longer served, the first served one starts. Without a
+terminal -- in print mode, or from a script -- it takes that model without asking. The first launch
+shows Claude Code's onboarding once, because the session runs in its own profile (`~/.claude-omni`),
+and its trust prompt once per project. `chezmoi apply` keeps the regular profile's theme, renderer
+and status line there; see "Claude Code and Codex Look" in
 [CLAUDE.md](../CLAUDE.md).
 
 ### The window a session gets
@@ -164,7 +188,6 @@ the smaller of OmniRoute's window, which OmniRoute enforces, and this repository
 | One OmniRoute knows (its catalog has `max_input_tokens`) | OmniRoute's | `256K` |
 | One OmniRoute does not know (no `max_input_tokens`) | OmniRoute's 128000 fallback, with a warning | `128K?` |
 | An `auto/*` combo | `autoWindow` (200000); OmniRoute advertises the largest window in the pool | `200K` |
-| A `window` set in `omniroute.yaml` | that value, if smaller than OmniRoute's | as set |
 
 The reply reservation follows the window: an eighth of it, between 8,192 and 32,000 tokens.
 
@@ -174,10 +197,11 @@ Every Claude Code tier -- Opus, Sonnet, Haiku, Fable and subagents -- is pinned 
 
 ### Switching models
 
-In the session, `/model` lists the listed models whose window is at least the session's, each with its
-window and provider. The window stays the session's after a switch, so a model with a smaller one would
-overflow before the session compacts, and OmniRoute's answer to an over-window request is not one Claude
-Code compacts on. `claude-omni -c -m ID` reaches any model, and keeps the conversation.
+In the session, `/model` lists the models OmniRoute serves whose window is at least the session's,
+each with its window and provider. The window stays the session's after a switch, so a model with a
+smaller one would overflow before the session compacts, and OmniRoute's answer to an over-window
+request is not one Claude Code compacts on. `claude-omni -c -m ID` reaches any model, and keeps the
+conversation.
 
 The status line shows the model and the session's window, `ctx 80% left (13k/64k)`. After a switch it adds
 the new model's own window, `(13k/64k · model 256k)`, and turns red when that one is smaller, which can

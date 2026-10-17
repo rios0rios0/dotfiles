@@ -48,19 +48,22 @@ chmod +x "$TMP/claude-omni" "$TMP/claude-omni-nosystemd"
 window="$(render "$UNIT" | sed -n 's/^Environment=OLLAMA_CONTEXT_LENGTH=//p')"
 gpu_model="$(chezmoi execute-template --config "$TMP/chezmoi.yaml" '{{ (includeTemplate "lib-local-llm.tmpl" . | fromJson).model }}')"
 
-# The catalog OmniRoute serves, as its /v1/models shapes it: the GPU models and every NIM model with
-# its 128000 fallback and no max_input_tokens, real windows elsewhere, an auto combo advertising the
-# largest window in its pool, one model too small for most sessions, and an image model.
+# The catalog OmniRoute serves, as its /v1/models shapes it: every chat model carries the stable
+# `root` a label comes from; the GPU models -- last in the catalog, as in OmniRoute's own -- and
+# the NIM model carry its 128000 fallback and no max_input_tokens; real windows elsewhere; an auto
+# combo advertising the largest window in its pool; one model too small for most sessions; and two
+# the lineup leaves out, an image model and one OmniRoute says cannot call tools.
 jq -n --arg gpu "$gpu_model" '{data: [
-    {id: "ollama-laptop/\($gpu)", context_length: 128000, max_input_tokens: null},
-    {id: "ollama/\($gpu)", context_length: 128000, max_input_tokens: null},
-    {id: "nvidia/z-ai/glm-5.3", context_length: 128000, max_input_tokens: null},
-    {id: "openrouter/moonshotai/kimi-k2.7-code", context_length: 262144, max_input_tokens: 262144, max_output_tokens: 235929},
-    {id: "openrouter/z-ai/glm-5.3", context_length: 1048576, max_input_tokens: 1048576, max_output_tokens: 131072},
-    {id: "openrouter/poolside/laguna-s-2.1:free", context_length: 262144, max_input_tokens: 262144},
-    {id: "auto/coding", context_length: 2000000, max_input_tokens: 2000000, max_output_tokens: 1800000},
-    {id: "openrouter/some/small", context_length: 32768, max_input_tokens: 32768},
-    {id: "openrouter/some/image", type: "image"}]}' > "$TMP/catalog.json"
+    {id: "nvidia/z-ai/glm-5.3", root: "z-ai/glm-5.3", context_length: 128000, max_input_tokens: null},
+    {id: "openrouter/moonshotai/kimi-k2.7-code", root: "moonshotai/kimi-k2.7-code", context_length: 262144, max_input_tokens: 262144, max_output_tokens: 235929},
+    {id: "openrouter/z-ai/glm-5.3", root: "z-ai/glm-5.3", context_length: 1048576, max_input_tokens: 1048576, max_output_tokens: 131072},
+    {id: "openrouter/poolside/laguna-s-2.1:free", root: "poolside/laguna-s-2.1:free", context_length: 262144, max_input_tokens: 262144},
+    {id: "auto/coding", root: "auto/coding", context_length: 2000000, max_input_tokens: 2000000, max_output_tokens: 1800000},
+    {id: "openrouter/some/small", root: "some/small", context_length: 32768, max_input_tokens: 32768},
+    {id: "openrouter/some/specialty", root: "some/specialty", context_length: 200000, max_input_tokens: 200000, capabilities: {tool_calling: false}},
+    {id: "openrouter/some/image", root: "some/image", type: "image"},
+    {id: "ollama-laptop/\($gpu)", root: $gpu, context_length: 128000, max_input_tokens: null, capabilities: {tool_calling: true}},
+    {id: "ollama-desktop/\($gpu)", root: $gpu, context_length: 128000, max_input_tokens: null}]}' > "$TMP/catalog.json"
 
 # Stubs. curl serves the catalog (recording the headers it was handed on stdin and its argument
 # list), answers this machine's Ollama once it is up and the tailnet's for the addresses in
@@ -277,13 +280,15 @@ fi
 # given a session on a GPU model
 reset
 # when
-run_omni "$TMP/claude-omni" -m "ollama/$gpu_model" -p hi 2>/dev/null
+run_omni "$TMP/claude-omni" -m "ollama-desktop/$gpu_model" -p hi 2>/dev/null
 lineup="$(settings_arg | jq -c '.modelPicker')"
-# then: only the listed models OmniRoute serves, labelled with their window, replacing the built-ins
+# then: the models OmniRoute lists that can call tools, the GPUs' own model leading, each option
+# labelled from its `root` and carrying its window, replacing the built-ins
 if [[ "$(jq -r '.replaceBuiltInOptions' <<<"$lineup")" == "true" &&
-    "$(jq -r '[.options[].model] | join(" ")' <<<"$lineup")" == "ollama-laptop/$gpu_model ollama/$gpu_model nvidia/z-ai/glm-5.3 openrouter/z-ai/glm-5.3 openrouter/moonshotai/kimi-k2.7-code openrouter/poolside/laguna-s-2.1:free auto/coding" &&
-    "$(jq -r '.options[] | select(.model == "nvidia/z-ai/glm-5.3") | .description' <<<"$lineup")" == "128K? context · nvidia" &&
-    "$(jq -r ".options[] | select(.model == \"ollama/$gpu_model\") | .label" <<<"$lineup")" == "$gpu_model · desktop GPU" ]]; then
+    "$(jq -r '[.options[].model] | join(" ")' <<<"$lineup")" == "ollama-laptop/$gpu_model ollama-desktop/$gpu_model nvidia/z-ai/glm-5.3 openrouter/moonshotai/kimi-k2.7-code openrouter/z-ai/glm-5.3 openrouter/poolside/laguna-s-2.1:free auto/coding" &&
+    "$(jq -r '[.options[].model] | index("openrouter/some/specialty") == null' <<<"$lineup")" == "true" &&
+    "$(jq -r '.options[] | select(.model == "nvidia/z-ai/glm-5.3") | "\(.label) \(.description)"' <<<"$lineup")" == "z-ai/glm-5.3 128K? context · nvidia" &&
+    "$(jq -r ".options[] | select(.model == \"ollama-desktop/$gpu_model\") | .label" <<<"$lineup")" == "$gpu_model · desktop GPU" ]]; then
     pass "/model offers the served models, each labelled with its window"
 else
     fail "unexpected lineup: $lineup"
@@ -313,7 +318,7 @@ run_omni "$TMP/claude-omni" -p hi 2>/dev/null
 reset
 # when
 run_omni "$TMP/claude-omni" -p hi 2>/dev/null
-# then: the first listed model OmniRoute serves
+# then: the first served model in the lineup
 [[ "$(envvar ANTHROPIC_MODEL)" == "ollama-laptop/$gpu_model" ]] &&
     pass "without a saved choice, claude-omni starts on the first served model" ||
     fail "unexpected default: $(envvar ANTHROPIC_MODEL)"
@@ -331,11 +336,11 @@ script -qec "env -i HOME='$TMP/home' PATH='$STUBS:/usr/bin:/bin' OMNIROUTE_API_K
 # given a session, for the status line's sake
 reset
 # when
-run_omni "$TMP/claude-omni" -m "ollama/$gpu_model" -p hi 2>/dev/null
+run_omni "$TMP/claude-omni" -m "ollama-desktop/$gpu_model" -p hi 2>/dev/null
 # then: every served chat model's window is on file, a GPU's at the server's and an auto combo's
 # at autoWindow, and no image model
 table="$TMP/profile/omniroute-windows.tsv"
-if grep -qxF "ollama/$gpu_model	$window" "$table" && grep -qxF "openrouter/some/small	32768" "$table" &&
+if grep -qxF "ollama-desktop/$gpu_model	$window" "$table" && grep -qxF "openrouter/some/small	32768" "$table" &&
     grep -qxF "auto/coding	200000" "$table" && ! grep -q '^openrouter/some/image' "$table"; then
     pass "the window of every served chat model is written for the status line"
 else
@@ -386,7 +391,7 @@ fi
 # given a model on another machine's GPU
 reset
 # when
-output="$(run_omni "$TMP/claude-omni" -m "ollama/$gpu_model" -p hi 2>&1)"
+output="$(run_omni "$TMP/claude-omni" -m "ollama-desktop/$gpu_model" -p hi 2>&1)"
 # then: the online machine that answers is found, the model loaded there, and the session goes on
 if [[ "$output" == *"using desktop (100.64.0.3)"* && "$(cat "$TMP/remote-loaded")" == "100.64.0.3" && -s "$TMP/claude.args" ]]; then
     pass "claude-omni finds the tailnet machine serving the GPU and loads the model there"
@@ -398,7 +403,7 @@ fi
 reset
 jq '.models[0].context_length = 32768' "$TMP/remote-ps.json" > "$TMP/remote-ps.tmp" && mv "$TMP/remote-ps.tmp" "$TMP/remote-ps.json"
 # when
-if output="$(run_omni "$TMP/claude-omni" -m "ollama/$gpu_model" -p hi 2>&1)"; then status=0; else status=$?; fi
+if output="$(run_omni "$TMP/claude-omni" -m "ollama-desktop/$gpu_model" -p hi 2>&1)"; then status=0; else status=$?; fi
 # then: a window mismatch truncates silently, so it stops the launch
 if [[ "$status" -ne 0 && "$output" == *"32768-token window"* && "$output" == *"chezmoi update"* && ! -e "$TMP/claude.args" ]]; then
     pass "claude-omni refuses a tailnet GPU whose window differs"
@@ -410,7 +415,7 @@ fi
 reset
 jq '.models[0].size_vram = 40' "$TMP/remote-ps.json" > "$TMP/remote-ps.tmp" && mv "$TMP/remote-ps.tmp" "$TMP/remote-ps.json"
 # when
-output="$(run_omni "$TMP/claude-omni" -m "ollama/$gpu_model" -p hi 2>&1)"
+output="$(run_omni "$TMP/claude-omni" -m "ollama-desktop/$gpu_model" -p hi 2>&1)"
 # then
 if [[ "$output" == *"WARN: 60% of $gpu_model runs on the CPU of desktop"* && -s "$TMP/claude.args" ]]; then
     pass "claude-omni warns when part of the model runs on the other machine's CPU, and goes on"
@@ -421,7 +426,7 @@ fi
 # given a tailnet machine named by the caller
 reset
 # when
-output="$(run_omni env CLAUDE_OMNI_GPU_HOST=desktop "$TMP/claude-omni" -m "ollama/$gpu_model" -p hi 2>&1)"
+output="$(run_omni env CLAUDE_OMNI_GPU_HOST=desktop "$TMP/claude-omni" -m "ollama-desktop/$gpu_model" -p hi 2>&1)"
 # then: the name resolves without MagicDNS
 [[ "$output" == *"using desktop (100.64.0.3)"* ]] && pass "CLAUDE_OMNI_GPU_HOST picks a tailnet machine by name" ||
     fail "CLAUDE_OMNI_GPU_HOST ignored: $output"
@@ -430,7 +435,7 @@ output="$(run_omni env CLAUDE_OMNI_GPU_HOST=desktop "$TMP/claude-omni" -m "ollam
 reset
 : > "$TMP/remote-answering"
 # when
-if output="$(run_omni "$TMP/claude-omni" -m "ollama/$gpu_model" -p hi 2>&1)"; then status=0; else status=$?; fi
+if output="$(run_omni "$TMP/claude-omni" -m "ollama-desktop/$gpu_model" -p hi 2>&1)"; then status=0; else status=$?; fi
 # then
 if [[ "$status" -ne 0 && "$output" == *"no machine on the tailnet shares Ollama"* && ! -e "$TMP/claude.args" ]]; then
     pass "claude-omni stops when no tailnet machine shares its GPU"
@@ -479,14 +484,44 @@ fi
 reset
 # when
 listing="$(run_omni "$TMP/claude-omni" --list --json 2>/dev/null)"
-# then: every listed model, with its window, where its window comes from, and whether it is served
-if [[ "$(jq -r ".[] | select(.id == \"ollama/$gpu_model\") | \"\(.window) \(.source) \(.gpu) \(.machine) \(.served)\"" <<<"$listing")" == "$window server ollama tailnet true" &&
-    "$(jq -r '.[] | select(.id == "nvidia/z-ai/glm-5.3") | "\(.window) \(.source)"' <<<"$listing")" == "128000 fallback" &&
-    "$(jq -r '.[] | select(.id == "nvidia/stepfun-ai/step-5-preview") | .served' <<<"$listing")" == "false" &&
+# then: every model of the lineup, with its window, where its window comes from, what OmniRoute
+# says it can do, and the label built from its root -- the tool-less and image models left out
+if [[ "$(jq -r ".[] | select(.id == \"ollama-desktop/$gpu_model\") | \"\(.window) \(.source) \(.gpu) \(.machine) \(.served)\"" <<<"$listing")" == "$window server ollama-desktop tailnet true" &&
+    "$(jq -r '.[] | select(.id == "nvidia/z-ai/glm-5.3") | "\(.window) \(.source) \(.label)"' <<<"$listing")" == "128000 fallback z-ai/glm-5.3" &&
+    "$(jq -c '[.[] | select(.id == "openrouter/some/specialty" or .id == "openrouter/some/image")] | length' <<<"$listing")" == "0" &&
     ! -e "$TMP/claude.args" ]]; then
-    pass "--list --json reports each listed model's window, its source and whether it is served"
+    pass "--list --json reports each model's window, its source and whether OmniRoute serves it"
 else
     fail "unexpected listing: $listing"
+fi
+
+# given a GPU whose model the catalog no longer carries
+reset
+cp "$TMP/catalog.json" "$TMP/catalog.saved"
+jq 'del(.data[] | select(.id | startswith("ollama-desktop/")))' "$TMP/catalog.json" > "$TMP/catalog.tmp" && mv "$TMP/catalog.tmp" "$TMP/catalog.json"
+# when
+output="$(run_omni "$TMP/claude-omni" --list 2>&1)"
+listing="$(run_omni "$TMP/claude-omni" --list --json 2>/dev/null)"
+mv "$TMP/catalog.saved" "$TMP/catalog.json"
+# then: it stays in the list, marked unserved and explained, so a GPU that fell out of the
+# catalog is visible instead of silently absent
+if [[ "$output" == *"GPU models marked - are configured"* &&
+    "$(jq -r '.[] | select(.id == "ollama-desktop/'"$gpu_model"'") | "\(.served) \(.window) \(.source)"' <<<"$listing")" == "false $window server" ]]; then
+    pass "a GPU model OmniRoute no longer serves is still listed, marked unserved and explained"
+else
+    fail "unserved GPU: $listing"
+fi
+
+# given --list --all
+reset
+# when
+listing="$(run_omni "$TMP/claude-omni" --list --all --json 2>/dev/null)"
+# then: the wider catalog, including the chat model the lineup left out for not calling tools
+if [[ "$(jq -r '[.[] | select(.id == "openrouter/some/specialty")] | length' <<<"$listing")" == "1" &&
+    "$(jq -r '[.[] | select(.id == "openrouter/some/image")] | length' <<<"$listing")" == "0" ]]; then
+    pass "--list --all shows the chat models the lineup filters out"
+else
+    fail "unexpected --all listing: $listing"
 fi
 
 # --- claude-omni-task -----------------------------------------------------------------------------
@@ -604,7 +639,7 @@ printf 'ollama-laptop/%s\n' "$gpu_model" > "$TMP/check-fail"
 # when
 output="$(run_task "$TMP/task-brief.md" 2>&1)" || true
 # then: the run moves to the next GPU, and the audit says why
-if [[ "$(sed -n '2p' "$TMP/task-launcher.args")" == "<ollama/$gpu_model>" &&
+if [[ "$(sed -n '2p' "$TMP/task-launcher.args")" == "<ollama-desktop/$gpu_model>" &&
     "$output" == *"skipped ollama-laptop: no Ollama server answers on this machine"* ]]; then
     pass "claude-omni-task moves to the next GPU when the first is not serving"
 else
@@ -625,7 +660,7 @@ output="$(run_task "$TMP/task-brief.md" 2>&1)" || true
 kill "$holder" 2>/dev/null || true
 wait "$holder" 2>/dev/null || true
 # then
-if [[ "$(sed -n '2p' "$TMP/task-launcher.args")" == "<ollama/$gpu_model>" && "$output" == *"ollama-laptop is running another task"* ]]; then
+if [[ "$(sed -n '2p' "$TMP/task-launcher.args")" == "<ollama-desktop/$gpu_model>" && "$output" == *"ollama-laptop is running another task"* ]]; then
     pass "claude-omni-task leaves a GPU another run holds and takes the next one"
 else
     fail "GPU lock: $(tr '\n' ' ' < "$TMP/task-launcher.args" 2>/dev/null) / $output"

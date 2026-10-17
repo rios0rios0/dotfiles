@@ -4,7 +4,7 @@
 #
 # chezmoi reads this file on every apply, so an edit reaches the wrapper on the next apply without
 # `chezmoi init`. OmniRoute's own state -- providers, keys, hidden models, window overrides -- lives
-# in its database, not here.
+# in its database, not here; the lineup claude-omni offers is whatever /v1/models answers at launch.
 omniroute:
   # The gateway. Its API key is the `cred:OMNIROUTE_API_KEY` field of this device's 1Password note,
   # which the shell exports as OMNIROUTE_API_KEY; it never appears in this repository.
@@ -23,45 +23,27 @@ omniroute:
     ollama-laptop:
       machine: 'local'
       label: 'laptop GPU'
-    ollama:
+    ollama-desktop:
       machine: 'tailnet'
       label: 'desktop GPU'
-  # The models the launch picker and Claude Code's /model offer, in this order. The first one
-  # OmniRoute serves is the default when the profile has no saved choice.
-  #   gpu:     a key of `gpus` above: local-llm.yaml's model on that GPU
-  #   id:      an OmniRoute model id, with `label` naming it in the picker and the status line
-  #   window:  overrides the window OmniRoute reports, but only downward: OmniRoute enforces its
-  #            own, so declaring more trades compaction for a 400
-  #   effort:  Claude Code's effort level for this model (low, medium, high, xhigh)
-  # NIM models are filtered in OmniRoute itself; this list intentionally picks only four preferred
-  # entries. `claude-omni --probe nvidia/` tests the current catalog, without changing visibility.
-  # NIM context is provider-defined; OmniRoute's 128000 fallback is not authoritative.
-  models:
-    - gpu: 'ollama-laptop'
-    - gpu: 'ollama'
-    - id: 'nvidia/z-ai/glm-5.3'
-      label: 'GLM 5.3 · NVIDIA NIM'
-    - id: 'nvidia/nvidia/nemotron-3-super-120b-a12b'
-      label: 'Nemotron 3 Super · NVIDIA NIM'
-    - id: 'nvidia/deepseek-ai/deepseek-v4.1-flash'
-      label: 'DeepSeek V4.1 Flash · NVIDIA NIM'
-    - id: 'nvidia/stepfun-ai/step-5-preview'
-      label: 'Step 5 Preview · NVIDIA NIM'
-    - id: 'openrouter/z-ai/glm-5.3'
-      label: 'GLM 5.3 · OpenRouter'
-    - id: 'openrouter/moonshotai/kimi-k2.7-code'
-      label: 'Kimi K2.7 Code · OpenRouter'
-    - id: 'openrouter/poolside/laguna-s-2.1:free'
-      label: 'Laguna S 2.1 · OpenRouter free'
-    - id: 'auto/coding'
-      label: 'Auto coding · OmniRoute picks'
+  # The models the launch picker and Claude Code's /model offer are the gateway's own: claude-omni
+  # reads OmniRoute's /v1/models on every launch, keeps every chat model that can call tools, and
+  # leads the list with `gpuModel` on each GPU. No list lives here, so curation moves to OmniRoute
+  # itself: hide a model in its dashboard, or scope the API key's policy, and the picker follows on
+  # the next launch. `claude-omni --list` prints the result, `--list --all` what OmniRoute holds.
+  #
+  # Claude Code's effort level (low, medium, high, xhigh) for a model is the one per-model setting
+  # kept here, keyed by the full OmniRoute id; a model left out runs at Claude Code's default:
+  #   efforts:
+  #     nvidia/z-ai/glm-5.3: low
+  efforts: {}
   # The window a session on an `auto/*` combo compacts at. OmniRoute advertises the largest window
   # in the combo's pool (2,000,000) and routes a request to a model that holds it, so this one only
   # decides how large the conversation may grow before Claude Code summarizes it.
   autoWindow: 200000
   # The GPUs a delegated run (`claude-omni-task` without -m) tries, in order: the first one free and
   # serving takes the run. A cloud model runs only when the caller names it with -m.
-  taskGpus: ['ollama-laptop', 'ollama']
+  taskGpus: ['ollama-laptop', 'ollama-desktop']
   # A session on a small window has to fit what Claude Code loads before the first prompt, so up to
   # `maxWindow` it gets a lean profile (measured in .docs/omniroute-local.md, "The profile"):
   #   rules  the global rules it keeps; the rest of ~/.claude/rules (~30K tokens) is excluded
@@ -79,29 +61,10 @@ omniroute:
   devices:
     mxhero-z790:
       gpus:
-        ollama:
+        ollama-desktop:
           machine: 'local'
           label: 'desktop GPU'
         ollama-laptop:
           machine: 'tailnet'
           label: 'laptop GPU'
-      models:
-        - gpu: 'ollama'
-        - gpu: 'ollama-laptop'
-        - id: 'nvidia/z-ai/glm-5.3'
-          label: 'GLM 5.3 · NVIDIA NIM'
-        - id: 'nvidia/nvidia/nemotron-3-super-120b-a12b'
-          label: 'Nemotron 3 Super · NVIDIA NIM'
-        - id: 'nvidia/deepseek-ai/deepseek-v4.1-flash'
-          label: 'DeepSeek V4.1 Flash · NVIDIA NIM'
-        - id: 'nvidia/stepfun-ai/step-5-preview'
-          label: 'Step 5 Preview · NVIDIA NIM'
-        - id: 'openrouter/z-ai/glm-5.3'
-          label: 'GLM 5.3 · OpenRouter'
-        - id: 'openrouter/moonshotai/kimi-k2.7-code'
-          label: 'Kimi K2.7 Code · OpenRouter'
-        - id: 'openrouter/poolside/laguna-s-2.1:free'
-          label: 'Laguna S 2.1 · OpenRouter free'
-        - id: 'auto/coding'
-          label: 'Auto coding · OmniRoute picks'
-      taskGpus: ['ollama', 'ollama-laptop']
+      taskGpus: ['ollama-desktop', 'ollama-laptop']

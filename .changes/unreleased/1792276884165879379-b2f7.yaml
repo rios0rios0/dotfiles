@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed `claude-omni` failing every request to this machine''s GPU through OmniRoute with a 502, because Ollama''s `0.0.0.0` bind is dual-stack: WSL relays it to Windows'' `::1` alone while Docker Desktop dials Windows'' IPv4 loopback through `host.docker.internal`, so the server now binds `127.0.0.1:11434` and Windows relays that on its own `127.0.0.1`, where the container connects'
+time: '2026-10-17T22:41:24.165832229Z'

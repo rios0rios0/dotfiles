@@ -29,9 +29,9 @@ localLLM:
   # Share this machine's server with the other machines on the tailnet, so that OmniRoute on them
   # can use this GPU and claude-omni can check its window: tailscale-up forwards the tailnet's port
   # 11434 to it (`tailscale serve`, never Funnel; on WSL, Windows' client forwards to Windows'
-  # `localhost`, which WSL hands on to Ollama). Ollama binds to all interfaces so Tailscale Serve
-  # can expose it; local Docker Desktop reaches it through host.docker.internal. The API has no
-  # authentication, so restrict access with the machine's network firewall.
+  # `localhost`, which WSL hands on to Ollama's loopback socket). Local Docker Desktop reaches the
+  # same socket through host.docker.internal, never the tailnet. The API has no authentication, and
+  # loopback keeps the network off it directly.
   shareOnTailnet: true
   # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
   #   devices:

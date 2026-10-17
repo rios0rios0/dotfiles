@@ -49,7 +49,7 @@ chmod +x "$STUBS/curl" "$STUBS/mkdir"
 OMNI_PROFILE="$SANDBOX/claude-omni"
 mkdir -p "$OMNI_PROFILE"
 printf '{"numStartups": 1}\n' > "$OMNI_PROFILE/.claude.json"
-printf 'ollama/qwen3.8:27b\t65536\nopenrouter/moonshotai/kimi-k2.7-code\t262144\n' > "$OMNI_PROFILE/omniroute-windows.tsv"
+printf 'ollama-desktop/qwen3.8:27b\t65536\nopenrouter/moonshotai/kimi-k2.7-code\t262144\n' > "$OMNI_PROFILE/omniroute-windows.tsv"
 
 # The regular profile, logged in with a token that has an hour left.
 REGULAR_PROFILE="$SANDBOX/claude"
@@ -201,7 +201,7 @@ omni_session_names_a_larger_models_window() {
 
     # when
     local line
-    line=$(omni_render "ollama/qwen3.8:27b" \
+    line=$(omni_render "ollama-desktop/qwen3.8:27b" \
         "$(omni_payload "openrouter/moonshotai/kimi-k2.7-code" "Kimi K2.7 Code · OpenRouter" 65536)") || return 1
 
     # then: the label, the session's window, which still decides when it compacts, and the model's own
@@ -216,7 +216,7 @@ omni_session_warns_when_the_model_is_smaller() {
     # when
     local line
     line=$(omni_render "openrouter/moonshotai/kimi-k2.7-code" \
-        "$(omni_payload "ollama/qwen3.8:27b" "qwen3.8:27b · desktop GPU" 262144)") || return 1
+        "$(omni_payload "ollama-desktop/qwen3.8:27b" "qwen3.8:27b · desktop GPU" 262144)") || return 1
 
     # then: in the error colour, since the session would compact only after the model overflows
     [[ "$line" == *$'\033[38;5;160m'"ctx 80% left · model holds 65k"* ]]
@@ -228,7 +228,7 @@ omni_session_on_its_launch_model_adds_nothing() {
 
     # when
     local line
-    line=$(omni_render "ollama/qwen3.8:27b" "$(omni_payload "ollama/qwen3.8:27b" "qwen3.8:27b · desktop GPU" 65536)") || return 1
+    line=$(omni_render "ollama-desktop/qwen3.8:27b" "$(omni_payload "ollama-desktop/qwen3.8:27b" "qwen3.8:27b · desktop GPU" 65536)") || return 1
 
     # then: the window as Claude Code reports it, and nothing more
     line=$(sed 's/\x1b\[[0-9;]*m//g' <<<"$line")
