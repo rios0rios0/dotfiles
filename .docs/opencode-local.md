@@ -18,13 +18,22 @@ in OpenCode without a change here.
 | Default model | `omniroute/auto/coding`: the gateway picks the upstream |
 | MCP servers | context7 (remote, every platform) and Chrome DevTools (local, Linux only, pinned like Claude Code's) |
 | Permissions | the same shell, read and edit allowances as the Claude Code side, as V2 ordered entries |
-| Rules | `~/.config/opencode/AGENTS.md`, applied by chezmoi, plus every project's `CLAUDE.md` through `instructions` |
+| Rules | `~/.config/opencode/AGENTS.md` (environment reality) and `rules/` (standards), synced by aisync, plus every project's `CLAUDE.md` through `instructions` |
 | Reference | `dotfiles` points at the chezmoi source, so a session can read the dotfiles that rendered the configuration |
 | Terminal look | `~/.config/opencode/cli.json` |
 
 The key is the same `cred:OMNIROUTE_API_KEY` field of the device note `claude-omni` uses: the
 credential loader exports `OMNIROUTE_API_KEY` in every shell, and OpenCode substitutes it when
 it loads the file. The repository itself never holds it.
+
+AI content is not part of this configuration. `~/.config/opencode/AGENTS.md`, `rules/`,
+`agents/`, `commands/` and `skills/` are synced by aisync (the `opencode` tool in the aifiles
+config), like the equivalent `~/.claude` and `~/.codex` trees; chezmoi renders only
+`opencode.json` and `cli.json` here. The local plugin
+`~/.config/opencode/plugins/no-claude-skills.ts` filters the Claude-compatible
+`~/.claude/skills` source out of the skill catalog (OpenCode V2 ignores the
+`OPENCODE_DISABLE_CLAUDE_CODE_*` variables, anomalyco/opencode#36990), so skills load only from
+`~/.config/opencode/skills`.
 
 ## Using it
 

@@ -23,11 +23,11 @@ AppData
 {{- end }}
 
 {{- /* Claude Code's ~/.claude. Linux gets only the look: settings.json, which carries it there,
-     and the status line script it runs. The other files -- the WSL preference in CLAUDE.md, the
-     trust dialog in .claude.json -- serve Windows and Android, which get no status line: it is a
-     bash script that forks jq on every redraw. See dot_claude/modify_settings.json. */ -}}
+     and the status line script it runs. The trust dialog in .claude.json serves Windows and
+     Android, which get no status line: it is a bash script that forks jq on every redraw. The
+     AI content in ~/.claude -- CLAUDE.md, rules, agents, commands and skills -- is aisync's, not
+     chezmoi's: see "AI Rules Sync" in CLAUDE.md. dot_claude/modify_settings.json holds the look. */ -}}
 {{- if eq .chezmoi.os "linux" }}
-.claude/CLAUDE.md
 .claude/.claude.json
 {{- else }}
 .claude/statusline-command.sh
