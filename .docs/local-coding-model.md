@@ -24,11 +24,15 @@ systemd starts. A WSL distribution can boot without systemd -- Kali's does until
 turns it on in `/etc/wsl.conf` -- and the installer then stops after step 1, to finish on the first
 apply after WSL restarts with it.
 
-Ollama listens on `0.0.0.0:11434` so Tailscale Serve can expose it to the tailnet and so Docker
-Desktop can reach it through `host.docker.internal`. WSL's localhost forwarding exposes the listener
-to Windows, and Windows' Tailscale client can forward tailnet traffic to it with `tailscale serve`.
-The API has no authentication: any device allowed through the host firewall can run inference, pull
-models and delete models. Restrict port `11434` to networks and devices you trust.
+Ollama listens on `127.0.0.1:11434`, and the IPv4-specific address is load-bearing on WSL. The
+family of the server's listening socket decides the family WSL's localhost forwarding publishes on
+the Windows side: a dual-stack `0.0.0.0` bind appears there on `::1` only, and Docker Desktop --
+which reaches this machine as `host.docker.internal`, dialing Windows' IPv4 loopback -- then gets
+connection refused. `127.0.0.1` publishes Windows' `127.0.0.1`, so OmniRoute's container connects.
+Tailscale is unaffected either way: Windows' client shares the server with `tailscale serve` to
+`localhost:11434`, which names both families. The API has no authentication: anything that can
+reach that port can run inference, pull models and delete models -- on WSL that is every process on
+the Windows side, so keep the tailnet share to devices you trust.
 
 ## Settings
 

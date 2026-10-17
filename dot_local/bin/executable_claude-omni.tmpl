@@ -13,6 +13,11 @@
 # OmniRoute speaks Claude Code's API and routes every request to the provider behind the model id,
 # so this script only tells Claude Code what it cannot learn on its own:
 #
+# The models it offers are the gateway's own: every launch fetches OmniRoute's /v1/models, keeps the
+# chat models that can call tools, and leads with `gpuModel` on each GPU, so the picker follows the
+# dashboard -- hide a model there, or scope the key's policy, and nothing here changes. `efforts`
+# in .chezmoidata/omniroute.yaml is the one per-model setting this repository still holds.
+#
 #   - The context window. Claude Code reads no window from a gateway: it assumes 200K for a model
 #     it does not recognise, and takes one CLAUDE_CODE_MAX_CONTEXT_TOKENS for the whole process.
 #     The window is the smaller of OmniRoute's, which it enforces, and this repository's. For a GPU
@@ -26,8 +31,8 @@
 #     keep the prompt cacheable and the client quiet; two headers keep OmniRoute from compressing
 #     the prompt or injecting memory into it.
 #
-# In the session, /model offers the listed models whose window is at least the session's: the
-# window cannot change once Claude Code runs, and a smaller model would overflow before the
+# In the session, /model offers the models OmniRoute lists whose window is at least the session's:
+# the window cannot change once Claude Code runs, and a smaller model would overflow before the
 # session compacts. `claude-omni -c -m ID` reaches the others and keeps the conversation.
 #
 # Nothing is exported beyond the claude process: an ANTHROPIC_AUTH_TOKEN in the shell would
@@ -123,11 +128,18 @@ case "$status" in
     *) die "OmniRoute answered HTTP $status for its model list" ;;
 esac
 
-# Every listed model, or the one -m names, resolved against the catalog. The window is the smaller
-# of OmniRoute's (`context_length`, and `max_input_tokens` when it sets one) and the repository's:
-# a GPU's from local-llm.yaml, a declared one, or autoWindow for an auto/* combo. `source` says
-# which: `server` (a GPU), `repo` (declared here), `omniroute`, or `fallback` -- OmniRoute's
-# catalog without `max_input_tokens`, which is its 128000 default rather than the provider's word.
+# The lineup, from the catalog: every chat model OmniRoute lists and reports able to call tools,
+# resolved against this repository. `gpuModel` on each GPU leads it -- local machine first, then
+# the tailnet -- and everything else keeps the catalog's own order. Nothing is enumerated here: a
+# model joins or leaves through OmniRoute itself (its key policy, its hidden models), and `--list`
+# shows the result.
+#
+# The window is the smaller of OmniRoute's (`context_length`, and `max_input_tokens` when it sets
+# one) and the repository's: a GPU's from local-llm.yaml, or autoWindow for an auto/* combo.
+# `source` says which: `server` (a GPU), `auto`, `omniroute`, or `fallback` -- the catalog without
+# `max_input_tokens`, which is OmniRoute's 128000 default rather than the provider's word. The
+# model -m names is resolved even when the lineup leaves it out; one the catalog does not hold at
+# all is reported unserved, as is a GPU whose model the catalog no longer carries.
 # shellcheck disable=SC2016
 resolve_jq='
 def positive: if type == "number" and . > 0 then . else null end;
@@ -138,40 +150,47 @@ def human:
   elif . % 1000 == 0 then "\(. / 1000)K"
   elif . % 1024 == 0 then "\(. / 1024)K"
   else "\(. / 1000 | floor)K" end;
-def entry_for($id):
-  ($id | split("/")[0]) as $provider
-  | if $cfg.gpus[$provider] then
-      {id: $id, label: "\($id | split("/")[1:] | join("/")) · \($cfg.gpus[$provider].label)",
-       gpu: $provider, machine: $cfg.gpus[$provider].machine, window: $cfg.gpuWindow}
-    else {id: $id, label: $id} end;
-def resolve($c):
-  (.id | split("/")[0]) as $provider
+def resolve($c; $served):
+  ($c.id | split("/")[0]) as $provider
+  | ($cfg.gpus[$provider] // null) as $gpu
   | ([$c.context_length, $c.max_input_tokens] | map(positive) | map(select(. != null))
-     | if length == 0 then null else min end) as $served
-  | (if .window != null then (.window | positive)
-     elif (.id | startswith("auto/")) then $cfg.autoWindow
+     | if length == 0 then null else min end) as $seen
+  | (if $gpu then $cfg.gpuWindow
+     elif ($c.id | startswith("auto/")) then $cfg.autoWindow
      else null end) as $declared
-  | ([$served, $declared] | map(select(. != null)) | if length == 0 then null else min end) as $window
-  | . + {
-      provider: $provider,
-      where: (if .gpu then $cfg.gpus[.gpu].label else $provider end),
-      served: ($c != null),
-      window: $window,
-      source: (if $window == null then null
-               elif .gpu and $window == $declared then "server"
-               elif $declared != null and $window == $declared then
-                 (if (.id | startswith("auto/")) and .window == null then "auto" else "repo" end)
-               elif $c.max_input_tokens != null then "omniroute"
-               else "fallback" end),
-      output: (if $window == null then null
-               else ([([($window / 8 | floor), 8192] | max), 32000, ($c.max_output_tokens | positive)]
-                     | map(select(. != null)) | min) end)
-    }
+  | ([$seen, $declared] | map(select(. != null)) | if length == 0 then null else min end) as $window
+  | {id: $c.id,
+     label: (if $gpu then "\($c.root // $c.id) · \($gpu.label)" else ($c.root // $c.id) end),
+     gpu: (if $gpu then $provider else null end),
+     machine: (if $gpu then $gpu.machine else null end),
+     where: (if $gpu then $gpu.label else $provider end),
+     served: $served,
+     window: $window,
+     source: (if $window == null then null
+              elif $gpu and $window == $declared then "server"
+              elif ($c.id | startswith("auto/")) and $window == $declared then "auto"
+              elif $c.max_input_tokens != null then "omniroute"
+              else "fallback" end),
+     output: (if $window == null then null
+              else ([([($window / 8 | floor), 8192] | max), 32000, ($c.max_output_tokens | positive)]
+                    | map(select(. != null)) | min) end)}
+  | (if ($cfg.efforts // {})[.id] then . + {effort: ($cfg.efforts // {})[.id]} else . end)
   | . + {shown: "\(.window | human)\(if .source == "fallback" then "?" else "" end)"};
-($catalog[0].data // [] | map({key: .id, value: .}) | from_entries) as $byId
-| ($cfg.models | map(.id)) as $listedIds
-| [ ($cfg.models[]), (if $want != "" and ($listedIds | any(.[]; . == $want) | not) then entry_for($want) else empty end)
-    | resolve($byId[.id]) ]
+($catalog[0].data // []) as $rows
+| ($rows | map({key: .id, value: .}) | from_entries) as $byId
+| ($cfg.gpus | to_entries | sort_by(if .value.machine == "local" then 0 else 1 end) | map(.key)) as $gpuKeys
+| [$gpuKeys[] | "\(.)/\($cfg.gpuModel)"] as $gpuIds
+| ([$gpuIds[] as $id
+    | ($byId[$id] // {id: $id, root: $cfg.gpuModel, context_length: $cfg.gpuWindow, max_input_tokens: $cfg.gpuWindow})
+    | resolve(.; $byId[$id] != null)]) as $gpus
+| ($rows
+   | map(select(.type == null and (.capabilities.tool_calling != false))
+         | select(.id as $i | ($gpuIds | index($i)) == null)
+         | resolve(.; true))) as $rest
+| ($gpus + $rest) as $entries
+| (if $want != "" and ($entries | map(.id) | index($want) == null)
+   then $entries + [($byId[$want] // {id: $want}) | resolve(.; $byId[$want] != null)]
+   else $entries end)
 '
 resolved="$(jq -c --argjson cfg "$config" --arg want "$model" --slurpfile catalog "$catalog" \
     -n "$resolve_jq")"
@@ -197,7 +216,7 @@ if [[ "$mode" == "list" ]]; then
         jq -r '.[] | [(if .served then " " else "-" end), .label, .shown, .where, .id] | @tsv' <<<"$resolved" |
             column -t -s $'\t'
         if jq -e 'any(.[]; .served | not)' <<<"$resolved" >/dev/null; then
-            note "models marked - are listed in .chezmoidata/omniroute.yaml but not served by OmniRoute"
+            note "GPU models marked - are configured in .chezmoidata/omniroute.yaml but not served by OmniRoute"
         fi
     fi
     exit 0
@@ -263,7 +282,7 @@ if [[ -t 0 && -t 2 ]]; then
 fi
 
 if [[ -z "$model" ]]; then
-    (( served_count > 0 )) || die "OmniRoute serves none of the models listed in .chezmoidata/omniroute.yaml; 'claude-omni --list' shows them"
+    (( served_count > 0 )) || die "OmniRoute serves no chat model that can call tools; 'claude-omni --list --all' shows what it does list"
     saved="$(jq -r '.model // empty' "$profile/settings.json" 2>/dev/null || true)"
     default="$(jq -r --arg saved "$saved" '[.[] | select(.served)] as $s
         | (if $saved != "" and ($s | any(.id == $saved)) then $saved else $s[0].id end)' <<<"$resolved")"
@@ -292,9 +311,9 @@ entry="$(jq -c --arg id "$model" 'map(select(.id == $id)) | .[-1] // empty' <<<"
 [[ -n "$entry" && "$(jq -r '.served' <<<"$entry")" == "true" ]] ||
     die "OmniRoute does not serve $model; 'claude-omni --list --all' shows what it does"
 window="$(jq -r '.window // empty' <<<"$entry")"
-[[ -n "$window" ]] || die "no context window is known for $model; set one for it in .chezmoidata/omniroute.yaml"
+[[ -n "$window" ]] || die "no context window is known for $model; give it one in OmniRoute's dashboard, or name another model"
 if [[ "$(jq -r '.source' <<<"$entry")" == "fallback" ]]; then
-    warn "OmniRoute knows no window for $model and reports its ${window}-token fallback; if the provider allows less, set a smaller window for it in .chezmoidata/omniroute.yaml"
+    warn "OmniRoute knows no window for $model and reports its ${window}-token fallback; if the provider allows less, set a smaller window for it in OmniRoute"
 fi
 output="$(jq -r '.output' <<<"$entry")"
 gpu="$(jq -r '.gpu // empty' <<<"$entry")"
@@ -389,7 +408,7 @@ fi
 need claude
 
 # --- the session ----------------------------------------------------------------------------------
-# One --settings value carries the /model lineup, each listed model's effort, and, on a small
+# One --settings value carries the /model lineup, each entry's effort, and, on a small
 # window, the rules the lean profile keeps. claudeMdExcludes drops the other global rules: a
 # separate config directory alone does not, because for any project under $HOME Claude Code reads
 # ~/.claude/rules as the rules of the ancestor directory ~.

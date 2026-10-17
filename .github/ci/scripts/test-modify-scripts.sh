@@ -394,7 +394,7 @@ local_profile_gets_the_regular_look() {
 
 local_profile_keeps_its_own_keys() {
     # given the theme onboarding picked and a model chosen with /model
-    local input='{"model": "ollama/qwen3.8:27b", "theme": "dark"}'
+    local input='{"model": "ollama-desktop/qwen3.8:27b", "theme": "dark"}'
 
     # when
     local out
@@ -403,7 +403,7 @@ local_profile_keeps_its_own_keys() {
     # then
     [ "$(jq -r '.theme' <<<"$out")" = "dark-ansi" ] &&
         [ "$(jq -r '.statusLine.type' <<<"$out")" = "command" ] &&
-        [ "$(jq -r '.model' <<<"$out")" = "ollama/qwen3.8:27b" ]
+        [ "$(jq -r '.model' <<<"$out")" = "ollama-desktop/qwen3.8:27b" ]
 }
 
 local_profile_passes_a_matching_file_through() {

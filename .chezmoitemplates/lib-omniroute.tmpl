@@ -1,8 +1,11 @@
 {{- /*
   Claude Code through OmniRoute, as JSON: .omniroute from .chezmoidata/omniroute.yaml with
   .omniroute.devices.<deviceName> laid over it, plus `gpuModel`, `gpuWindow` and `gpuKeepAlive`:
-  local-llm.yaml's model, the window its server allocates, and how long it stays loaded. Every `gpu:` entry of `models` is expanded into the
-  OmniRoute id of that model on that GPU, a label, the GPU's `machine`, and that window.
+  local-llm.yaml's model, the window its server allocates, and how long it stays loaded.
+
+  No model list is rendered here. claude-omni resolves its lineup from OmniRoute's /v1/models on
+  every launch, so `gpus` above is all the repository needs to know about models: the prefix of
+  each GPU's provider, which the launcher matches against the catalog.
 
   claude-omni and claude-omni-task read it the same way,
       includeTemplate "lib-omniroute.tmpl" . | fromJson
@@ -24,23 +27,6 @@
 {{-   $_ := set $settings $key $value -}}
 {{- end -}}
 {{- $llm := includeTemplate "lib-local-llm.tmpl" . | fromJson -}}
-{{- $models := list -}}
-{{- range $settings.models -}}
-{{-   if hasKey . "gpu" -}}
-{{-     if not (hasKey $settings.gpus .gpu) -}}
-{{-       fail (printf "omniroute.models: gpu %q is not a key of omniroute.gpus" .gpu) -}}
-{{-     end -}}
-{{-     $gpu := get $settings.gpus .gpu -}}
-{{-     $entry := dict "id" (printf "%s/%s" .gpu $llm.model) "label" (printf "%s · %s" $llm.model $gpu.label) "gpu" .gpu "machine" $gpu.machine "window" (int $llm.contextTokens) -}}
-{{-     if hasKey . "effort" -}}
-{{-       $_ := set $entry "effort" .effort -}}
-{{-     end -}}
-{{-     $models = append $models $entry -}}
-{{-   else -}}
-{{-     $models = append $models . -}}
-{{-   end -}}
-{{- end -}}
-{{- $_ := set $settings "models" $models -}}
 {{- $_ := set $settings "gpuModel" $llm.model -}}
 {{- $_ := set $settings "gpuWindow" (int $llm.contextTokens) -}}
 {{- $_ := set $settings "gpuKeepAlive" $llm.keepAlive -}}

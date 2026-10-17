@@ -3,11 +3,10 @@
 OpenCode is the second client of the local [OmniRoute](omniroute-local.md) gateway:
 `chezmoi apply` renders `dot_config/opencode/opencode.json.tmpl` to
 `~/.config/opencode/opencode.json`, making OmniRoute the primary provider and
-`omniroute/auto/coding` the default model. No model list lives in this repository for OpenCode
--- unlike `claude-omni`, whose listed models come from `.chezmoidata/omniroute.yaml`, OpenCode
-discovers the catalog from the gateway's own `/v1/models`, which serves exactly what the API
-key's policy allows. A model, or a whole new provider, added in OmniRoute's dashboard appears
-in OpenCode without a change here.
+`omniroute/auto/coding` the default model. No model list lives in this repository for OpenCode:
+it discovers the catalog from the gateway's own `/v1/models`, which serves exactly what the API
+key's policy allows. `claude-omni` resolves its lineup from the same endpoint, so a model, or a
+whole new provider, added in OmniRoute's dashboard appears in both without a change here.
 
 ## What is configured
 

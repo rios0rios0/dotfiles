@@ -15,10 +15,12 @@ Documentation=https://docs.ollama.com/faq
 
 [Service]
 ExecStart=%h/.local/bin/ollama serve
-# Listen on every interface so Tailscale Serve can expose the API to the tailnet. Docker Desktop
-# reaches it through host.docker.internal, which routes to Windows localhost and then to WSL.
-# The API has no authentication; restrict access with the machine's network firewall.
-Environment=OLLAMA_HOST=0.0.0.0:11434
+# Loopback only, on IPv4: Docker Desktop dials host.docker.internal over Windows' IPv4 loopback,
+# and WSL's localhost relay puts an IPv4 socket exactly there, where `0.0.0.0` is a dual-stack
+# `[::]` that Windows sees on `::1` alone and the container's fetch fails while the server is up.
+# Tailscale Serve, for another machine's OmniRoute, forwards the tailnet's port to this same
+# localhost. The API has no authentication; the LAN and tailnet cannot reach it directly.
+Environment=OLLAMA_HOST=127.0.0.1:11434
 # Must equal the window claude-omni declares for this GPU; both are rendered from one value.
 Environment=OLLAMA_CONTEXT_LENGTH={{ int $llm.contextTokens }}
 Environment=OLLAMA_KV_CACHE_TYPE={{ $llm.kvCacheType }}

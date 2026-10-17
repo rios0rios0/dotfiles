@@ -256,16 +256,16 @@ On Linux with an NVIDIA driver, `chezmoi apply` installs Ollama as a user servic
 
 ## Claude Code Through OmniRoute
 
-The [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway with providers such as both GPUs' Ollama, NVIDIA NIM and OpenRouter; its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes. `claude-omni` starts Claude Code through it, on a model picked from the list in `.chezmoidata/omniroute.yaml` or named with `-m`, in a profile of its own, without touching the regular `claude`, its login or ccswitch's rotation:
+The [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway with providers such as both GPUs' Ollama, NVIDIA NIM and OpenRouter; its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes. `claude-omni` starts Claude Code through it, on a model picked from the gateway's own catalog or named with `-m`, in a profile of its own, without touching the regular `claude`, its login or ccswitch's rotation:
 
 ```bash
 claude-omni                      # pick a model; each line shows its context window
 claude-omni -m nvidia/z-ai/glm-5.3 -p "explain this repository"
 claude-omni -c -m openrouter/moonshotai/kimi-k2.7-code   # switch model, keep the conversation
-claude-omni --list               # the listed models, their windows and where they run
+claude-omni --list               # what the gateway serves, each model's window and where it runs
 ```
 
-It gives Claude Code each model's real context window -- for a GPU model the one the Ollama server allocates, which OmniRoute cannot see -- and `/model` in the session offers the listed models that hold at least that window. The status line shows the model and its window. When ccswitch reports that no account has capacity left, `claude` points at `claude-omni` before launching.
+It gives Claude Code each model's real context window -- for a GPU model the one the Ollama server allocates, which OmniRoute cannot see -- and `/model` in the session offers every model the gateway serves that holds at least that window. The status line shows the model and its window. When ccswitch reports that no account has capacity left, `claude` points at `claude-omni` before launching.
 
 `claude-omni-task` runs one unattended task on the first free GPU, or on a model named with `-m`, and hands back an audit of the run -- every action with its result, the change it made measured against a snapshot of the working tree, and one command that undoes it -- which is what the `omniroute-general` agent uses.
 

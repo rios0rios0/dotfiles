@@ -51,13 +51,12 @@ settings() {
         ${override:+--override-data "$override"} '{{ includeTemplate "lib-local-llm.tmpl" . }}'
 }
 
-# omni_gpu_windows [override JSON]: the window claude-omni declares for GPU models, once from
-# gpuWindow and once from every GPU entry of its model list, space-separated
+# omni_gpu_windows [override JSON]: the window claude-omni declares for GPU models
 omni_gpu_windows() {
     local override="${1:-}"
     PATH="$TMP/bin-gpu" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
         ${override:+--override-data "$override"} \
-        '{{ $omni := includeTemplate "lib-omniroute.tmpl" . | fromJson }}{{ $omni.gpuWindow }} {{ range $omni.models }}{{ if hasKey . "gpu" }}{{ .window }} {{ end }}{{ end }}'
+        '{{ $omni := includeTemplate "lib-omniroute.tmpl" . | fromJson }}{{ $omni.gpuWindow }}'
 }
 
 UNIT="$REPO_ROOT/dot_config/systemd/user/ollama.service.tmpl"
@@ -114,29 +113,33 @@ fi
 
 # The machines share this checkout but not their local/remote topology. The persistent deviceName
 # selects the right provider map; otherwise the desktop would try to reach its own GPU via tailnet.
+# The gpus map has to name exactly OmniRoute's provider prefixes: claude-omni resolves its lineup
+# from the gateway's /v1/models, so a key that drifts from the dashboard drops that GPU silently.
 for device in alien-a51 mxhero-z790; do
     config="$(PATH="$TMP/bin-gpu" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
         --override-data "{\"deviceName\":\"$device\"}" \
         '{{ includeTemplate "lib-omniroute.tmpl" . }}')"
-    if [[ "$device" == alien-a51 ]]; then local_gpu=ollama-laptop; remote_gpu=ollama; local_label='laptop GPU'; remote_label='desktop GPU'
-    else local_gpu=ollama; remote_gpu=ollama-laptop; local_label='desktop GPU'; remote_label='laptop GPU'; fi
+    if [[ "$device" == alien-a51 ]]; then local_gpu=ollama-laptop; remote_gpu=ollama-desktop; local_label='laptop GPU'; remote_label='desktop GPU'
+    else local_gpu=ollama-desktop; remote_gpu=ollama-laptop; local_label='desktop GPU'; remote_label='laptop GPU'; fi
     if [[ "$(jq -r --arg gpu "$local_gpu" '.gpus[$gpu].machine + " " + .gpus[$gpu].label' <<<"$config")" == "local $local_label" &&
         "$(jq -r --arg gpu "$remote_gpu" '.gpus[$gpu].machine + " " + .gpus[$gpu].label' <<<"$config")" == "tailnet $remote_label" &&
-        "$(jq -r '[.models[] | select(has("gpu")) | .gpu] | join(" ")' <<<"$config")" == "$local_gpu $remote_gpu" &&
+        "$(jq -r '.gpus | keys | join(" ")' <<<"$config")" == "ollama-desktop ollama-laptop" &&
         "$(jq -r '.taskGpus | join(" ")' <<<"$config")" == "$local_gpu $remote_gpu" ]]; then
         pass "$device maps its local GPU directly and the other device through the tailnet"
     else
-        fail "$device GPU routing is wrong: $(jq -c '{gpus, models, taskGpus}' <<<"$config")"
+        fail "$device GPU routing is wrong: $(jq -c '{gpus, taskGpus}' <<<"$config")"
     fi
 done
 
-# Ollama binds to all interfaces so Tailscale Serve can expose it to the tailnet; Docker Desktop
-# reaches it through host.docker.internal. The API has no authentication, so restrict access with
-# the firewall.
-if render gpu "$UNIT" | grep -qx 'Environment=OLLAMA_HOST=0.0.0.0:11434'; then
-    pass "Ollama binds all interfaces for Tailscale Serve"
+# Ollama listens on IPv4 loopback: Docker Desktop dials host.docker.internal over Windows' IPv4
+# loopback, which WSL's relay answers only for an IPv4 listener (0.0.0.0 becomes a dual-stack [::]
+# that Windows sees on ::1 alone, and the container's fetch fails while the server is up), and
+# Tailscale Serve forwards the tailnet's port to this same localhost from Windows. The API has no
+# authentication; the network cannot reach it directly.
+if render gpu "$UNIT" | grep -qx 'Environment=OLLAMA_HOST=127.0.0.1:11434'; then
+    pass "Ollama binds IPv4 loopback for host.docker.internal and Tailscale Serve"
 else
-    fail "Ollama must bind 0.0.0.0:11434 for Tailscale Serve to expose it"
+    fail "Ollama must bind 127.0.0.1:11434 so the container and Tailscale Serve reach it"
 fi
 
 for override in "" '{"localLLM":{"devices":{"testdevice":{"contextTokens":32768}}}}'; do
