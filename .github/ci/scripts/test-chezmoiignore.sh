@@ -140,26 +140,24 @@ check_platform "android" \
     --include ".config/mcphub"
 
 # Claude Code's look: Linux gets settings.json and the status line script from ~/.claude and
-# nothing else there; Windows and Android keep the rest of ~/.claude and get no status line.
+# nothing else there; Windows and Android keep the trust dialog and get no status line. The
+# AI content of ~/.claude (CLAUDE.md, rules, agents, commands, skills) is aisync's, not chezmoi's.
 # Codex's look is built into Codex, so ~/.codex/config.toml ships everywhere.
 check_platform "linux" \
     --include-line ".claude" \
     --include ".claude/settings.json" \
     --include ".claude/statusline-command.sh" \
-    --ignore-line ".claude/CLAUDE.md" \
     --ignore-line ".claude/.claude.json" \
     --include ".codex"
 
 check_platform "$WINDOWS_OS" \
     --include ".claude/settings.json" \
-    --include ".claude/CLAUDE.md" \
     --include ".claude/.claude.json" \
     --ignore-line ".claude/statusline-command.sh" \
     --include ".codex"
 
 check_platform "android" \
     --include ".claude/settings.json" \
-    --include ".claude/CLAUDE.md" \
     --include ".claude/.claude.json" \
     --ignore-line ".claude/statusline-command.sh" \
     --include ".codex"

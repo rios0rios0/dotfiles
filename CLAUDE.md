@@ -694,7 +694,7 @@ Verified on Linux (the `--ignore-scripts` install, `neon --version`, and esbuild
 
 ## AI Rules Sync
 
-AI assistant rules (Claude Code, GitHub Copilot CLI, Codex, etc.) are **not** managed by chezmoi. The rules, agents and skills in directories like `~/.claude/` and `~/.codex/` are synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply). chezmoi touches only the individual files there that "JSON Patching" and "Claude Code and Codex Look" name.
+AI assistant rules (Claude Code, GitHub Copilot CLI, Codex, OpenCode, etc.) are **not** managed by chezmoi. Everything the harnesses load as AI content lives in their own directories and is synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply): `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.config/opencode/AGENTS.md` carry the per-machine environment reality (WSL facts, the interactive `cp`/`rm`/`mv` guards, quoting rules), and `rules/`, `agents/`, `commands/` and `skills/` under each directory carry the portable content. chezmoi touches only the individual files there that "JSON Patching" and "Claude Code and Codex Look" name, plus OpenCode's `opencode.json` and `cli.json`.
 
 After the dependency installer finishes, run `aisync init`, `aisync source add guide --source-repo rios0rios0/guide --branch generated`, and `aisync pull` to populate the rules. Subsequent `aisync pull` calls refresh them on demand.
 
@@ -836,7 +836,7 @@ OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencod
 |------|-------|
 | Global config | `dot_config/opencode/opencode.json.tmpl`, applied on every platform that gets a shell |
 | Look | `dot_config/opencode/cli.json` |
-| Rules | `dot_config/opencode/AGENTS.md`, applied to `~/.config/opencode/AGENTS.md`; each project's `CLAUDE.md` arrives through `instructions` |
+| Rules | `~/.config/opencode/AGENTS.md` and `rules/`, synced by aisync, not chezmoi; each project's `CLAUDE.md` arrives through `instructions` |
 | Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported by the credential loader and read at config load as `{env:OMNIROUTE_API_KEY}` |
 
 **Keep these, each prevents a failure that was observed or measured:**
@@ -847,7 +847,7 @@ OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencod
 4. **The `dotfiles` reference is absolute on purpose.** A local reference path resolves against the config document's directory unless absolute; the template renders `{{ .chezmoi.sourceDir }}`, so a session reads the actual dotfiles checkout (usually `~/.local/share/chezmoi`).
 5. **Permissions are V2 ordered entries** (`{action, resource, effect}`), the same allowances as the Claude Code side; what the list does not allow, the TUI still asks for.
 
-`make test-opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json`, `cli.json` and `AGENTS.md` -- not for the directory itself, where OpenCode keeps files of its own.
+`make test-opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json` and `cli.json` -- not for the directory itself, where OpenCode keeps files of its own, including the aisync-synced rules, agents, commands and skills.
 
 ## Tailscale
 
