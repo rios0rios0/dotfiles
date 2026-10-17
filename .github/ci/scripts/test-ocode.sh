@@ -7,7 +7,8 @@ set -euo pipefail
 # `install_bun` is sourced from the shared dependency library against a `curl` stub that
 # fabricates the upstream installer. Covers the skip paths (no checkout, no bun), the first
 # build (including the fork channel and release-grade version it must carry), the no-op
-# rebuild, the rebuild on a new head, the rebuild that restores a missing binary, the
+# rebuild, the rebuild on a new head, the rebuild that restores a missing binary, the prompt
+# for a running ocode and both answers to it, the process started while the build runs, the
 # ~/.bun/bin fallback, the installed skip, the installer call (with SHELL empty, so bun's
 # script cannot edit an rc file chezmoi owns), both installer failures, the Linux wiring and
 # the PATH block rendered on each platform.
@@ -48,11 +49,17 @@ esac
 STUB
 
 # bun stub: records every invocation and the build identity it was given, and fabricates the
-# artifact under --outdir.
+# artifact under --outdir. With BUN_STUB_RACE set it also starts the installed binary mid-build,
+# standing in for a person who opens ocode while the build runs -- the build-minutes window the
+# installer's rename closes.
 cat >"$BUN_STUB/bun" <<'STUB'
 #!/bin/bash
 echo "$*" >>"${BUN_CALLS:?}"
 echo "${OPENCODE_CHANNEL:-unset}/${OPENCODE_VERSION:-unset}" >>"${BUN_ENV:?}"
+if [ -n "${BUN_STUB_RACE:-}" ]; then
+    "$HOME/.local/bin/ocode" 300 &
+    echo "$!" >"${BUN_RACE_PID:?}"
+fi
 for arg in "$@"; do
     case "$arg" in
         --outdir=*) out="${arg#--outdir=}" ;;
@@ -69,7 +76,9 @@ export BUN_ENV="$TMP/bun-env"
 : >"$BUN_CALLS"
 : >"$BUN_ENV"
 
-run_script() { (cd "$TMP" && PATH="$BUN_STUB:$STUB:$PATH" bash "$SCRIPT") >"$TMP/out" 2>&1; echo $? >"$TMP/rc"; }
+# stdin is /dev/null unless a file is given, so a case that reaches the kill prompt and answers
+# nothing declines it instead of reading the test runner's terminal.
+run_script() { (cd "$TMP" && PATH="$BUN_STUB:$STUB:$PATH" bash "$SCRIPT" <"${1:-/dev/null}") >"$TMP/out" 2>&1; echo $? >"$TMP/rc"; }
 rc() { cat "$TMP/rc"; }
 calls() { wc -l <"$BUN_CALLS"; }
 
@@ -270,6 +279,73 @@ else
         pass "Android carries no ~/.bun/bin PATH block"
     fi
 fi
+
+# 14) A running ocode executes the installed binary, so the prompt appears; with nothing on stdin
+#     to answer it, the build is skipped, and the marker and the binary are both left alone.
+printf 'fake7890\n' >"$CHECKOUT/.git/HEAD"
+cp /bin/sleep "$HOME/.local/bin/ocode"
+"$HOME/.local/bin/ocode" 300 &
+declined_pid=$!
+before="$(calls)"
+run_script
+[ "$(rc)" -eq 0 ] || fail "a declined prompt must exit 0"
+grep -q "ocode is running" "$TMP/out" || fail "a running ocode must be reported"
+grep -q "skipped the build" "$TMP/out" || fail "a declined prompt must say the build was skipped"
+[ "$(calls)" -eq "$before" ] || fail "a declined prompt must not build"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake4567" ] || fail "a declined prompt must leave the marker"
+cmp -s "$HOME/.local/bin/ocode" /bin/sleep || fail "a declined prompt must leave the binary"
+pass "a running ocode is asked about, and a decline skips the build"
+
+# 15) The same situation answered yes: the process is killed and the build runs.
+printf 'y\n' >"$TMP/answer"
+before="$(calls)"
+run_script "$TMP/answer"
+[ "$(rc)" -eq 0 ] || fail "an accepted prompt must exit 0"
+grep -q "killed PID" "$TMP/out" || fail "an accepted prompt must report the kill"
+[ "$(calls)" -eq $((before + 1)) ] || fail "an accepted prompt must build"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake7890" ] || fail "an accepted prompt must move the marker"
+grep -q "fake ocode" "$HOME/.local/bin/ocode" || fail "an accepted prompt must install the new binary"
+wait "$declined_pid" 2>/dev/null || true
+if kill -0 "$declined_pid" 2>/dev/null; then
+    fail "the killed ocode must be gone"
+fi
+pass "a running ocode is killed when the prompt is accepted, and the build proceeds"
+
+# 16) An unchanged head needs no build, so a running ocode is not asked about at all.
+cp /bin/sleep "$HOME/.local/bin/ocode"
+"$HOME/.local/bin/ocode" 300 &
+unchanged_pid=$!
+before="$(calls)"
+run_script
+[ "$(rc)" -eq 0 ] || fail "an unchanged head must exit 0 with ocode running"
+[ "$(calls)" -eq "$before" ] || fail "an unchanged head must not build with ocode running"
+if grep -q "ocode is running" "$TMP/out"; then
+    fail "an unchanged head must not prompt about ocode"
+fi
+kill -0 "$unchanged_pid" 2>/dev/null || fail "the running ocode must be left alone when nothing builds"
+kill "$unchanged_pid" 2>/dev/null || true
+wait "$unchanged_pid" 2>/dev/null || true
+pass "a running ocode is not prompted about when the head is unchanged"
+
+# 17) One started *while* the build runs (the stub starts it mid-build) must not fail the install:
+#     a direct cp onto it would die with "Text file busy", the staged rename replaces it.
+printf 'fake9999\n' >"$CHECKOUT/.git/HEAD"
+export BUN_STUB_RACE=1 BUN_RACE_PID="$TMP/race-pid"
+before="$(calls)"
+run_script
+unset BUN_STUB_RACE BUN_RACE_PID
+race_pid="$(cat "$TMP/race-pid")"
+[ "$(rc)" -eq 0 ] || fail "a process started mid-build must not fail the install"
+if grep -q "Text file busy" "$TMP/out"; then
+    fail "the install must not lose the running-binary race"
+fi
+[ "$(calls)" -eq $((before + 1)) ] || fail "the race case must build once"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake9999" ] || fail "the race case must move the marker"
+grep -q "fake ocode" "$HOME/.local/bin/ocode" || fail "the race case must install the new binary"
+kill -0 "$race_pid" 2>/dev/null || fail "the racing process must be left running (it holds the old file)"
+kill "$race_pid" 2>/dev/null || true
+wait "$race_pid" 2>/dev/null || true
+pass "a process started mid-build cannot fail the install"
 
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-ocode] all ocode fork-builder and bun provisioning tests passed" >&2

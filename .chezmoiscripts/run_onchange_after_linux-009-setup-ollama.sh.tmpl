@@ -13,8 +13,8 @@
 #
 # `run_onchange_` rather than `run_once_`. A version bump changes the pins below, and a new model
 # or context window changes the digest of the rendered unit recorded on the next line, so either
-# re-runs this script, which restarts the server on the new binary and settings and pulls a model
-# that is not there yet:
+# re-runs this script, which restarts the server on the new binary and settings, checks that it
+# found a GPU, and pulls a model that is not there yet:
 #   unit {{ includeTemplate "dot_config/systemd/user/ollama.service.tmpl" . | sha256sum }}
 #
 # Without systemd it stops early and exits 0, which chezmoi records as done, so the line below
@@ -124,44 +124,67 @@ install_release() {
     echo "[$prefix] installed Ollama $version to $install_dir" >&2
 }
 
-# Proves the model runs on the GPU by loading it once and reading where Ollama placed it. Nothing
-# else would tell: when CUDA discovery fails, Ollama serves from the CPU, an order of magnitude
-# slower, and every request still succeeds. Only that fails the run. Partial or no placement while
-# a game or the Windows desktop holds the VRAM is a warning, because it passes once that is freed.
+# Proves the server discovered a usable GPU, without loading anything. While it starts, the server
+# logs one "inference compute" line per backend it found, and `library=cpu` alone means no
+# accelerator answered. Reading that line replaces the old check, which loaded the model and read
+# where Ollama placed it: the load put ~17 GB of weights in VRAM at every apply and paid a ~17 s
+# cold start that the first real request would otherwise have re-used. The failure it caught is
+# caught the same way -- a damaged CUDA install (a WSL VM once went down mid-install, leaving the
+# two libcublasLt libraries truncated) makes discovery crash, `cpu` becomes the only backend, and
+# every request then runs on the CPU, an order of magnitude slower, without an error.
 verify_gpu() {
-    local request placement size vram free_mib
+    local invocation lines gpu_line description available size
 
-    request="$(jq -nc --arg model "$model" \
-        '{model: $model, prompt: "ok", stream: false, think: false, keep_alive: "30s", options: {num_predict: 1}}')"
-    if ! curl -fsS --max-time 600 "$api/api/generate" -d "$request" >/dev/null; then
-        echo "[$prefix] ERROR: $model failed to load; check 'journalctl --user -u $unit'" >&2
-        return 1
-    fi
-
-    placement="$(curl -fsS --max-time 5 "$api/api/ps" | jq -r --arg model "$model" \
-        '.models[] | select(.name == $model) | "\(.size) \(.size_vram)"' | head -1)"
-    read -r size vram <<<"$placement"
-    if [[ -z "$size" ]]; then
-        echo "[$prefix] ERROR: $model is not among the loaded models; check 'journalctl --user -u $unit'" >&2
-        return 1
-    fi
-
-    # None on the GPU means one of two things, told apart by what is free: a GPU that something
-    # else has filled, which passes, or one Ollama could not use although it had room.
-    if (( vram == 0 )); then
-        free_mib="$(nvidia-smi --query-gpu=memory.free --format=csv,noheader,nounits 2>/dev/null | head -1 | tr -dc '0-9')"
-        if [[ -n "$free_mib" ]] && (( free_mib * 1024 * 1024 < size )); then
-            echo "[$prefix] WARN: $model runs on the CPU for now: only $free_mib MiB of VRAM is free; it moves to the GPU once that is freed" >&2
-            return 0
+    # Only the lines of this start: the journal keeps every earlier one, and a line from before a
+    # broken install would pass the check. systemd has reported an invocation id since v232; the
+    # timestamp taken just before the restart is the fallback for one that does not.
+    invocation="$(systemctl --user show -p InvocationID --value "$unit" 2>/dev/null || true)"
+    journal_since_start() {
+        if [[ -n "$invocation" ]]; then
+            journalctl --user -u "$unit" --no-pager -o cat "_SYSTEMD_INVOCATION_ID=$invocation" 2>/dev/null
+        else
+            journalctl --user -u "$unit" --no-pager -o cat --since "$started_at" 2>/dev/null
         fi
-        echo "[$prefix] ERROR: $model runs on the CPU although the GPU has room: Ollama found no usable GPU; check 'journalctl --user -u $unit' for 'GPU discovery'" >&2
+    }
+
+    # Discovery runs while the server starts, so its line may arrive a couple of seconds after
+    # /api/version answers. A line that is not a GPU is then decisive: the CPU backend is listed
+    # only when nothing else answered.
+    lines=""
+    gpu_line=""
+    for _ in $(seq 1 30); do
+        lines="$(journal_since_start || true)"
+        gpu_line="$(sed -n '/msg="inference compute"/{/library=cpu/!p;}' <<<"$lines")"
+        gpu_line="${gpu_line%%$'\n'*}"
+        if [[ -n "$gpu_line" ]] || grep -q 'msg="inference compute"' <<<"$lines"; then
+            break
+        fi
+        sleep 1
+    done
+
+    if [[ -z "$gpu_line" ]]; then
+        if grep -q 'msg="inference compute"' <<<"$lines"; then
+            echo "[$prefix] ERROR: Ollama found no usable GPU: the only backend its start-up log lists is the CPU; check 'journalctl --user -u $unit' for a GPU discovery failure" >&2
+        else
+            echo "[$prefix] ERROR: the server logged no GPU discovery after starting; check 'journalctl --user -u $unit'" >&2
+        fi
         return 1
     fi
-    if (( vram < size )); then
-        echo "[$prefix] WARN: only $(( vram * 100 / size ))% of $model fits in free VRAM now; the rest runs on the CPU until the GPU is freed" >&2
-        return 0
+
+    description="$(sed -n 's/.*description="\([^"]*\)".*/\1/p' <<<"$gpu_line")"
+    available="$(sed -n 's/.*available="\([^"]*\)".*/\1/p' <<<"$gpu_line")"
+    echo "[$prefix] ${description:-a GPU} is available to the server${available:+ ($available of VRAM free)}; nothing is loaded, so the first request loads the model" >&2
+
+    # With the model no longer loaded to be measured, this is a forecast rather than an
+    # observation: the model's blobs against the VRAM the server reported free. When even the
+    # weights alone do not fit, the model cannot run fully on the GPU until whatever else holds
+    # the VRAM is freed.
+    size="$(curl -fsS --max-time 5 "$api/api/tags" 2>/dev/null | jq -r --arg model "$model" \
+        '[.models[]? | select(.name == $model)][0] | .size // empty' 2>/dev/null || true)"
+    if [[ -n "$available" && -n "$size" ]] &&
+        awk -v gib="$available" -v bytes="$size" 'BEGIN { exit !(gib * 1073741824 < bytes) }'; then
+        echo "[$prefix] WARN: only $available of VRAM is free, less than $model's weights alone; part of it will run on the CPU until the GPU is freed" >&2
     fi
-    echo "[$prefix] $model runs fully on the GPU ($(( vram / 1024 / 1024 / 1024 )) GiB of VRAM)" >&2
 }
 
 # Each release unpacks to several GB of CUDA libraries, so only the pinned one is kept. It runs
@@ -213,7 +236,9 @@ if ! systemctl --user enable "$unit" >/dev/null 2>&1; then
 fi
 
 # Restart rather than start: a running server keeps the binary and the settings it was started
-# with, and this script runs precisely when one of those changed.
+# with, and this script runs precisely when one of those changed. The time is recorded first so
+# the GPU check can read this start's log where systemd reports no invocation id.
+started_at="$(date '+%Y-%m-%d %H:%M:%S')"
 systemctl --user restart "$unit"
 
 ready=false
@@ -229,6 +254,10 @@ if [[ "$ready" != true ]]; then
     exit 1
 fi
 
+# Before the pull, so a machine whose GPU discovery broke fails here instead of after an 18 GB
+# download. Nothing is loaded by it: the model stays out of VRAM until a request needs it.
+verify_gpu || exit 1
+
 prune_releases
 
 if "$link" show "$model" >/dev/null 2>&1; then
@@ -241,7 +270,5 @@ else
     fi
 fi
 
-verify_gpu || exit 1
-
-echo "[$prefix] ready at $api with $model" >&2
+echo "[$prefix] ready at $api with $model; the model loads on the first request that needs it" >&2
 {{- end }}
