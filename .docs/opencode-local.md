@@ -53,6 +53,15 @@ Model ids are the ones OmniRoute uses, so any id from the picker (`omniroute/aut
 `omniroute/codex/...`, `omniroute/nvidia/...`) can also be passed verbatim to
 `claude-omni -m` or `claude-omni-task -m`.
 
+## The fork build (`ocode`)
+
+`ocode` is the same CLI, built from the personal fork `rios0rios0/opencode` (branch
+`feat/provider-omniroute`) instead of the official binary: it adds the OmniRoute provider plugin
+and the `OPENCODE_DISABLE_CLAUDE_CODE` gate. `run_after_linux-006-build-ocode.sh` rebuilds it
+from the checkout at `~/Development/github.com/opencode/opencode` whenever that checkout's HEAD
+moved, and installs it as `~/.local/bin/ocode`; see the "Fork Build (`ocode`)" part of the main
+`CLAUDE.md` for the mechanics.
+
 ## When models are missing
 
 - **The gateway is down.** While OmniRoute does not answer, the provider serves no models;

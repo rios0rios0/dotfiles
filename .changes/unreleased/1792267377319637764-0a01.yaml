@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `run_after_linux-006-build-ocode.sh`, which builds the personal OpenCode fork checkout (`~/Development/github.com/opencode/opencode`, branch `feat/provider-omniroute`) into `~/.local/bin/ocode` whenever its HEAD moved past the last build, so `ocode` always carries the fork''s custom features; no checkout or no `bun` skips, a failed build fails the apply, and `make test-ocode` covers it against stubbed `git` and `bun`'
+time: '2026-10-17T19:45:00.000000000Z'
