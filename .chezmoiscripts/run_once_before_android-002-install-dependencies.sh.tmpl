@@ -238,10 +238,14 @@ install_terra() {
     install_go_tool_from_source https://github.com/rios0rios0/terra.git terra
     # On Android we build terra from source, so `terra self-update` is not
     # appropriate — the source repo is the canonical version. `terra update`
-    # exposes no auto-answer flag in the currently installed binary, so pipe
-    # `yes` to stdin to auto-confirm the y/N prompts when newer
-    # terraform/terragrunt blobs are detected.
-    yes y | terra update
+    # auto-answers its y/N prompts for newer terraform/terragrunt versions only
+    # through TERRA_ASSUME_YES=true: since terra 1.16.10 it skips the prompt
+    # whenever stdin is not a terminal (a pipe included), so `yes y` alone
+    # reported "Non-interactive session" and changed nothing. The pipe stays for
+    # the terra built here before that version — this function does not rebuild
+    # one that already exists at ~/.local/bin/terra, and such an older binary
+    # reads its prompt from stdin.
+    yes y | TERRA_ASSUME_YES=true terra update
 }
 
 # https://kubernetes.io/docs/tasks/tools/install-kubectl-linux/

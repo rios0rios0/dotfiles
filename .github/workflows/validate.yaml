@@ -424,8 +424,26 @@ jobs:
     runs-on: 'ubuntu-latest'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Test the ocode fork-builder'
+      - name: 'Install chezmoi'
+        run: |
+          cd "$(mktemp -d)"
+          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive" chezmoi
+          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
+      - name: 'Test the ocode fork-builder and its bun provisioning'
         run: 'make test-ocode'
+
+  test-terra-update:
+    name: 'Test (terra update)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Test the unattended terra update calls'
+        run: 'make test-terra-update'
 
   sast:
     name: SAST

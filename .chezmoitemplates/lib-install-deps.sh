@@ -192,6 +192,26 @@ install_opencode() {
 }
 
 # =========================================================================================================
+# https://bun.sh
+# Bun (`bun`), the runtime `run_after_linux-006-build-ocode.sh` builds the ocode fork with.
+# The upstream installer puts the binary under ~/.bun and, when `$SHELL` names a shell it
+# knows, appends `export PATH="$HOME/.bun/bin:$PATH"` to that shell's rc file -- ~/.zshrc
+# here, which chezmoi owns and rewrites, so the line would survive exactly until the next
+# apply (the flyctl/opencode story). It is run with SHELL empty for that reason: its shell
+# detection then falls through to printing the manual instruction instead of editing a file,
+# and `dot_zshenv.tmpl` carries the PATH block. Bun updates itself (`bun upgrade`), not an
+# apply. Called only by the Linux installer: the build it feeds is Linux-only, and bun
+# publishes no build bionic can start.
+install_bun() {
+    if [[ -x "$HOME/.bun/bin/bun" ]]; then
+        echo "[install-deps] bun is already installed, skipping" >&2
+        return
+    fi
+
+    SHELL='' run_remote_installer "bun" "https://bun.sh/install" || return 1
+}
+
+# =========================================================================================================
 # https://cli.sentry.dev/getting-started/
 # Sentry CLI (binary `sentry`, npm package `sentry`, from getsentry/cli -- not the classic
 # Rust `sentry-cli`). Same body on both platforms because the npm package is the CLI itself
