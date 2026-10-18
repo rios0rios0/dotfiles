@@ -2,9 +2,10 @@
 set -euo pipefail
 
 # Tests claude-omni, Claude Code through OmniRoute: how it sizes each model's window, what it hands
-# Claude Code, the GPU guards it keeps from claude-local and claude-remote, the /model lineup, the
-# audited runs of claude-omni-task, and the capacity hint in the zsh wrapper. curl, claude,
-# systemctl and tailscale are stubs, so no OmniRoute, GPU or network is needed.
+# Claude Code, the GPU guards it keeps from claude-local and claude-remote, the /model lineup when
+# it outgrows a command-line argument, the audited runs of claude-omni-task, and the capacity hint
+# in the zsh wrapper. curl, claude, systemctl and tailscale are stubs, so no OmniRoute, GPU or
+# network is needed.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -153,8 +154,12 @@ envvar() {
     sed -n "s/^$1=//p" "$TMP/claude.env"
 }
 
+# The settings reach Claude Code as a file in the profile, so the --settings value is a path; the
+# inline form is still read straight from the argument.
 settings_arg() {
-    awk 'prev == "<--settings>" { sub(/^</, ""); sub(/>$/, ""); print; exit } { prev = $0 }' "$TMP/claude.args"
+    local arg
+    arg="$(awk 'prev == "<--settings>" { sub(/^</, ""); sub(/>$/, ""); print; exit } { prev = $0 }' "$TMP/claude.args")"
+    if [[ -f "$arg" ]]; then cat "$arg"; else printf '%s' "$arg"; fi
 }
 
 # --- windows -------------------------------------------------------------------------------------
@@ -346,6 +351,45 @@ if grep -qxF "ollama-desktop/$gpu_model	$window" "$table" && grep -qxF "openrout
 else
     fail "unexpected windows table: $(tr '\n' ' ' < "$table")"
 fi
+
+# --- a lineup too large for a command line ---------------------------------------------------------
+
+# The real catalog holds more than a thousand chat models, and the resolved lineup and the settings
+# built from it both pass MAX_ARG_STRLEN (32 pages): an exec given one argument that long fails with
+# "Argument list too long" before anything runs. The launcher therefore hands jq the lineup on stdin
+# and Claude Code a settings file named on its command line, and a catalog this size must launch
+# like any other.
+
+# given a catalog whose lineup and settings pass the argument limit
+reset
+cp "$TMP/catalog.json" "$TMP/catalog.saved"
+jq '.data += [range(1; 1501) | {id: "openrouter/bulk/provider-\(.)/filler-model", root: "bulk/provider-\(.)/filler-model", context_length: 128000, max_input_tokens: 128000}]' \
+    "$TMP/catalog.saved" > "$TMP/catalog.json"
+# the fixture is only a fixture if its lineup really crosses the limit, or this test proves nothing
+arg_limit=$(( 32 * $(getconf PAGESIZE) ))
+config="$(chezmoi execute-template --config "$TMP/chezmoi.yaml" '{{ includeTemplate "lib-omniroute.tmpl" . | fromJson | toJson }}')"
+resolve_jq="$(sed -n "/^resolve_jq='/,/^'$/p" "$TMP/claude-omni" | sed '1d;$d')"
+lineup_size="$(jq -c --argjson cfg "$config" --arg want "" --slurpfile catalog "$TMP/catalog.json" -n "$resolve_jq" | wc -c)"
+(( lineup_size > arg_limit )) ||
+    fail "the bulk fixture's lineup ($lineup_size bytes) no longer crosses MAX_ARG_STRLEN ($arg_limit)"
+
+# when
+if output="$(run_omni "$TMP/claude-omni" -m openrouter/some/small -p hi 2>&1)"; then status=0; else status=$?; fi
+# then: the session starts, the settings arrive as a file past the limit, and the windows table
+# holds the whole catalog
+settings_path="$(awk 'prev == "<--settings>" { sub(/^</, ""); sub(/>$/, ""); print; exit } { prev = $0 }' "$TMP/claude.args")"
+settings_size=0
+[[ -f "$settings_path" ]] && settings_size="$(wc -c < "$settings_path")"
+if [[ "$status" -eq 0 && "$settings_size" -gt "$arg_limit" ]] &&
+    [[ "$(settings_arg | jq -r '.modelPicker.replaceBuiltInOptions')" == "true" ]] &&
+    awk -F '\t' '$1 == "openrouter/bulk/provider-1/filler-model" && $2 == 128000 { found = 1 } END { exit !found }' "$TMP/profile/omniroute-windows.tsv" &&
+    awk -F '\t' '$1 == "openrouter/some/small" && $2 == 32768 { found = 1 } END { exit !found }' "$TMP/profile/omniroute-windows.tsv"; then
+    pass "a lineup and settings past an argument's limit launch like any other"
+else
+    fail "large lineup: status=$status settings=$settings_size output=$output"
+fi
+
+mv -f "$TMP/catalog.saved" "$TMP/catalog.json"
 
 # --- the GPU guards -------------------------------------------------------------------------------
 

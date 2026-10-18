@@ -211,7 +211,9 @@ only happen with a model id typed into `/model` by hand.
 
 `~/.claude-omni` is a profile of its own: `/model` choices are saved to its settings, and in the regular
 profile they would be sent to Anthropic. It also leaves out the regular profile's plugins, skills, agents
-and MCP servers.
+and MCP servers. Two files the launcher writes sit there as well: `omniroute-settings.json`, named on
+Claude Code's command line because the `/model` lineup outgrows a command-line argument, and
+`omniroute-windows.tsv`, every served model's window for the status line.
 
 On a window of 128K or less the session is also lean, because what loads before the first prompt has to
 fit. Measured with `/context` on 2026-10-12 (Claude Code `2.1.296`):
