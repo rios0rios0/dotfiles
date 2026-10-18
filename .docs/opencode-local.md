@@ -82,15 +82,19 @@ rebuild replace the background service on the next launch. bun, its build runtim
 `~/.bun/bin/bun` itself, so the first apply after the install builds without waiting for a new
 shell.
 
-A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, and
-overwriting a file that is being executed fails with `Text file busy`, which would take the whole
-apply down with it. The builder therefore looks for processes running **that** file (through
+A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, the file
+the build replaces. The builder looks for processes running **that** file (through
 `/proc/<pid>/exe`, so an `ocode` started from another path is left alone) and asks before killing
-them, because they are somebody's session. Answering no, or applying unattended where nothing
-answers, skips the build and leaves the marker: the next apply tries again. The install itself goes
-through a temporary name beside the target and a rename, so an `ocode` started *while* the build
-runs cannot fail it either. `make test-ocode` covers both answers, the unattended skip, and the
-mid-build race.
+them, because they are somebody's session. The answer never decides whether the build happens:
+the install stages the new binary beside the target and renames it into place, so the running
+session is not disturbed and keeps the binary it started with until it restarts. Answering no --
+or applying unattended, where nothing answers -- leaves the session alone and builds anyway, and
+an `ocode` started *while* the build runs is safe for the same reason. `make test-ocode` covers
+every path of the prompt and the mid-build race.
+
+The `rebuild-ocode` zsh function runs the same script on demand, resolving it through
+`chezmoi source-path`, so a build can be caught up after pulling the fork checkout -- or when an
+apply found nothing to build -- without a whole apply. `make test-zshrc-functions` covers it.
 
 ## When models are missing
 

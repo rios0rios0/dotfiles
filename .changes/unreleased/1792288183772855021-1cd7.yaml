@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed the `ocode` fork build skipping when a running ocode was left alone: answering no to the kill prompt -- or applying unattended, where nothing answers -- now leaves the session running and builds anyway, because the staged rename replaces the binary under a running process without disturbing it, and a process that survives SIGKILL is warned about instead of failing the apply'
+time: '2026-10-18T01:49:43.77246601Z'
