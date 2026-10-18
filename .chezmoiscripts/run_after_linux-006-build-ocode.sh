@@ -19,13 +19,14 @@ set -euo pipefail
 # a run_after script that runs on every apply. A build that fails fails the apply, so the next
 # one retries it.
 #
-# A running ocode -- the TUI or the server it spawns -- is executing ~/.local/bin/ocode, a file
-# `cp` cannot overwrite while it runs ("Text file busy"), and that error fails the whole apply.
-# The script therefore finds the processes running that file and asks before killing them, since
-# they are somebody's session; declining, or running unattended with nothing on stdin, skips the
-# build and leaves the marker, so the next apply tries again. The install itself stages the new
-# binary under a temporary name and renames it into place, so an ocode started *while* the build
-# runs cannot fail it either.
+# A running ocode -- the TUI or the server it spawns -- executes ~/.local/bin/ocode, the file the
+# build replaces. The script finds the processes running that file and asks before killing them,
+# because they are somebody's session and killing one ends it. The answer never decides whether
+# the build happens, though: the install stages the new binary under a temporary name and renames
+# it into place, and a rename replaces the directory entry while the running process keeps the old
+# inode. Declining, or running unattended with nothing on stdin, therefore leaves the session
+# alone and builds anyway -- the session keeps the binary it started with until it restarts -- and
+# an ocode started *while* the build runs is safe for the same reason.
 
 source_dir="${OCODE_SOURCE:-$HOME/Development/github.com/opencode/opencode}"
 target="$HOME/.local/bin/ocode"
@@ -73,11 +74,12 @@ running_pids() {
     done
 }
 
-# Asked before the build rather than caught after it: the build takes minutes, and killing the
-# running ocode before it starts is the whole point -- the person knows it is their session.
+# Asked before the build rather than caught after it: the build takes minutes, and whether to end
+# somebody's session is their call. Both answers build; they differ only in whether the running
+# session is ended first.
 mapfile -t running < <(running_pids)
 if (( ${#running[@]} > 0 )); then
-    echo "[ocode] ocode is running (PID ${running[*]}): it executes $target, which the build cannot overwrite, and killing it ends the session it serves" >&2
+    echo "[ocode] ocode is running (PID ${running[*]}), executing $target; killing it ends the session it serves, and the build runs either way" >&2
     printf '%s' "[ocode] kill it and continue with the build? [y/N] " >&2
     answer=""
     read -r answer || true
@@ -98,13 +100,12 @@ if (( ${#running[@]} > 0 )); then
             mapfile -t still < <(running_pids)
         fi
         if (( ${#still[@]} > 0 )); then
-            echo "[ocode] ERROR: PID ${still[*]} still executes $target after SIGKILL; kill it and run 'chezmoi apply' again" >&2
-            exit 1
+            echo "[ocode] WARN: PID ${still[*]} survived SIGKILL; the build replaces $target anyway and the process keeps the binary it started with" >&2
+        else
+            echo "[ocode] killed PID ${running[*]}" >&2
         fi
-        echo "[ocode] killed PID ${running[*]}" >&2
     else
-        echo "[ocode] skipped the build: ocode is still running; close it and run 'chezmoi apply' again" >&2
-        exit 0
+        echo "[ocode] leaving PID ${running[*]} running: the build replaces $target without disturbing it, and the session keeps the binary it started with until it restarts" >&2
     fi
 fi
 

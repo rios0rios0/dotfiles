@@ -1,13 +1,15 @@
 #!/bin/bash
 set -euo pipefail
 
-# Tests two functions dot_zshrc.tmpl defines on Linux and Android alike: `top-size`, which lists the
-# biggest entries under a directory, and `sentry-ds`, which runs the Sentry CLI on the work account.
+# Tests three functions dot_zshrc.tmpl defines: `top-size`, which lists the biggest entries under a
+# directory, and `sentry-ds`, which runs the Sentry CLI on the work account, on Linux and Android
+# alike, plus `rebuild-ocode`, which runs the ocode fork-build script, on Linux only.
 #
 # The template is rendered for both platforms and only those blocks are sourced, in a bare zsh, so no
 # plugin loads. du, sort, sed and head are the real ones, reached through a PATH that holds nothing
 # else: every CI runner has a sudo, and a sudo found on the host would decide which branch of
-# `top-size` runs. sudo, sentry and the completion system are stubs.
+# `top-size` runs. sudo, sentry, the completion system, and the chezmoi and build-script stand-ins
+# are stubs.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 EXIT_CODE=0
@@ -15,7 +17,7 @@ EXIT_CODE=0
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
 
-echo "[test-zshrc-functions] testing top-size and sentry-ds in dot_zshrc.tmpl..." >&2
+echo "[test-zshrc-functions] testing top-size, sentry-ds and rebuild-ocode in dot_zshrc.tmpl..." >&2
 
 pass() { echo "[test-zshrc-functions] PASS: $1" >&2; }
 fail() { echo "[test-zshrc-functions] FAIL: $1" >&2; EXIT_CODE=1; }
@@ -109,7 +111,7 @@ for platform in linux android; do
     sentry_ds="$TMP/sentry-ds-$platform.zsh"
     awk '/^top-size\(\) \{$/, /^\}$/' "$rendered" > "$top_size"
     awk '/^unalias sentry-ds /, /^fi$/' "$rendered" > "$sentry_ds"
-    # Both fail loudly if a block is renamed or moves under a platform conditional, rather than
+    # These fail loudly if a block is renamed or moves under a platform conditional, rather than
     # leaving the cases below with nothing to test
     if ! grep -q 'du ' "$top_size"; then
         fail "$platform: no top-size function in the rendered zshrc"
@@ -118,6 +120,20 @@ for platform in linux android; do
     if ! grep -q 'compdef _sentry-ds sentry-ds' "$sentry_ds"; then
         fail "$platform: no sentry-ds block in the rendered zshrc"
         continue
+    fi
+    # `rebuild-ocode` runs the Linux-only fork build, so it is extracted where it belongs and
+    # asserted absent where it does not
+    if [[ "$platform" == linux ]]; then
+        rebuild_ocode="$TMP/rebuild-ocode.zsh"
+        awk '/^rebuild-ocode\(\) \{$/, /^\}$/' "$rendered" > "$rebuild_ocode"
+        if ! grep -q 'run_after_linux-006-build-ocode.sh' "$rebuild_ocode"; then
+            fail "$platform: no rebuild-ocode function in the rendered zshrc"
+            continue
+        fi
+    elif grep -q 'rebuild-ocode' "$rendered"; then
+        fail "$platform: the Linux-only rebuild-ocode function leaked into the $platform zshrc"
+    else
+        pass "$platform: carries no rebuild-ocode function"
     fi
 
     # --- top-size --------------------------------------------------------------------------------
@@ -241,6 +257,73 @@ for platform in linux android; do
         ' _ "$sentry_ds" 2>&1)" || true
     check "$platform: sources cleanly without a completion system" \
         "$(printf '%s\n' 'status=0' 'sentry-ds: function')" "$actual"
+
+    # --- rebuild-ocode (Linux only) --------------------------------------------------------------
+
+    if [[ "$platform" == linux ]]; then
+        # The function's whole job is to find the build script in the chezmoi source and run it, so
+        # the source, the script and chezmoi are stand-ins: a checkout whose script reports what it
+        # was given on stdout, and a chezmoi that answers `source-path` with it. bash is the real
+        # one, since the function hands the script to it.
+        rebuild_source="$TMP/rebuild-source"
+        mkdir -p "$rebuild_source/.chezmoiscripts" "$TMP/bin/rebuild"
+        ln -s "$(type -P bash)" "$TMP/bin/rebuild/bash"
+        cat > "$rebuild_source/.chezmoiscripts/run_after_linux-006-build-ocode.sh" <<EOF
+#!/bin/bash
+printf 'args=<%s>\n' "\$*"
+printf 'cwd=%s\n' "\$PWD"
+exit "\${REBUILD_STATUS:-0}"
+EOF
+        chmod +x "$rebuild_source/.chezmoiscripts/run_after_linux-006-build-ocode.sh"
+        cat > "$TMP/bin/rebuild/chezmoi" <<EOF
+#!/bin/bash
+echo "\$*" >> "$TMP/chezmoi.log"
+[[ "\$1" == source-path ]] || exit 1
+echo "$rebuild_source"
+EOF
+        chmod +x "$TMP/bin/rebuild/chezmoi"
+
+        # Runs rebuild-ocode from a directory under the given PATH, leaving stdout in $TMP/out,
+        # stderr in $TMP/err and the status in $STATUS, and starting with an empty chezmoi log.
+        run_rebuild_ocode() {
+            : > "$TMP/chezmoi.log"
+            STATUS=0
+            (cd "$1" && LC_ALL=C PATH="$2" "$ZSH_BIN" -f -c 'source "$1"; rebuild-ocode' _ "$rebuild_ocode") \
+                > "$TMP/out" 2> "$TMP/err" || STATUS=$?
+        }
+
+        # given a source checkout whose build script answers for the build
+        # when rebuild-ocode runs
+        run_rebuild_ocode "$TMP" "$TMP/bin/rebuild"
+        # then chezmoi supplied the source, and the script ran with no arguments from the caller
+        check "linux: asks chezmoi for the source" "source-path" "$(cat "$TMP/chezmoi.log")"
+        check "linux: runs the build script from the caller's directory" \
+            "$(printf 'args=<>\ncwd=%s' "$TMP")" "$(cat "$TMP/out")"
+        check "linux: returns the build's status" "0" "$STATUS"
+
+        # given a build that fails
+        # when / then its status reaches the caller
+        export REBUILD_STATUS=1
+        run_rebuild_ocode "$TMP" "$TMP/bin/rebuild"
+        unset REBUILD_STATUS
+        check "linux: passes a failed build through" "1" "$STATUS"
+
+        # given a chezmoi that answers with a source holding no build script
+        # when / then it fails, naming the path
+        rm "$rebuild_source/.chezmoiscripts/run_after_linux-006-build-ocode.sh"
+        run_rebuild_ocode "$TMP" "$TMP/bin/rebuild"
+        check "linux: fails when the build script is missing" \
+            "1 [rebuild-ocode] ERROR: no build script at $rebuild_source/.chezmoiscripts/run_after_linux-006-build-ocode.sh; run 'chezmoi init' and 'chezmoi apply' first" \
+            "$STATUS $(cat "$TMP/err")"
+
+        # given a PATH without chezmoi, as a shell that never loaded the dotfiles
+        # when / then it fails, naming chezmoi
+        mkdir -p "$TMP/empty"
+        run_rebuild_ocode "$TMP" "$TMP/empty"
+        check "linux: fails when chezmoi is not on PATH" \
+            "1 [rebuild-ocode] ERROR: chezmoi is not on PATH, so the build script cannot be found" \
+            "$STATUS $(cat "$TMP/err")"
+    fi
 done
 
 if [[ "$EXIT_CODE" -eq 0 ]]; then

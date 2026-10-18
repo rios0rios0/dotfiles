@@ -8,10 +8,10 @@ set -euo pipefail
 # fabricates the upstream installer. Covers the skip paths (no checkout, no bun), the first
 # build (including the fork channel and release-grade version it must carry), the no-op
 # rebuild, the rebuild on a new head, the rebuild that restores a missing binary, the prompt
-# for a running ocode and both answers to it, the process started while the build runs, the
-# ~/.bun/bin fallback, the installed skip, the installer call (with SHELL empty, so bun's
-# script cannot edit an rc file chezmoi owns), both installer failures, the Linux wiring and
-# the PATH block rendered on each platform.
+# for a running ocode with no answer, a decline and an acceptance -- none of which may skip the
+# build -- the process started while the build runs, the ~/.bun/bin fallback, the installed
+# skip, the installer call (with SHELL empty, so bun's script cannot edit an rc file chezmoi
+# owns), both installer failures, the Linux wiring and the PATH block rendered on each platform.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -77,7 +77,8 @@ export BUN_ENV="$TMP/bun-env"
 : >"$BUN_ENV"
 
 # stdin is /dev/null unless a file is given, so a case that reaches the kill prompt and answers
-# nothing declines it instead of reading the test runner's terminal.
+# nothing leaves the running ocode alone and builds anyway, instead of reading the test runner's
+# terminal.
 run_script() { (cd "$TMP" && PATH="$BUN_STUB:$STUB:$PATH" bash "$SCRIPT" <"${1:-/dev/null}") >"$TMP/out" 2>&1; echo $? >"$TMP/rc"; }
 rc() { cat "$TMP/rc"; }
 calls() { wc -l <"$BUN_CALLS"; }
@@ -281,37 +282,63 @@ else
 fi
 
 # 14) A running ocode executes the installed binary, so the prompt appears; with nothing on stdin
-#     to answer it, the build is skipped, and the marker and the binary are both left alone.
+#     to answer it (an unattended apply), the session is left alone and the build runs anyway --
+#     the staged rename replaces the file under a running process without disturbing it.
 printf 'fake7890\n' >"$CHECKOUT/.git/HEAD"
+cp /bin/sleep "$HOME/.local/bin/ocode"
+"$HOME/.local/bin/ocode" 300 &
+unanswered_pid=$!
+before="$(calls)"
+run_script
+[ "$(rc)" -eq 0 ] || fail "an unanswered prompt must exit 0"
+grep -q "ocode is running" "$TMP/out" || fail "a running ocode must be reported"
+grep -q "leaving PID" "$TMP/out" || fail "an unanswered prompt must say the session is left alone"
+[ "$(calls)" -eq $((before + 1)) ] || fail "an unanswered prompt must build anyway"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake7890" ] || fail "an unanswered prompt must move the marker"
+grep -q "fake ocode" "$HOME/.local/bin/ocode" || fail "an unanswered prompt must install the new binary"
+kill -0 "$unanswered_pid" 2>/dev/null || fail "the running ocode must survive the build"
+kill "$unanswered_pid" 2>/dev/null || true
+wait "$unanswered_pid" 2>/dev/null || true
+pass "a running ocode is asked about, and an unanswered prompt builds anyway without touching it"
+
+# 15) The same situation answered no: the session is still left alone and the build still runs.
+printf 'fakeabcd\n' >"$CHECKOUT/.git/HEAD"
 cp /bin/sleep "$HOME/.local/bin/ocode"
 "$HOME/.local/bin/ocode" 300 &
 declined_pid=$!
 before="$(calls)"
-run_script
+printf 'n\n' >"$TMP/answer"
+run_script "$TMP/answer"
 [ "$(rc)" -eq 0 ] || fail "a declined prompt must exit 0"
-grep -q "ocode is running" "$TMP/out" || fail "a running ocode must be reported"
-grep -q "skipped the build" "$TMP/out" || fail "a declined prompt must say the build was skipped"
-[ "$(calls)" -eq "$before" ] || fail "a declined prompt must not build"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake4567" ] || fail "a declined prompt must leave the marker"
-cmp -s "$HOME/.local/bin/ocode" /bin/sleep || fail "a declined prompt must leave the binary"
-pass "a running ocode is asked about, and a decline skips the build"
+grep -q "leaving PID" "$TMP/out" || fail "a declined prompt must say the session is left alone"
+[ "$(calls)" -eq $((before + 1)) ] || fail "a declined prompt must build anyway"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fakeabcd" ] || fail "a declined prompt must move the marker"
+grep -q "fake ocode" "$HOME/.local/bin/ocode" || fail "a declined prompt must install the new binary"
+kill -0 "$declined_pid" 2>/dev/null || fail "the running ocode must survive a declined prompt"
+kill "$declined_pid" 2>/dev/null || true
+wait "$declined_pid" 2>/dev/null || true
+pass "a running ocode survives a decline, and the build proceeds"
 
-# 15) The same situation answered yes: the process is killed and the build runs.
+# 16) Answered yes: the process is killed first, and then the build runs.
+printf 'fakefade\n' >"$CHECKOUT/.git/HEAD"
+cp /bin/sleep "$HOME/.local/bin/ocode"
+"$HOME/.local/bin/ocode" 300 &
+accepted_pid=$!
 printf 'y\n' >"$TMP/answer"
 before="$(calls)"
 run_script "$TMP/answer"
 [ "$(rc)" -eq 0 ] || fail "an accepted prompt must exit 0"
 grep -q "killed PID" "$TMP/out" || fail "an accepted prompt must report the kill"
 [ "$(calls)" -eq $((before + 1)) ] || fail "an accepted prompt must build"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake7890" ] || fail "an accepted prompt must move the marker"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fakefade" ] || fail "an accepted prompt must move the marker"
 grep -q "fake ocode" "$HOME/.local/bin/ocode" || fail "an accepted prompt must install the new binary"
-wait "$declined_pid" 2>/dev/null || true
-if kill -0 "$declined_pid" 2>/dev/null; then
+wait "$accepted_pid" 2>/dev/null || true
+if kill -0 "$accepted_pid" 2>/dev/null; then
     fail "the killed ocode must be gone"
 fi
 pass "a running ocode is killed when the prompt is accepted, and the build proceeds"
 
-# 16) An unchanged head needs no build, so a running ocode is not asked about at all.
+# 17) An unchanged head needs no build, so a running ocode is not asked about at all.
 cp /bin/sleep "$HOME/.local/bin/ocode"
 "$HOME/.local/bin/ocode" 300 &
 unchanged_pid=$!
@@ -327,7 +354,7 @@ kill "$unchanged_pid" 2>/dev/null || true
 wait "$unchanged_pid" 2>/dev/null || true
 pass "a running ocode is not prompted about when the head is unchanged"
 
-# 17) One started *while* the build runs (the stub starts it mid-build) must not fail the install:
+# 18) One started *while* the build runs (the stub starts it mid-build) must not fail the install:
 #     a direct cp onto it would die with "Text file busy", the staged rename replaces it.
 printf 'fake9999\n' >"$CHECKOUT/.git/HEAD"
 export BUN_STUB_RACE=1 BUN_RACE_PID="$TMP/race-pid"

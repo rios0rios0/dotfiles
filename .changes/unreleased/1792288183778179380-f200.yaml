@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added the `rebuild-ocode` zsh function (Linux), which runs the same fork-build script `chezmoi apply` runs, resolved through `chezmoi source-path`, so a build can be caught up after pulling the fork checkout -- or when an apply found nothing to build -- without a whole apply'
+time: '2026-10-18T01:49:43.778047442Z'

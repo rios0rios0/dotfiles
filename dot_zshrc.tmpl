@@ -484,6 +484,31 @@ unalias codexx 2>/dev/null
 codexx() {
     command codex --dangerously-bypass-approvals-and-sandbox "$@"
 }
+{{- if eq .chezmoi.os "linux" }}
+
+###### OpenCode (ocode) ############################################################
+# Rebuild `ocode`, the personal OpenCode fork's binary, on demand: it runs the same script
+# `chezmoi apply` runs there (run_after_linux-006-build-ocode.sh, resolved through the chezmoi
+# source so it cannot drift from what an apply would execute). Use it after pulling the fork
+# checkout at ~/Development/github.com/opencode/opencode (OCODE_SOURCE names another), without
+# waiting for the next apply. An unchanged checkout is a no-op, read from the
+# ~/.cache/ocode-built-commit marker. A running ocode is asked about; declining leaves it
+# running and the build goes on regardless, and the session keeps the old binary until it
+# restarts.
+rebuild-ocode() {
+    local source_dir script
+    if ! source_dir="$(chezmoi source-path 2>/dev/null)"; then
+        echo "[rebuild-ocode] ERROR: chezmoi is not on PATH, so the build script cannot be found" >&2
+        return 1
+    fi
+    script="$source_dir/.chezmoiscripts/run_after_linux-006-build-ocode.sh"
+    if [[ ! -f "$script" ]]; then
+        echo "[rebuild-ocode] ERROR: no build script at $script; run 'chezmoi init' and 'chezmoi apply' first" >&2
+        return 1
+    fi
+    bash "$script"
+}
+{{- end }}
 
 ###### Claude Code #################################################################
 # Shared pre-launch guard for every Claude Code entrypoint below: a no-network call

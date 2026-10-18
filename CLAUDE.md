@@ -27,7 +27,7 @@ make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR s
 make test-shell-credentials         # 1Password credential/workspace loading and removal
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
-make test-zshrc-functions           # top-size and sentry-ds in dot_zshrc: arguments, sudo, the work store, completion
+make test-zshrc-functions           # top-size, sentry-ds and rebuild-ocode in dot_zshrc: arguments, sudo, the work store, completion, the resolved build script
 make test-sentry-setup              # the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds
 make test-local-llm                 # the local model server: its settings, one context window with claude-omni, the installer's gate
 make test-claude-omni               # claude-omni and claude-omni-task: windows, the environment, the /model lineup, GPU guards, the audit, the capacity hint
@@ -38,7 +38,7 @@ make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, t
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
 make test-omniroute-backup          # the OmniRoute stack's encrypted backups: the snapshot flow, retention, the installer's gate
-make test-ocode                     # the ocode fork build: skip paths, rebuilds, the ~/.bun/bin fallback, the bun installer and its PATH block
+make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the ~/.bun/bin fallback, the bun installer and its PATH block
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
 ```
 
@@ -220,7 +220,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-omni`, `claude-omni-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-omni`, `claude-omni-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -889,15 +889,17 @@ makes each rebuild replace the background service on the next launch. The marker
 script that runs on every apply; `OCODE_SOURCE` names another checkout. No checkout and no `bun`
 are skips, never failures -- a failed build is an error, retried by the next apply.
 
-A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, and
-overwriting a file that is being executed fails with `Text file busy`, which took the whole apply
-down with it. The builder therefore looks for the processes executing **that file** (through
+A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, the file
+the build replaces. The builder looks for the processes executing **that file** (through
 `/proc/<pid>/exe`, not by name: an `ocode` started from another path holds no file of ours) and,
 when it finds any, asks whether to kill them, because they are somebody's session and killing one
-ends it. An answer of yes kills them before the build; no -- or an unattended run, where stdin
-answers nothing -- skips the build and leaves the marker, so the next apply tries again. The
-install itself goes through a temporary name beside the target and a rename, so an `ocode` started
-*while* the build runs cannot fail it either.
+ends it. The answer never decides whether the build happens, though: the install stages the new
+binary under a temporary name beside the target and renames it into place, and a rename replaces
+the directory entry while the running process keeps the old inode. An answer of no -- and an
+unattended run, where stdin answers nothing -- therefore leaves the session alone and builds
+anyway, and the session keeps the binary it started with until it restarts; yes kills first, and
+a process that survives SIGKILL is only warned about, never a reason to skip. An `ocode` started
+*while* the build runs is safe for the same reason.
 
 bun, the build's runtime, comes from `install_bun` (shared library, called by the Linux
 installer) as `~/.bun/bin/bun`. The upstream `bun.sh/install` script would append its own PATH
@@ -908,9 +910,14 @@ resolves bun from PATH and falls back to `~/.bun/bin/bun`, so the first apply af
 builds even though the running shell's PATH predates the export; only when neither answers is
 the build skipped. `make test-ocode` covers the skip paths, the first build (including the
 channel and release-grade version it carries), the no-op and the rebuilds against stubbed
-`git` and `bun`, the running-`ocode` prompt with both answers, the process started mid-build,
-and the installer's skip, its `SHELL`-empty call, both failures, the Linux wiring and the PATH
-block per platform.
+`git` and `bun`, the running-`ocode` prompt with no answer, a decline and an acceptance, the
+process started mid-build, and the installer's skip, its `SHELL`-empty call, both failures, the
+Linux wiring and the PATH block per platform.
+
+`chezmoi apply` is not the only way to run the build: the `rebuild-ocode` zsh function (Linux
+only) resolves the same script through `chezmoi source-path` and runs it, so a build can be
+caught up after pulling the checkout, or when an apply found nothing to build, without a whole
+apply. `make test-zshrc-functions` covers it.
 
 ## Tailscale
 
