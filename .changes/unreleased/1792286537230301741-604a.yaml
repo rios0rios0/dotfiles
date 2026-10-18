@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'passed the `claude-omni` model lineup and settings through stdin and a profile file, so a model catalog too large for a command-line argument no longer fails a launch with `Argument list too long`'
+time: '2026-10-18T01:22:17.230210138Z'

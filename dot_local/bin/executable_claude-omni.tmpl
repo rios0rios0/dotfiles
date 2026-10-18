@@ -118,7 +118,7 @@ key="${OMNIROUTE_API_KEY:-}"
 mkdir -p "$profile"
 catalog="$profile/omniroute-models.json"
 fetched="$(mktemp "$profile/.omniroute-models.XXXXXX")"
-trap 'rm -f "$fetched" "${windows:-}"' EXIT
+trap 'rm -f "$fetched" "${settings_tmp:-}" "${windows:-}"' EXIT
 status="$(curl -sS --max-time 15 -o "$fetched" -w '%{http_code}' -H @- "$base/v1/models?prefix=alias" \
     <<<"Authorization: Bearer $key" 2>/dev/null)" || status="000"
 case "$status" in
@@ -408,21 +408,26 @@ fi
 need claude
 
 # --- the session ----------------------------------------------------------------------------------
-# One --settings value carries the /model lineup, each entry's effort, and, on a small
-# window, the rules the lean profile keeps. claudeMdExcludes drops the other global rules: a
-# separate config directory alone does not, because for any project under $HOME Claude Code reads
-# ~/.claude/rules as the rules of the ancestor directory ~.
+# The /model lineup, each entry's effort, and, on a small window, the rules the lean profile keeps,
+# reach Claude Code as a settings file named on its command line, written atomically into the
+# profile: the JSON carries every served model, and as a --settings value it would exceed
+# MAX_ARG_STRLEN on a large catalog and fail the exec with "Argument list too long". claudeMdExcludes
+# drops the other global rules: a separate config directory alone does not, because for any project
+# under $HOME Claude Code reads ~/.claude/rules as the rules of the ancestor directory ~.
 
 lean="$(jq -r --argjson window "$window" '.lean.maxWindow >= $window' <<<"$config")"
+settings_file="$profile/omniroute-settings.json"
+settings_tmp="$(mktemp "$profile/.omniroute-settings.XXXXXX")"
 # shellcheck disable=SC2016
-settings="$(jq -c --argjson cfg "$config" --argjson window "$window" --arg home "$home_dir" --argjson lean "$lean" '
+jq -c --argjson cfg "$config" --argjson window "$window" --arg home "$home_dir" --argjson lean "$lean" '
     {modelPicker: {replaceBuiltInOptions: true,
                    options: [.[] | select(.served and .window != null and .window >= $window)
                              | {model: .id, label: .label, description: "\(.shown) context · \(.where)"}]},
      modelSettings: ([.[] | select(.effort) | {key: .id, value: {effortLevel: .effort}}] | from_entries)}
     + (if $lean then {claudeMdExcludes: ["\($home)/.claude/rules/!(\($cfg.lean.rules | join("|"))).md",
                                          "\($home)/.claude/CLAUDE.md"]}
-       else {} end)' <<<"$resolved")"
+       else {} end)' <<<"$resolved" >"$settings_tmp"
+mv -f "$settings_tmp" "$settings_file"
 tools=()
 if [[ "$lean" == "true" ]]; then
     tools=(--tools "$(jq -r '.lean.tools | join(",")' <<<"$config")")
@@ -430,19 +435,21 @@ fi
 
 # The window of every model OmniRoute serves, for the status line: after /model, the window it
 # shows stays the session's, and this is where it finds the new model's own. Each is sized as a
-# launch would size it: a GPU prefix at the server's window, an auto/* combo at autoWindow.
+# launch would size it: a GPU prefix at the server's window, an auto/* combo at autoWindow. The
+# lineup arrives on stdin and the catalog through --slurpfile: as a jq argument the lineup would
+# exceed MAX_ARG_STRLEN on a large catalog and fail with "Argument list too long".
 windows="$(mktemp "$profile/.omniroute-windows.XXXXXX")"
 # shellcheck disable=SC2016
-jq -r --argjson listed "$resolved" --argjson cfg "$config" '
-    ([.data[] | select(.type == null)
+jq -r --argjson cfg "$config" --slurpfile catalog "$catalog" '
+    ([($catalog[0].data // [])[] | select(.type == null)
       | (.id | split("/")[0]) as $provider
       | {key: .id, value: ([.context_length, .max_input_tokens,
                             (if $cfg.gpus[$provider] then $cfg.gpuWindow else null end),
                             (if .id | startswith("auto/") then $cfg.autoWindow else null end)]
                            | map(select(type == "number" and . > 0)) | if length == 0 then null else min end)}]
      | from_entries)
-    + ($listed | map(select(.window != null) | {key: .id, value: .window}) | from_entries)
-    | to_entries[] | select(.value != null) | "\(.key)\t\(.value)"' "$catalog" >"$windows"
+    + (map(select(.window != null) | {key: .id, value: .window}) | from_entries)
+    | to_entries[] | select(.value != null) | "\(.key)\t\(.value)"' <<<"$resolved" >"$windows"
 mv -f "$windows" "$profile/omniroute-windows.tsv"
 
 export ANTHROPIC_BASE_URL="$base"
@@ -470,4 +477,4 @@ export CLAUDE_OMNI_WINDOW="$window"
 
 # --tools takes a variadic list, so --settings goes between it and the caller's arguments: an
 # option ends the list, where a prompt given as the first argument would join it as a tool name.
-exec claude --model "$model" "${tools[@]}" --settings "$settings" "${args[@]}"
+exec claude --model "$model" "${tools[@]}" --settings "$settings_file" "${args[@]}"
