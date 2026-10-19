@@ -59,6 +59,8 @@ docker compose up -d omniroute
 
 `update-image.sh` asks GitHub for the newest successful run of the workflow, resolves the digest of that commit's `sha-<commit>` tag, and rewrites the `omniroute` image line in `compose.yaml`; it prints the two commands above. `--check` exits 1 when the pin is not the newest build, `--tag TAG` pins a release tag instead, and `--file PATH` rewrites another Compose file. It needs `gh` authenticated to the fork and `docker` with buildx; a public package resolves anonymously, a private one needs `docker login ghcr.io` first. A failed or unfinished build leaves the previous pin in place.
 
+The pin is recognized by the repository's final path component and in either quoting style, so the official image of the first run, this fork's, and a mirror named by `OMNIROUTE_IMAGE` are all readable — a pin an earlier run wrote stays updatable. The rewrite keeps the quoting the file already used and is read back with the same matcher before it replaces the file, so a writer and a reader that disagree fail the run instead of producing a file the next one cannot parse.
+
 ### Data, migrations and rollback
 
 The Compose project keeps its name (`dotfiles`) and volume names (`omniroute-data`, `omniroute-redis-data`), so switching the image reuses the existing database and provider credentials. The fork is based on upstream `v3.8.52`, whose migrations run on the first start and are one-way: take a backup before recreating the container.

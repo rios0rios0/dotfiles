@@ -18,6 +18,10 @@ set -euo pipefail
 #   ./update-image.sh --tag TAG    # pin TAG instead (e.g. a release tag), bypassing GitHub
 #   ./update-image.sh --file PATH  # rewrite another compose file
 #
+# The pin is recognized by its repository name rather than by registry, so the official image
+# of the first run, the fork, and a mirror chosen with OMNIROUTE_IMAGE are all readable -- and
+# a pin written by an earlier run stays updatable whatever repository it names.
+#
 # Environment:
 #   OMNIROUTE_IMAGE    image repository (default ghcr.io/rios0rios0/omniroute)
 #   OMNIROUTE_COMPOSE  compose file (default compose.yaml beside this script)
@@ -80,17 +84,22 @@ done
 
 [[ -f "$compose" ]] || fail "no Compose file at $compose"
 [[ -n "$image" ]] || fail "OMNIROUTE_IMAGE is empty"
+# The value reaches a sed pattern and replacement, so a character it cannot express is refused
+# here rather than producing a rewrite that silently matches nothing.
+[[ "$image" =~ ^[A-Za-z0-9][A-Za-z0-9._/-]*$ ]] \
+    || fail "OMNIROUTE_IMAGE '$image' is not a plain image repository (letters, digits, '.', '_', '/', '-')"
 
-# The service may still point at the official upstream image on the first run; both shapes
-# are rewritable so the switch needs no manual edit. Any other image (redis, a sidecar) is
-# left alone.
-image_re='ghcr\.io/(rios0rios0|diegosouzapw)/omniroute'
-matches="$(grep -cE "^[[:space:]]*image:[[:space:]]*'?${image_re}@sha256:[0-9a-f]{64}'?[[:space:]]*$" "$compose" || true)"
+# One reader and one writer, or the next run cannot read what this one wrote. The repository
+# is matched by its final path component, so the official upstream image, this fork's, and a
+# mirror named by OMNIROUTE_IMAGE are all recognized; `image:` lines of other services (redis,
+# a sidecar) end in no such name and are left alone. Quoting is optional in Compose, so both
+# forms are accepted, and the rewrite keeps whichever the file already uses.
+pin_re="^[[:space:]]*image:[[:space:]]*'?([^[:space:]']*omniroute)(@sha256:[0-9a-f]{64})'?[[:space:]]*\$"
+matches="$(grep -cE "$pin_re" "$compose" || true)"
 if [[ "$matches" != "1" ]]; then
     fail "expected exactly one found OmniRoute image digest in $compose, found $matches"
 fi
-current="$(grep -E "^[[:space:]]*image:[[:space:]]*'?${image_re}@sha256:[0-9a-f]{64}'?[[:space:]]*$" "$compose" \
-    | sed -E 's/.*@(sha256:[0-9a-f]{64}).*/\1/')"
+current="$(sed -nE "s/${pin_re}/\1\2/p" "$compose")"
 
 if [[ -n "$tag" ]]; then
     ref="$tag"
@@ -116,24 +125,34 @@ digest="$(docker buildx imagetools inspect "$image:$ref" --format '{{.Manifest.D
     || fail "could not resolve $image:$ref; is buildx available, and the package public or logged in?"
 [[ "$digest" =~ ^sha256:[0-9a-f]{64}$ ]] || fail "unexpected digest '$digest' for $image:$ref"
 
-if [[ "$current" == "$digest" ]]; then
-    log "already pinned to $image@$digest ($ref)"
+desired="${image}@${digest}"
+# Compare the whole reference, not just the digest: pointing OMNIROUTE_IMAGE at a mirror must
+# rewrite the repository even when both builds share a digest.
+if [[ "$current" == "$desired" ]]; then
+    log "already pinned to $desired ($ref)"
     exit 0
 fi
 
 if [[ "$check" == "true" ]]; then
-    log "the pin differs: compose has $current, the newest build is $digest ($ref)"
+    log "the pin differs: compose has $current, the newest build is $desired ($ref)"
     exit 1
 fi
 
 log "pinning $image"
 log "  from $current"
-log "  to   $digest ($ref)"
+log "  to   $desired ($ref)"
 tmp="$(mktemp "${compose}.XXXXXX")"
 trap 'rm -f "$tmp"' EXIT
-sed -E "s#^([[:space:]]*image:[[:space:]]*')${image_re}@sha256:[0-9a-f]{64}'#\1${image}@${digest}'#" \
+# Two substitutions, one per quoting style: a quoted line cannot match the unquoted pattern
+# (it excludes the quote), and vice versa, so exactly one of them applies.
+sed -E \
+    -e "s#^([[:space:]]*image:[[:space:]]*)'[^[:space:]']*omniroute@sha256:[0-9a-f]{64}'#\1'${desired}'#" \
+    -e "s#^([[:space:]]*image:[[:space:]]*)[^[:space:]']*omniroute@sha256:[0-9a-f]{64}([[:space:]]*)\$#\1${desired}\2#" \
     "$compose" >"$tmp"
-grep -qF "image: '${image}@${digest}'" "$tmp" || fail "the rewrite produced no matching image line; $compose is unchanged"
+# Read the result back the way the next run will: the rewrite must be legible to the same
+# matcher, whatever repository or quoting it started from.
+pinned="$(sed -nE "s/${pin_re}/\1\2/p" "$tmp")"
+[[ "$pinned" == "$desired" ]] || fail "the rewrite produced no matching image line; $compose is unchanged"
 chmod --reference="$compose" "$tmp"
 command mv -f "$tmp" "$compose"
 trap - EXIT

@@ -4,8 +4,8 @@ set -euo pipefail
 # Tests the OmniRoute image pin updater without GitHub, the registry or Docker: `gh` and
 # `docker` are stubs that return a fixed run and digest, and the Compose file is a fixture in
 # a temp directory. The cases that matter are the first switch away from the official image,
-# an unchanged pin, --check in both directions, --tag bypassing GitHub, and every failure
-# leaving the file untouched.
+# an unchanged pin, --check in both directions, --tag bypassing GitHub, an unquoted pin, a
+# mirror repository, and every failure leaving the file untouched.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 EXIT_CODE=0
@@ -87,7 +87,8 @@ export FAKE_DOCKER_LOG="$TMP/docker.log"
 export OMNIROUTE_COMPOSE="$COMPOSE"
 touch "$FAKE_DOCKER_LOG"
 
-image_line() { grep -E '^[[:space:]]*image:' "$COMPOSE"; }
+image_line_of() { grep -E '^[[:space:]]*image:' "$1"; }
+image_line() { image_line_of "$COMPOSE"; }
 checksum() { cksum "$COMPOSE"; }
 
 if [[ -x "$SCRIPT" ]]; then
@@ -201,6 +202,78 @@ if grep -q ':v9.9.9' "$FAKE_DOCKER_LOG"; then
     pass "--tag resolves the named tag"
 else
     fail "--tag did not resolve the named tag: $(cat "$FAKE_DOCKER_LOG")"
+fi
+
+# An unquoted pin is a valid Compose reference, and the writer must accept whatever the reader
+# does: a rewrite that only recognizes the quoted form fails on a real Compose file.
+cat > "$TMP/unquoted.yaml" <<YAML
+services:
+  omniroute:
+    image: ghcr.io/diegosouzapw/omniroute@${DIGEST_OFFICIAL}
+YAML
+if OMNIROUTE_COMPOSE="$TMP/unquoted.yaml" FAKE_DIGEST="$DIGEST_A" FAKE_GH_SHA="$SHA_A" "$SCRIPT" 2>"$TMP/unquoted.log"; then
+    pass "an unquoted pin is updated"
+else
+    fail "an unquoted pin could not be updated: $(cat "$TMP/unquoted.log")"
+fi
+if grep -qE "^[[:space:]]*image: ghcr\.io/rios0rios0/omniroute@${DIGEST_A}[[:space:]]*$" "$TMP/unquoted.yaml"; then
+    pass "the rewrite keeps the pin unquoted"
+else
+    fail "the unquoted pin was not rewritten: $(image_line_of "$TMP/unquoted.yaml")"
+fi
+
+# A pin written by an earlier run against another repository stays readable: OMNIROUTE_IMAGE
+# may name a mirror, and the file that run wrote must not become unreadable input to the next.
+MIRROR="ghcr.io/mirror-org/omniroute"
+cat > "$TMP/mirror.yaml" <<YAML
+services:
+  omniroute:
+    image: '${MIRROR}@${DIGEST_A}'
+YAML
+if OMNIROUTE_COMPOSE="$TMP/mirror.yaml" OMNIROUTE_IMAGE="$MIRROR" FAKE_DIGEST="$DIGEST_B" FAKE_GH_SHA="$SHA_A" "$SCRIPT" 2>"$TMP/mirror.log"; then
+    pass "a mirror pin is updated"
+else
+    fail "a mirror pin could not be updated: $(cat "$TMP/mirror.log")"
+fi
+if grep -qF "image: '${MIRROR}@${DIGEST_B}'" "$TMP/mirror.yaml"; then
+    pass "the mirror pin holds the new digest"
+else
+    fail "the mirror pin was not rewritten: $(image_line_of "$TMP/mirror.yaml")"
+fi
+if OMNIROUTE_COMPOSE="$TMP/mirror.yaml" OMNIROUTE_IMAGE="$MIRROR" FAKE_DIGEST="$DIGEST_B" FAKE_GH_SHA="$SHA_A" "$SCRIPT" --check >/dev/null 2>&1; then
+    pass "--check accepts the mirror pin it just wrote"
+else
+    fail "--check rejects the mirror pin it just wrote"
+fi
+
+# The repository is part of the pin: an equal digest built into another repository is still a
+# different image, so it must be neither reported current nor left in place.
+cat > "$TMP/repository.yaml" <<YAML
+services:
+  omniroute:
+    image: 'ghcr.io/rios0rios0/omniroute@${DIGEST_A}'
+YAML
+if OMNIROUTE_COMPOSE="$TMP/repository.yaml" OMNIROUTE_IMAGE="$MIRROR" FAKE_DIGEST="$DIGEST_A" FAKE_GH_SHA="$SHA_A" "$SCRIPT" --check >/dev/null 2>&1; then
+    fail "--check exits 0 when only the repository differs"
+else
+    pass "--check reports a differing repository with an equal digest"
+fi
+if OMNIROUTE_COMPOSE="$TMP/repository.yaml" OMNIROUTE_IMAGE="$MIRROR" FAKE_DIGEST="$DIGEST_A" FAKE_GH_SHA="$SHA_A" "$SCRIPT" 2>"$TMP/repository.log"; then
+    if grep -qF "image: '${MIRROR}@${DIGEST_A}'" "$TMP/repository.yaml"; then
+        pass "an equal digest in another repository is rewritten"
+    else
+        fail "the repository was not rewritten: $(image_line_of "$TMP/repository.yaml")"
+    fi
+else
+    fail "the repository switch failed: $(cat "$TMP/repository.log")"
+fi
+
+# The value reaches a sed program, so a character it cannot express is refused up front rather
+# than producing a rewrite that matches nothing.
+if OMNIROUTE_IMAGE='ghcr.io/example/omni#route' OMNIROUTE_COMPOSE="$TMP/mirror.yaml" "$SCRIPT" >/dev/null 2>&1; then
+    fail "an image repository with sed metacharacters exits 0"
+else
+    pass "an image repository with sed metacharacters is refused"
 fi
 
 # Failures leave the pin where it was.

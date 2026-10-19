@@ -872,7 +872,10 @@ stack is run from the checkout, and the digest in `compose.yaml` is what decides
 1. **The pin is a digest, never the branch tag.** Every build publishes `:feat-model-quota-api` (moves
    on each push) and `:sha-<full commit>` (immutable). `update-image.sh` asks GitHub for the newest
    successful run, resolves that commit's tag and rewrites only the `omniroute` image line. Pinning
-   the branch tag would let `docker compose pull` change what runs with no commit to name it.
+   the branch tag would let `docker compose pull` change what runs with no commit to name it. The
+   helper reads a pin back with the same matcher it writes with -- repository name, either quoting
+   style -- so a mirror named by `OMNIROUTE_IMAGE` and a pin an earlier run wrote both stay
+   updatable; the rewrite is verified against that matcher before it replaces the file.
 2. **CI builds it, not the checkout.** The image is a Next.js build with a 12 GB heap, 27-55 minutes
    on a hosted runner (`target: runner-base`, `OMNIROUTE_USE_TURBOPACK=0`,
    `OMNIROUTE_BUILD_MEMORY_MB=12288`, `linux/amd64` -- the settings upstream's publish workflow
