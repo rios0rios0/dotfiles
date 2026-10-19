@@ -419,6 +419,14 @@ jobs:
       - name: 'Test the backup script, its retention and the installer gate'
         run: 'make test-omniroute-backup'
 
+  test-omniroute-image:
+    name: 'Test (OmniRoute fork image pin)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Test the image pin updater and its failure paths'
+        run: 'make test-omniroute-image'
+
   test-ocode:
     name: 'Test (ocode fork build)'
     runs-on: 'ubuntu-latest'
