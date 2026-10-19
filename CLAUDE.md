@@ -38,6 +38,7 @@ make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, t
 make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
 make test-omniroute-backup          # the OmniRoute stack's encrypted backups: the snapshot flow, retention, the installer's gate
+make test-omniroute-image           # the custom OmniRoute image pin: the switch from upstream, --check, --tag, and failed lookups leaving the pin untouched
 make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the ~/.bun/bin fallback, the bun installer and its PATH block
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
 ```
@@ -849,6 +850,56 @@ Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NV
 10. **Nothing that grows with the catalog rides on a command line.** The resolved lineup and the settings JSON carry every served model -- 273 KB and 159 KB against the 1352-model catalog of 2026-10-17 -- and Linux refuses to exec a single argument past `MAX_ARG_STRLEN` (32 pages) with `Argument list too long`, before the program runs. The lineup therefore reaches `jq` on stdin (its catalog through `--slurpfile`), and the settings go into `omniroute-settings.json` in the profile, whose path is what `--settings` names. However many models the gateway adds, a launch cannot fail on their size.
 
 `make test-claude-omni` covers 1 to 8, 10 and the capacity hint against stubbed `curl`, `claude`, `systemctl` and `tailscale`; `make test-statusline` covers 9; `make test-chezmoiignore` covers the gate. Removing the feature means `.chezmoiremove` entries for `~/.local/bin/claude-omni` and `~/.local/bin/claude-omni-task` and a `path:` tombstone for `.claude-omni`.
+
+## The OmniRoute Fork Image
+
+The Compose stack in `local-services/omniroute/` runs `ghcr.io/rios0rios0/omniroute`, a build
+of the `feat/model-quota-api` branch of the `rios0rios0/OmniRoute` fork, not the official
+`diegosouzapw/omniroute` image: the gateway needs that branch's model-scoped quota endpoint.
+The fork's own `.github/workflows/publish-ghcr.yml` publishes it on every push to the branch.
+`local-services` is in `.chezmoiignore`, so none of this is deployed by `chezmoi apply` -- the
+stack is run from the checkout, and the digest in `compose.yaml` is what decides what runs.
+
+| Part | Where |
+|------|-------|
+| Image | `ghcr.io/rios0rios0/omniroute`, digest-pinned in `local-services/omniroute/compose.yaml` |
+| Build | the fork's `publish-ghcr.yml`, `runner-base` for `linux/amd64`, on every push to `feat/model-quota-api` |
+| Pin update | `local-services/omniroute/update-image.sh` (requires `gh` and `docker` buildx) |
+| Guide | `.docs/omniroute-local.md`, "The custom fork image" |
+
+**Keep these, each prevents a failure that was observed or measured:**
+
+1. **The pin is a digest, never the branch tag.** Every build publishes `:feat-model-quota-api` (moves
+   on each push) and `:sha-<full commit>` (immutable). `update-image.sh` asks GitHub for the newest
+   successful run, resolves that commit's tag and rewrites only the `omniroute` image line. Pinning
+   the branch tag would let `docker compose pull` change what runs with no commit to name it. The
+   helper reads a pin back with the same matcher it writes with -- repository name, either quoting
+   style -- so a mirror named by `OMNIROUTE_IMAGE` and a pin an earlier run wrote both stay
+   updatable; the rewrite is verified against that matcher before it replaces the file.
+2. **CI builds it, not the checkout.** The image is a Next.js build with a 12 GB heap, 27-55 minutes
+   on a hosted runner (`target: runner-base`, `OMNIROUTE_USE_TURBOPACK=0`,
+   `OMNIROUTE_BUILD_MEMORY_MB=12288`, `linux/amd64` -- the settings upstream's publish workflow
+   validated). The fork checkout is sparse, so `docker build .` from it fails until
+   `git sparse-checkout disable`, and rebuilding on every apply would cost an hour -- the `ocode`
+   pattern covers a binary built in seconds, not an image.
+3. **The Compose project and volume names are load-bearing.** `name: 'dotfiles'` and the
+   `volumes:` block keep `dotfiles_omniroute-data` and `dotfiles_omniroute-redis-data`, so swapping
+   the image reuses the database, provider credentials and Redis state; a renamed project makes
+   Compose create empty volumes instead. That is also why `local-services/omniroute/` does not move.
+4. **`runner-base` means no web-cookie providers.** `gemini-web`, `claude-web` and
+   `claude-turnstile` need the `runner-web` target's Chromium; that target is one line in the fork's
+   workflow. Everything this stack uses (Ollama, NVIDIA NIM, OpenRouter) is in base.
+5. **Migrations are one-way, so a backup comes first.** The fork is based on upstream `v3.8.52`, and
+   its first start migrates the v3.8.51 database. `omniroute-backup` takes a `VACUUM INTO` snapshot
+   encrypted with the backup key; rolling the image reference back restores neither the schema nor
+   the data, so the archive is the rollback.
+6. **The package is public; a private one needs a login.** The fork is public, so GHCR serves the
+   image anonymously. If its visibility changes, `docker login ghcr.io` with `read:packages` must
+   run before `docker compose pull`, or the pull fails while the previous image keeps running.
+
+`make test-omniroute-image` covers 1 and the failures -- the first switch away from the official
+image, `--check` in both directions, `--tag`, a file with no recognised digest, and every failed
+lookup leaving the pin untouched -- against stubbed `gh` and `docker`.
 
 ## OpenCode V2 Through OmniRoute
 

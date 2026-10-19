@@ -46,7 +46,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 ### Development Tools
 
 - **Claude Code**, **Codex CLI** and **GitHub Copilot CLI** (AI coding assistants)
-- **`claude-omni`**: Claude Code through **OmniRoute**, on a GPU's Ollama model or a cloud provider such as NVIDIA NIM or OpenRouter, with each model's window in the picker and the status line; see the [OmniRoute guide](.docs/omniroute-local.md)
+- **`claude-omni`**: Claude Code through **OmniRoute**, on a GPU's Ollama model or a cloud provider such as NVIDIA NIM or OpenRouter, with each model's window in the picker and the status line; the gateway runs a digest-pinned build of the [`rios0rios0/OmniRoute`](https://github.com/rios0rios0/OmniRoute) fork, published to GHCR; see the [OmniRoute guide](.docs/omniroute-local.md)
 - **OpenCode**: the same **OmniRoute** gateway as its primary provider, discovering the models the API key allows from the gateway itself, with the Claude Code permission set, the context7 and Chrome DevTools (Linux) MCP servers and the terminal look; see the [OpenCode guide](.docs/opencode-local.md)
 - **Tailscale**: Windows' client on Windows and its WSL, which reaches it through a `tailscale` wrapper; `tailscaled` on bare-metal Linux, installed and logged in by `chezmoi apply` and rejoined by every interactive zsh; OmniRoute reaches another machine's GPU across it
 - **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm); `sentry-ds` runs it on the work account, from a login store of its own (log in once with `sentry-ds auth login`), which needs CLI `0.47.0` or newer: `chezmoi apply` upgrades an older one
