@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'pinned the local OmniRoute stack to the digest of the `rios0rios0/OmniRoute` fork image published to GHCR on every push to `feat/model-quota-api`, replacing the official upstream image, and added `update-image.sh` to move the pin to the newest successful build'
+time: '2026-10-19T17:42:47.460286169Z'

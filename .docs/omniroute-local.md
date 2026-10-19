@@ -37,7 +37,42 @@ docker compose logs -f omniroute
 
 Open `http://127.0.0.1:20128`. The initial dashboard setup may ask for a bootstrap token; find it in the `omniroute` service logs. Create a dashboard API key for Claude Code after signing in.
 
-The Compose file uses a pinned OmniRoute `v3.8.51` `linux/amd64` image digest. Both services use `restart: always`, so Docker starts them automatically when its daemon starts. All published ports bind to `127.0.0.1`; Redis has no host-published port. `docker compose down` preserves the named data volumes. `docker compose down -v` deletes the database, Redis data, and configured provider credentials.
+The Compose file pins a custom build of the fork (`ghcr.io/rios0rios0/omniroute`) by digest rather than the official image; see [The custom fork image](#the-custom-fork-image). Both services use `restart: always`, so Docker starts them automatically when its daemon starts. All published ports bind to `127.0.0.1`; Redis has no host-published port. `docker compose down` preserves the named data volumes. `docker compose down -v` deletes the database, Redis data, and configured provider credentials.
+
+## The custom fork image
+
+The stack runs `ghcr.io/rios0rios0/omniroute`, built from the `feat/model-quota-api` branch of the [`rios0rios0/OmniRoute`](https://github.com/rios0rios0/OmniRoute) fork, because the gateway needs that branch's model-scoped quota endpoint. The official `diegosouzapw/omniroute` image does not carry it.
+
+The [publish workflow](https://github.com/rios0rios0/OmniRoute/blob/feat/model-quota-api/.github/workflows/publish-ghcr.yml) builds and pushes the image on every push to that branch. It uses the Dockerfile's `runner-base` target for `linux/amd64` -- the same flavour as the official image the stack ran before, without Chromium/Playwright, so the web-cookie providers (`gemini-web`, `claude-web`, `claude-turnstile`) are unavailable. Hosted builds take 27-55 minutes and use `OMNIROUTE_USE_TURBOPACK=0` with a 12 GB heap, the settings upstream's publish workflow validated.
+
+Each build publishes two tags: `:feat-model-quota-api`, which moves with the branch, and `:sha-<full commit>`, which does not. The Compose file pins the **digest**, never the branch tag: a tag cannot name the code a running container holds.
+
+### Update the pin
+
+Push the branch and wait for **Publish custom image to GHCR** to finish. Then, from `local-services/omniroute/`:
+
+```bash
+./update-image.sh
+docker compose pull omniroute
+docker compose up -d omniroute
+```
+
+`update-image.sh` asks GitHub for the newest successful run of the workflow, resolves the digest of that commit's `sha-<commit>` tag, and rewrites the `omniroute` image line in `compose.yaml`; it prints the two commands above. `--check` exits 1 when the pin is not the newest build, `--tag TAG` pins a release tag instead, and `--file PATH` rewrites another Compose file. It needs `gh` authenticated to the fork and `docker` with buildx; a public package resolves anonymously, a private one needs `docker login ghcr.io` first. A failed or unfinished build leaves the previous pin in place.
+
+### Data, migrations and rollback
+
+The Compose project keeps its name (`dotfiles`) and volume names (`omniroute-data`, `omniroute-redis-data`), so switching the image reuses the existing database and provider credentials. The fork is based on upstream `v3.8.52`, whose migrations run on the first start and are one-way: take a backup before recreating the container.
+
+```bash
+omniroute-backup
+docker compose up -d omniroute
+```
+
+Rolling the image reference back is not enough once migrations have run; restore the database and `server.env` from the backup (see [Encrypted backups](#encrypted-backups)). Keep both the previous digest from `git diff` and the archive taken just before the switch.
+
+### Package visibility
+
+The fork repository is public, so the GHCR package is public and Compose pulls it without credentials. If the package is made private, run `docker login ghcr.io` with a token carrying `read:packages` before `docker compose pull`; otherwise the pull fails while the last pulled image keeps running.
 
 ## Connect the GPUs' Ollama
 

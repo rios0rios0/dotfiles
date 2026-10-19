@@ -16,8 +16,10 @@ services:
       retries: 3
 
   omniroute:
-    # Known-good v3.8.51 linux/amd64 release image digest.
-    image: 'ghcr.io/diegosouzapw/omniroute@sha256:77b38c546e1c74add83d73cd2c752342c364c0565fb0cc21eb4792e9c0a5cb79'
+    # The rios0rios0/OmniRoute fork (branch feat/model-quota-api), built by
+    # .github/workflows/publish-ghcr.yml in the fork and pinned by digest. Move the pin with
+    # `./update-image.sh`; see .docs/omniroute-local.md, "The custom fork image".
+    image: 'ghcr.io/rios0rios0/omniroute@sha256:a4fe41cc9b355b26b3a8be0917b1b884aa361f4f4d9f81130d14343aeb0bf811'
     platform: 'linux/amd64'
     restart: 'always'
     stop_grace_period: '40s'
