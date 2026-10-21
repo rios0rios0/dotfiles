@@ -1,0 +1,11 @@
+# Git reads this file only when `core.excludesFile` is unset, and dot_gitconfig.tmpl points that
+# at ~/.gitignore (dot_gitignore), where the global rules live. It exists for ggshield: its
+# pre-commit hook runs git with GIT_CONFIG_GLOBAL and GIT_CONFIG_SYSTEM blanked, so its
+# `git check-ignore .cache_ggshield` never sees that setting and falls back to this path. Without
+# the entry below the hook takes its cache for unignored and appends `.cache_ggshield` to the
+# `.gitignore` of every repository it has flagged once.
+.cache_ggshield
+
+# Claude Code wrote this rule here before chezmoi managed the file; it is kept so a later write of
+# the same rule finds it present. `.claude/` in ~/.gitignore is what ignores the file for git.
+**/.claude/settings.local.json
