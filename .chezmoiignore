@@ -39,6 +39,13 @@ AppData
 .ssh
 {{- end }}
 
+{{- /* ggshield's pre-commit hook is wired on Linux alone (`hooksPath` in dot_gitconfig.tmpl), and
+     .config/git/ignore exists only to answer the `git check-ignore` that hook runs: see the comment
+     at the top of dot_config/git/ignore. */ -}}
+{{- if ne .chezmoi.os "linux" }}
+.config/git/ignore
+{{- end }}
+
 {{- /* Linux features ship systemd user units, each gated on what it serves. .config/systemd
      itself is ignored only when none applies, so that Windows, Android and a machine with no use
      for any of them never get an empty ~/.config/systemd/user. */ -}}

@@ -162,6 +162,13 @@ check_platform "android" \
     --ignore-line ".claude/statusline-command.sh" \
     --include ".codex"
 
+# ggshield's pre-commit hook is wired on Linux alone, and so is the ~/.config/git/ignore that
+# answers its `git check-ignore` (ggshield runs git without the global config, so
+# `core.excludesFile` never reaches it).
+check_platform "linux" --include-line ".config/git/ignore"
+check_platform "$WINDOWS_OS" --ignore-line ".config/git/ignore"
+check_platform "android" --ignore-line ".config/git/ignore"
+
 # WSL vs bare-metal Linux. The SSH agent bridge relays a Windows named pipe, so it must ship
 # on WSL and nowhere else -- on bare metal its unit would point at an npiperelay.exe that is
 # never installed. The only signal separating the two is the kernel release string.
