@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added `top-size [count] [depth: 1-3] [dir]` on Linux and Android, which lists the biggest entries under a directory, largest first: hidden entries are ranked too and the directory''s own total is left out, it stays on the directory''s file system and follows a symlinked directory, and it reads through `sudo` only where `sudo` exists, failing visibly when `sudo` cannot authenticate instead of printing an empty list'
-time: '2026-10-17T20:01:08.502710663Z'

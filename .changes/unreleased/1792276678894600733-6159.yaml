@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the `ocode` fork build skipping with `bun is not on PATH` on a machine whose bun was installed all along: `install_bun` (shared library, called by the Linux installer) now provisions bun into `~/.bun` through `bun.sh/install` run with `SHELL` empty so its shell detection cannot append a PATH line to an rc file chezmoi owns, `dot_zshenv.tmpl` carries the `~/.bun/bin` block, and the builder resolves bun from PATH with a fallback to `~/.bun/bin/bun`, so the first apply after the install builds even before a new shell sees the export'
-time: '2026-10-17T22:37:58.894540659Z'

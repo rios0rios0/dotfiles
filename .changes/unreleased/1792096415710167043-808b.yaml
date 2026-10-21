@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the fresh-machine `aisync` steps: the shared age key is restored from 1Password first and `aisync --use-system-git init rios0rios0` clones the existing `aifiles` repo, where a bare `aisync init` created a new key and an empty, disconnected repo'
-time: '2026-10-15T20:33:35.710026915Z'

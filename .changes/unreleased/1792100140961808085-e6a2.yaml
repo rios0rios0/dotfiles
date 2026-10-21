@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the Default row of `/model` in a Claude Code session on a non-Anthropic model, which switched to the model''s `[1m]` variant and sized its context window at 1,000,000 tokens, past the point where the server truncates the prompt'
-time: '2026-10-15T21:35:40.961700061Z'

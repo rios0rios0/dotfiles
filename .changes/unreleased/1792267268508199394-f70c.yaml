@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added `sentry-ds`, which runs the Sentry CLI on the work account from a login store of its own (`SENTRY_CONFIG_DIR`, beside the default store), drops any exported Sentry token so that a missing work login never falls back to another account, and completes org and project slugs from that store'
-time: '2026-10-17T20:01:08.508144511Z'

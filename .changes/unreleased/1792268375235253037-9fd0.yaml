@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added `make test-sentry-setup`, covering the Sentry CLI version floor on both platforms: the version comparison, a CLI at the floor left alone, an older one upgraded before the setup, a failed upgrade and one that leaves the CLI on PATH older both failing the script, a CLI that reports no version, no CLI at all, and the Linux script finding the CLI under NVM'
-time: '2026-10-17T20:19:35.235194785Z'

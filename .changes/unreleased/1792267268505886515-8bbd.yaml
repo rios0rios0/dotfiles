@@ -1,4 +1,0 @@
-kind: 'Removed'
-body: 'removed the `top5size` alias, which `top-size` replaces: with no arguments, `top-size` lists the five biggest entries of the current directory, hidden ones included'
-breaking: true
-time: '2026-10-17T20:01:08.505815201Z'

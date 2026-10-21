@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'changed `claude-omni` to fetch its model lineup from OmniRoute''s `/v1/models` on every launch instead of a hand-curated `models` list committed in `.chezmoidata/omniroute.yaml`: it keeps every chat model that can call tools, leads with each GPU''s model, and follows models added, hidden or restricted in OmniRoute''s dashboard, leaving `efforts` as the one per-model setting the repository holds'
-time: '2026-10-17T22:41:24.165725529Z'

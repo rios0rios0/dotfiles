@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added `run_onchange_after_linux-012-setup-claude-lsp.sh`, which gives Claude Code code intelligence on every Linux machine: it installs pinned `gopls` (into `~/.local/bin`, so a Go upgrade cannot drop it from `PATH`), `typescript-language-server` with `typescript` `6.0.3` (TypeScript 7 ships no tsserver) and `pyright`, then installs the official `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins at user scope, since enabling a plugin in `settings.json` does not install it; `make test-claude-lsp` covers the pins, the order, the regular profile and the first apply''s bash'
-time: '2026-10-15T02:44:29.762552446Z'

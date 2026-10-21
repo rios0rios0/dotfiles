@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added the Context7 MCP server on every platform, through its remote HTTP endpoint with the key in an `Authorization` header that Claude Code fills from `CONTEXT7_API_KEY` (a `cred:CONTEXT7_API_KEY` field on the device note), and the Chrome DevTools MCP server on Linux, pinned to `chrome-devtools-mcp@1.10.1` and run headless with a throwaway profile per session, redacted network headers, and Google''s usage statistics, CrUX lookups and update checks turned off'
-time: '2026-10-15T02:05:20.678149632Z'

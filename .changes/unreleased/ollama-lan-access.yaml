@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'added per-device OmniRoute GPU routing so the laptop (`alien-a51`) maps `ollama-laptop` as local and `ollama` as tailnet, while the desktop (`mxhero-z790`) swaps those roles; Ollama binds to all interfaces so Tailscale Serve can expose it for remote access, while Docker Desktop reaches the local instance through `host.docker.internal`'
-time: '2026-10-15T19:00:00Z'
