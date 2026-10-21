@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the `ocode` fork build failing with `Text file busy` on a machine running `ocode`: the builder now finds the processes executing `~/.local/bin/ocode` (through `/proc/<pid>/exe`, so one started from another path is left alone), asks whether to kill them before the minutes-long build, skips with exit 0 when declined or unattended so the next apply retries, and installs through a temporary name and a rename so an `ocode` started mid-build cannot fail it either'
-time: '2026-10-17T23:21:53.217132327Z'

@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the Linux Claude Code LSP installer using NVM''s default Node even when another `npm` is already on `PATH`, failing when NVM cannot select the default, and verifying `gopls`, `typescript-language-server`, and `pyright-langserver` resolve before installing their plugins; regression tests cover package-manager successes without binaries'
-time: '2026-10-15T04:54:49.768896124Z'

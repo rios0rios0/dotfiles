@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: "documented OmniRoute's Docker Desktop route to WSL-hosted Ollama and retained the tailnet access path"
-time: '2026-10-15T04:53:22.301177946Z'

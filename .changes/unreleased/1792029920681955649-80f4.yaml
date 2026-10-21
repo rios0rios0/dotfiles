@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added `run_onchange_after_linux-011-setup-chrome.sh`, which installs Google Chrome on every Linux machine from Google''s apt repository for the Chrome DevTools MCP server, trusting the signing key, fetched over HTTPS only, for that repository only and only once its primary key proves to be Google''s, rather than Kali''s `chromium`, which trailed the stable channel by five releases'
-time: '2026-10-15T02:05:20.681837508Z'

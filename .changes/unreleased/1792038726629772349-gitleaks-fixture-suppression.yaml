@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'suppressed the working-tree Gitleaks false positive for the non-secret SSH CI fixture'
-time: '2026-10-15T04:32:06Z'

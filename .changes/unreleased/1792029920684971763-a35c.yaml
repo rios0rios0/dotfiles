@@ -1,3 +1,0 @@
-kind: 'Removed'
-body: 'removed the GitHub, Azure DevOps, SonarQube and Kubernetes MCP servers in favour of their CLIs: the next `chezmoi apply` deletes them from `~/.claude.json`, and the GitHub one from mcp-hub''s `servers.json` on Android, through a per-platform list of retired servers, since the merge otherwise leaves servers it no longer manages in place; it also takes the `mcp__github__*` permission rule out of `~/.claude/settings.json` on Windows and Android'
-time: '2026-10-15T02:05:20.684880812Z'

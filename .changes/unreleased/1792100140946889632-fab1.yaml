@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'raised the time OmniRoute waits for a provider to start answering before retrying to two minutes, so a request NVIDIA NIM is still queueing is waited for once instead of being aborted at 30 seconds and queued again, which doubled the wait to over a minute'
-time: '2026-10-15T21:35:40.946827939Z'

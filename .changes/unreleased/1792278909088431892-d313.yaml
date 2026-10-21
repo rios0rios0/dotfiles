@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the `ocode` fork build being refused by the OpenCode free tier: `run_after_linux-006-build-ocode.sh` now builds it as a release-grade client on the fork channel (`OPENCODE_CHANNEL=feat-provider-omniroute`, `OPENCODE_VERSION=2.0.<%y%m%d%H%M>`), because the Console reads the client version from the User-Agent and refuses the free tier below 1.18.0, which the branch build preview version (`0.0.0-<branch>-<time>`) was; the build stamp also makes each rebuild replace the background service on the next launch'
-time: '2026-10-17T23:15:09.088371889Z'

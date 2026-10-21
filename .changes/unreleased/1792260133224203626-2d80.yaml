@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'aligned the managed `~/.config/opencode/cli.json` look with the live TUI preference: `thinking: hide` and the low session verbosity, so the next `chezmoi apply` no longer reverts the hand-picked look'
-time: '2026-10-17T17:15:00.000000000Z'

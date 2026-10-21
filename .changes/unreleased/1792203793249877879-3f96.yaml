@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'the local OmniRoute stack now gets a daily encrypted backup: `omniroute-backup` takes a consistent `VACUUM INTO` snapshot of the gateway database inside its container, packs it with the bootstrap `server.env`, age-encrypts the tar with a key of its own (`~/.ssh/omniroute-backup-key`), rotates `~/.local/share/omniroute-backups`, and a systemd user timer runs it daily on WSL; the OmniRoute guide documents the restore and the copy of the key to keep'
-time: '2026-10-17T02:23:13.253396426Z'

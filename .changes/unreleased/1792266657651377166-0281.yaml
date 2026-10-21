@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'documented where the OpenCode Claude-compat skill filter stands: upstream''s restore of `OPENCODE_DISABLE_CLAUDE_CODE` was closed unmerged (sst/opencode#51888), the gate lives on the personal opencode fork branch `feat/provider-omniroute` (rios0rios0/opencode), and the local `no-claude-skills` plugin stays the stopgap until a fork build runs on the machine'
-time: '2026-10-17T19:05:00.000000000Z'

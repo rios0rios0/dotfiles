@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'moved the OmniRoute Compose stack and environment template into `local-services/omniroute/` while preserving its existing Docker project and data volumes'
-time: '2026-10-15T04:25:06Z'

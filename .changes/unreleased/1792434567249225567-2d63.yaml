@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'pinned the OmniRoute stack to the digest of the manually dispatched fork build and documented the fork''s disabled inherited workflows'
-time: '2026-10-19T18:29:27.249139946Z'

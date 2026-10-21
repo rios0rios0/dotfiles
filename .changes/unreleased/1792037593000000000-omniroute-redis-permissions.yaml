@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed Redis snapshot failures by letting the image repair data volume ownership and drop privileges before starting the server'
-time: '2026-10-15T04:13:13Z'

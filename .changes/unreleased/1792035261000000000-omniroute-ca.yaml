@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added configurable CA bundle trust for OmniRoute outbound HTTPS requests'
-time: '2026-10-15T03:34:21Z'

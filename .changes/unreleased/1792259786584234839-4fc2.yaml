@@ -1,3 +1,0 @@
-kind: 'Removed'
-body: 'removed `dot_claude/CLAUDE.md` and `dot_config/opencode/AGENTS.md`, the last AI-rule files chezmoi shipped: the per-machine environment-reality guide (WSL facts, the interactive `cp`/`rm`/`mv` guards, quoting rules) and the portable rules, agents, commands and skills now live in `~/.claude`, `~/.codex` and `~/.config/opencode` and are synced by aisync, whose `opencode` tool is enabled with an allowlist that excludes chezmoi''s `opencode.json` and `cli.json`'
-time: '2026-10-17T16:57:00.000000000Z'

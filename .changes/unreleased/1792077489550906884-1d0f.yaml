@@ -1,3 +1,0 @@
-kind: 'Removed'
-body: 'removed Tailscale''s Linux client from WSL machines that had it, because a client inside WSL beside the Windows one breaks WSL''s tailnet traffic, and dropped the per-shell `tailscale-up --no-login` hook on WSL, where Windows'' client rejoins by itself'
-time: '2026-10-15T15:18:09.550851173Z'

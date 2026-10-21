@@ -1,4 +1,0 @@
-kind: 'Removed'
-body: 'removed `claude-local` and `claude-remote`, which `claude-omni` replaces: the next apply deletes their commands and `claude-local-task`, and moves `~/.claude-local` to `~/.claude-omni` once, transcripts and audits included'
-breaking: true
-time: '2026-10-15T21:35:40.938251921Z'

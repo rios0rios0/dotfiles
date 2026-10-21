@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'changed `claude-local-task` into `claude-omni-task`, which takes the first free and serving GPU in `taskGpus`, under a lock per GPU, or a model named with `-m`, and records in its audit which cloud provider received the files a cloud model read'
-time: '2026-10-15T21:35:40.944387118Z'
