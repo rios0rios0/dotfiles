@@ -3,9 +3,12 @@ set -euo pipefail
 
 # Tests the ocode fork-builder and the bun provisioning it depends on, without bun, git, the
 # network or a real fork checkout: `git` and `bun` are stubs, the checkout is a fake directory
-# whose `.git` exists, the build fabricates the artifact the fork's build would emit, and
-# `install_bun` is sourced from the shared dependency library against a `curl` stub that
-# fabricates the upstream installer. Covers the skip paths (no checkout, no bun), the first
+# whose `.git` holds a head, a branch and refs, the build fabricates the artifact the fork's
+# build would emit, and `install_bun` is sourced from the shared dependency library against a
+# `curl` stub that fabricates the upstream installer. Covers the checkout the builder obtains
+# itself (the clone onto the fork's branch with the fork/upstream remote layout, the branch
+# switch, the branch created from the fork's remote-tracking one, the checkout holding no fork
+# branch, a directory that is not a checkout, a failed clone), the skip without bun, the first
 # build (including the fork channel and release-grade version it must carry), the no-op
 # rebuild, the rebuild on a new head, the rebuild that restores a missing binary, the prompt
 # for a running ocode with no answer, a decline and an acceptance -- none of which may skip the
@@ -38,15 +41,81 @@ STUB="$TMP/stub"
 BUN_STUB="$TMP/bun-stub"
 mkdir -p "$STUB" "$BUN_STUB" "$CHECKOUT/.git"
 
-# git stub: HEAD comes from the checkout's .git/HEAD file; log echoes a fake subject.
+# git stub: a fake checkout under .git -- HEAD holds the sha, HEAD_REF the branch, refs/ the
+# branches and the remote-tracking ones, remotes/ the remote URLs -- so the clone, the branch
+# switch and the remote layout are all assertable. Every invocation is recorded in $GIT_CALLS.
+# CLONE_FAIL makes the clone fail the way a machine without the network does.
 cat >"$STUB/git" <<'STUB'
 #!/bin/bash
-case "$*" in
-    *"rev-parse"*) cat "${CHECKOUT:?}/.git/HEAD" ;;
-    *"log"*) echo "fake0123 chore: fake fork commit" ;;
+echo "$*" >>"${GIT_CALLS:?}"
+if [ "$1" = "-C" ]; then
+    dir="$2"
+    shift 2
+else
+    dir="$PWD"
+fi
+sub="$1"
+shift
+case "$sub" in
+    rev-parse)
+        case "$*" in
+            "HEAD") cat "$dir/.git/HEAD" ;;
+            "--abbrev-ref HEAD") cat "$dir/.git/HEAD_REF" ;;
+            --verify*)
+                for arg in "$@"; do ref="$arg"; done
+                [ -e "$dir/.git/$ref" ]
+                ;;
+            *) echo "stub git: unexpected rev-parse: $*" >&2; exit 1 ;;
+        esac
+        ;;
+    log) echo "fake0123 chore: fake fork commit" ;;
+    clone)
+        [[ -z "${CLONE_FAIL:-}" ]] || exit 128
+        remote=""; branch=""
+        while [ $# -gt 0 ]; do
+            case "$1" in
+                --origin) remote="$2"; shift 2 ;;
+                --branch) branch="$2"; shift 2 ;;
+                *) url="$1"; target="$1"; shift ;;
+            esac
+        done
+        mkdir -p "$target/.git" "$target/.git/remotes"
+        printf '%s\n' "$branch" >"$target/.git/HEAD_REF"
+        printf 'fake0001\n' >"$target/.git/HEAD"
+        mkdir -p "$(dirname "$target/.git/refs/heads/$branch")" "$(dirname "$target/.git/refs/remotes/$remote/$branch")"
+        : >"$target/.git/refs/heads/$branch"
+        : >"$target/.git/refs/remotes/$remote/$branch"
+        printf '%s\n' "$url" >"$target/.git/remotes/$remote"
+        ;;
+    remote)
+        case "$1" in
+            get-url)
+                [ -f "$dir/.git/remotes/$2" ] || exit 2
+                cat "$dir/.git/remotes/$2"
+                ;;
+            add)
+                mkdir -p "$dir/.git/remotes"
+                printf '%s\n' "$3" >"$dir/.git/remotes/$2"
+                ;;
+            *) echo "stub git: unexpected remote: $*" >&2; exit 1 ;;
+        esac
+        ;;
+    checkout)
+        if [ "$1" = "-b" ]; then
+            branch="$2"
+            mkdir -p "$(dirname "$dir/.git/refs/heads/$branch")"
+            : >"$dir/.git/refs/heads/$branch"
+        else
+            branch="$1"
+            [ -e "$dir/.git/refs/heads/$branch" ] || exit 1
+        fi
+        printf '%s\n' "$branch" >"$dir/.git/HEAD_REF"
+        ;;
     *) echo "stub git: unexpected args: $*" >&2; exit 1 ;;
 esac
 STUB
+export GIT_CALLS="$TMP/git-calls"
+: >"$GIT_CALLS"
 
 # bun stub: records every invocation and the build identity it was given, and fabricates the
 # artifact under --outdir. With BUN_STUB_RACE set it also starts the installed binary mid-build,
@@ -83,36 +152,105 @@ run_script() { (cd "$TMP" && PATH="$BUN_STUB:$STUB:$PATH" bash "$SCRIPT" <"${1:-
 rc() { cat "$TMP/rc"; }
 calls() { wc -l <"$BUN_CALLS"; }
 
-# 1) No checkout: skip, no binary, no marker, and the message says why.
+# 1) No checkout: the fork is cloned onto its branch, the remotes are named the way the
+#    hand-made checkouts on this machine have them (`fork` for rios0rios0, `origin` for sst
+#    upstream), and the build then runs -- a fresh machine ends the apply with ocode installed
+#    *and* the checkout ready to edit. The build carries a release-grade version on the fork's
+#    channel, because the Console's free tier refuses client versions below 1.18.0 and a bare
+#    branch build's preview version falls below it.
 rm -rf "$CHECKOUT"
 run_script
-[ "$(rc)" -eq 0 ] || fail "skip without checkout must exit 0"
-[ ! -e "$HOME/.local/bin/ocode" ] || fail "skip must not install a binary"
-grep -q "no fork checkout" "$TMP/out" || fail "skip must say why"
-pass "no checkout skips"
-
-# 2) First build installs an executable ocode, records the head, and builds as a release-grade
-#    client on the fork's channel -- the Console's free tier refuses client versions below
-#    1.18.0, which a bare branch build's preview version would be.
-mkdir -p "$CHECKOUT/.git"
-printf 'fake0123\n' >"$CHECKOUT/.git/HEAD"
-run_script
-[ "$(rc)" -eq 0 ] || fail "first build must exit 0"
-[ -x "$HOME/.local/bin/ocode" ] || fail "first build must install an executable ocode"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake0123" ] || fail "marker must hold the built head"
-[ "$(calls)" -eq 1 ] || fail "first build must invoke bun once"
+[ "$(rc)" -eq 0 ] || fail "the clone must exit 0"
+grep -qF "clone --origin fork --branch feat/provider-omniroute https://github.com/rios0rios0/opencode.git $CHECKOUT" "$GIT_CALLS" ||
+    fail "a missing checkout must be cloned from the fork on its branch"
+[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "feat/provider-omniroute" ] || fail "the clone must land on the fork's branch"
+[ "$(cat "$CHECKOUT/.git/remotes/origin")" = "https://github.com/sst/opencode.git" ] ||
+    fail "the clone must get sst upstream as origin"
+[ -x "$HOME/.local/bin/ocode" ] || fail "the build after the clone must install an executable ocode"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake0001" ] || fail "marker must hold the built head"
+[ "$(calls)" -eq 1 ] || fail "the first build must invoke bun once"
 identity="$(tail -n 1 "$BUN_ENV")"
 [ "${identity%%/*}" = "feat-provider-omniroute" ] || fail "the build must carry the fork's channel: $identity"
 [[ "${identity##*/}" =~ ^2\.0\.[0-9]+$ ]] || fail "the build must carry a release-grade version, not a preview one: $identity"
-pass "first build installs ocode, records the head, and carries the fork's channel and a release-grade version"
+pass "a missing checkout is cloned onto the fork's branch with the fork/upstream remotes, then built"
 
-# 3) Unchanged head: no rebuild.
+# 2) A checkout left on another branch is switched to the fork's: the channel below is stamped
+#    onto whatever HEAD holds, so building `main` would label a binary as the fork and carry
+#    none of its code. The head is unchanged, so nothing is rebuilt.
+printf 'main\n' >"$CHECKOUT/.git/HEAD_REF"
+before="$(calls)"
+: >"$GIT_CALLS"
+run_script
+[ "$(rc)" -eq 0 ] || fail "a branch switch must exit 0"
+grep -q "checkout is on main, switching to feat/provider-omniroute" "$TMP/out" || fail "the switch must say which branch it came from"
+[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "feat/provider-omniroute" ] || fail "the checkout must end on the fork's branch"
+[ "$(calls)" -eq "$before" ] || fail "an unchanged head must not rebuild after a branch switch"
+pass "a checkout on another branch is switched to the fork's without rebuilding"
+
+# 3) The branch is missing locally but the fork's remote-tracking one is there: it is created
+#    from that, so a clone made by hand with another branch checked out still lands on the fork.
+rm -f "$CHECKOUT/.git/refs/heads/feat/provider-omniroute"
+printf 'main\n' >"$CHECKOUT/.git/HEAD_REF"
+: >"$GIT_CALLS"
+run_script
+[ "$(rc)" -eq 0 ] || fail "tracking the fork's branch must exit 0"
+grep -qF "checkout -b feat/provider-omniroute --track fork/feat/provider-omniroute" "$GIT_CALLS" ||
+    fail "a missing local branch must be created from fork/<branch>"
+[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "feat/provider-omniroute" ] || fail "the tracked branch must be checked out"
+pass "a missing local branch is created from the fork's remote-tracking one"
+
+# 4) Neither the branch nor the fork's remote one exists: the checkout is left alone and
+#    nothing is built, rather than building whatever branch it happens to be on.
+rm -rf "$CHECKOUT/.git/refs/heads/feat/provider-omniroute" "$CHECKOUT/.git/refs/remotes"
+printf 'main\n' >"$CHECKOUT/.git/HEAD_REF"
+rm -f "$HOME/.local/bin/ocode"
+before="$(calls)"
+run_script
+[ "$(rc)" -eq 0 ] || fail "a checkout without the fork's branch must skip"
+grep -q "has no feat/provider-omniroute branch" "$TMP/out" || fail "the missing branch must be reported"
+[ "$(calls)" -eq "$before" ] || fail "a checkout without the fork's branch must not build"
+[ ! -e "$HOME/.local/bin/ocode" ] || fail "a checkout without the fork's branch must not install a binary"
+pass "a checkout with no fork branch warns and builds nothing"
+
+# 5) A directory that is not a checkout is not cloned into: it may hold somebody's work, and a
+#    clone would either fail on it or, worse, be mistaken for done.
+rm -rf "$CHECKOUT"
+mkdir -p "$CHECKOUT"
+before="$(wc -l <"$GIT_CALLS")"
+run_script
+[ "$(rc)" -eq 0 ] || fail "a non-checkout directory must skip"
+grep -q "exists but is not a git checkout" "$TMP/out" || fail "a non-checkout directory must say why it is left alone"
+[ "$(wc -l <"$GIT_CALLS")" -eq "$before" ] || fail "a non-checkout directory must not be cloned into"
+pass "a directory that is not a checkout is left alone"
+
+# 6) A clone that fails -- no network, for instance -- is a warning, not a failed apply: there
+#    is simply nothing to build yet, and the next apply tries again.
+rm -rf "$CHECKOUT"
+export CLONE_FAIL=1
+run_script
+unset CLONE_FAIL
+[ "$(rc)" -eq 0 ] || fail "a failed clone must not fail the apply"
+grep -q "WARN: failed to clone" "$TMP/out" || fail "a failed clone must say what failed"
+[ ! -e "$HOME/.local/bin/ocode" ] || fail "a failed clone must not install a binary"
+pass "a failed clone warns and skips"
+
+# Restore the checkout the remaining cases build from: the head test 1 built, on the fork's
+# branch, with the binary that the marker now matches.
+rm -rf "$CHECKOUT"
+mkdir -p "$CHECKOUT/.git/refs/heads/feat" "$CHECKOUT/.git/refs/remotes/fork/feat"
+printf 'fake0001\n' >"$CHECKOUT/.git/HEAD"
+printf 'feat/provider-omniroute\n' >"$CHECKOUT/.git/HEAD_REF"
+: >"$CHECKOUT/.git/refs/heads/feat/provider-omniroute"
+: >"$CHECKOUT/.git/refs/remotes/fork/feat/provider-omniroute"
+printf '#!/bin/bash\necho fake ocode\n' >"$HOME/.local/bin/ocode"
+chmod +x "$HOME/.local/bin/ocode"
+# 7) Unchanged head: no rebuild.
 run_script
 [ "$(rc)" -eq 0 ] || fail "unchanged apply must exit 0"
 [ "$(calls)" -eq 1 ] || fail "unchanged head must not rebuild"
 pass "unchanged head does not rebuild"
 
-# 4) New head: rebuild and move the marker.
+# 8) New head: rebuild and move the marker.
 printf 'fake4567\n' >"$CHECKOUT/.git/HEAD"
 run_script
 [ "$(rc)" -eq 0 ] || fail "rebuild must exit 0"
@@ -120,14 +258,14 @@ run_script
 [ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake4567" ] || fail "marker must move with the head"
 pass "new head rebuilds"
 
-# 5) Binary deleted but head unchanged: the rebuild restores it.
+# 9) Binary deleted but head unchanged: the rebuild restores it.
 rm -f "$HOME/.local/bin/ocode"
 run_script
 [ "$(rc)" -eq 0 ] || fail "missing binary must rebuild"
 [ -x "$HOME/.local/bin/ocode" ] || fail "missing binary must be reinstalled"
 pass "missing binary is reinstalled"
 
-# 6) bun off PATH but at ~/.bun/bin: the build runs anyway. This is the first apply after
+# 10) bun off PATH but at ~/.bun/bin: the build runs anyway. This is the first apply after
 #    `install_bun`, whose PATH export only reaches shells started after it.
 mkdir -p "$HOME/.bun/bin"
 cp "$BUN_STUB/bun" "$HOME/.bun/bin/bun"
@@ -139,7 +277,7 @@ echo $? >"$TMP/rc"
 [ -x "$HOME/.local/bin/ocode" ] || fail "the ~/.bun/bin fallback must install the binary"
 pass "bun at ~/.bun/bin is used when PATH has none"
 
-# 7) No bun anywhere: skip, and the message names both places that were looked at. The
+# 11) No bun anywhere: skip, and the message names both places that were looked at. The
 #    restricted PATH keeps any real bun out of the picture.
 rm -rf "$HOME/.bun"
 (cd "$TMP" && PATH="$STUB" /bin/bash "$SCRIPT") >"$TMP/out" 2>&1
@@ -194,7 +332,7 @@ run_install_bun() {
 }
 curl_calls() { wc -l <"$CURL_CALLS"; }
 
-# 8) An existing ~/.bun/bin/bun is a skip: nothing is downloaded.
+# 12) An existing ~/.bun/bin/bun is a skip: nothing is downloaded.
 mkdir -p "$HOME/.bun/bin"
 cp "$BUN_STUB/bun" "$HOME/.bun/bin/bun"
 run_install_bun
@@ -203,7 +341,7 @@ run_install_bun
 grep -q "bun is already installed, skipping" "$TMP/out" || fail "the installed skip must say why"
 pass "an installed bun is skipped"
 
-# 9) A machine without bun fetches the upstream installer and runs it with SHELL empty and no
+# 13) A machine without bun fetches the upstream installer and runs it with SHELL empty and no
 #    arguments -- with a shell named, the installer would edit that shell's rc file, which
 #    chezmoi owns and rewrites.
 rm -rf "$HOME/.bun"
@@ -214,7 +352,7 @@ grep -q 'https://bun.sh/install' "$CURL_CALLS" || fail "the install must fetch t
 [ "$(sed -n '2p' "$INSTALLER_CALLS")" = "args=" ] || fail "the installer must be run without arguments: $(sed -n '2p' "$INSTALLER_CALLS")"
 pass "the upstream installer runs with SHELL empty"
 
-# 10) A failed download fails the install, so `verify` retries it on the next apply.
+# 14) A failed download fails the install, so `verify` retries it on the next apply.
 rm -rf "$HOME/.bun"
 export CURL_FAIL=1
 run_install_bun
@@ -223,7 +361,7 @@ unset CURL_FAIL
 grep -q "failed to download the bun installer" "$TMP/out" || fail "a failed download must say what failed"
 pass "a failed download fails the install"
 
-# 11) A failed installer fails the install the same way.
+# 15) A failed installer fails the install the same way.
 rm -rf "$HOME/.bun"
 export INSTALLER_FAIL=7
 run_install_bun
@@ -232,7 +370,7 @@ unset INSTALLER_FAIL
 grep -q "exited with status 7" "$TMP/out" || fail "a failed installer must report its status"
 pass "a failed installer fails the install"
 
-# 12) The Linux dependency installer verifies install_bun; the Android one installs nothing.
+# 16) The Linux dependency installer verifies install_bun; the Android one installs nothing.
 if grep -q '^verify install_bun$' "$LINUX_INSTALLER"; then
     pass "the Linux installer verifies install_bun"
 else
@@ -244,7 +382,7 @@ else
     pass "the Android installer installs nothing"
 fi
 
-# 13) The ZSHENV template carries the ~/.bun/bin PATH block on Linux and macOS (the same
+# 17) The ZSHENV template carries the ~/.bun/bin PATH block on Linux and macOS (the same
 #     non-Android branch as flyctl and opencode) and none on Android.
 chmod +x "$CI_DIR/fixtures/mock-op.sh" 2>/dev/null || true
 cat >"$TMP/chezmoi.yaml" <<EOF
@@ -281,7 +419,7 @@ else
     fi
 fi
 
-# 14) A running ocode executes the installed binary, so the prompt appears; with nothing on stdin
+# 18) A running ocode executes the installed binary, so the prompt appears; with nothing on stdin
 #     to answer it (an unattended apply), the session is left alone and the build runs anyway --
 #     the staged rename replaces the file under a running process without disturbing it.
 printf 'fake7890\n' >"$CHECKOUT/.git/HEAD"
@@ -301,7 +439,7 @@ kill "$unanswered_pid" 2>/dev/null || true
 wait "$unanswered_pid" 2>/dev/null || true
 pass "a running ocode is asked about, and an unanswered prompt builds anyway without touching it"
 
-# 15) The same situation answered no: the session is still left alone and the build still runs.
+# 19) The same situation answered no: the session is still left alone and the build still runs.
 printf 'fakeabcd\n' >"$CHECKOUT/.git/HEAD"
 cp /bin/sleep "$HOME/.local/bin/ocode"
 "$HOME/.local/bin/ocode" 300 &
@@ -319,7 +457,7 @@ kill "$declined_pid" 2>/dev/null || true
 wait "$declined_pid" 2>/dev/null || true
 pass "a running ocode survives a decline, and the build proceeds"
 
-# 16) Answered yes: the process is killed first, and then the build runs.
+# 20) Answered yes: the process is killed first, and then the build runs.
 printf 'fakefade\n' >"$CHECKOUT/.git/HEAD"
 cp /bin/sleep "$HOME/.local/bin/ocode"
 "$HOME/.local/bin/ocode" 300 &
@@ -338,7 +476,7 @@ if kill -0 "$accepted_pid" 2>/dev/null; then
 fi
 pass "a running ocode is killed when the prompt is accepted, and the build proceeds"
 
-# 17) An unchanged head needs no build, so a running ocode is not asked about at all.
+# 21) An unchanged head needs no build, so a running ocode is not asked about at all.
 cp /bin/sleep "$HOME/.local/bin/ocode"
 "$HOME/.local/bin/ocode" 300 &
 unchanged_pid=$!
@@ -354,7 +492,7 @@ kill "$unchanged_pid" 2>/dev/null || true
 wait "$unchanged_pid" 2>/dev/null || true
 pass "a running ocode is not prompted about when the head is unchanged"
 
-# 18) One started *while* the build runs (the stub starts it mid-build) must not fail the install:
+# 22) One started *while* the build runs (the stub starts it mid-build) must not fail the install:
 #     a direct cp onto it would die with "Text file busy", the staged rename replaces it.
 printf 'fake9999\n' >"$CHECKOUT/.git/HEAD"
 export BUN_STUB_RACE=1 BUN_RACE_PID="$TMP/race-pid"
