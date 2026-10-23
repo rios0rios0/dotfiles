@@ -929,16 +929,24 @@ OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencod
 `ocode` is the personal fork's build of OpenCode, carrying the custom features the official binary
 lacks: the OmniRoute provider plugin and the `OPENCODE_DISABLE_CLAUDE_CODE` gate, both on branch
 `feat/provider-omniroute` of `rios0rios0/opencode`. `run_after_linux-006-build-ocode.sh` keeps it
-current: when the checkout at `~/Development/github.com/opencode/opencode` exists, it runs the
-fork's own single-platform build whenever the checkout's HEAD moved past the last one, and
+current, checkout included: a missing one at `~/Development/github.com/opencode/opencode` is cloned
+from the fork straight onto that branch (with the fork named `fork` and sst upstream named
+`origin`, as the hand-made checkouts on these machines have them), and an existing one sitting on
+another branch is switched to it. The branch is not optional bookkeeping -- the build stamps the
+channel onto whatever HEAD holds, so a checkout left on `main` would produce a binary labelled as
+the fork and carrying none of its code. It then runs the fork's own single-platform build whenever
+the checkout's HEAD moved past the last one, and
 installs the result as `~/.local/bin/ocode`. The build pins the channel and version the Console
 reads from the User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a build-stamped
 `OPENCODE_VERSION` (`2.0.<%y%m%d%H%M>`) -- because the free tier refuses client versions below
 1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview version is; the stamp also
 makes each rebuild replace the background service on the next launch. The marker
 `~/.cache/ocode-built-commit` makes an unchanged apply a no-op, which is why this is a `run_after`
-script that runs on every apply; `OCODE_SOURCE` names another checkout. No checkout and no `bun`
-are skips, never failures -- a failed build is an error, retried by the next apply.
+script that runs on every apply; `OCODE_SOURCE` names another checkout. No `bun`, a failed clone,
+a directory at the checkout's path that is not a checkout, and a checkout holding neither the
+branch nor the fork's remote-tracking one are skips, never failures -- the last two because an
+apply with no network must still finish, and the third because that directory may hold somebody's
+work. A failed build is an error, retried by the next apply.
 
 A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, the file
 the build replaces. The builder looks for the processes executing **that file** (through
@@ -959,8 +967,11 @@ rewrites -- so `install_bun` runs it with `SHELL` empty, which falls through to 
 manual instruction, and `dot_zshenv.tmpl` carries the `~/.bun/bin` PATH block. The builder
 resolves bun from PATH and falls back to `~/.bun/bin/bun`, so the first apply after the install
 builds even though the running shell's PATH predates the export; only when neither answers is
-the build skipped. `make test-ocode` covers the skip paths, the first build (including the
-channel and release-grade version it carries), the no-op and the rebuilds against stubbed
+the build skipped. `make test-ocode` covers the checkout the builder obtains itself (the clone
+onto the fork's branch and the remote layout it leaves, the branch switch, the branch created
+from the fork's remote-tracking one, a checkout holding no fork branch, a directory that is not
+a checkout, and a failed clone that only warns), the skip without bun, the first build (including
+the channel and release-grade version it carries), the no-op and the rebuilds against stubbed
 `git` and `bun`, the running-`ocode` prompt with no answer, a decline and an acceptance, the
 process started mid-build, and the installer's skip, its `SHELL`-empty call, both failures, the
 Linux wiring and the PATH block per platform.

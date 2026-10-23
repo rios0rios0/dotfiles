@@ -9,9 +9,13 @@ set -euo pipefail
 # command): the Console refuses the free tier for client versions below 1.18.0, and a bare
 # branch build's `0.0.0-<branch>-<time>` preview version falls below it.
 #
-# Without the checkout this script skips: cloning is left to the user
-# (git clone https://github.com/rios0rios0/opencode.git into
-# ~/Development/github.com/opencode/opencode). Set OCODE_SOURCE to name another checkout.
+# The checkout is the script's to obtain, and it never builds the wrong branch: a missing one is
+# cloned from the fork and left on `feat/provider-omniroute`, and an existing one sitting on
+# another branch is switched to it -- the channel below is stamped whatever HEAD happens to hold,
+# so a checkout left on `main` would otherwise produce a binary labelled as the fork. A directory
+# that exists without being a checkout is not cloned into, and both a failed clone and a branch
+# the checkout does not have warn and skip, so an apply without the network still finishes.
+# Set OCODE_SOURCE to name another checkout.
 # bun, the runtime the build needs, comes from `install_bun` into ~/.bun with its PATH line in
 # `dot_zshenv.tmpl`; the script also falls back to ~/.bun/bin/bun itself, and skips only when
 # neither answers.
@@ -32,11 +36,9 @@ source_dir="${OCODE_SOURCE:-$HOME/Development/github.com/opencode/opencode}"
 target="$HOME/.local/bin/ocode"
 marker="$HOME/.cache/ocode-built-commit"
 outdir="$HOME/.cache/ocode-build"
-
-if [ ! -d "$source_dir/.git" ]; then
-    echo "[ocode] skipped: no fork checkout at $source_dir (clone rios0rios0/opencode there, branch feat/provider-omniroute)" >&2
-    exit 0
-fi
+branch="feat/provider-omniroute"
+fork_url="https://github.com/rios0rios0/opencode.git"
+upstream_url="https://github.com/sst/opencode.git"
 
 # bun is resolved from PATH first and from ~/.bun/bin second: `install_bun` puts it there
 # and `dot_zshenv.tmpl` carries the PATH line, but a shell started before that apply still
@@ -53,6 +55,43 @@ fi
 # The build may spawn `bun` itself, so its directory goes on PATH for the duration.
 bun_dir="$(dirname "$bun")"
 export PATH="$bun_dir:$PATH"
+
+# Cloned onto the fork's branch directly, so the checkout the build sees is the fork's even on
+# its first apply. `--origin fork` names the remote the way the hand-made checkouts on this
+# machine do, and sst upstream becomes `origin`, so a command typed on one machine means the
+# same on another. `-e` rather than `-d`: a worktree's `.git` is a file.
+if [ ! -e "$source_dir/.git" ]; then
+    if [ -e "$source_dir" ]; then
+        echo "[ocode] skipped: $source_dir exists but is not a git checkout, so it is not cloned into (remove it, or set OCODE_SOURCE to another path)" >&2
+        exit 0
+    fi
+    echo "[ocode] cloning $fork_url (branch $branch) into $source_dir..." >&2
+    mkdir -p "$(dirname "$source_dir")"
+    if ! git clone --origin fork --branch "$branch" "$fork_url" "$source_dir" >&2; then
+        echo "[ocode] WARN: failed to clone $fork_url, so there is nothing to build yet; the next apply tries again" >&2
+        exit 0
+    fi
+    if ! git -C "$source_dir" remote get-url origin >/dev/null 2>&1; then
+        git -C "$source_dir" remote add origin "$upstream_url" >&2 || true
+    fi
+fi
+
+# The build stamps the channel below onto whatever HEAD is, so a checkout left on another branch
+# would produce a binary labelled as the fork and carrying none of its code. Local branch first,
+# then the fork's remote-tracking one (which the clone above has), and otherwise nothing: no
+# network fetch of the branch, because an apply that cannot reach GitHub must still finish.
+current_branch="$(git -C "$source_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
+if [ "$current_branch" != "$branch" ]; then
+    echo "[ocode] checkout is on ${current_branch:-an unknown branch}, switching to $branch" >&2
+    if git -C "$source_dir" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null; then
+        git -C "$source_dir" checkout "$branch" >&2
+    elif git -C "$source_dir" rev-parse --verify --quiet "refs/remotes/fork/$branch" >/dev/null; then
+        git -C "$source_dir" checkout -b "$branch" --track "fork/$branch" >&2
+    else
+        echo "[ocode] WARN: $source_dir has no $branch branch and no fork/$branch to track; leaving it alone, so nothing is built" >&2
+        exit 0
+    fi
+fi
 
 head="$(git -C "$source_dir" rev-parse HEAD)"
 if [ "$(cat "$marker" 2>/dev/null || true)" = "$head" ] && [ -x "$target" ]; then
