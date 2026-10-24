@@ -16,12 +16,25 @@ set -euo pipefail
 # that exists without being a checkout is not cloned into, and both a failed clone and a branch
 # the checkout does not have warn and skip, so an apply without the network still finishes.
 # Set OCODE_SOURCE to name another checkout.
+#
 # bun, the runtime the build needs, comes from `install_bun` into ~/.bun with its PATH line in
 # `dot_zshenv.tmpl`; the script also falls back to ~/.bun/bin/bun itself, and skips only when
-# neither answers.
+# neither answers. That bun is the machine's, though, and the checkout pins its own in
+# package.json's `packageManager` (`bun@X.Y.Z`), the field upstream OpenCode's CI reads to
+# install exactly that version. The two drift apart (`bun upgrade`, a rebase that moves the
+# pin), and a newer bun is no drop-in: 1.4.4 refuses a patch file in the checkout that the 1.4.2
+# pin applies. So the build installs the checkout's dependencies, and then builds, with the
+# pinned bun: the resolved one when it is that version, otherwise a copy under
+# ~/.cache/ocode-bun/<version>/, which the first build that needs it downloads from bun's GitHub
+# release and verifies against the release's SHASUMS256.txt. A missing or unreadable pin and a
+# failed download warn and fall back to the resolved bun, so an apply without the network still
+# finishes. The install itself (`bun install --frozen-lockfile`, upstream CI's command) runs
+# before every build because the build takes it for granted: its `--skip-install` skips only its
+# own cross-platform install of two native packages, and a fresh clone, which nothing had
+# installed, failed with dozens of `Could not resolve: "effect"`.
 # A marker at ~/.cache/ocode-built-commit makes unchanged applies a no-op, which is why this is
-# a run_after script that runs on every apply. A build that fails fails the apply, so the next
-# one retries it.
+# a run_after script that runs on every apply. A build that fails -- the dependency install
+# included -- fails the apply, so the next one retries it.
 #
 # A running ocode -- the TUI or the server it spawns -- executes ~/.local/bin/ocode, the file the
 # build replaces. The script finds the processes running that file and asks before killing them,
@@ -36,9 +49,11 @@ source_dir="${OCODE_SOURCE:-$HOME/Development/github.com/rios0rios0/opencode}"
 target="$HOME/.local/bin/ocode"
 marker="$HOME/.cache/ocode-built-commit"
 outdir="$HOME/.cache/ocode-build"
+bun_cache="$HOME/.cache/ocode-bun"
 branch="reworked"
 fork_url="https://github.com/rios0rios0/opencode.git"
 upstream_url="https://github.com/sst/opencode.git"
+bun_releases="https://github.com/oven-sh/bun/releases/download"
 
 # bun is resolved from PATH first and from ~/.bun/bin second: `install_bun` puts it there
 # and `dot_zshenv.tmpl` carries the PATH line, but a shell started before that apply still
@@ -52,9 +67,6 @@ if [ -z "$bun" ]; then
     echo "[ocode] skipped: bun is not installed (not on PATH, no ~/.bun/bin/bun)" >&2
     exit 0
 fi
-# The build may spawn `bun` itself, so its directory goes on PATH for the duration.
-bun_dir="$(dirname "$bun")"
-export PATH="$bun_dir:$PATH"
 
 # Cloned onto the fork's branch directly, so the checkout the build sees is the fork's even on
 # its first apply. `--origin fork` names the remote the way the hand-made checkouts on this
@@ -149,6 +161,156 @@ if (( ${#running[@]} > 0 )); then
 fi
 
 echo "[ocode] building $(git -C "$source_dir" log -1 --format='%h %s')..." >&2
+
+# The release asset bun's own installer (bun.sh/install) picks for this machine: by architecture,
+# and on x64 the `-baseline` build when the CPU lacks AVX2, which the default x64 build requires.
+# Fails, printing nothing, on an architecture bun publishes no Linux build for.
+bun_asset() {
+    case "$(uname -m)" in
+        x86_64 | amd64)
+            if grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
+                echo "bun-linux-x64"
+            else
+                echo "bun-linux-x64-baseline"
+            fi
+            ;;
+        aarch64 | arm64)
+            echo "bun-linux-aarch64"
+            ;;
+        *)
+            return 1
+            ;;
+    esac
+}
+
+# Fetches bun $1 from its GitHub release into $bun_cache/$1/bun. Not through bun.sh/install: that
+# script replaces ~/.bun, the machine's own bun, and edits a shell rc file chezmoi owns. The zip is
+# checked against the SHASUMS256.txt published with the release before anything is extracted, and
+# the binary must start and report the version asked for before it takes its final name, so the
+# cache only ever holds a working copy of the pinned bun. Anything else warns, leaves the cache as
+# it was, and fails, which the caller answers by falling back to the resolved bun.
+fetch_bun() {
+    local version="$1"
+    local dest="$bun_cache/$1"
+    local asset base workdir expected staged reported tool
+
+    if ! asset="$(bun_asset)"; then
+        echo "[ocode] WARN: bun publishes no Linux build for $(uname -m), so bun $version cannot be fetched" >&2
+        return 1
+    fi
+    for tool in curl unzip; do
+        if ! command -v "$tool" >/dev/null 2>&1; then
+            echo "[ocode] WARN: $tool is not installed, so bun $version cannot be fetched" >&2
+            return 1
+        fi
+    done
+
+    base="$bun_releases/bun-v$version"
+    workdir="$(mktemp -d)"
+    echo "[ocode] downloading $asset.zip from $base..." >&2
+    if ! curl --proto '=https' --proto-redir '=https' -fsSL --connect-timeout 20 --retry 2 -o "$workdir/$asset.zip" "$base/$asset.zip" ||
+        ! curl --proto '=https' --proto-redir '=https' -fsSL --connect-timeout 20 --retry 2 -o "$workdir/SHASUMS256.txt" "$base/SHASUMS256.txt"; then
+        echo "[ocode] WARN: failed to download bun $version from $base" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+
+    # Matched on the file name as a whole string, not as a pattern: the x64 asset's name is a
+    # prefix of the `-baseline` one's, and its dots would match any character.
+    expected="$(awk -v name="$asset.zip" '$2 == name { print $1; exit }' "$workdir/SHASUMS256.txt")"
+    if [[ ! "$expected" =~ ^[0-9a-f]{64}$ ]]; then
+        echo "[ocode] WARN: the SHASUMS256.txt of bun $version lists no checksum for $asset.zip, so it is not used" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    if ! echo "$expected  $workdir/$asset.zip" | sha256sum --check --status; then
+        echo "[ocode] WARN: $asset.zip does not match the checksum in the SHASUMS256.txt of bun $version, so it is not used" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    if ! unzip -oq "$workdir/$asset.zip" "$asset/bun" -d "$workdir" || [ ! -f "$workdir/$asset/bun" ]; then
+        echo "[ocode] WARN: $asset.zip of bun $version holds no $asset/bun" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+
+    # Staged beside its final name and renamed into place, as the install below does with ocode,
+    # and asked for its version there rather than in the temporary directory, which may be
+    # mounted noexec. A binary that cannot start on this CPU fails here, not halfway into the
+    # dependency install.
+    staged="$dest/bun.new.$$"
+    if ! mkdir -p "$dest" || ! command cp "$workdir/$asset/bun" "$staged" || ! chmod 0755 "$staged"; then
+        echo "[ocode] WARN: could not stage bun $version under $dest" >&2
+        rm -rf "$workdir"
+        rm -f "$staged"
+        rmdir "$dest" 2>/dev/null || true
+        return 1
+    fi
+    rm -rf "$workdir"
+    reported="$("$staged" --version 2>/dev/null || true)"
+    if [ "$reported" != "$version" ]; then
+        echo "[ocode] WARN: the downloaded bun reports ${reported:-no version} rather than $version, so it is not used" >&2
+        rm -f "$staged"
+        rmdir "$dest" 2>/dev/null || true
+        return 1
+    fi
+    if ! command mv -f "$staged" "$dest/bun"; then
+        echo "[ocode] WARN: could not move bun $version into place at $dest/bun" >&2
+        rm -f "$staged"
+        return 1
+    fi
+    echo "[ocode] cached bun $version at $dest/bun" >&2
+}
+
+# The bun the checkout pins (see the header), read with jq as the root package.json's
+# `packageManager`. Only a plain release version counts as a pin: a range, a tag such as
+# `canary` and another package manager name nothing a release download can fetch. The resolved
+# bun is kept whenever that version is unknown or cannot be had.
+bun_version="$("$bun" --version 2>/dev/null || true)"
+manifest="$source_dir/package.json"
+pinned=""
+if ! package_manager="$(jq -r '.packageManager // empty' "$manifest" 2>/dev/null)"; then
+    echo "[ocode] WARN: could not read packageManager from $manifest (jq missing, or the file missing or not JSON), so the build uses $bun, which reports ${bun_version:-no version}" >&2
+elif [[ "$package_manager" =~ ^bun@([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
+    pinned="${BASH_REMATCH[1]}"
+else
+    echo "[ocode] WARN: $manifest pins no bun release (packageManager is ${package_manager:-missing}), so the build uses $bun, which reports ${bun_version:-no version}" >&2
+fi
+if [ -n "$pinned" ]; then
+    cached="$bun_cache/$pinned/bun"
+    if [ "$bun_version" = "$pinned" ]; then
+        echo "[ocode] $bun is bun $pinned, the version the checkout pins" >&2
+    elif [ -x "$cached" ] && [ "$("$cached" --version 2>/dev/null || true)" = "$pinned" ]; then
+        echo "[ocode] the checkout pins bun $pinned and $bun reports ${bun_version:-no version}; using the cached $cached" >&2
+        bun="$cached"
+        bun_version="$pinned"
+    else
+        echo "[ocode] the checkout pins bun $pinned and $bun reports ${bun_version:-no version}; fetching bun $pinned" >&2
+        if fetch_bun "$pinned"; then
+            bun="$cached"
+            bun_version="$pinned"
+        else
+            echo "[ocode] WARN: bun $pinned is not available, so the build uses $bun, which reports ${bun_version:-no version} and may reject what bun $pinned accepts; the next build tries the download again" >&2
+        fi
+    fi
+fi
+
+# The install and the build both spawn `bun` themselves -- the root postinstall is a `bun run`,
+# and so is the build script -- so the chosen bun's directory goes first on PATH for the
+# duration: every bun involved must be the one that resolved the lockfile.
+bun_dir="$(dirname "$bun")"
+export PATH="$bun_dir:$PATH"
+
+# The workspace install the build takes for granted (see the header). `--frozen-lockfile`
+# installs exactly bun.lock, as upstream's CI does, and fails rather than rewrite the lockfile of
+# somebody's checkout. Lifecycle scripts stay enabled: the root postinstall restores the execute
+# bit on node-pty's prebuilt spawn-helper, without which no terminal can be spawned.
+echo "[ocode] installing the checkout's dependencies with bun ${bun_version:-of unknown version} ($bun)..." >&2
+if ! (cd "$source_dir" && "$bun" install --frozen-lockfile); then
+    echo "[ocode] ERROR: bun install --frozen-lockfile failed in $source_dir, so nothing was built; the next apply tries again" >&2
+    exit 1
+fi
+
 # Build identity: the binary must report a release-grade version, because the Console's free
 # tier gate reads it from the User-Agent -- `opencode/<channel>/<version>/<name>` -- and
 # refuses clients below 1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview
@@ -159,8 +321,10 @@ OPENCODE_CHANNEL="feat-provider-omniroute"
 OPENCODE_VERSION="2.0.$(date -u +%y%m%d%H%M)"
 export OPENCODE_CHANNEL OPENCODE_VERSION
 # A single, current-platform build; the web UI bundle and the release assets cost minutes each
-# and add nothing to a local binary. The fork's build re-creates the outdir itself and emits
-# <outdir>/cli-<target>/bin/opencode.
+# and add nothing to a local binary. `--skip-install` stays: the install above brought this
+# platform's native packages, and what the flag skips is the build's own install of those
+# packages for every platform, which only a cross-platform release needs. The fork's build
+# re-creates the outdir itself and emits <outdir>/cli-<target>/bin/opencode.
 "$bun" run --cwd "$source_dir/packages/cli" build --single --skip-install --skip-web-ui --outdir="$outdir"
 
 built="$(find "$outdir" -path '*/bin/opencode' -type f | head -n 1)"

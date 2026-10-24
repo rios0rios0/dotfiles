@@ -39,7 +39,7 @@ make test-statusline                # Claude Code status line: both profiles, no
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
 make test-omniroute-backup          # the OmniRoute stack's encrypted backups: the snapshot flow, retention, the installer's gate
 make test-omniroute-image           # the custom OmniRoute image pin: the switch from upstream, --check, --tag, and failed lookups leaving the pin untouched
-make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the ~/.bun/bin fallback, the bun installer and its PATH block
+make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the dependency install, the pinned bun (cache, verified download, fallbacks), the ~/.bun/bin fallback, the bun installer and its PATH block
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
 ```
 
@@ -946,7 +946,8 @@ script that runs on every apply; `OCODE_SOURCE` names another checkout. No `bun`
 a directory at the checkout's path that is not a checkout, and a checkout holding neither the
 branch nor the fork's remote-tracking one are skips, never failures -- the last two because an
 apply with no network must still finish, and the third because that directory may hold somebody's
-work. A failed build is an error, retried by the next apply.
+work. A failed build -- a failed dependency install included -- is an error, retried by the next
+apply.
 
 A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, the file
 the build replaces. The builder looks for the processes executing **that file** (through
@@ -967,14 +968,49 @@ rewrites -- so `install_bun` runs it with `SHELL` empty, which falls through to 
 manual instruction, and `dot_zshenv.tmpl` carries the `~/.bun/bin` PATH block. The builder
 resolves bun from PATH and falls back to `~/.bun/bin/bun`, so the first apply after the install
 builds even though the running shell's PATH predates the export; only when neither answers is
-the build skipped. `make test-ocode` covers the checkout the builder obtains itself (the clone
-onto the fork's branch and the remote layout it leaves, the branch switch, the branch created
-from the fork's remote-tracking one, a checkout holding no fork branch, a directory that is not
-a checkout, and a failed clone that only warns), the skip without bun, the first build (including
-the channel and release-grade version it carries), the no-op and the rebuilds against stubbed
-`git` and `bun`, the running-`ocode` prompt with no answer, a decline and an acceptance, the
-process started mid-build, and the installer's skip, its `SHELL`-empty call, both failures, the
-Linux wiring and the PATH block per platform.
+the build skipped.
+
+That bun is the machine's, though, and the checkout pins its own: the `packageManager` field of
+its root `package.json` (`bun@X.Y.Z`), which upstream OpenCode's CI
+(`.github/actions/setup-bun`) reads to install exactly that version. The two drift apart -- a
+`bun upgrade`, a rebase that moves the pin -- and a newer bun is no drop-in: bun 1.4.4 refused a
+patch file in the checkout (`hunk #10 does not apply to photon_rs.js`) that its 1.4.2 pin
+applies. So on every build the builder runs `bun install --frozen-lockfile` in the checkout and
+then the build, both with the pinned bun and with that bun's directory first on PATH, because
+the root `postinstall` and the build spawn `bun` themselves. The pinned bun is the resolved one
+when it is that version, and otherwise a copy under `~/.cache/ocode-bun/<version>/`, which the
+first build that needs it downloads from bun's GitHub release, not through `bun.sh/install`,
+which would replace `~/.bun`. The asset is the one `bun.sh/install` would pick:
+`bun-linux-x64.zip`, its `-baseline` build on a CPU without AVX2, or `bun-linux-aarch64.zip`. The
+zip is verified against the release's `SHASUMS256.txt` before anything is extracted, and the
+binary is cached only once it reports the pinned version, so a build this CPU cannot start
+never lands there. A missing or non-release pin (a range, `canary`, another package manager), an
+unreadable `package.json`, an architecture bun publishes no build for and a failed download
+all warn and fall back to the resolved bun, so an apply without the network still finishes.
+Versions the checkout no longer pins stay in the cache until it is cleared (each is a whole bun
+binary: 1.4.2 is 80 MB, 1.4.4 107 MB).
+
+The install runs because the build takes it for granted: the fork's `--skip-install` skips only
+the build's own cross-platform install of the native `@opentui/core` and `@opencode-ai/pty`
+packages, and a fresh clone, which nothing had installed, failed with dozens of
+`Could not resolve: "effect"`. `--frozen-lockfile` installs exactly `bun.lock`, as upstream's CI
+does, and fails rather than rewrite the lockfile of somebody's checkout. Lifecycle scripts stay
+on: the root `postinstall` restores the execute bit on node-pty's prebuilt `spawn-helper`. An
+unchanged apply still runs neither.
+
+`make test-ocode` covers the checkout the builder obtains itself (the clone onto the fork's
+branch and the remote layout it leaves, the branch switch, the branch created from the fork's
+remote-tracking one, a checkout holding no fork branch, a directory that is not a checkout, and a
+failed clone that only warns), the skip without bun, the first build (including the channel and
+release-grade version it carries, and the dependency install that precedes it), the no-op and
+the rebuilds against stubbed `git` and `bun`, the running-`ocode` prompt with no answer, a
+decline and an acceptance, the process started mid-build, the pinned bun against a stubbed
+release (the resolved bun at the pin, a cached copy, a stale cached copy fetched again, the x64
+and arm64 downloads, HTTPS-only, each then running the install and the build from the front of
+PATH), every fallback (no network, a checksum mismatch, a binary that cannot start, an
+unsupported architecture, a missing, non-release or unreadable pin), the failed install that
+fails the apply, and the installer's skip, its `SHELL`-empty call, both failures, the Linux
+wiring and the PATH block per platform.
 
 `chezmoi apply` is not the only way to run the build: the `rebuild-ocode` zsh function (Linux
 only) resolves the same script through `chezmoi source-path` and runs it, so a build can be

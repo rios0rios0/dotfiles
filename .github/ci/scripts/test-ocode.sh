@@ -3,18 +3,25 @@ set -euo pipefail
 
 # Tests the ocode fork-builder and the bun provisioning it depends on, without bun, git, the
 # network or a real fork checkout: `git` and `bun` are stubs, the checkout is a fake directory
-# whose `.git` holds a head, a branch and refs, the build fabricates the artifact the fork's
-# build would emit, and `install_bun` is sourced from the shared dependency library against a
-# `curl` stub that fabricates the upstream installer. Covers the checkout the builder obtains
-# itself (the clone onto the fork's branch with the fork/upstream remote layout, the branch
-# switch, the branch created from the fork's remote-tracking one, the checkout holding no fork
-# branch, a directory that is not a checkout, a failed clone), the skip without bun, the first
-# build (including the fork channel and release-grade version it must carry), the no-op
-# rebuild, the rebuild on a new head, the rebuild that restores a missing binary, the prompt
-# for a running ocode with no answer, a decline and an acceptance -- none of which may skip the
-# build -- the process started while the build runs, the ~/.bun/bin fallback, the installed
-# skip, the installer call (with SHELL empty, so bun's script cannot edit an rc file chezmoi
-# owns), both installer failures, the Linux wiring and the PATH block rendered on each platform.
+# whose `.git` holds a head, a branch and refs and whose package.json pins a bun version, the
+# build fabricates the artifact the fork's build would emit, bun's GitHub releases are a local
+# directory a `curl` stub serves, and `install_bun` is sourced from the shared dependency
+# library against a `curl` stub that fabricates the upstream installer. Covers the checkout the
+# builder obtains itself (the clone onto the fork's branch with the fork/upstream remote layout,
+# the branch switch, the branch created from the fork's remote-tracking one, the checkout
+# holding no fork branch, a directory that is not a checkout, a failed clone), the skip without
+# bun, the first build (including the fork channel and release-grade version it must carry, and
+# the dependency install that must precede it), the no-op rebuild, the rebuild on a new head,
+# the rebuild that restores a missing binary, the prompt for a running ocode with no answer, a
+# decline and an acceptance -- none of which may skip the build -- the process started while
+# the build runs, the ~/.bun/bin fallback, the bun the checkout pins (the resolved one when it is
+# that version, otherwise a cached copy, or one downloaded for this machine's architecture and
+# verified against the release's SHASUMS256.txt, each running the install and the build from the
+# front of PATH), every fallback to the resolved bun (no network, a checksum mismatch, a binary
+# that cannot start, an architecture without a build, a missing, non-release or unreadable pin),
+# the failed install that fails the apply, the installed skip, the installer call (with SHELL
+# empty, so bun's script cannot edit an rc file chezmoi owns), both installer failures, the
+# Linux wiring and the PATH block rendered on each platform.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -36,15 +43,35 @@ fail() { echo "[test-ocode] FAIL: $1" >&2; EXIT_CODE=1; }
 export HOME="$TMP/home"
 mkdir -p "$HOME"
 
+# The release zips the download cases are served from are fabricated here, so zip is needed
+# beside the unzip the builder itself uses.
+if ! command -v zip >/dev/null 2>&1; then
+    echo "[test-ocode] FAIL: zip is not on PATH, so bun's release zips cannot be fabricated" >&2
+    exit 1
+fi
+
+# The bun version the fake checkout pins, and the newer one the machine's bun drifts to -- the
+# pair behind the incident: bun 1.4.4 refuses a patch file that the checkout's 1.4.2 pin applies.
+PIN="1.4.2"
+NEWER="1.4.4"
+BUN_RELEASES="https://github.com/oven-sh/bun/releases/download"
+export CLONE_PIN="$PIN"
+
 export CHECKOUT="$HOME/Development/github.com/rios0rios0/opencode"
 STUB="$TMP/stub"
 BUN_STUB="$TMP/bun-stub"
-mkdir -p "$STUB" "$BUN_STUB" "$CHECKOUT/.git"
+RELEASE_STUB="$TMP/release-stub"
+mkdir -p "$STUB" "$BUN_STUB" "$RELEASE_STUB" "$CHECKOUT/.git" "$TMP/tmpdir"
+
+# The checkout's root package.json, with $1 as its packageManager -- the only field the builder
+# reads from it.
+write_manifest() { printf '{\n  "name": "opencode",\n  "packageManager": "%s"\n}\n' "$1" >"$CHECKOUT/package.json"; }
 
 # git stub: a fake checkout under .git -- HEAD holds the sha, HEAD_REF the branch, refs/ the
 # branches and the remote-tracking ones, remotes/ the remote URLs -- so the clone, the branch
-# switch and the remote layout are all assertable. Every invocation is recorded in $GIT_CALLS.
-# CLONE_FAIL makes the clone fail the way a machine without the network does.
+# switch and the remote layout are all assertable. The clone also brings the package.json a real
+# one would, pinning bun $CLONE_PIN. Every invocation is recorded in $GIT_CALLS. CLONE_FAIL makes
+# the clone fail the way a machine without the network does.
 cat >"$STUB/git" <<'STUB'
 #!/bin/bash
 echo "$*" >>"${GIT_CALLS:?}"
@@ -86,6 +113,7 @@ case "$sub" in
         : >"$target/.git/refs/heads/$branch"
         : >"$target/.git/refs/remotes/$remote/$branch"
         printf '%s\n' "$url" >"$target/.git/remotes/$remote"
+        printf '{\n  "name": "opencode",\n  "packageManager": "bun@%s"\n}\n' "${CLONE_PIN:?}" >"$target/package.json"
         ;;
     remote)
         case "$1" in
@@ -117,12 +145,24 @@ STUB
 export GIT_CALLS="$TMP/git-calls"
 : >"$GIT_CALLS"
 
-# bun stub: records every invocation and the build identity it was given, and fabricates the
-# artifact under --outdir. With BUN_STUB_RACE set it also starts the installed binary mid-build,
-# standing in for a person who opens ocode while the build runs -- the build-minutes window the
-# installer's rename closes.
-cat >"$BUN_STUB/bun" <<'STUB'
+# bun stub, written for one version by make_bun_stub: answers `--version` with it; records every
+# install and every build in $BUN_LOG as `<kind>|<its own path>|<its working directory>|<the bun
+# a process it spawned would run>|<arguments>`, and each build's arguments in $BUN_CALLS and the
+# build identity it was given in $BUN_ENV; fails the install with BUN_INSTALL_FAIL set; and
+# fabricates the artifact under --outdir. With BUN_STUB_RACE set it also starts the installed
+# binary mid-build, standing in for a person who opens ocode while the build runs -- the
+# build-minutes window the installer's rename closes.
+cat >"$TMP/bun-stub.in" <<'STUB'
 #!/bin/bash
+if [ "$1" = "--version" ]; then
+    echo "@VERSION@"
+    exit 0
+fi
+if [ "$1" = "install" ]; then
+    echo "install|$0|$PWD|$(command -v bun)|$*" >>"${BUN_LOG:?}"
+    exit "${BUN_INSTALL_FAIL:-0}"
+fi
+echo "build|$0|$PWD|$(command -v bun)|$*" >>"${BUN_LOG:?}"
 echo "$*" >>"${BUN_CALLS:?}"
 echo "${OPENCODE_CHANNEL:-unset}/${OPENCODE_VERSION:-unset}" >>"${BUN_ENV:?}"
 if [ -n "${BUN_STUB_RACE:-}" ]; then
@@ -138,19 +178,84 @@ mkdir -p "$out/cli-linux-x64/bin"
 printf '#!/bin/bash\necho fake ocode\n' >"$out/cli-linux-x64/bin/opencode"
 chmod +x "$out/cli-linux-x64/bin/opencode"
 STUB
-chmod +x "$STUB/git" "$BUN_STUB/bun"
+make_bun_stub() {
+    mkdir -p "$(dirname "$1")"
+    sed "s/@VERSION@/$2/" "$TMP/bun-stub.in" >"$1"
+    chmod +x "$1"
+}
+make_bun_stub "$BUN_STUB/bun" "$PIN"
+chmod +x "$STUB/git"
 
 export BUN_CALLS="$TMP/bun-calls"
 export BUN_ENV="$TMP/bun-env"
+export BUN_LOG="$TMP/bun-log"
 : >"$BUN_CALLS"
 : >"$BUN_ENV"
+: >"$BUN_LOG"
+
+# curl stub for bun's GitHub releases: serves $RELEASE_ROOT/<tag>/<asset> for
+# $BUN_RELEASES/<tag>/<asset> and fails any other request the way a 404 does -- or every request,
+# with RELEASE_FAIL set, the way a machine without the network does. Every invocation's arguments
+# go to $RELEASE_CALLS. It is on every PATH the builder runs with, so no case reaches the network.
+cat >"$RELEASE_STUB/curl" <<'STUB'
+#!/bin/bash
+echo "$*" >>"${RELEASE_CALLS:?}"
+[[ -z "${RELEASE_FAIL:-}" ]] || exit 6
+out=""
+url=""
+while [ $# -gt 0 ]; do
+    case "$1" in
+        -o) out="$2"; shift 2 ;;
+        --proto | --proto-redir | --connect-timeout | --retry) shift 2 ;;
+        -*) shift ;;
+        *) url="$1"; shift ;;
+    esac
+done
+prefix="https://github.com/oven-sh/bun/releases/download/"
+[[ "$url" == "$prefix"* && -f "${RELEASE_ROOT:?}/${url#"$prefix"}" ]] || exit 22
+cp "$RELEASE_ROOT/${url#"$prefix"}" "$out"
+STUB
+# uname stub: `uname -m` answers $FAKE_UNAME_M when it is set, so a case can stand on another
+# architecture; everything else is the real uname's.
+cat >"$RELEASE_STUB/uname" <<'STUB'
+#!/bin/bash
+if [ "$*" = "-m" ] && [ -n "${FAKE_UNAME_M:-}" ]; then
+    echo "$FAKE_UNAME_M"
+    exit 0
+fi
+exec "${REAL_UNAME:?}" "$@"
+STUB
+chmod +x "$RELEASE_STUB/curl" "$RELEASE_STUB/uname"
+REAL_UNAME="$(command -v uname)"
+export REAL_UNAME
+export RELEASE_ROOT="$TMP/releases"
+export RELEASE_CALLS="$TMP/release-calls"
+: >"$RELEASE_CALLS"
 
 # stdin is /dev/null unless a file is given, so a case that reaches the kill prompt and answers
 # nothing leaves the running ocode alone and builds anyway, instead of reading the test runner's
-# terminal.
-run_script() { (cd "$TMP" && PATH="$BUN_STUB:$STUB:$PATH" bash "$SCRIPT" <"${1:-/dev/null}") >"$TMP/out" 2>&1; echo $? >"$TMP/rc"; }
+# terminal. TMPDIR is the test's own, so a case can check that a download left nothing in it, and
+# a failing run is recorded rather than ending the test.
+run_script() {
+    local status=0
+    (cd "$TMP" && PATH="$BUN_STUB:$RELEASE_STUB:$STUB:$PATH" TMPDIR="$TMP/tmpdir" bash "$SCRIPT" <"${1:-/dev/null}") >"$TMP/out" 2>&1 || status=$?
+    echo "$status" >"$TMP/rc"
+}
 rc() { cat "$TMP/rc"; }
 calls() { wc -l <"$BUN_CALLS"; }
+installs() { grep -c '^install|' "$BUN_LOG" || true; }
+# The last install or build ($1) the bun stubs recorded.
+last_entry() { grep "^$1|" "$BUN_LOG" | tail -n 1 || true; }
+# Whether the last install and the last build both ran with bun $1, and a `bun` that either of
+# them spawned would have run $1 too.
+ran_with() {
+    local kind entry self spawned
+    for kind in install build; do
+        entry="$(last_entry "$kind")"
+        IFS='|' read -r _ self _ spawned _ <<<"$entry"
+        [ "$self" = "$1" ] && [ "$spawned" = "$1" ] || return 1
+    done
+}
 
 # 1) No checkout: the fork is cloned onto its branch, the remotes are named the way the
 #    hand-made checkouts on this machine have them (`fork` for rios0rios0, `origin` for sst
@@ -173,6 +278,26 @@ identity="$(tail -n 1 "$BUN_ENV")"
 [ "${identity%%/*}" = "feat-provider-omniroute" ] || fail "the build must carry the fork's channel: $identity"
 [[ "${identity##*/}" =~ ^2\.0\.[0-9]+$ ]] || fail "the build must carry a release-grade version, not a preview one: $identity"
 pass "a missing checkout is cloned onto the fork's branch with the fork/upstream remotes, then built"
+
+# 1b) The fresh clone is where the build used to die on dozens of `Could not resolve: "effect"`:
+#     nothing had installed the workspace, and the build's `--skip-install` skips only its own
+#     cross-platform install of two native packages. The dependencies are installed first, in the
+#     checkout, from the frozen lockfile and with the lifecycle scripts on (the root postinstall
+#     fixes node-pty's spawn-helper), and the build keeps `--skip-install`. The resolved bun is
+#     the version the clone pins, so it runs both, first on PATH, and nothing is downloaded.
+install_entry="$(last_entry install)"
+[ "$(installs)" -eq 1 ] || fail "the first build must install the checkout's dependencies once"
+[ "$(tail -n 2 "$BUN_LOG" | cut -d'|' -f1 | paste -sd' ')" = "install build" ] ||
+    fail "the dependencies must be installed before the build: $(cat "$BUN_LOG")"
+[ "$(cut -d'|' -f3 <<<"$install_entry")" = "$CHECKOUT" ] || fail "the install must run in the checkout: $install_entry"
+[ "$(cut -d'|' -f5 <<<"$install_entry")" = "install --frozen-lockfile" ] ||
+    fail "the install must be 'install --frozen-lockfile' alone, lifecycle scripts on: $install_entry"
+grep -q -- '--skip-install' "$BUN_CALLS" || fail "the build must keep --skip-install"
+ran_with "$BUN_STUB/bun" || fail "a resolved bun at the pinned version must run the install and the build: $(tail -n 2 "$BUN_LOG")"
+grep -qF "is bun $PIN, the version the checkout pins" "$TMP/out" || fail "a resolved bun at the pinned version must be named as such"
+[ ! -s "$RELEASE_CALLS" ] || fail "a resolved bun at the pinned version must not download another: $(cat "$RELEASE_CALLS")"
+[ ! -e "$HOME/.cache/ocode-bun" ] || fail "a resolved bun at the pinned version must cache nothing"
+pass "a fresh clone's dependencies are installed before the build, by the resolved bun when it is the pinned version"
 
 # 2) A checkout left on another branch is switched to the fork's: the channel below is stamped
 #    onto whatever HEAD holds, so building `main` would label a binary as the fork and carry
@@ -242,19 +367,23 @@ printf 'fake0001\n' >"$CHECKOUT/.git/HEAD"
 printf 'reworked\n' >"$CHECKOUT/.git/HEAD_REF"
 : >"$CHECKOUT/.git/refs/heads/reworked"
 : >"$CHECKOUT/.git/refs/remotes/fork/reworked"
+write_manifest "bun@$PIN"
 printf '#!/bin/bash\necho fake ocode\n' >"$HOME/.local/bin/ocode"
 chmod +x "$HOME/.local/bin/ocode"
-# 7) Unchanged head: no rebuild.
+# 7) Unchanged head: no rebuild, and no install either -- an unchanged apply stays a no-op.
 run_script
 [ "$(rc)" -eq 0 ] || fail "unchanged apply must exit 0"
 [ "$(calls)" -eq 1 ] || fail "unchanged head must not rebuild"
+[ "$(installs)" -eq 1 ] || fail "unchanged head must not install the dependencies"
 pass "unchanged head does not rebuild"
 
-# 8) New head: rebuild and move the marker.
+# 8) New head: rebuild and move the marker. The install runs again: it belongs to every build,
+#    not only to a clone's.
 printf 'fake4567\n' >"$CHECKOUT/.git/HEAD"
 run_script
 [ "$(rc)" -eq 0 ] || fail "rebuild must exit 0"
 [ "$(calls)" -eq 2 ] || fail "new head must rebuild"
+[ "$(installs)" -eq 2 ] || fail "a rebuild must install the dependencies first"
 [ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake4567" ] || fail "marker must move with the head"
 pass "new head rebuilds"
 
@@ -266,15 +395,17 @@ run_script
 pass "missing binary is reinstalled"
 
 # 10) bun off PATH but at ~/.bun/bin: the build runs anyway. This is the first apply after
-#    `install_bun`, whose PATH export only reaches shells started after it.
+#    `install_bun`, whose PATH export only reaches shells started after it. That bun is the
+#    pinned version, so it installs and builds, and goes first on PATH for both.
 mkdir -p "$HOME/.bun/bin"
 cp "$BUN_STUB/bun" "$HOME/.bun/bin/bun"
 rm -f "$HOME/.local/bin/ocode"
-(cd "$TMP" && PATH="$STUB:/usr/bin:/bin" bash "$SCRIPT") >"$TMP/out" 2>&1
+(cd "$TMP" && PATH="$RELEASE_STUB:$STUB:/usr/bin:/bin" bash "$SCRIPT") >"$TMP/out" 2>&1
 echo $? >"$TMP/rc"
 [ "$(rc)" -eq 0 ] || fail "the ~/.bun/bin fallback must build"
 [ "$(calls)" -eq 4 ] || fail "the ~/.bun/bin fallback must invoke bun"
 [ -x "$HOME/.local/bin/ocode" ] || fail "the ~/.bun/bin fallback must install the binary"
+ran_with "$HOME/.bun/bin/bun" || fail "the ~/.bun/bin fallback must install and build with that bun: $(tail -n 2 "$BUN_LOG")"
 pass "bun at ~/.bun/bin is used when PATH has none"
 
 # 11) No bun anywhere: skip, and the message names both places that were looked at. The
@@ -511,6 +642,212 @@ kill -0 "$race_pid" 2>/dev/null || fail "the racing process must be left running
 kill "$race_pid" 2>/dev/null || true
 wait "$race_pid" 2>/dev/null || true
 pass "a process started mid-build cannot fail the install"
+
+# --- The bun the checkout pins ---------------------------------------------------------------
+# The cases above ran with a resolved bun at the pinned version. From here the machine's bun has
+# drifted past the pin, the way `bun upgrade` leaves it -- the incident's second half, where bun
+# 1.4.4 refused a patch file that the checkout's 1.4.2 pin applies.
+make_bun_stub "$BUN_STUB/bun" "$NEWER"
+cache="$HOME/.cache/ocode-bun/$PIN"
+RELEASE="$RELEASE_ROOT/bun-v$PIN"
+# Packages $1 as the bun of every Linux asset of the pinned release and publishes the
+# SHASUMS256.txt that goes with them, the layout of bun's own releases: <asset>.zip holding
+# <asset>/bun.
+build_release() {
+    local asset
+    rm -rf "$TMP/release-src" "$RELEASE"
+    mkdir -p "$RELEASE"
+    for asset in bun-linux-aarch64 bun-linux-x64-baseline bun-linux-x64; do
+        mkdir -p "$TMP/release-src/$asset"
+        cp "$1" "$TMP/release-src/$asset/bun"
+        chmod +x "$TMP/release-src/$asset/bun"
+        (cd "$TMP/release-src" && zip -q -r "$RELEASE/$asset.zip" "$asset")
+    done
+    (cd "$RELEASE" && sha256sum bun-linux-aarch64.zip bun-linux-x64-baseline.zip bun-linux-x64.zip >SHASUMS256.txt)
+}
+make_bun_stub "$TMP/pinned-bun" "$PIN"
+build_release "$TMP/pinned-bun"
+# bun's installer picks between the two x64 builds by the CPU's AVX2 flag, and so does the
+# builder; the cases expect whichever one this machine's /proc/cpuinfo calls for.
+if grep -qw avx2 /proc/cpuinfo 2>/dev/null; then
+    x64_asset="bun-linux-x64"
+else
+    x64_asset="bun-linux-x64-baseline"
+fi
+export FAKE_UNAME_M="x86_64"
+# A new head, so the next run builds, and an empty download log for it to fill.
+head_seq=0
+new_head() {
+    head_seq=$((head_seq + 1))
+    printf 'pin%04d\n' "$head_seq" >"$CHECKOUT/.git/HEAD"
+    : >"$RELEASE_CALLS"
+}
+# What a download may leave behind: anything in the builder's TMPDIR, and a staged bun that
+# never took its cached name.
+leftovers() {
+    find "$TMP/tmpdir" -mindepth 1 2>/dev/null || true
+    find "$HOME/.cache/ocode-bun" -name 'bun.new.*' 2>/dev/null || true
+}
+
+# 23) Nothing cached: the pinned bun is downloaded -- the asset for this CPU and the release's
+#     SHASUMS256.txt, both HTTPS-only, redirects included -- verified, cached, and then runs the
+#     install and the build, first on PATH, so a bun they spawn is the pinned one too.
+rm -rf "$HOME/.cache/ocode-bun"
+new_head
+run_script
+[ "$(rc)" -eq 0 ] || fail "fetching the pinned bun must exit 0: $(cat "$TMP/out")"
+grep -qF "$BUN_RELEASES/bun-v$PIN/$x64_asset.zip" "$RELEASE_CALLS" ||
+    fail "the download must fetch the $x64_asset asset of bun v$PIN: $(cat "$RELEASE_CALLS")"
+grep -qF "$BUN_RELEASES/bun-v$PIN/SHASUMS256.txt" "$RELEASE_CALLS" || fail "the download must fetch the release's SHASUMS256.txt"
+[ "$(grep -c -v -e "--proto =https --proto-redir =https" "$RELEASE_CALLS" || true)" -eq 0 ] ||
+    fail "every download must be HTTPS-only, redirects included: $(cat "$RELEASE_CALLS")"
+[ "$("$cache/bun" --version 2>/dev/null)" = "$PIN" ] || fail "the pinned bun must be cached at $cache/bun"
+ran_with "$cache/bun" || fail "the cached pinned bun must run the install and the build, first on PATH: $(tail -n 2 "$BUN_LOG")"
+grep -qF "the checkout pins bun $PIN and $BUN_STUB/bun reports $NEWER" "$TMP/out" || fail "the drift must be reported"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "$(cat "$CHECKOUT/.git/HEAD")" ] || fail "the build with the pinned bun must move the marker"
+[ -z "$(leftovers)" ] || fail "the download must leave nothing behind: $(leftovers)"
+if grep -q "WARN" "$TMP/out"; then
+    fail "a successful fetch must not warn: $(grep WARN "$TMP/out")"
+fi
+pass "a drifted bun gets the pinned one downloaded, verified and cached, and that one installs and builds"
+
+# 24) Cached: used as it is, nothing is downloaded.
+new_head
+run_script
+[ "$(rc)" -eq 0 ] || fail "a cached pinned bun must build"
+[ ! -s "$RELEASE_CALLS" ] || fail "a cached pinned bun must not be downloaded again: $(cat "$RELEASE_CALLS")"
+ran_with "$cache/bun" || fail "the cached pinned bun must run the install and the build: $(tail -n 2 "$BUN_LOG")"
+grep -qF "using the cached $cache/bun" "$TMP/out" || fail "the cached bun must be named"
+pass "a cached copy of the pinned bun is used without a download"
+
+# 25) A cached file that does not report the pin -- replaced, or cut short -- is not trusted: the
+#     pinned bun is fetched again over it.
+make_bun_stub "$cache/bun" "0.0.0"
+new_head
+run_script
+[ "$(rc)" -eq 0 ] || fail "a stale cached bun must not fail the build"
+grep -qF "/bun-v$PIN/$x64_asset.zip" "$RELEASE_CALLS" || fail "a stale cached bun must be fetched again"
+[ "$("$cache/bun" --version 2>/dev/null)" = "$PIN" ] || fail "the stale cached bun must be replaced by the pinned one"
+ran_with "$cache/bun" || fail "the refetched bun must run the install and the build"
+pass "a cached bun that does not report the pin is fetched again rather than trusted"
+
+# 26) An arm64 machine fetches the aarch64 build.
+rm -rf "$HOME/.cache/ocode-bun"
+export FAKE_UNAME_M="aarch64"
+new_head
+run_script
+export FAKE_UNAME_M="x86_64"
+[ "$(rc)" -eq 0 ] || fail "an arm64 fetch must exit 0"
+grep -qF "$BUN_RELEASES/bun-v$PIN/bun-linux-aarch64.zip" "$RELEASE_CALLS" ||
+    fail "an arm64 machine must fetch bun-linux-aarch64: $(cat "$RELEASE_CALLS")"
+ran_with "$cache/bun" || fail "the aarch64 build must run the install and the build"
+pass "an arm64 machine fetches the aarch64 build"
+
+# 27) No network: the download fails, the build falls back to the resolved bun with a warning and
+#     still runs, and nothing is cached -- an apply without the network still finishes.
+rm -rf "$HOME/.cache/ocode-bun"
+export RELEASE_FAIL=1
+new_head
+run_script
+unset RELEASE_FAIL
+[ "$(rc)" -eq 0 ] || fail "a failed download must not fail the apply"
+grep -qF "WARN: failed to download bun $PIN from $BUN_RELEASES/bun-v$PIN" "$TMP/out" || fail "a failed download must say what failed"
+grep -qF "WARN: bun $PIN is not available, so the build uses $BUN_STUB/bun" "$TMP/out" || fail "the fallback must name the bun it uses"
+ran_with "$BUN_STUB/bun" || fail "without the network the resolved bun must run the install and the build"
+[ ! -e "$cache/bun" ] || fail "a failed download must cache nothing"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "$(cat "$CHECKOUT/.git/HEAD")" ] || fail "the fallback build must move the marker"
+[ -z "$(leftovers)" ] || fail "a failed download must leave nothing behind: $(leftovers)"
+pass "without the network the build warns and falls back to the resolved bun"
+
+# 28) A zip that does not match the release's SHASUMS256.txt -- a corrupted download -- is never
+#     extracted or cached, and the build falls back.
+cp "$RELEASE/$x64_asset.zip" "$TMP/good.zip"
+printf 'x' >>"$RELEASE/$x64_asset.zip"
+new_head
+run_script
+cp "$TMP/good.zip" "$RELEASE/$x64_asset.zip"
+[ "$(rc)" -eq 0 ] || fail "a checksum mismatch must not fail the apply"
+grep -qF "WARN: $x64_asset.zip does not match the checksum in the SHASUMS256.txt of bun $PIN" "$TMP/out" ||
+    fail "a checksum mismatch must be reported"
+[ ! -e "$cache" ] || fail "a zip that fails its checksum must not reach the cache"
+ran_with "$BUN_STUB/bun" || fail "a checksum mismatch must fall back to the resolved bun"
+[ -z "$(leftovers)" ] || fail "a checksum mismatch must leave nothing behind: $(leftovers)"
+pass "a zip that does not match the release's SHASUMS256.txt is not used"
+
+# 29) A verified binary that cannot report the pinned version -- one this CPU cannot start, say --
+#     is discarded before it takes its cached name, and the build falls back.
+printf '#!/bin/bash\nexit 132\n' >"$TMP/broken-bun"
+build_release "$TMP/broken-bun"
+new_head
+run_script
+build_release "$TMP/pinned-bun"
+[ "$(rc)" -eq 0 ] || fail "a bun that cannot start must not fail the apply"
+grep -qF "WARN: the downloaded bun reports no version rather than $PIN" "$TMP/out" || fail "a bun that cannot start must be reported"
+[ ! -e "$cache" ] || fail "a bun that cannot start must not be cached, nor leave its directory"
+ran_with "$BUN_STUB/bun" || fail "a bun that cannot start must fall back to the resolved one"
+[ -z "$(leftovers)" ] || fail "a discarded bun must leave nothing behind: $(leftovers)"
+pass "a downloaded bun that cannot report the pinned version is discarded"
+
+# 30) An architecture bun publishes no Linux build for downloads nothing and falls back.
+rm -rf "$HOME/.cache/ocode-bun"
+export FAKE_UNAME_M="riscv64"
+new_head
+run_script
+export FAKE_UNAME_M="x86_64"
+[ "$(rc)" -eq 0 ] || fail "an unsupported architecture must not fail the apply"
+grep -qF "WARN: bun publishes no Linux build for riscv64" "$TMP/out" || fail "an unsupported architecture must be reported"
+[ ! -s "$RELEASE_CALLS" ] || fail "an unsupported architecture must download nothing: $(cat "$RELEASE_CALLS")"
+ran_with "$BUN_STUB/bun" || fail "an unsupported architecture must fall back to the resolved bun"
+pass "an architecture without a bun build falls back without a download"
+
+# 31) No packageManager at all: nothing to fetch, so the resolved bun builds, with a warning.
+printf '{\n  "name": "opencode"\n}\n' >"$CHECKOUT/package.json"
+new_head
+run_script
+[ "$(rc)" -eq 0 ] || fail "a missing pin must not fail the apply"
+grep -qF "WARN: $CHECKOUT/package.json pins no bun release (packageManager is missing)" "$TMP/out" || fail "a missing pin must be reported"
+[ ! -s "$RELEASE_CALLS" ] || fail "a missing pin must download nothing"
+ran_with "$BUN_STUB/bun" || fail "a missing pin must fall back to the resolved bun"
+pass "a checkout that pins no bun builds with the resolved one"
+
+# 32) A packageManager that names no bun release -- a tag, a range, another package manager -- is
+#     no pin a release download can serve.
+for value in "bun@canary" "bun@^1.4.2" "pnpm@9.15.0"; do
+    write_manifest "$value"
+    new_head
+    run_script
+    [ "$(rc)" -eq 0 ] || fail "$value: must not fail the apply"
+    grep -qF "pins no bun release (packageManager is $value)" "$TMP/out" || fail "$value: must be reported as no pin"
+    [ ! -s "$RELEASE_CALLS" ] || fail "$value: must download nothing"
+    ran_with "$BUN_STUB/bun" || fail "$value: must fall back to the resolved bun"
+done
+pass "a packageManager that names no bun release falls back without a download"
+
+# 33) A package.json that is not JSON cannot be read at all, which warns the same way.
+printf 'not json\n' >"$CHECKOUT/package.json"
+new_head
+run_script
+[ "$(rc)" -eq 0 ] || fail "an unreadable package.json must not fail the apply"
+grep -qF "WARN: could not read packageManager from $CHECKOUT/package.json" "$TMP/out" || fail "an unreadable package.json must be reported"
+[ ! -s "$RELEASE_CALLS" ] || fail "an unreadable package.json must download nothing"
+ran_with "$BUN_STUB/bun" || fail "an unreadable package.json must fall back to the resolved bun"
+pass "an unreadable package.json falls back to the resolved bun"
+write_manifest "bun@$PIN"
+
+# 34) A failed install fails the apply before anything is built, and leaves the marker where it
+#     was, so the next apply tries again.
+make_bun_stub "$BUN_STUB/bun" "$PIN"
+marker_before="$(cat "$HOME/.cache/ocode-built-commit")"
+before="$(calls)"
+export BUN_INSTALL_FAIL=1
+new_head
+run_script
+unset BUN_INSTALL_FAIL
+[ "$(rc)" -ne 0 ] || fail "a failed install must fail the apply"
+grep -qF "ERROR: bun install --frozen-lockfile failed in $CHECKOUT" "$TMP/out" || fail "a failed install must say what failed"
+[ "$(calls)" -eq "$before" ] || fail "a failed install must not build"
+[ "$(cat "$HOME/.cache/ocode-built-commit")" = "$marker_before" ] || fail "a failed install must leave the marker, so the next apply retries"
+pass "a failed dependency install fails the apply before the build"
 
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-ocode] all ocode fork-builder and bun provisioning tests passed" >&2

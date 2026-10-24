@@ -82,6 +82,15 @@ rebuild replace the background service on the next launch. bun, its build runtim
 `~/.bun/bin/bun` itself, so the first apply after the install builds without waiting for a new
 shell.
 
+The build runs on the bun the checkout pins (`packageManager` in its `package.json`), as
+upstream OpenCode's CI does, because a newer bun can reject what the pinned one installs (1.4.4
+refused a patch file the fork's 1.4.2 pin applies). That is the machine's bun when it is that
+version; otherwise the first build that needs it downloads that version from bun's GitHub
+release into `~/.cache/ocode-bun/<version>/`, verified against the release's `SHASUMS256.txt`.
+With it, the builder runs `bun install --frozen-lockfile` in the checkout before every build,
+which the fork's build assumes has happened. A pin that cannot be read or fetched (no network)
+warns and falls back to the machine's bun.
+
 A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, the file
 the build replaces. The builder looks for processes running **that** file (through
 `/proc/<pid>/exe`, so an `ocode` started from another path is left alone) and asks before killing
