@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'changed the `ocode` fork build''s version stamp from `2.0.<build time>`, which read lower than the upstream release the fork is built on once `reworked` moved onto `v2.1.4`, to `<release>-reworked.<build time>` (e.g. `2.1.4-reworked.2610241230`): `<release>` is the checkout''s `packages/cli/package.json` `version`, so the stamp follows every upstream release the fork is rebased onto, the suffix is the fork''s branch, and the build time stays because a launch replaces the background service only when the versions differ; a CLI package that names no release version stamps `2.0.0` with a warning'
+time: '2026-10-24T05:22:06.714647816Z'

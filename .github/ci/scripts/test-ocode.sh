@@ -10,8 +10,10 @@ set -euo pipefail
 # builder obtains itself (the clone onto the fork's branch with the fork/upstream remote layout,
 # the branch switch, the branch created from the fork's remote-tracking one, the checkout
 # holding no fork branch, a directory that is not a checkout, a failed clone), the skip without
-# bun, the first build (including the fork channel and release-grade version it must carry, and
-# the dependency install that must precede it), the no-op rebuild, the rebuild on a new head,
+# bun, the first build (including the fork channel and the version it must carry -- the release
+# the checkout is built on, marked as the fork's build, or 2.0.0 when its CLI package names no
+# release -- and the dependency install that must precede it), the no-op rebuild, the rebuild on
+# a new head,
 # the rebuild that restores a missing binary, the prompt for a running ocode with no answer, a
 # decline and an acceptance -- none of which may skip the build -- the process started while
 # the build runs, the ~/.bun/bin fallback, the bun the checkout pins (the resolved one when it is
@@ -56,6 +58,8 @@ PIN="1.4.2"
 NEWER="1.4.4"
 BUN_RELEASES="https://github.com/oven-sh/bun/releases/download"
 export CLONE_PIN="$PIN"
+# The upstream release the fake checkout is built on, as its CLI package's `version` names it.
+export CLONE_RELEASE="2.1.4"
 
 export CHECKOUT="$HOME/Development/github.com/rios0rios0/opencode"
 STUB="$TMP/stub"
@@ -66,12 +70,18 @@ mkdir -p "$STUB" "$BUN_STUB" "$RELEASE_STUB" "$CHECKOUT/.git" "$TMP/tmpdir"
 # The checkout's root package.json, with $1 as its packageManager -- the only field the builder
 # reads from it.
 write_manifest() { printf '{\n  "name": "opencode",\n  "packageManager": "%s"\n}\n' "$1" >"$CHECKOUT/package.json"; }
+# The checkout's CLI package.json, with $1 as its version -- the release the builder stamps.
+write_cli_manifest() {
+    mkdir -p "$CHECKOUT/packages/cli"
+    printf '{\n  "name": "@opencode/cli",\n  "version": "%s"\n}\n' "$1" >"$CHECKOUT/packages/cli/package.json"
+}
 
 # git stub: a fake checkout under .git -- HEAD holds the sha, HEAD_REF the branch, refs/ the
 # branches and the remote-tracking ones, remotes/ the remote URLs -- so the clone, the branch
 # switch and the remote layout are all assertable. The clone also brings the package.json a real
-# one would, pinning bun $CLONE_PIN. Every invocation is recorded in $GIT_CALLS. CLONE_FAIL makes
-# the clone fail the way a machine without the network does.
+# one would, pinning bun $CLONE_PIN, and the CLI package's, naming release $CLONE_RELEASE. Every
+# invocation is recorded in $GIT_CALLS. CLONE_FAIL makes the clone fail the way a machine without
+# the network does.
 cat >"$STUB/git" <<'STUB'
 #!/bin/bash
 echo "$*" >>"${GIT_CALLS:?}"
@@ -114,6 +124,8 @@ case "$sub" in
         : >"$target/.git/refs/remotes/$remote/$branch"
         printf '%s\n' "$url" >"$target/.git/remotes/$remote"
         printf '{\n  "name": "opencode",\n  "packageManager": "bun@%s"\n}\n' "${CLONE_PIN:?}" >"$target/package.json"
+        mkdir -p "$target/packages/cli"
+        printf '{\n  "name": "@opencode/cli",\n  "version": "%s"\n}\n' "${CLONE_RELEASE:?}" >"$target/packages/cli/package.json"
         ;;
     remote)
         case "$1" in
@@ -276,7 +288,9 @@ grep -qF "clone --origin fork --branch reworked https://github.com/rios0rios0/op
 [ "$(calls)" -eq 1 ] || fail "the first build must invoke bun once"
 identity="$(tail -n 1 "$BUN_ENV")"
 [ "${identity%%/*}" = "feat-provider-omniroute" ] || fail "the build must carry the fork's channel: $identity"
-[[ "${identity##*/}" =~ ^2\.0\.[0-9]+$ ]] || fail "the build must carry a release-grade version, not a preview one: $identity"
+[[ "${identity##*/}" =~ ^2\.1\.4-reworked\.[0-9]{10}$ ]] ||
+    fail "the build must carry the checkout's release marked as the fork's build, <release>-reworked.<build time>: $identity"
+grep -qF "stamping the build as ${identity%%/*} ${identity##*/}" "$TMP/out" || fail "the build identity must be reported: $identity"
 pass "a missing checkout is cloned onto the fork's branch with the fork/upstream remotes, then built"
 
 # 1b) The fresh clone is where the build used to die on dozens of `Could not resolve: "effect"`:
@@ -368,6 +382,7 @@ printf 'reworked\n' >"$CHECKOUT/.git/HEAD_REF"
 : >"$CHECKOUT/.git/refs/heads/reworked"
 : >"$CHECKOUT/.git/refs/remotes/fork/reworked"
 write_manifest "bun@$PIN"
+write_cli_manifest "$CLONE_RELEASE"
 printf '#!/bin/bash\necho fake ocode\n' >"$HOME/.local/bin/ocode"
 chmod +x "$HOME/.local/bin/ocode"
 # 7) Unchanged head: no rebuild, and no install either -- an unchanged apply stays a no-op.
@@ -848,6 +863,32 @@ grep -qF "ERROR: bun install --frozen-lockfile failed in $CHECKOUT" "$TMP/out" |
 [ "$(calls)" -eq "$before" ] || fail "a failed install must not build"
 [ "$(cat "$HOME/.cache/ocode-built-commit")" = "$marker_before" ] || fail "a failed install must leave the marker, so the next apply retries"
 pass "a failed dependency install fails the apply before the build"
+
+# 35) The version follows the release the checkout is built on: a checkout rebased onto the next
+#     upstream release stamps that release, still marked as the fork's build.
+write_cli_manifest "2.2.0"
+new_head
+run_script
+[ "$(rc)" -eq 0 ] || fail "a build on another release must succeed: $(cat "$TMP/out")"
+identity="$(tail -n 1 "$BUN_ENV")"
+[[ "${identity##*/}" =~ ^2\.2\.0-reworked\.[0-9]{10}$ ]] || fail "the version must follow the checkout's release: $identity"
+pass "the build version follows the upstream release the checkout is built on"
+
+# 36) A CLI package that names no release version -- no version at all, a pre-release, a file that
+#     is not JSON -- stamps 2.0.0 instead, still marked as the fork's build, and says so, so the
+#     build stays release-grade and the apply goes on.
+for manifest in '{"name": "@opencode/cli"}' '{"name": "@opencode/cli", "version": "0.0.0-dev-202610241230"}' 'not json'; do
+    printf '%s\n' "$manifest" >"$CHECKOUT/packages/cli/package.json"
+    new_head
+    run_script
+    [ "$(rc)" -eq 0 ] || fail "$manifest: a CLI package without a release version must not fail the apply"
+    identity="$(tail -n 1 "$BUN_ENV")"
+    [[ "${identity##*/}" =~ ^2\.0\.0-reworked\.[0-9]{10}$ ]] || fail "$manifest: must stamp 2.0.0 as the fork's build: $identity"
+    grep -qE "WARN: .*$CHECKOUT/packages/cli/package\.json.*so the build is stamped 2\.0\.0" "$TMP/out" ||
+        fail "$manifest: the fallback must be reported: $(grep WARN "$TMP/out")"
+done
+write_cli_manifest "$CLONE_RELEASE"
+pass "a CLI package that names no release version stamps 2.0.0 with a warning"
 
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-ocode] all ocode fork-builder and bun provisioning tests passed" >&2
