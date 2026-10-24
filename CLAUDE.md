@@ -938,9 +938,11 @@ the fork and carrying none of its code. It then runs the fork's own single-platf
 the checkout's HEAD moved past the last one, and
 installs the result as `~/.local/bin/ocode`. The build pins the channel and version the Console
 reads from the User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a build-stamped
-`OPENCODE_VERSION` (`2.0.<%y%m%d%H%M>`) -- because the free tier refuses client versions below
-1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview version is; the stamp also
-makes each rebuild replace the background service on the next launch. The marker
+`OPENCODE_VERSION` (`<release>-reworked.<%y%m%d%H%M>`, e.g. `2.1.4-reworked.2610241230`, with
+`<release>` the checkout's `packages/cli/package.json` `version`, or 2.0.0 with a warning when that
+names no release) -- because the free tier refuses client versions below 1.18.0, which a bare
+branch build's `0.0.0-<branch>-<time>` preview version is; the stamp also makes each rebuild
+replace the background service on the next launch. The marker
 `~/.cache/ocode-built-commit` makes an unchanged apply a no-op, which is why this is a `run_after`
 script that runs on every apply; `OCODE_SOURCE` names another checkout. No `bun`, a failed clone,
 a directory at the checkout's path that is not a checkout, and a checkout holding neither the

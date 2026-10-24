@@ -314,12 +314,28 @@ fi
 # Build identity: the binary must report a release-grade version, because the Console's free
 # tier gate reads it from the User-Agent -- `opencode/<channel>/<version>/<name>` -- and
 # refuses clients below 1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview
-# version is. The channel stays the branch, so the fork keeps its own service registration,
-# port and database; the patch tracks the build time so a rebuild replaces the background
-# service on the next launch.
+# version is. The version is the upstream release the checkout is built on -- the CLI
+# package's `version`, which upstream's release commit sets -- marked as this fork's build of
+# it: `<release>-<branch>.<build time>`, e.g. `2.1.4-reworked.2610241230`. The build time keeps
+# every build's version distinct, because a launch replaces the background service only when the
+# service reports a version other than the binary's own, so a rebuild would otherwise go on
+# talking to the service the previous build started. A CLI package that names no release
+# version stamps 2.0.0 instead, with a warning, so the build stays release-grade. The channel
+# stays `feat-provider-omniroute`, the fork's original branch, so the fork keeps its own service
+# registration, port and database.
+cli_manifest="$source_dir/packages/cli/package.json"
+if ! release="$(jq -r '.version // empty' "$cli_manifest" 2>/dev/null)"; then
+    echo "[ocode] WARN: could not read the release version from $cli_manifest (jq missing, or the file missing or not JSON), so the build is stamped 2.0.0" >&2
+    release="2.0.0"
+elif [[ ! "$release" =~ ^[0-9]+\.[0-9]+\.[0-9]+$ ]]; then
+    echo "[ocode] WARN: $cli_manifest names no release version (version is ${release:-missing}), so the build is stamped 2.0.0" >&2
+    release="2.0.0"
+fi
 OPENCODE_CHANNEL="feat-provider-omniroute"
-OPENCODE_VERSION="2.0.$(date -u +%y%m%d%H%M)"
+# A semver pre-release identifier allows only [0-9A-Za-z-], and a branch can hold a `/`.
+OPENCODE_VERSION="$release-${branch//[^0-9A-Za-z-]/-}.$(date -u +%y%m%d%H%M)"
 export OPENCODE_CHANNEL OPENCODE_VERSION
+echo "[ocode] stamping the build as $OPENCODE_CHANNEL $OPENCODE_VERSION" >&2
 # A single, current-platform build; the web UI bundle and the release assets cost minutes each
 # and add nothing to a local binary. `--skip-install` stays: the install above brought this
 # platform's native packages, and what the flag skips is the build's own install of those
