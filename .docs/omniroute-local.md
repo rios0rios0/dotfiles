@@ -41,13 +41,13 @@ The Compose file pins a custom build of the fork (`ghcr.io/rios0rios0/omniroute`
 
 ## The custom fork image
 
-The stack runs `ghcr.io/rios0rios0/omniroute`, built from the `feat/model-quota-api` branch of the [`rios0rios0/OmniRoute`](https://github.com/rios0rios0/OmniRoute) fork, because the gateway needs that branch's model-scoped quota endpoint. The official `diegosouzapw/omniroute` image does not carry it.
+The stack runs `ghcr.io/rios0rios0/omniroute`, built from the `reworked` branch of the [`rios0rios0/OmniRoute`](https://github.com/rios0rios0/OmniRoute) fork, because the gateway needs that branch's model-scoped quota endpoint. The official `diegosouzapw/omniroute` image does not carry it.
 
-The [publish workflow](https://github.com/rios0rios0/OmniRoute/blob/feat/model-quota-api/.github/workflows/publish-ghcr.yml) builds and pushes the image on every push to that branch. It uses the Dockerfile's `runner-base` target for `linux/amd64` -- the same flavour as the official image the stack ran before, without Chromium/Playwright, so the web-cookie providers (`gemini-web`, `claude-web`, `claude-turnstile`) are unavailable. Hosted builds take 27-55 minutes and use `OMNIROUTE_USE_TURBOPACK=0` with a 12 GB heap, the settings upstream's publish workflow validated.
+The [publish workflow](https://github.com/rios0rios0/OmniRoute/blob/reworked/.github/workflows/publish-ghcr.yml) builds and pushes the image on every push to that branch. It uses the Dockerfile's `runner-base` target for `linux/amd64` -- the same flavour as the official image the stack ran before, without Chromium/Playwright, so the web-cookie providers (`gemini-web`, `claude-web`, `claude-turnstile`) are unavailable. Hosted builds take 27-55 minutes and use `OMNIROUTE_USE_TURBOPACK=0` with a 12 GB heap, the settings upstream's publish workflow validated.
 
 The fork keeps only that workflow enabled: the inherited upstream workflows (CI, CodeQL, semgrep, Publish to npm, Deploy to VPS, the nightly suite, and the rest) are disabled in its Actions settings, so a matching branch or PR cannot start a job that would fail for lack of secrets. Re-enable one deliberately before using it.
 
-Each build publishes two tags: `:feat-model-quota-api`, which moves with the branch, and `:sha-<full commit>`, which does not. The Compose file pins the **digest**, never the branch tag: a tag cannot name the code a running container holds.
+Each build publishes two tags: `:reworked`, which moves with the branch, and `:sha-<full commit>`, which does not. The Compose file pins the **digest**, never the branch tag: a tag cannot name the code a running container holds.
 
 ### Update the pin
 

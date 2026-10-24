@@ -490,7 +490,7 @@ codexx() {
 # Rebuild `ocode`, the personal OpenCode fork's binary, on demand: it runs the same script
 # `chezmoi apply` runs there (run_after_linux-006-build-ocode.sh, resolved through the chezmoi
 # source so it cannot drift from what an apply would execute). Use it after pulling the fork
-# checkout at ~/Development/github.com/opencode/opencode (OCODE_SOURCE names another), without
+# checkout at ~/Development/github.com/rios0rios0/opencode (OCODE_SOURCE names another), without
 # waiting for the next apply. An unchanged checkout is a no-op, read from the
 # ~/.cache/ocode-built-commit marker. A running ocode is asked about; declining leaves it
 # running and the build goes on regardless, and the session keeps the old binary until it
@@ -593,4 +593,3 @@ if [[ -o interactive ]] && command -v tailscale-up >/dev/null 2>&1; then
 fi
 {{- end }}
 {{- end }}
-

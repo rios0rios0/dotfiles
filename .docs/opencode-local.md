@@ -35,7 +35,7 @@ config), like the equivalent `~/.claude` and `~/.codex` trees; chezmoi renders o
 `~/.config/opencode/skills`.
 
 Upstream's restore of those variables (sst/opencode#51888) was closed unmerged; the gate now
-lives on the personal fork `rios0rios0/opencode`, branch `feat/provider-omniroute` (commit
+lives on the personal fork `rios0rios0/opencode`, branch `reworked` (commit
 "feat(core): restore OPENCODE_DISABLE_CLAUDE_CODE for compatibility roots"), which gates the
 `~/.claude` compatibility roots at discovery. Until a build from that branch runs on this
 machine, the plugin is the stopgap; afterwards, delete the plugin and export
@@ -68,9 +68,9 @@ Model ids are the ones OmniRoute uses, so any id from the picker (`omniroute/aut
 ## The fork build (`ocode`)
 
 `ocode` is the same CLI, built from the personal fork `rios0rios0/opencode` (branch
-`feat/provider-omniroute`) instead of the official binary: it adds the OmniRoute provider plugin
+`reworked`) instead of the official binary: it adds the OmniRoute provider plugin
 and the `OPENCODE_DISABLE_CLAUDE_CODE` gate. `run_after_linux-006-build-ocode.sh` rebuilds it
-from the checkout at `~/Development/github.com/opencode/opencode` whenever that checkout's HEAD
+from the checkout at `~/Development/github.com/rios0rios0/opencode` whenever that checkout's HEAD
 moved, and installs it as `~/.local/bin/ocode`; see the "Fork Build (`ocode`)" part of the main
 `CLAUDE.md` for the mechanics. The build pins the client identity the Console reads from the
 User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a build-stamped

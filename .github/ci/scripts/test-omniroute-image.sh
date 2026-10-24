@@ -44,6 +44,7 @@ mkdir -p "$TMP/stub"
 cat > "$TMP/stub/gh" <<'STUB_GH'
 #!/bin/bash
 set -euo pipefail
+printf '%s\n' "$*" >> "${FAKE_GH_LOG:?}"
 case "$*" in
     *"repos/rios0rios0/OmniRoute/actions/workflows/publish-ghcr.yml/runs"*)
         if [[ "${FAKE_GH_FAIL:-}" == "true" ]]; then
@@ -84,8 +85,10 @@ chmod +x "$TMP/stub/gh" "$TMP/stub/docker"
 
 export PATH="$TMP/stub:$PATH"
 export FAKE_DOCKER_LOG="$TMP/docker.log"
+export FAKE_GH_LOG="$TMP/gh.log"
 export OMNIROUTE_COMPOSE="$COMPOSE"
 touch "$FAKE_DOCKER_LOG"
+touch "$FAKE_GH_LOG"
 
 image_line_of() { grep -E '^[[:space:]]*image:' "$1"; }
 image_line() { image_line_of "$COMPOSE"; }
@@ -145,8 +148,13 @@ if grep -q ':sha-'"$SHA_A" "$FAKE_DOCKER_LOG"; then
 else
     fail "the updater did not use the sha-<commit> tag: $(cat "$FAKE_DOCKER_LOG")"
 fi
-if grep -q ':feat-model-quota-api' "$FAKE_DOCKER_LOG"; then
-    fail "the mutable branch tag was resolved"
+if grep -q 'branch=reworked' "$FAKE_GH_LOG"; then
+    pass "the workflow lookup follows the reworked branch"
+else
+    fail "the workflow lookup did not use branch reworked: $(cat "$FAKE_GH_LOG")"
+fi
+if grep -q ':reworked' "$FAKE_DOCKER_LOG"; then
+    fail "the mutable branch tag was resolved instead of the immutable sha tag"
 else
     pass "the mutable branch tag is never pinned"
 fi
