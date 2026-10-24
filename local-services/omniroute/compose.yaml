@@ -19,7 +19,7 @@ services:
     # The rios0rios0/OmniRoute fork (branch reworked), built by
     # .github/workflows/publish-ghcr.yml in the fork and pinned by digest. Move the pin with
     # `./update-image.sh`; see .docs/omniroute-local.md, "The custom fork image".
-    image: 'ghcr.io/rios0rios0/omniroute@sha256:df266a214c2dfec50c3813efdad07ea6711a205f529ab48bf027e37dfbe1c4a8'
+    image: 'ghcr.io/rios0rios0/omniroute@sha256:a330cf727e343a14df19f6efb57f7366ec6097de400d99714038f605cc2c8ce3'
     platform: 'linux/amd64'
     restart: 'always'
     stop_grace_period: '40s'
@@ -33,6 +33,8 @@ services:
       ALLOW_API_KEY_REVEAL: 'false'
       OMNIROUTE_MEMORY_MB: '2048'
       NODE_EXTRA_CA_CERTS: '/run/omniroute-ca/ca-bundle.pem'
+      # Keep reasoning-effort choices in the model selector instead of advertising duplicate model rows.
+      OMNIROUTE_DISABLE_THINKING_LEVEL_VARIANTS: 'true'
       # How long the first, pooled attempt at a cloud provider may wait for its response to start
       # before OmniRoute retries it on a fresh socket. The 30-second default re-queues requests
       # NVIDIA NIM is still holding in its queue: z-ai/glm-5.3-flash started answering after
