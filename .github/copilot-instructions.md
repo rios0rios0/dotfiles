@@ -100,7 +100,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **NVM** (v0.40.2) — Node.js version manager (installs LTS + corepack)
   - **Pyenv** — Python version manager (installs Python 3.13.2)
   - **Flutter** — the current stable SDK from the official tarball (resolved from Flutter's releases manifest, SHA-256 verified) under `~/.local/share/flutter`, with `flutter` and `dart` linked into `~/.local/bin`; `flutter upgrade` moves an installed SDK forward
-  - **bun** — the runtime the `ocode` fork build uses, via `bun.sh/install` run with `SHELL` empty so its shell detection cannot append a PATH line to an rc file chezmoi owns; the `~/.bun/bin` block lives in `dot_zshenv.tmpl`
+  - **bun** — the runtime the `ocode` fork build uses, via `bun.sh/install` run with `SHELL` empty so its shell detection cannot append a PATH line to an rc file chezmoi owns; the `~/.bun/bin` block lives in `dot_zshenv.tmpl`. The build itself installs and builds with the bun the fork checkout pins (`packageManager`), downloading that version into `~/.cache/ocode-bun/<version>/` (verified against the release's `SHASUMS256.txt`) when this one differs
   - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
   - **GitHub Copilot CLI** (binary `copilot`, via upstream install script into `~/.local/bin`)
   - **Codex CLI** (`@openai/codex` npm package; its platform package bundles the bubblewrap the sandbox needs, so nothing else is installed for it)
