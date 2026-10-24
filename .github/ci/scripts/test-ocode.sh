@@ -36,7 +36,7 @@ fail() { echo "[test-ocode] FAIL: $1" >&2; EXIT_CODE=1; }
 export HOME="$TMP/home"
 mkdir -p "$HOME"
 
-export CHECKOUT="$HOME/Development/github.com/opencode/opencode"
+export CHECKOUT="$HOME/Development/github.com/rios0rios0/opencode"
 STUB="$TMP/stub"
 BUN_STUB="$TMP/bun-stub"
 mkdir -p "$STUB" "$BUN_STUB" "$CHECKOUT/.git"
@@ -161,9 +161,9 @@ calls() { wc -l <"$BUN_CALLS"; }
 rm -rf "$CHECKOUT"
 run_script
 [ "$(rc)" -eq 0 ] || fail "the clone must exit 0"
-grep -qF "clone --origin fork --branch feat/provider-omniroute https://github.com/rios0rios0/opencode.git $CHECKOUT" "$GIT_CALLS" ||
+grep -qF "clone --origin fork --branch reworked https://github.com/rios0rios0/opencode.git $CHECKOUT" "$GIT_CALLS" ||
     fail "a missing checkout must be cloned from the fork on its branch"
-[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "feat/provider-omniroute" ] || fail "the clone must land on the fork's branch"
+[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ] || fail "the clone must land on the fork's branch"
 [ "$(cat "$CHECKOUT/.git/remotes/origin")" = "https://github.com/sst/opencode.git" ] ||
     fail "the clone must get sst upstream as origin"
 [ -x "$HOME/.local/bin/ocode" ] || fail "the build after the clone must install an executable ocode"
@@ -182,32 +182,32 @@ before="$(calls)"
 : >"$GIT_CALLS"
 run_script
 [ "$(rc)" -eq 0 ] || fail "a branch switch must exit 0"
-grep -q "checkout is on main, switching to feat/provider-omniroute" "$TMP/out" || fail "the switch must say which branch it came from"
-[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "feat/provider-omniroute" ] || fail "the checkout must end on the fork's branch"
+grep -q "checkout is on main, switching to reworked" "$TMP/out" || fail "the switch must say which branch it came from"
+[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ] || fail "the checkout must end on the fork's branch"
 [ "$(calls)" -eq "$before" ] || fail "an unchanged head must not rebuild after a branch switch"
 pass "a checkout on another branch is switched to the fork's without rebuilding"
 
 # 3) The branch is missing locally but the fork's remote-tracking one is there: it is created
 #    from that, so a clone made by hand with another branch checked out still lands on the fork.
-rm -f "$CHECKOUT/.git/refs/heads/feat/provider-omniroute"
+rm -f "$CHECKOUT/.git/refs/heads/reworked"
 printf 'main\n' >"$CHECKOUT/.git/HEAD_REF"
 : >"$GIT_CALLS"
 run_script
 [ "$(rc)" -eq 0 ] || fail "tracking the fork's branch must exit 0"
-grep -qF "checkout -b feat/provider-omniroute --track fork/feat/provider-omniroute" "$GIT_CALLS" ||
+grep -qF "checkout -b reworked --track fork/reworked" "$GIT_CALLS" ||
     fail "a missing local branch must be created from fork/<branch>"
-[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "feat/provider-omniroute" ] || fail "the tracked branch must be checked out"
+[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ] || fail "the tracked branch must be checked out"
 pass "a missing local branch is created from the fork's remote-tracking one"
 
 # 4) Neither the branch nor the fork's remote one exists: the checkout is left alone and
 #    nothing is built, rather than building whatever branch it happens to be on.
-rm -rf "$CHECKOUT/.git/refs/heads/feat/provider-omniroute" "$CHECKOUT/.git/refs/remotes"
+rm -rf "$CHECKOUT/.git/refs/heads/reworked" "$CHECKOUT/.git/refs/remotes"
 printf 'main\n' >"$CHECKOUT/.git/HEAD_REF"
 rm -f "$HOME/.local/bin/ocode"
 before="$(calls)"
 run_script
 [ "$(rc)" -eq 0 ] || fail "a checkout without the fork's branch must skip"
-grep -q "has no feat/provider-omniroute branch" "$TMP/out" || fail "the missing branch must be reported"
+grep -q "has no reworked branch" "$TMP/out" || fail "the missing branch must be reported"
 [ "$(calls)" -eq "$before" ] || fail "a checkout without the fork's branch must not build"
 [ ! -e "$HOME/.local/bin/ocode" ] || fail "a checkout without the fork's branch must not install a binary"
 pass "a checkout with no fork branch warns and builds nothing"
@@ -239,9 +239,9 @@ pass "a failed clone warns and skips"
 rm -rf "$CHECKOUT"
 mkdir -p "$CHECKOUT/.git/refs/heads/feat" "$CHECKOUT/.git/refs/remotes/fork/feat"
 printf 'fake0001\n' >"$CHECKOUT/.git/HEAD"
-printf 'feat/provider-omniroute\n' >"$CHECKOUT/.git/HEAD_REF"
-: >"$CHECKOUT/.git/refs/heads/feat/provider-omniroute"
-: >"$CHECKOUT/.git/refs/remotes/fork/feat/provider-omniroute"
+printf 'reworked\n' >"$CHECKOUT/.git/HEAD_REF"
+: >"$CHECKOUT/.git/refs/heads/reworked"
+: >"$CHECKOUT/.git/refs/remotes/fork/reworked"
 printf '#!/bin/bash\necho fake ocode\n' >"$HOME/.local/bin/ocode"
 chmod +x "$HOME/.local/bin/ocode"
 # 7) Unchanged head: no rebuild.

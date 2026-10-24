@@ -4,7 +4,7 @@ set -euo pipefail
 # Pins local-services/omniroute/compose.yaml to the image built from the newest successful
 # run of the fork's publish workflow, by digest.
 #
-# Why a digest and not the branch tag: `feat/model-quota-api` moves on every push, so a tag
+# Why a digest and not the branch tag: `reworked` moves on every push, so a tag
 # cannot name the code a running container holds. The fork publishes `sha-<full commit>` for
 # each build; asking GitHub for the newest successful run and resolving that tag ties the pin
 # to a commit that passed the build, and the digest ties it to the exact image bytes.
@@ -13,7 +13,7 @@ set -euo pipefail
 # `docker login ghcr.io` first; a public one resolves anonymously.
 #
 # Usage:
-#   ./update-image.sh              # pin the newest successful build of feat/model-quota-api
+#   ./update-image.sh              # pin the newest successful build of reworked
 #   ./update-image.sh --check      # exit 1 when compose does not hold that digest
 #   ./update-image.sh --tag TAG    # pin TAG instead (e.g. a release tag), bypassing GitHub
 #   ./update-image.sh --file PATH  # rewrite another compose file
@@ -29,7 +29,7 @@ set -euo pipefail
 prefix="omniroute-image"
 repo="rios0rios0/OmniRoute"
 workflow="publish-ghcr.yml"
-branch="feat/model-quota-api"
+branch="reworked"
 image="${OMNIROUTE_IMAGE:-ghcr.io/rios0rios0/omniroute}"
 script_dir="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 compose="${OMNIROUTE_COMPOSE:-$script_dir/compose.yaml}"

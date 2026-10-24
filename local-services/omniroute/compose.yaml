@@ -16,7 +16,7 @@ services:
       retries: 3
 
   omniroute:
-    # The rios0rios0/OmniRoute fork (branch feat/model-quota-api), built by
+    # The rios0rios0/OmniRoute fork (branch reworked), built by
     # .github/workflows/publish-ghcr.yml in the fork and pinned by digest. Move the pin with
     # `./update-image.sh`; see .docs/omniroute-local.md, "The custom fork image".
     image: 'ghcr.io/rios0rios0/omniroute@sha256:df266a214c2dfec50c3813efdad07ea6711a205f529ab48bf027e37dfbe1c4a8'

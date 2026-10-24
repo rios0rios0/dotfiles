@@ -4,13 +4,13 @@ set -euo pipefail
 # Builds the local OpenCode fork checkout into ~/.local/bin/ocode whenever the checkout's HEAD
 # differs from the last build, and installs the result as `ocode` -- the personal fork's build,
 # carrying its custom features (the OmniRoute provider plugin and the
-# OPENCODE_DISABLE_CLAUDE_CODE gate, branch feat/provider-omniroute). It builds as a
+# OPENCODE_DISABLE_CLAUDE_CODE gate, branch reworked). It builds as a
 # release-grade client on the fork's own channel (see the build-identity note above the build
 # command): the Console refuses the free tier for client versions below 1.18.0, and a bare
 # branch build's `0.0.0-<branch>-<time>` preview version falls below it.
 #
 # The checkout is the script's to obtain, and it never builds the wrong branch: a missing one is
-# cloned from the fork and left on `feat/provider-omniroute`, and an existing one sitting on
+# cloned from the fork and left on `reworked`, and an existing one sitting on
 # another branch is switched to it -- the channel below is stamped whatever HEAD happens to hold,
 # so a checkout left on `main` would otherwise produce a binary labelled as the fork. A directory
 # that exists without being a checkout is not cloned into, and both a failed clone and a branch
@@ -32,11 +32,11 @@ set -euo pipefail
 # alone and builds anyway -- the session keeps the binary it started with until it restarts -- and
 # an ocode started *while* the build runs is safe for the same reason.
 
-source_dir="${OCODE_SOURCE:-$HOME/Development/github.com/opencode/opencode}"
+source_dir="${OCODE_SOURCE:-$HOME/Development/github.com/rios0rios0/opencode}"
 target="$HOME/.local/bin/ocode"
 marker="$HOME/.cache/ocode-built-commit"
 outdir="$HOME/.cache/ocode-build"
-branch="feat/provider-omniroute"
+branch="reworked"
 fork_url="https://github.com/rios0rios0/opencode.git"
 upstream_url="https://github.com/sst/opencode.git"
 

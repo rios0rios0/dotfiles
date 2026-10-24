@@ -854,7 +854,7 @@ Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NV
 ## The OmniRoute Fork Image
 
 The Compose stack in `local-services/omniroute/` runs `ghcr.io/rios0rios0/omniroute`, a build
-of the `feat/model-quota-api` branch of the `rios0rios0/OmniRoute` fork, not the official
+of the `reworked` branch of the `rios0rios0/OmniRoute` fork, not the official
 `diegosouzapw/omniroute` image: the gateway needs that branch's model-scoped quota endpoint.
 The fork's own `.github/workflows/publish-ghcr.yml` publishes it on every push to the branch.
 `local-services` is in `.chezmoiignore`, so none of this is deployed by `chezmoi apply` -- the
@@ -863,13 +863,13 @@ stack is run from the checkout, and the digest in `compose.yaml` is what decides
 | Part | Where |
 |------|-------|
 | Image | `ghcr.io/rios0rios0/omniroute`, digest-pinned in `local-services/omniroute/compose.yaml` |
-| Build | the fork's `publish-ghcr.yml`, `runner-base` for `linux/amd64`, on every push to `feat/model-quota-api` |
+| Build | the fork's `publish-ghcr.yml`, `runner-base` for `linux/amd64`, on every push to `reworked` |
 | Pin update | `local-services/omniroute/update-image.sh` (requires `gh` and `docker` buildx) |
 | Guide | `.docs/omniroute-local.md`, "The custom fork image" |
 
 **Keep these, each prevents a failure that was observed or measured:**
 
-1. **The pin is a digest, never the branch tag.** Every build publishes `:feat-model-quota-api` (moves
+1. **The pin is a digest, never the branch tag.** Every build publishes `:reworked` (moves
    on each push) and `:sha-<full commit>` (immutable). `update-image.sh` asks GitHub for the newest
    successful run, resolves that commit's tag and rewrites only the `omniroute` image line. Pinning
    the branch tag would let `docker compose pull` change what runs with no commit to name it. The
@@ -928,8 +928,8 @@ OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencod
 
 `ocode` is the personal fork's build of OpenCode, carrying the custom features the official binary
 lacks: the OmniRoute provider plugin and the `OPENCODE_DISABLE_CLAUDE_CODE` gate, both on branch
-`feat/provider-omniroute` of `rios0rios0/opencode`. `run_after_linux-006-build-ocode.sh` keeps it
-current, checkout included: a missing one at `~/Development/github.com/opencode/opencode` is cloned
+`reworked` of `rios0rios0/opencode`. `run_after_linux-006-build-ocode.sh` keeps it
+current, checkout included: a missing one at `~/Development/github.com/rios0rios0/opencode` is cloned
 from the fork straight onto that branch (with the fork named `fork` and sst upstream named
 `origin`, as the hand-made checkouts on these machines have them), and an existing one sitting on
 another branch is switched to it. The branch is not optional bookkeeping -- the build stamps the
