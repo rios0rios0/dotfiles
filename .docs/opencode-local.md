@@ -75,12 +75,10 @@ the tier, such as Codex's `*-high`, keep those rows: they are models, not varian
 it as `~/.local/bin/ocode`; see the "Fork Build (`ocode`)" part of the main `CLAUDE.md` for the
 mechanics. The build pins the client identity the Console reads from the
 User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a build-stamped
-`OPENCODE_VERSION=<release>-reworked.<%y%m%d%H%M>`, e.g. `2.1.4-reworked.2610241230`, where
-`<release>` is the upstream release the checkout is built on (its `packages/cli/package.json`
-`version`, or 2.0.0 with a warning when that names no release) -- because the free tier refuses
-client versions below 1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview version
-is; the channel keeps the fork's service registration, port and database its own, and the stamp
-makes each rebuild replace the background service on the next launch. bun, its build runtime, comes from
+`OPENCODE_VERSION=2.0.<%y%m%d%H%M>` -- because the free tier refuses client versions below
+1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview version is; the channel
+keeps the fork's service registration, port and database its own, and the stamp makes each
+rebuild replace the background service on the next launch. bun, its build runtime, comes from
 `install_bun` into `~/.bun` (PATH block in `dot_zshenv.tmpl`), and the builder falls back to
 `~/.bun/bin/bun` itself, so the first apply after the install builds without waiting for a new
 shell.
@@ -107,6 +105,50 @@ every path of the prompt and the mid-build race.
 The `rebuild-ocode` zsh function runs the same script on demand, resolving it through
 `chezmoi source-path`, so a build can be caught up after pulling the fork checkout -- or when an
 apply found nothing to build -- without a whole apply. `make test-zshrc-functions` covers it.
+
+## The web UI on the tailnet
+
+OpenCode's web UI is the client a phone uses: the server renders it, and the official binary is
+a glibc build Termux's bionic cannot start, so there is nothing to install on the phone. What the
+phone needs is a reachable server and a session.
+
+`tailscale-up` shares it, the same way it shares Ollama and for the same reason: `tailscale serve
+--bg --tcp=<port>` puts the forward in the client's own state, so it comes back with the service,
+and it never uses Funnel. Both settings live in `.chezmoidata/opencode.yaml`, read through
+`.chezmoitemplates/lib-opencode.tmpl`:
+
+| Key | Default | What it does |
+|-----|---------|--------------|
+| `shareOnTailnet` | `true` | whether `tailscale-up` forwards the port |
+| `webPort` | `41320` | the port the fork's service listens on -- its channel's default |
+| `devices.<deviceName>` | `{}` | per-device overrides, laid over key by key like `local-llm.yaml`'s |
+
+**The service keeps listening on loopback.** `ocode service set hostname 0.0.0.0` is not part of
+this: on WSL, Windows' client forwards to Windows' `localhost`, which WSL's localhost relay hands
+to the service's `127.0.0.1` socket, and on bare metal the forward names `127.0.0.1` directly. The
+port therefore stays closed to the Wi-Fi network, and the tailnet's ACLs decide who reaches it.
+
+Pair a device with the reachable address in the link, never the loopback one the TUI prints:
+
+```bash
+tailscale status --json | jq -r '.Self.DNSName'   # <machine>.<tailnet>.ts.net.
+ocode pair --url "http://<machine>.<tailnet>.ts.net:41320"
+```
+
+`--url` is what replaces `127.0.0.1` in the link, so the QR code carries the address the phone can
+actually dial (`tailscale ip -4` gives the `100.x.y.z` form, which works as well). Opening the link
+on the phone signs it in with a session cookie and loads the UI.
+
+The link is one-time and expires in 5 minutes; the session it grants lasts 30 days. Changing the
+server password signs every session out, and `ocode service set password ...` is how a session is
+revoked. The pairing page is a navigation, and the cookie carries no `Secure` flag, which is why
+the plain-TCP forward is enough here.
+
+Switching `shareOnTailnet` off stops `tailscale-up` from re-creating the forward; it does not
+remove the one already in the client, because a `serve` entry outlives the repository that set it.
+Remove it with `tailscale serve --tcp=41320 off`. A share left pointing at a stopped service
+answers connections with nothing behind them, which is harmless: the next `ocode` start serves the
+UI again.
 
 ## When models are missing
 

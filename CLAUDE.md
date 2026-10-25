@@ -31,7 +31,7 @@ make test-zshrc-functions           # top-size, sentry-ds and rebuild-ocode in d
 make test-sentry-setup              # the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds
 make test-local-llm                 # the local model server: its settings, the window its unit allocates, the installer's gate
 make test-opencode                  # OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference
-make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server
+make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server and the ocode web UI
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: with and without a login, no refresh without one, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
@@ -856,6 +856,7 @@ OpenCode runs on the OmniRoute gateway: `dot_config/opencode/opencode.json.tmpl`
 | Look | `dot_config/opencode/cli.json` |
 | Rules | `~/.config/opencode/AGENTS.md` and `rules/`, synced by aisync, not chezmoi; each project's `CLAUDE.md` arrives through `instructions` |
 | Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported by the credential loader and read at config load as `{env:OMNIROUTE_API_KEY}` |
+| Web UI on the tailnet | `.chezmoidata/opencode.yaml` (port, share switch) read through `lib-opencode.tmpl`; `tailscale-up` forwards it as a plain-TCP `serve` entry, on loopback. Pair with `ocode pair --url http://<machine>.<tailnet>.ts.net:<webPort>`; see `.docs/opencode-local.md` |
 
 **Keep these, each prevents a failure that was observed or measured:**
 
@@ -974,6 +975,7 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
 | `tailscale` in a shell | `dot_local/bin/executable_tailscale`, a wrapper for `tailscale.exe` | the package's |
 | Login | the Tailscale app on Windows | `tailscale-up`, which waits for the browser |
 | Sharing the model's server | `tailscale-up`, through Windows' `tailscale serve` | `tailscale-up`, through `tailscale serve` |
+| Sharing the ocode web UI | `tailscale-up`, the same way (`.chezmoidata/opencode.yaml`) | `tailscale-up`, the same way |
 | `.chezmoiscripts/run_onchange_after_linux-010-setup-tailscale.sh.tmpl` | runs `tailscale-up --no-login`, nothing else | installs, enables `tailscaled`, logs in |
 | Shell hook (`dot_zshrc.tmpl`, "Tailscale") | none | `tailscale-up --no-login` in every interactive zsh |
 
@@ -1029,6 +1031,16 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
     nothing listens on until a WSL terminal opens once (RustDesk, on the desktop). Windows'
     client keeps the machine on the tailnet meanwhile, and `tailscale set --unattended=true`
     keeps it there after its user signs out and before the first sign-in after a reboot.
+11. **The ocode web UI is a plain-TCP forward on loopback, and the pairing link names the tailnet.**
+    `.chezmoidata/opencode.yaml` (through `lib-opencode.tmpl`) decides the port and whether it is
+    shared, and `tailscale-up` forwards it exactly as it forwards Ollama's -- `serve --tcp`, never
+    Funnel, on `localhost` on WSL and `127.0.0.1` on bare metal. The service therefore keeps
+    listening on loopback, so `ocode service set hostname 0.0.0.0` is not needed and would open the
+    port to the Wi-Fi network; the phone pairs with `ocode pair --url
+    http://<machine>.<tailnet>.ts.net:<webPort>`, which is what puts a reachable host in the
+    one-time link and the QR code. The session that link grants lasts 30 days and rotating the
+    server password revokes it; a `serve` entry outlives the repository that set it, so switching
+    `shareOnTailnet` off leaves `tailscale serve --tcp=<webPort> off` to a person.
 
 What the Linux client leaves behind on WSL is root's, so no tombstone reaches it:
 `sudo apt-get purge -y tailscale` also removes `/var/lib/tailscale`, and
@@ -1036,7 +1048,7 @@ What the Linux client leaves behind on WSL is root's, so no tombstone reaches it
 drops the repository. Delete that machine in the admin console too, so that Windows' node can
 take its name.
 
-`make test-tailscale` covers 1 to 6 and 9 against stubs of both clients, `systemctl` and `sudo`,
+`make test-tailscale` covers 1 to 7, 9 and 11 against stubs of both clients, `systemctl` and `sudo`,
 and the removal on WSL alone; `make test-chezmoiignore` covers the gates.
 
 ## systemd on WSL (Turned On by chezmoi)

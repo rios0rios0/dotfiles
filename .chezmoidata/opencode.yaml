@@ -1,0 +1,24 @@
+# OpenCode V2 on this machine: the official `opencode` and the fork build `ocode`. See
+# .docs/opencode-local.md and CLAUDE.md, "OpenCode V2 Through OmniRoute".
+#
+# chezmoi reads this file on every apply -- unlike `data:` in .chezmoi.yaml.tmpl, which only
+# `chezmoi init` regenerates -- so an edit reaches tailscale-up on the next apply. It is read
+# through .chezmoitemplates/lib-opencode.tmpl.
+opencode:
+  # Share the ocode web UI with the tailnet, so that a phone or another machine can open it:
+  # tailscale-up forwards the tailnet's port `webPort` to it with `tailscale serve` (never Funnel).
+  # On WSL, Windows' client forwards to Windows' `localhost`, which WSL hands on to the service's
+  # loopback socket, so the server keeps listening on loopback alone -- `service set hostname
+  # 0.0.0.0` is not needed and would expose it to every interface as well. The UI is password
+  # protected, and a device joins it with a one-time pairing link: `ocode pair --url
+  # http://<machine>.<tailnet>.ts.net:<webPort>` prints the link and a QR code for it.
+  shareOnTailnet: true
+  # The port the fork's service listens on: its channel's default. `ocode service status` prints
+  # the live one, and a port pinned with `ocode service set port` has to match this, or the share
+  # forwards to nothing.
+  webPort: 41320
+  # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
+  #   devices:
+  #     some-desktop:
+  #       shareOnTailnet: false
+  devices: {}

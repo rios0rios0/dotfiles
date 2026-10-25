@@ -1,0 +1,23 @@
+{{- /*
+  The OpenCode settings for this device, as JSON: .opencode from .chezmoidata/opencode.yaml with
+  .opencode.devices.<deviceName> laid over it.
+
+  tailscale-up reads it, and only it, so that what this machine shares on the tailnet and which
+  port it forwards are one declaration rather than one per consumer:
+      includeTemplate "lib-opencode.tmpl" . | fromJson
+*/ -}}
+{{- /* deviceName is read with `get`, as lib-local-llm.tmpl does and for the same reason: a config
+       that predates it must render with the defaults, so run_before_000-verify-chezmoi-config can
+       report the stale config instead of the apply dying on a template error. */ -}}
+{{- $oc := .opencode -}}
+{{- $deviceName := get . "deviceName" -}}
+{{- $device := dict -}}
+{{- if hasKey $oc.devices $deviceName -}}
+{{-   $device = get $oc.devices $deviceName -}}
+{{- end -}}
+{{- /* Laid over key by key with `set`, never with sprig's merge, which drops false and 0. */ -}}
+{{- $settings := deepCopy (omit $oc "devices") -}}
+{{- range $key, $value := $device -}}
+{{-   $_ := set $settings $key $value -}}
+{{- end -}}
+{{- toJson $settings -}}

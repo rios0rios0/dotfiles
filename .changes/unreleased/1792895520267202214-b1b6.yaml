@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'shared the `ocode` web UI with the tailnet from `tailscale-up`, with the port and the switch declared once in `.chezmoidata/opencode.yaml` and read through `lib-opencode.tmpl`: the forward is a plain-TCP `tailscale serve` entry to the service''s loopback socket -- `localhost` on WSL, which Windows'' client reaches through WSL''s relay, and `127.0.0.1` on bare metal -- so nothing on the Wi-Fi network reaches it and `ocode service set hostname 0.0.0.0` is not needed, a phone pairs with `ocode pair --url http://<machine>.<tailnet>.ts.net:<webPort>` so the one-time link and its QR code name an address it can dial, and one `serve status` call now answers for every share the machine declares'
+time: '2026-10-25T02:32:00.267119747Z'

@@ -1,4 +1,5 @@
 {{- $llm := includeTemplate "lib-local-llm.tmpl" . | fromJson -}}
+{{- $oc := includeTemplate "lib-opencode.tmpl" . | fromJson -}}
 {{- $wsl := and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
 #!/bin/bash
 
@@ -17,7 +18,8 @@
 # where Tailscale's WSL guide says a second client breaks WSL's traffic through the first. That
 # client is a service that starts with Windows and rejoins by itself, and its app owns the login,
 # so nothing here waits for a browser, needs root, or runs in every shell. What is left to do here
-# is sharing this machine's Ollama with the tailnet, when .chezmoidata/local-llm.yaml says so.
+# is sharing, on the tailnet, this machine's Ollama (.chezmoidata/local-llm.yaml) and the ocode web
+# UI (.chezmoidata/opencode.yaml), when those say so.
 {{- else }}
 #
 #   tailscale-up             starts tailscaled if it is off; logs in if needed, printing the login
@@ -39,7 +41,8 @@
 #         MagicDNS when no DNS manager runs, so every lookup would fail while tailscaled is down.
 #         Peers are reached by address instead: `tailscale ip -4 <name>`, or
 #         `tailscale status --json`.
-#   - sharing this machine's Ollama with the tailnet, when .chezmoidata/local-llm.yaml says so.
+#   - sharing, on the tailnet, this machine's Ollama (.chezmoidata/local-llm.yaml) and the ocode web
+#     UI (.chezmoidata/opencode.yaml), when those say so.
 {{- end }}
 
 set -euo pipefail
@@ -190,11 +193,18 @@ fi
 # names, so preferences set by hand since survive.
 tailscale set "${prefs[@]}" 2>/dev/null || sudo tailscale set "${prefs[@]}"
 {{- end }}
-{{- if and $llm.enabled $llm.shareOnTailnet }}
+{{- $share_ollama := and $llm.enabled $llm.shareOnTailnet -}}
+{{- if or $share_ollama $oc.shareOnTailnet }}
 
-# This machine's Ollama, on the tailnet's port 11434: where OmniRoute on another machine reaches
-# this GPU. Serve keeps the forward in the client's state, so it comes back with the service; it
-# is set here when it is missing or forwards anywhere else, as the one an older revision set does.
+# What this machine shares on the tailnet: forwards the client keeps in its own state, so they come
+# back with the service. Each is set here when it is missing or forwards anywhere else, as the one
+# an older revision set does. One `serve status` answers for all of them, so the pass a new shell
+# runs costs one call, not one per share.
+serve_json="$(tailscale serve status --json 2>/dev/null || true)"
+[[ -n "$serve_json" ]] || serve_json='{}'
+{{- if $share_ollama }}
+
+# Ollama, on the tailnet's port 11434: where OmniRoute on another machine reaches this GPU.
 {{- if $wsl }}
 #
 # Windows' client forwards to Windows' loopback, where WSL's localhost relay hands each connection
@@ -207,7 +217,7 @@ target="localhost:11434"
 target="127.0.0.1:11434"
 {{- end }}
 
-if [[ "$(tailscale serve status --json 2>/dev/null | jq -r '.TCP["11434"].TCPForward // empty' 2>/dev/null)" != "$target" ]]; then
+if [[ "$(jq -r '.TCP["11434"].TCPForward // empty' <<<"$serve_json" 2>/dev/null)" != "$target" ]]; then
 {{- if $wsl }}
     tailscale serve --bg --tcp=11434 "tcp://$target" >/dev/null ||
         stop "could not share Ollama through Windows' Tailscale client"
@@ -217,6 +227,30 @@ if [[ "$(tailscale serve status --json 2>/dev/null | jq -r '.TCP["11434"].TCPFor
 {{- end }}
     echo "[$prefix] sharing Ollama with the tailnet on port 11434" >&2
 fi
+{{- end }}
+{{- if $oc.shareOnTailnet }}
+
+# The ocode web UI, on the tailnet's port {{ $oc.webPort }}: where a phone or another machine opens
+# it, and pairs with `ocode pair --url http://<machine>.<tailnet>.ts.net:{{ $oc.webPort }}`. The
+# service keeps listening on loopback -- Windows' client forwards to Windows' `localhost`, which
+# WSL hands on to it -- so nothing else on the network reaches it.
+{{- if $wsl }}
+ocode_target="localhost:{{ $oc.webPort }}"
+{{- else }}
+ocode_target="127.0.0.1:{{ $oc.webPort }}"
+{{- end }}
+
+if [[ "$(jq -r '.TCP["{{ $oc.webPort }}"].TCPForward // empty' <<<"$serve_json" 2>/dev/null)" != "$ocode_target" ]]; then
+{{- if $wsl }}
+    tailscale serve --bg --tcp={{ $oc.webPort }} "tcp://$ocode_target" >/dev/null ||
+        stop "could not share the ocode web UI through Windows' Tailscale client"
+{{- else }}
+    tailscale serve --bg --tcp={{ $oc.webPort }} "tcp://$ocode_target" >/dev/null 2>&1 ||
+        sudo tailscale serve --bg --tcp={{ $oc.webPort }} "tcp://$ocode_target" >/dev/null
+{{- end }}
+    echo "[$prefix] sharing the ocode web UI with the tailnet on port {{ $oc.webPort }}" >&2
+fi
+{{- end }}
 {{- end }}
 
 echo "[$prefix] on the tailnet as $(tailscale ip -4 2>/dev/null | head -1)" >&2
