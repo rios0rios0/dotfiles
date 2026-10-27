@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'changed the local OmniRoute catalog to hide separate reasoning-effort model rows while keeping effort selection available after choosing a model, and pinned the stack to the newest successful `reworked` GHCR image'
-time: '2026-10-24T05:55:00.000Z'

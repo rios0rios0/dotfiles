@@ -191,6 +191,12 @@ the models it offers are whatever the key's policy lets `/v1/models` serve: a mo
 or restricted in OmniRoute's dashboard, and OpenCode follows. Setup and usage are in
 [OpenCode V2 through OmniRoute](opencode-local.md).
 
+The Compose file sets `OMNIROUTE_DISABLE_THINKING_LEVEL_VARIANTS`, so `/v1/models` lists a reasoning
+model once instead of adding a `<model>-<tier>` row per effort tier; OpenCode offers the tiers as the
+model's variants instead. The flag is a feature flag, and a value set in the dashboard (Settings,
+Feature Flags) overrides the Compose one: if the suffixed rows come back, look there for an override
+before suspecting the image.
+
 ## Encrypted backups
 
 The stack's state lives in a Docker volume, where `docker compose down -v`, a corrupted volume or a

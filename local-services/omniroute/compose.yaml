@@ -19,7 +19,7 @@ services:
     # The rios0rios0/OmniRoute fork (branch reworked), built by
     # .github/workflows/publish-ghcr.yml in the fork and pinned by digest. Move the pin with
     # `./update-image.sh`; see .docs/omniroute-local.md, "The custom fork image".
-    image: 'ghcr.io/rios0rios0/omniroute@sha256:a330cf727e343a14df19f6efb57f7366ec6097de400d99714038f605cc2c8ce3'
+    image: 'ghcr.io/rios0rios0/omniroute@sha256:3984a0611d0aea726ba7d0c63020049e90b27aac7d889430b65731ae66a01578'
     platform: 'linux/amd64'
     restart: 'always'
     stop_grace_period: '40s'
@@ -33,7 +33,12 @@ services:
       ALLOW_API_KEY_REVEAL: 'false'
       OMNIROUTE_MEMORY_MB: '2048'
       NODE_EXTRA_CA_CERTS: '/run/omniroute-ca/ca-bundle.pem'
-      # Keep reasoning-effort choices in the model selector instead of advertising duplicate model rows.
+      # List each reasoning model once. By default /v1/models adds a `<model>-<tier>` row for every
+      # effort tier a model has (`-low`, `-medium`, `-high`, ...), so OpenCode's picker showed each
+      # such model once more per tier. The effort stays selectable: the base model keeps
+      # `capabilities.effort_tiers`, which ocode's OmniRoute provider turns into the model's variants
+      # (ctrl+t in the TUI), and a suffixed id sent on a request still routes. Off by default upstream;
+      # a dashboard override (Settings, Feature Flags) wins over this value.
       OMNIROUTE_DISABLE_THINKING_LEVEL_VARIANTS: 'true'
       # How long the first, pooled attempt at a cloud provider may wait for its response to start
       # before OmniRoute retries it on a fresh socket. The 30-second default re-queues requests

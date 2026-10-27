@@ -61,6 +61,13 @@ ocode models                   # the full catalog, with the omniroute/* entries 
 Model ids are OmniRoute's own behind the provider's `omniroute/` prefix: `omniroute/auto/coding`,
 `omniroute/codex/...`, `omniroute/nvidia/...`.
 
+A reasoning model is listed once, and its effort is a variant of it: `ctrl+t` cycles the variants
+in the TUI, and `ocode run -m omniroute/<model>#high` picks one for a single run. The variants are
+the `capabilities.effort_tiers` the gateway reports for the model, so a model that reports none has
+none. OmniRoute would also list each tier as a model of its own (`<model>-high`), which the Compose
+file turns off with `OMNIROUTE_DISABLE_THINKING_LEVEL_VARIANTS`. Providers whose own model ids carry
+the tier, such as Codex's `*-high`, keep those rows: they are models, not variants.
+
 ## The fork build (`ocode`)
 
 `run_after_linux-006-build-ocode.sh` rebuilds `ocode` from the checkout at
