@@ -18,11 +18,11 @@ set -euo pipefail
 # converged (a commit hash from the feature branch changes when the branch is
 # rebased before merge).
 TOMBSTONES=(
-    # Claude Code's npm package -- replaced (2026-10-27) by Anthropic's native build, which
-    # `install_claude_cli` puts behind ~/.local/bin/claude and which updates itself. npm 12 blocks
-    # the postinstall that copies the native binary over the package's placeholder, so the npm
-    # `claude` would turn into a stub at its next update. The installer runs before this and fails
-    # the apply when the native build is missing, so this never removes the only `claude`.
+    # Claude Code's npm package -- replaced in #269 (2026-10-27) by Anthropic's native build,
+    # which `install_claude_cli` puts behind ~/.local/bin/claude and which updates itself. npm 12
+    # blocks the postinstall that copies the native binary over the package's placeholder, so the
+    # npm `claude` would turn into a stub at its next update. The installer runs before this and
+    # fails the apply when the native build is missing, so this never removes the only `claude`.
     "npm_global:@anthropic-ai/claude-code"
 
     # Kali's apt `yq`, kislyuk's Python wrapper around jq (with its `xq` and `tomlq`) -- replaced
