@@ -208,7 +208,7 @@ Phase 3 is what authenticates every template here.
 | 3    | `run_once_before_linux-002-install-dependencies.sh`           | `[automated]` | apt packages plus every tool in the table below. 45-120 minutes.                                                                                                                                             |
 | 4    | `run_once_before_linux-003-configure-dependencies.sh`         | `[automated]` | Symlinks Debian's `batcat` to `~/.local/bin/bat`.                                                                                                                                                            |
 | 5    | `run_once_before_linux-004-install-fonts.sh.tmpl`             | `[automated]` | The same three font families into `~/.fonts`, then `fc-cache`.                                                                                                                                              |
-| 6    | `run_before_linux-005-export-private-key.sh.tmpl`             | `[automated]` | On every apply where a key is missing or differs: signs in with `op signin --account my` and writes the chezmoi age key to `~/.ssh/chezmoi`, and on WSL the OmniRoute backup key.                           |
+| 6    | `run_before_linux-005-export-private-key.sh.tmpl`             | `[automated]` | On every apply where a key is missing or differs: signs in with `op signin --account my` and writes the chezmoi age key to `~/.ssh/chezmoi`, on WSL the OmniRoute backup key, and the aisync key to `~/.config/aisync/key.txt` (only when it is missing). |
 | 7    | Managed files                                                 | `[automated]` | `.zshrc`, `.zshenv`, `.p10k.zsh`, `.tmux.conf`, `.gitconfig`, `.age_recipients`, `.docker/config.json`, `.config/ggshield`, the `ssh` and `ssh-add` wrappers in `~/.local/bin`, `.scripts/*`, `~/.claude.json` (MCP servers), Atuin's `.config/atuin/config.toml`, and the decrypted `.kube`, `.john`, `.sqlmap` and `.npmrc`. `.ssh/config` is Windows and Android only. |
 | 8    | `run_once_after_linux-001-extract-compressed-folders.sh`      | `[automated]` | Restores `~/.kube/config-files` from the `~/.kube/config-files.tar` the apply decrypts, and any other folder the folder watcher backs up as `<folder>.tar` (`.john` and `.sqlmap` are deployed file by file, so they have none). A folder that already exists is left alone; one that fails to unpack fails the apply, which retries it. |
 | 9    | `run_once_after_linux-002-clone-pentesting-tools.sh`          | `[automated]` | Clones VHostScan, dirsearch, StegCracker and stegbrute into `~/Development/Tools`.                                                                                                                           |
@@ -219,6 +219,7 @@ Phase 3 is what authenticates every template here.
 | 14   | `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl`      | `[automated]` | Raises a CLI older than `0.47.0` (the floor `sentry-ds` needs) with `sentry cli upgrade`, failing until it holds; then `sentry cli setup --no-modify-path`: the zsh completion into `~/.local/share/zsh/site-functions`, and the Claude Code skill once `~/.claude` exists (the next `sentry cli upgrade` adds it otherwise). |
 | 15   | `run_onchange_after_linux-011-setup-chrome.sh`               | `[automated]` | Google Chrome from Google's apt repository, for the Chrome DevTools MCP server; asks for the sudo password. Its key is trusted for that repository only, and only once its fingerprint proves it Google's. |
 | 16   | `run_onchange_after_linux-012-setup-claude-lsp.sh`           | `[automated]` | Pinned `gopls` (into `~/.local/bin`), `typescript-language-server` and `pyright`, and the `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins at user scope. Claude Code loads them at its next start. Adding the plugins' marketplace prints `SSH not configured, cloning via HTTPS`, which is expected. Claude Code first tries `ssh -T git@github.com` for 3 seconds without prompting, and the first apply cannot pass that: it runs from bash, before `~/.local/bin` and its `ssh.exe` wrapper are on `PATH`, and Linux's own `ssh` knows no GitHub host key. The repository is public, so HTTPS clones it without credentials. |
+| 17   | `run_after_linux-014-sync-aifiles.sh.tmpl`                   | `[automated]` | Clones aifiles into `~/.config/aisync/repo` if needed and pulls it into `~/.claude` and `~/.config/opencode`: instructions, settings, rules, agents, commands, hooks, skills, Claude's project memories and recent conversations. The first sync lets aifiles' copy win, after backing up every local file it may replace to `/tmp/aifiles-first-sync.*`; after that an apply pulls only when aifiles moved. It never prompts, pushes or fails the apply. |
 
 ### What the dependency installer provides
 
@@ -253,7 +254,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | ruff                                             | `install_ruff`                       | `[automated]` | Astral install script.                                                                                                          |
 | yq                                               | `install_yq`                         | `[automated]` | mikefarah's release, pinned and SHA-256 checked, into `~/.local/bin`; Kali's apt `yq` is a different tool.                      |
 | Atuin (shell history)                            | `install_atuin`                      | `[partial]`   | The release tarball, pinned and SHA-256 checked, into `~/.local/bin`; `.zshrc` starts it. The account login and the one-time import of the zsh-histdb history are by hand (below). |
-| aisync                                           | `install_aisync`                     | `[partial]`   | Installed here; the key, the `aifiles` clone and the first pull are done by hand (below).                                       |
+| aisync                                           | `install_aisync`                     | `[automated]` | Installed here; `run_after_linux-014` clones aifiles and pulls it after every apply.                                            |
 | Atlassian CLI                                    | `install_acli`                       | `[automated]` |                                                                                                                                 |
 | Speedtest CLI                                    | `install_speedtest_cli`              | `[automated]` | Ookla apt repository.                                                                                                           |
 
@@ -266,10 +267,6 @@ place in `~/Development/Tools/Cyclonedx` yourself).
 
 ```sh
 exec zsh                                   # first zsh: ZINIT clones Powerlevel10k and the plugins
-mkdir -p ~/.config/aisync && (umask 077 && op read "op://Private/aisync.age/private key" > ~/.config/aisync/key.txt)
-aisync --use-system-git init rios0rios0    # clones aifiles; a bare `init` makes a new key and an empty repo
-aisync source add guide --source-repo rios0rios0/guide --branch generated
-aisync pull                                # personal files and the last 14 days of conversations
 claude                                     # /login, then: ccswitch enroll
 sentry auth login                          # device code entered at a URL; `--token <API token>` skips OAuth
 neon login                                 # browser flow; `NEON_API_KEY` or `neon profile create <name> --api-key -` (stdin) skips it
@@ -279,6 +276,12 @@ atuin login -u <username>                  # the password and key from the `Atui
 Then import the zsh-histdb history once and run `atuin sync`. On `alien-a51`, which runs the Atuin
 server, that means starting the server and registering the account first, and importing only the
 laptop's own commands. [atuin-sync.md](atuin-sync.md) has the commands for each device.
+
+aisync needs nothing here: the apply fetched its key, cloned aifiles into `~/.config/aisync/repo`
+and pulled it, letting aifiles' copy win over what was there, which it backed up to an
+`aifiles-first-sync.*` directory in `/tmp` first (see "AI Rules Sync" in CLAUDE.md). Never run a bare
+`aisync init`, which generates a new key, nor `aisync source add`, which breaks every later pull. When
+an apply reports changes on both sides, settle them with `aisync sync` in a terminal.
 
 If `docker` should work inside Kali through Docker Desktop, enable its WSL integration for
 `kali-linux` under Docker Desktop's settings.
@@ -339,6 +342,7 @@ and then drop you into zsh: type `exit` to let the installer continue.
 | 9    | `run_after_android-005-prune-tmp-modcache.sh`                       | `[automated]` | Deletes Go module caches left under `$TMPDIR`, which otherwise crash Termux on exit.                                                            |
 | 10   | `run_after_android-007-build-claude-exec-shim.sh`                   | `[automated]` | Compiles `~/.local/bin/claude-exec-shim` with `clang`, so Claude Code's `grep` and `find` can run its musl binary without `LD_PRELOAD`.          |
 | 11   | `run_onchange_after_android-006-setup-sentry-cli.sh.tmpl`           | `[automated]` | Raises a CLI older than `0.47.0` (the floor `sentry-ds` needs) with `sentry cli upgrade`, failing until it holds; then `sentry cli setup --no-modify-path`: the zsh completion and the Claude Code skill (`~/.claude` is managed here, so it already exists). |
+| 12   | `run_after_android-008-sync-aifiles.sh.tmpl`                        | `[automated]` | The same pull as Linux's step 17. The key is rendered from 1Password on an apply that finds none, and `~/.config/aisync/exclude` keeps aifiles' Linux/WSL copies of `settings.json`, `CLAUDE.md` and `AGENTS.md` off the phone. It needs aisync 1.7.0; an older one is reported with the command that rebuilds it. |
 
 ### What the dependency installer provides
 
@@ -371,8 +375,8 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 
 ### After the apply `[manual]`
 
-Same `aisync`, `claude`, `sentry auth login` and `atuin login` steps as Phase 4, minus `ccswitch`
-(Linux only), with Neon authenticated by an API key rather than the browser flow
+Same `claude`, `sentry auth login` and `atuin login` steps as Phase 4, minus `ccswitch` (Linux
+only), with Neon authenticated by an API key rather than the browser flow
 (`neon profile create <name> --api-key -` reads it from stdin). Then import the phone's zsh-histdb
 history into Atuin under its device name, as [atuin-sync.md](atuin-sync.md) shows for Termux. Then
 the Android settings
@@ -428,7 +432,7 @@ Candidates for future issues, in rough order of payoff:
 3. **Broken winget manifests**: `Asus.ArmouryCrate`, `Blizzard.BattleNet`, `Ubisoft.Connect`. Re-test them periodically, or install from the vendor URL with a checksum.
 4. **Windows features up front.** A small elevated pre-step could enable Virtual Machine Platform and WSL and run `wsl --set-default-version 2` before winget, instead of relying on `wsl --install` inside `windows-002`.
 5. **Baremetal Linux 1Password.** `linux-001` and `linux-005` assume `op.exe`.
-6. **Post-install steps that need a token**: `aisync` first pull, `ccswitch enroll`, the Claude Code bootstrap on Android. The `cred:` fields on the device note could feed them.
+6. **Post-install steps that need a token**: `ccswitch enroll`, the Claude Code bootstrap on Android. The `cred:` fields on the device note could feed them.
 7. **`imagemagick`, `pdftk` on WSL, PDM**: decide where they belong and add them to the installers or drop them from the checklist.
 8. **Zone.Identifier cleanup** after a backup restore could live in a `dot_scripts` helper.
 9. **Flutter on Termux is unverified.** `install_flutter` in the Android installer was written from `dpkg-deb` inspection of the community package, not from a run on a device. Run one `chezmoi apply` on the phone and record whether `flutter --version`, `flutter precache --web` and `flutter test` work; if the package cannot be made to start, demote the row to `[manual]` and keep only the native `dart`.

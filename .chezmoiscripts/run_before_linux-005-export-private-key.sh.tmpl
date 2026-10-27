@@ -1,15 +1,20 @@
 #!/bin/bash
 
-# Puts the age keys this machine needs in ~/.ssh, from 1Password, before any file is applied:
+# Puts the age keys this machine needs in place, from 1Password, before any file is applied:
 #   ~/.ssh/chezmoi                decrypts every encrypted_*.age file (.kube, .john, .npmrc...)
 #   ~/.ssh/omniroute-backup-key   encrypts the OmniRoute backups; WSL only, where they run
+#   ~/.config/aisync/key.txt      decrypts aifiles, which run_after_linux-014 syncs through aisync
 # .chezmoidata/age-keys.yaml names each item and each key's public half; see CLAUDE.md, "Age Keys".
 #
 # A `run_before_` script, not `run_once_`: it runs on every apply and returns before touching
 # 1Password while each file holds its key, so a key that is missing, was deleted, or is an older
 # one -- the SSH key this repository encrypted to until 2026-10-27 -- is fetched on the next apply.
-# A chezmoi key that cannot be fetched fails the apply, which could decrypt nothing without it; a
-# backup key only warns, because the apply needs none.
+# A chezmoi key that cannot be fetched fails the apply, which could decrypt nothing without it; the
+# other two only warn, because the apply needs neither.
+#
+# The aisync key is never replaced, only fetched when missing: aisync's own `init` and
+# `key generate` write that file, so another key there may be one aisync generated, and something
+# may already be encrypted to it. Moving it aside is a person's decision, never an apply's.
 #
 # Nothing here deletes ~/.ssh, which on WSL also holds the SSH agent bridge's socket.
 
@@ -24,6 +29,9 @@ chezmoi_reference={{ .ageKeys.chezmoi.privateKey | squote }}
 backup_key="$ssh_dir/omniroute-backup-key"
 backup_recipient={{ .ageKeys.omnirouteBackup.recipient | squote }}
 backup_reference={{ .ageKeys.omnirouteBackup.privateKey | squote }}
+aisync_key="$HOME/.config/aisync/key.txt"
+aisync_recipient={{ .ageKeys.aisync.recipient | squote }}
+aisync_reference={{ .ageKeys.aisync.privateKey | squote }}
 
 # TODO: workaround since "op" isn't installed on WSL
 op() {
@@ -31,9 +39,12 @@ op() {
 }
 
 # key_matches <file> <recipient>: an identity written by age-keygen names its public key in a
-# comment, so the check needs neither an age binary nor 1Password.
+# comment, so the check needs neither an age binary nor 1Password. One without that comment --
+# aisync can import a bare key -- is asked of age-keygen, where there is one.
 key_matches() {
-    [[ -f "$1" ]] && grep -qxF "# public key: $2" "$1"
+    [[ -f "$1" ]] || return 1
+    grep -qxF "# public key: $2" "$1" && return 0
+    command -v age-keygen >/dev/null 2>&1 && [[ "$(age-keygen -y "$1" 2>/dev/null)" == "$2" ]]
 }
 
 # fetch_key <file> <recipient> <reference>: stages the identity beside the target and renames it
@@ -55,6 +66,7 @@ fetch_key() {
 
 need_chezmoi=false
 need_backup=false
+need_aisync=false
 if key_matches "$chezmoi_key" "$chezmoi_recipient"; then
     echo "[$prefix] the chezmoi age key at $chezmoi_key is already in place" >&2
 else
@@ -67,12 +79,25 @@ if grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null; then
         need_backup=true
     fi
 fi
-if ! $need_chezmoi && ! $need_backup; then
+if key_matches "$aisync_key" "$aisync_recipient"; then
+    echo "[$prefix] the aisync age key at $aisync_key is already in place" >&2
+elif [[ -e "$aisync_key" ]]; then
+    echo "[$prefix] WARN: $aisync_key holds another key, and aifiles is encrypted to $aisync_recipient; nothing is synced until it is moved aside (it may decrypt something) and the next apply fetches the right one" >&2
+else
+    need_aisync=true
+fi
+if ! $need_chezmoi && ! $need_backup && ! $need_aisync; then
     exit 0
 fi
 
-mkdir -p "$ssh_dir"
-chmod 700 "$ssh_dir"
+if $need_chezmoi || $need_backup; then
+    mkdir -p "$ssh_dir"
+    chmod 700 "$ssh_dir"
+fi
+if $need_aisync; then
+    mkdir -p "${aisync_key%/*}"
+    chmod 700 "${aisync_key%/*}"
+fi
 
 # sign into the personal 1Password account ('my' shorthand refers to my.1password.com)
 # when multiple accounts are configured, --account my ensures the personal account is used
@@ -87,7 +112,12 @@ else
     if $need_chezmoi; then
         exit 1
     fi
-    echo "[$prefix] WARN: $backup_key was not fetched; the next apply tries again" >&2
+    if $need_backup; then
+        echo "[$prefix] WARN: $backup_key was not fetched; the next apply tries again" >&2
+    fi
+    if $need_aisync; then
+        echo "[$prefix] WARN: $aisync_key was not fetched; the next apply tries again" >&2
+    fi
     exit 0
 fi
 
@@ -97,4 +127,7 @@ if $need_chezmoi && ! fetch_key "$chezmoi_key" "$chezmoi_recipient" "$chezmoi_re
 fi
 if $need_backup && ! fetch_key "$backup_key" "$backup_recipient" "$backup_reference"; then
     echo "[$prefix] WARN: 1Password did not return the OmniRoute backup key, so backups fail until it arrives; the next apply tries again ('op read \"$backup_reference\" --account my')" >&2
+fi
+if $need_aisync && ! fetch_key "$aisync_key" "$aisync_recipient" "$aisync_reference"; then
+    echo "[$prefix] WARN: 1Password did not return the aisync age key, so aifiles is not synced until it arrives; the next apply tries again ('op read \"$aisync_reference\" --account my')" >&2
 fi

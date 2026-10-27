@@ -121,9 +121,12 @@ pyvenv.cfg
 .zshrc
 {{- end }}
 
-{{- /* Android‑exclusive files – only for Android. When not running Android, ignore them. */ -}}
+{{- /* Android‑exclusive files – only for Android. When not running Android, ignore them.
+     .config/aisync holds aisync's exclusions, which keep aifiles' Linux/WSL copies off the phone;
+     elsewhere the directory is aisync's alone (its key and its clone of aifiles). */ -}}
 {{- if ne .chezmoi.os "android" }}
 .chezmoiscripts/android-*.sh
+.config/aisync
 .local/bin/wrapper
 .local/bin/xclip
 .local/bin/clipshot

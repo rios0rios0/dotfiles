@@ -197,6 +197,12 @@ check_platform "linux" --include-line ".config/atuin"
 check_platform "android" --include-line ".config/atuin"
 check_platform "$WINDOWS_OS" --ignore-line ".config/atuin"
 
+# aisync's exclusions keep aifiles' Linux/WSL copies of three files off the phone; everywhere else
+# ~/.config/aisync is aisync's own, so chezmoi must not create or own it.
+check_platform "android" --include-line ".config/aisync"
+check_platform "linux" --ignore-line ".config/aisync"
+check_platform "$WINDOWS_OS" --ignore-line ".config/aisync"
+
 # WSL vs bare-metal Linux. The SSH agent bridge relays a Windows named pipe, so it must ship
 # on WSL and nowhere else -- on bare metal its unit would point at an npiperelay.exe that is
 # never installed. The only signal separating the two is the kernel release string.

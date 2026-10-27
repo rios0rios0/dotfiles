@@ -1,0 +1,20 @@
+#!/bin/bash
+
+# Fills ~/.claude and ~/.config/opencode from aifiles through aisync after every apply: Claude's
+# CLAUDE.md, settings, rules, agents, commands, hooks, scripts and skills, OpenCode's AGENTS.md,
+# rules, agents, commands, skills and plugins, and Claude's project memories and recent
+# conversations. The body is .chezmoitemplates/lib-aifiles-sync.sh, which Android shares; "AI Rules
+# Sync" in CLAUDE.md lists the rules it keeps.
+#
+# `run_after_`, not `run_onchange_`: aifiles changes without this repository changing, and an apply
+# that finds aifiles unchanged costs one `git ls-remote`. After the files, because a first apply has
+# neither ~/.claude nor the ~/.gitconfig whose sshCommand reaches 1Password on WSL before them; and
+# after linux-007 and linux-012, so that on a first sync aifiles' copy of what they write lands
+# last. run_before_linux-005 fetches the key.
+
+set -euo pipefail
+
+{{ template "lib-aifiles-sync.sh" }}
+
+# 1.6.0: conversations and memories, --prefer, and the sync.use_system_git aifiles' config.yaml sets
+aifiles_sync {{ .ageKeys.aisync.recipient | squote }} '1.6.0' self-update
