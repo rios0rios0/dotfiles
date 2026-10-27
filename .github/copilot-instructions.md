@@ -88,11 +88,11 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)
   - **terra** (Terraform + Terragrunt version manager via upstream install script, same as Android)
   - **SDKMAN** — Java/Gradle ecosystem (installs latest Java and Gradle)
-  - **NVM** (v0.40.2) — Node.js version manager (installs LTS + corepack)
+  - **NVM** (v0.40.2) — Node.js version manager (installs LTS, upgrades npm to its latest with `nvm install-latest-npm`, + corepack)
   - **Pyenv** — Python version manager (installs Python 3.13.2)
   - **Flutter** — the current stable SDK from the official tarball (resolved from Flutter's releases manifest, SHA-256 verified) under `~/.local/share/flutter`, with `flutter` and `dart` linked into `~/.local/bin`; `flutter upgrade` moves an installed SDK forward
   - **bun** — the runtime the `ocode` fork build uses, via `bun.sh/install` run with `SHELL` empty so its shell detection cannot append a PATH line to an rc file chezmoi owns; the `~/.bun/bin` block lives in `dot_zshenv.tmpl`. The build itself installs and builds with the bun the fork checkout pins (`packageManager`), downloading that version into `~/.cache/ocode-bun/<version>/` (verified against the release's `SHASUMS256.txt`) when this one differs
-  - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
+  - **Claude Code** — Anthropic's native build from `claude.ai/install.sh`, behind `~/.local/bin/claude`, which updates itself; not the npm package, whose postinstall npm 12 blocks (its `npm_global` tombstone is in the Linux removal script)
   - **Sentry CLI** (`sentry` npm package from `getsentry/cli`, through the shared `install_sentry_cli`; the official `cli.sentry.dev/install` script is not used because its Bun-compiled glibc binary cannot run on Termux, and npm gives both platforms the same JavaScript bundle; completions and the agent skill come from `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl`)
   - **Neon CLI** (`neon` npm package from `neondatabase/neon-pkgs`, through the shared `install_neon_cli`; fresh installs take `neon`, not the legacy `neonctl` compatibility shim, and the plain JavaScript bundle needs no wrapper on Termux — its `--keyring` native addon has no android-arm64 build and the CLI falls back to file-based credentials)
   - **GitHub CLI** (gh, via apt repository)
@@ -152,7 +152,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Android: Key is retrieved by the `op` wrapper during chezmoi template rendering
 
 #### Post-Apply Scripts (`run_once_after_*` and `run_after_*`)
-- `run_once_after_linux-001-extract-compressed-folders.sh` — extracts `.tar.gz` archives for `~/.histdb`, `~/.john`, `~/.kube/config-files`, `~/.sqlmap`
+- `run_once_after_linux-001-extract-compressed-folders.sh` — restores each watched folder (`~/.histdb`, `~/.john`, `~/.kube/config-files`, `~/.sqlmap`) that is missing from the `<folder>.tar` beside it, which the folder watcher writes and the apply decrypts (today only `~/.kube/config-files.tar`); existing folders are left alone
 - `run_once_after_linux-002-clone-pentesting-tools.sh` — clones pentesting tools (VHostScan, dirsearch, StegCracker, stegbrute) to `~/Development/Tools/`
 - `run_once_after_windows-001-create-ssh-known-hosts.ps1` — pre-populates `~/.ssh/known_hosts` for GitHub, GitLab, Azure DevOps, Bitbucket (avoids SSH freeze in WSL)
 - `run_after_linux-002-import-gpg-keys.sh.tmpl` — imports GPG keys from 1Password (device note, `gpg:` entries)

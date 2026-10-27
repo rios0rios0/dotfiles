@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'replaced Adobe Acrobat Reader with SumatraPDF and CCleaner with BleachBit in the Windows dependency installer, both open source (GPL-3.0), and tombstoned `Adobe.Acrobat.Reader.64-bit` and `Piriform.CCleaner`, so the next apply uninstalls them where they are installed; SumatraPDF fills no PDF forms, which Edge''s built-in viewer does'
+time: '2026-10-27T21:52:40.269904135Z'

@@ -134,7 +134,7 @@ install_nvm() {
     else
         # Globally installed npm packages live inside the active version's tree, so a
         # new LTS major starts empty and every `npm install -g` CLI this installer
-        # placed (`sentry`, Claude Code) silently disappears from PATH -- the
+        # placed (`sentry`, `neon`) silently disappears from PATH -- the
         # old tree still holds them, which is why nothing downstream reports an error.
         # `--reinstall-packages-from` rebuilds them in the new tree. It is only passed
         # when there is a version to copy from: on a first install `nvm current` prints
@@ -145,6 +145,16 @@ install_nvm() {
         fi
         nvm install --lts "${reinstall_from[@]}"
     fi
+
+    # Node ships the npm that was current at its release, which npm's own releases overtake:
+    # 24.22.1 came with 11.19.1 while 12.2.1 was out, so every `npm install -g` here opened with
+    # "New major version of npm available!". nvm's own upgrade installs the newest npm that runs
+    # on this Node. It runs after both branches, so an LTS that was already installed is upgraded
+    # too. npm 12 blocks the install scripts of global packages, which none of the CLIs installed
+    # here needs: each passes `--ignore-scripts` anyway, and Claude Code, whose npm package needs
+    # its postinstall, comes from Anthropic's native build instead (`install_claude_cli` in the
+    # Linux installer).
+    nvm install-latest-npm
 
     # corepack ships no lifecycle scripts, so `--ignore-scripts` costs nothing and
     # keeps a compromised registry response from running code at install time.

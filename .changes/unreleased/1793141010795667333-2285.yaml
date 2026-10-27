@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'changed Claude Code on Linux from the npm package to Anthropic''s native build, installed from `claude.ai/install.sh` behind `~/.local/bin/claude` and updating itself, and tombstoned the npm package: npm 12 blocks the postinstall that copies the native binary over the package''s placeholder, which left `claude` a stub that exits 1 and made Claude Code''s own updates fail; the installer verifies the native build, so a failed install stops the apply before the npm package is removed, covered by `make test-claude-install`'
+time: '2026-10-27T22:43:30.795667333Z'

@@ -97,6 +97,21 @@ never run again -- is installed by the next `chezmoi apply`.
 
 ### 3.1 Prerequisites `[manual]`
 
+Every prerequisite comes from winget, so set it up first, from Windows PowerShell:
+
+1. Download `Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle` from the
+   [latest winget-cli release](https://github.com/microsoft/winget-cli/releases/latest) and install
+   it with `Add-AppxPackage .\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle`. If it reports
+   a missing dependency, run `Add-AppxPackage` on each `x64` package in
+   `DesktopAppInstaller_Dependencies.zip`, from the same release, and then on the bundle again.
+2. Add `C:\Users\<USER>\AppData\Local\Microsoft\WindowsApps` to the user `Path`, where `<USER>` is
+   the Windows user name: Start > "Edit environment variables for your account" > `Path` > Edit >
+   New. The `winget.exe` alias lives in that folder.
+3. Close the terminal and open a new one, which reads the new `Path`, and check that
+   `winget --version` answers.
+
+Then:
+
 ```powershell
 winget install Microsoft.PowerShell          # then reopen the terminal in PowerShell 7
 winget install Git.Git                       # if ASLR is enforced, use the installer from git-scm.com instead
@@ -138,7 +153,7 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 
 - `$requirements`: `AgileBits.1Password`, `AgileBits.1Password.CLI`, `FiloSottile.age`, `Git.Git`, `JanDeDobbeleer.OhMyPosh`, `Microsoft.PowerShell`, `Microsoft.WSL`, `Microsoft.WindowsTerminal`, `Tailscale.Tailscale`
 - `$hardware`: `CPUID.CPU-Z.ROG`, `FinalWire.AIDA64.Extreme`, `Logitech.GHUB`, `PassMark.PerformanceTest`
-- `$utilities`: `Adobe.Acrobat.Reader.64-bit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.CCleaner`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `msstore:9NCBCSZSJRSB` (Spotify, Microsoft Store edition)
+- `$utilities`: `BleachBit.BleachBit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `SumatraPDF.SumatraPDF`, `msstore:9NCBCSZSJRSB` (Spotify, Microsoft Store edition)
 - `$communication`: `Zoom.Zoom.EXE`
 - `$development`: `Docker.DockerDesktop`, `ExpressVPN.ExpressVPN`, `Microsoft.Azure.StorageExplorer`, `Mirantis.Lens`, `OpenVPNTechnologies.OpenVPNConnect`, `BurntSushi.ripgrep.MSVC`
 - `$gaming`: `ElectronicArts.EADesktop`, `EpicGames.EpicGamesLauncher`, `GOG.Galaxy`, `Valve.Steam`
@@ -195,7 +210,7 @@ Phase 3 is what authenticates every template here.
 | 5    | `run_once_before_linux-004-install-fonts.sh.tmpl`             | `[automated]` | The same three font families into `~/.fonts`, then `fc-cache`.                                                                                                                                              |
 | 6    | `run_before_linux-005-export-private-key.sh.tmpl`             | `[automated]` | On every apply where a key is missing or differs: signs in with `op signin --account my` and writes the chezmoi age key to `~/.ssh/chezmoi`, and on WSL the OmniRoute backup key.                           |
 | 7    | Managed files                                                 | `[automated]` | `.zshrc`, `.zshenv`, `.p10k.zsh`, `.tmux.conf`, `.gitconfig`, `.age_recipients`, `.docker/config.json`, `.config/ggshield`, the `ssh` and `ssh-add` wrappers in `~/.local/bin`, `.scripts/*`, `~/.claude.json` (MCP servers), and the decrypted `.kube`, `.histdb`, `.john`, `.sqlmap` and `.npmrc`. `.ssh/config` is Windows and Android only. |
-| 8    | `run_once_after_linux-001-extract-compressed-folders.sh`      | `[automated]` | Unpacks the decrypted `.histdb`, `.john`, `.kube/config-files` and `.sqlmap` archives.                                                                                                                      |
+| 8    | `run_once_after_linux-001-extract-compressed-folders.sh`      | `[automated]` | Restores `~/.kube/config-files` from the `~/.kube/config-files.tar` the apply decrypts, and any other folder the folder watcher backs up as `<folder>.tar` (`.histdb`, `.john` and `.sqlmap` are deployed file by file, so they have none). A folder that already exists is left alone; one that fails to unpack fails the apply, which retries it. |
 | 9    | `run_once_after_linux-002-clone-pentesting-tools.sh`          | `[automated]` | Clones VHostScan, dirsearch, StegCracker and stegbrute into `~/Development/Tools`.                                                                                                                           |
 | 10   | `run_after_linux-002-import-gpg-keys.sh.tmpl`                 | `[automated]` | Imports the GPG keys the device note references.                                                                                                                                                             |
 | 11   | `run_after_linux-004-install-ggshield-hook.sh`                | `[automated]` | Generates the global GitGuardian pre-commit hook; `core.hooksPath` in `.gitconfig` points at it.                                                                                                             |
@@ -203,7 +218,7 @@ Phase 3 is what authenticates every template here.
 | 13   | `run_onchange_after_linux-006-remove-dependencies.sh.tmpl`    | `[automated]` | Tombstones; silent on a fresh machine.                                                                                                                                                                       |
 | 14   | `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl`      | `[automated]` | Raises a CLI older than `0.47.0` (the floor `sentry-ds` needs) with `sentry cli upgrade`, failing until it holds; then `sentry cli setup --no-modify-path`: the zsh completion into `~/.local/share/zsh/site-functions`, and the Claude Code skill once `~/.claude` exists (the next `sentry cli upgrade` adds it otherwise). |
 | 15   | `run_onchange_after_linux-011-setup-chrome.sh`               | `[automated]` | Google Chrome from Google's apt repository, for the Chrome DevTools MCP server; asks for the sudo password. Its key is trusted for that repository only, and only once its fingerprint proves it Google's. |
-| 16   | `run_onchange_after_linux-012-setup-claude-lsp.sh`           | `[automated]` | Pinned `gopls` (into `~/.local/bin`), `typescript-language-server` and `pyright`, and the `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins at user scope. Claude Code loads them at its next start. |
+| 16   | `run_onchange_after_linux-012-setup-claude-lsp.sh`           | `[automated]` | Pinned `gopls` (into `~/.local/bin`), `typescript-language-server` and `pyright`, and the `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins at user scope. Claude Code loads them at its next start. Adding the plugins' marketplace prints `SSH not configured, cloning via HTTPS`, which is expected. Claude Code first tries `ssh -T git@github.com` for 3 seconds without prompting, and the first apply cannot pass that: it runs from bash, before `~/.local/bin` and its `ssh.exe` wrapper are on `PATH`, and Linux's own `ssh` knows no GitHub host key. The repository is public, so HTTPS clones it without credentials. |
 
 ### What the dependency installer provides
 
@@ -220,11 +235,11 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | kubectl (`v1.32` apt channel), krew with `ctx` and `ns` | `install_kubectl`, `install_krew` | `[automated]` |                                                                                                                                 |
 | terra (Terraform and Terragrunt manager)         | `install_terra`                      | `[automated]` | Upstream install script, then `terra self-update` and `terra update` with `TERRA_ASSUME_YES=true`, so an unattended run updates instead of reporting "Non-interactive session - skipping update". |
 | Java and Gradle, via SDKMAN                      | `install_sdkman`                     | `[automated]` | Latest candidates, refreshed on every run.                                                                                      |
-| Node.js LTS, via NVM `v0.40.2`, plus corepack    | `install_nvm`                        | `[automated]` |                                                                                                                                 |
-| Python `3.13.2`, via pyenv                       | `install_pyenv`                      | `[automated]` | Also installs the apt build dependencies pyenv needs.                                                                           |
+| Node.js LTS, via NVM `v0.40.2`, plus corepack    | `install_nvm`                        | `[automated]` | npm is upgraded to its latest release with `nvm install-latest-npm` on every pass.                                              |
+| Python `3.13.2`, via pyenv                       | `install_pyenv`                      | `[automated]` | Also installs the apt build dependencies pyenv needs, and upgrades that Python's pip to the latest release.                     |
 | Flutter (current stable, with its Dart)          | `install_flutter`                    | `[automated]` | The official Linux x64 tarball, resolved from Flutter's releases manifest and verified against the SHA-256 it publishes, under `~/.local/share/flutter`; `flutter` and `dart` are linked into `~/.local/bin`, so a Dart SDK that was there by hand is repointed (logged). An installed SDK moves to the next stable with `flutter upgrade`. Web artifacts are precached; the Android toolchain, Chrome and the Linux desktop toolchain that `flutter doctor` lists are deliberately not installed. |
 | bun (the `ocode` fork build's runtime)           | `install_bun`                        | `[automated]` | Upstream `bun.sh/install` into `~/.bun`, run with `SHELL` empty so its shell detection cannot append a PATH line to an rc file chezmoi owns; `dot_zshenv.tmpl` adds `~/.bun/bin` to PATH. The `ocode` build itself installs and builds with the bun the fork checkout pins, so when this one is another version the first apply also downloads the pinned one into `~/.cache/ocode-bun/<version>/`. |
-| Claude Code                                      | `install_claude_cli`                 | `[automated]` | npm package.                                                                                                                    |
+| Claude Code                                      | `install_claude_cli`                 | `[automated]` | Anthropic's native build from `claude.ai/install.sh`, checked against the SHA-256 in Anthropic's release manifest, behind `~/.local/bin/claude`; it updates itself. A failed install fails the apply, which retries it. |
 | ccswitch                                         | `install_ccswitch`                   | `[partial]`   | Installed here; every account still has to be enrolled once with `ccswitch enroll` after `claude` and `/login`.                 |
 | Sentry CLI                                       | `install_sentry_cli`                 | `[automated]` | npm package (`sentry`, from getsentry/cli), shared with Android through `lib-install-deps.sh`; completions and the agent skill come from step 14.                                  |
 | Neon CLI                                         | `install_neon_cli`                   | `[automated]` | npm package (`neon`, from neondatabase/neon-pkgs), shared with Android through `lib-install-deps.sh`; fresh installs take the `neon` package, not the legacy `neonctl` compatibility shim. |
@@ -385,7 +400,7 @@ Everything left is a download, a login or a license. The order does not matter w
 | Docker Desktop first start                                                   | `[manual]` | Accept the terms, sign in, enable WSL integration for `kali-linux` if wanted.                                                                             |
 | Microsoft Store apps: WhatsApp, Telegram, CineBench, draw.io, JW Library     | `[manual]` | 1Password, Spotify, TranslucentTB and Oh My Posh from the same list already came from winget in Phase 3.                                                  |
 | Office 365, Notion                                                           | `[manual]` | account.microsoft.com and notion.so downloads.                                                                                                            |
-| Licenses: AIDA64 Extreme, CCleaner Professional, Revo Uninstaller Pro, EaseUS Partition Master, PerformanceTest, ExpressVPN, Grammarly | `[manual]` | The apps are installed; the keys and accounts are not.                                                                        |
+| Licenses: AIDA64 Extreme, Revo Uninstaller Pro, EaseUS Partition Master, PerformanceTest, ExpressVPN, Grammarly | `[manual]` | The apps are installed; the keys and accounts are not.                                                                        |
 | Battle.net, Ubisoft Connect, Mavis HUB                                       | `[manual]` | The first two have broken winget manifests (Phase 3); Mavis HUB has none.                                                                                 |
 | Watchtower                                                                   | `[manual]` | A container that updates other containers; run it on Docker Desktop yourself.                                                                             |
 | Authy Desktop, NiceHash Miner                                                | `[manual]` | Twilio discontinued the Authy desktop app in 2024; NiceHash is still a question mark on the original checklist.                                           |
@@ -470,8 +485,8 @@ under `.chezmoiscripts/`; winget IDs refer to `run_once_before_windows-001-insta
 | PassMark PerformanceTest            | `[automated]` `PassMark.PerformanceTest`                                                     |
 | EaseUS Partition Master Professional | `[automated]` `EaseUS.PartitionMaster`; the license is `[manual]`                            |
 | Revo Uninstaller Pro                | `[automated]` `RevoUninstaller.RevoUninstallerPro`; the license is `[manual]`                |
-| Adobe Acrobat Reader                | `[automated]` `Adobe.Acrobat.Reader.64-bit`                                                  |
-| CCleaner Professional               | `[automated]` `Piriform.CCleaner`; the license is `[manual]`                                 |
+| Adobe Acrobat Reader                | `[automated]` as SumatraPDF, `SumatraPDF.SumatraPDF`; it fills no forms, so those open in Edge's built-in viewer |
+| CCleaner Professional               | `[automated]` as BleachBit, `BleachBit.BleachBit`, which needs no license                    |
 | Recuva                              | `[automated]` `Piriform.Recuva`                                                              |
 | PowerChute Serial Shutdown          | `[manual]`                                                                                   |
 | ExpressVPN                          | `[automated]` `ExpressVPN.ExpressVPN`                                                        |
