@@ -75,10 +75,12 @@ the tier, such as Codex's `*-high`, keep those rows: they are models, not varian
 it as `~/.local/bin/ocode`; see the "Fork Build (`ocode`)" part of the main `CLAUDE.md` for the
 mechanics. The build pins the client identity the Console reads from the
 User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a build-stamped
-`OPENCODE_VERSION=2.0.<%y%m%d%H%M>` -- because the free tier refuses client versions below
-1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview version is; the channel
-keeps the fork's service registration, port and database its own, and the stamp makes each
-rebuild replace the background service on the next launch. bun, its build runtime, comes from
+`OPENCODE_VERSION=<release>-reworked.<%y%m%d%H%M>`, e.g. `2.1.4-reworked.2610241230`, where
+`<release>` is the upstream release the checkout is built on (its `packages/cli/package.json`
+`version`, or 2.0.0 with a warning when that names no release) -- because the free tier refuses
+client versions below 1.18.0, which a bare branch build's `0.0.0-<branch>-<time>` preview version
+is; the channel keeps the fork's service registration, port and database its own, and the stamp
+makes each rebuild replace the background service on the next launch. bun, its build runtime, comes from
 `install_bun` into `~/.bun` (PATH block in `dot_zshenv.tmpl`), and the builder falls back to
 `~/.bun/bin/bun` itself, so the first apply after the install builds without waiting for a new
 shell.
