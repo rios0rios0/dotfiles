@@ -1,0 +1,25 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# Fills ~/.claude and ~/.config/opencode from aifiles through aisync after every apply, as
+# run_after_linux-014 does on Linux and with the same body (.chezmoitemplates/lib-aifiles-sync.sh),
+# except for three things:
+#   - The key comes from chezmoi's own 1Password session, rendered into this script the way
+#     run_after_android-001 brings the SSH keys, and only on an apply that finds no key at all: no
+#     `op` is signed in for a script to call on Termux.
+#   - ~/.config/aisync/exclude keeps aifiles' copies of settings.json, CLAUDE.md and OpenCode's
+#     AGENTS.md off the phone in both directions, since they are written for Linux/WSL; aisync
+#     reads that file from 1.7.0 on, hence the higher minimum.
+#   - An older aisync is reported with the command that rebuilds it: releases carry no Android
+#     binary, so `aisync self-update` has nothing to install.
+
+set -euo pipefail
+
+{{ template "lib-aifiles-sync.sh" }}
+{{ if stat (joinPath .chezmoi.homeDir ".config/aisync/key.txt") }}
+aifiles_sync {{ .ageKeys.aisync.recipient | squote }} '1.7.0' rebuild
+{{- else }}
+IFS= read -r -d '' identity <<'AISYNC_IDENTITY' || true
+{{ onepasswordRead .ageKeys.aisync.privateKey "my" | trim }}
+AISYNC_IDENTITY
+aifiles_sync {{ .ageKeys.aisync.recipient | squote }} '1.7.0' rebuild "${identity%$'\n'}"
+{{- end }}

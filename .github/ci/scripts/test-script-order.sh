@@ -7,11 +7,13 @@ EXIT_CODE=0
 
 echo "[test-script-order] verifying script execution order..." >&2
 
-# Verify that scripts sort in the correct dependency order
+# Verify that scripts sort in the correct dependency order. PHASE picks the before-scripts (the
+# default) or the after-scripts, which chezmoi orders the same way among themselves.
 check_order() {
     local platform="$1"
     shift
     local expected=("$@")
+    local phase="${PHASE:-before}"
 
     # Get actual sorted order of the platform's before scripts, run_once_ and run_before_ alike.
     # chezmoi orders scripts by target name, which drops the `run_*_` attributes, so the sort
@@ -22,8 +24,9 @@ check_order() {
     # LC_ALL=C is required: chezmoi orders scripts by Go byte comparison, whereas
     # a locale-aware sort (e.g. en_US.UTF-8) ignores the '-' separator and would
     # place "001a-create-op-wrapper" before "001-create-wrapper".
-    done < <(find "$SCRIPTS_DIR" \( -name "run_once_before_${platform}-*" -o -name "run_before_${platform}-*" \) -type f \
-        -printf '%f\n' | sed -E 's/^run_(once_)?before_//' | LC_ALL=C sort)
+    done < <(find "$SCRIPTS_DIR" \( -name "run_once_${phase}_${platform}-*" -o -name "run_onchange_${phase}_${platform}-*" \
+        -o -name "run_${phase}_${platform}-*" \) -type f \
+        -printf '%f\n' | sed -E "s/^run_(once_|onchange_)?${phase}_//" | LC_ALL=C sort)
 
     # Verify each expected prefix appears in order
     local last_idx=-1
@@ -46,7 +49,7 @@ check_order() {
         fi
     done
 
-    echo "[test-script-order] PASS: $platform (${#actual[@]} scripts in correct order)" >&2
+    echo "[test-script-order] PASS: $platform $phase (${#actual[@]} scripts in correct order)" >&2
 }
 
 # Android: wrapper → op → gh → golangci-lint → acli → claude wrappers → install deps → fonts
@@ -74,6 +77,17 @@ check_order "windows" \
     "002-configure-dependencies" \
     "003-install-fonts" \
     "004-export-private-key"
+
+# After the files: aisync's pull lands after the Sentry CLI's skill and the LSP plugins, so a first
+# sync gives aifiles' copy of what they write the last word.
+PHASE=after check_order "linux" \
+    "007-setup-sentry-cli" \
+    "012-setup-claude-lsp" \
+    "014-sync-aifiles"
+
+PHASE=after check_order "android" \
+    "006-setup-sentry-cli" \
+    "008-sync-aifiles"
 
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-script-order] all script ordering tests passed" >&2

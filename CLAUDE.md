@@ -44,7 +44,8 @@ make test-ocode                     # the ocode fork build: skip paths, rebuilds
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
 make test-yq                        # mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring
 make test-chlog                     # chlog from upstream's pinned tag: the go install, the skip, the replacement, the failures, the wiring
-make test-export-keys               # the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key
+make test-aifiles-sync              # the aisync hook: the first sync's backup, pull only, the unchanged no-op, failures only warning, both platforms
+make test-export-keys               # the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key, aisync's
 make test-export-key-windows        # the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh)
 make test-install-fonts-windows     # the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh)
 make test-powershell-profile-windows # PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh)
@@ -228,7 +229,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -392,10 +393,10 @@ installs both halves:
    a session on another profile cannot put plugins into that profile.
 7. **A failure fails the apply.** A server that does not install keeps its plugin out, and the run
    exits non-zero so the next apply retries it; a machine without `claude` fails the same way.
-8. **aifiles mirrors the result.** Where aisync runs, `aisync pull` rewrites `settings.json` from
-   aifiles' copy, asking first when the live file differs, and accepting drops whatever only the live
-   file has. That copy therefore lists the same three plugins and the marketplace: add a plugin in
-   both places.
+8. **aifiles mirrors the result.** On Linux, the aisync hook that runs after this script (see "AI
+   Rules Sync") takes aifiles' `settings.json` whole on a device's first sync, dropping whatever only
+   the live file has, and a later change on both sides is left for someone to settle. That copy
+   therefore lists the same three plugins and the marketplace: add a plugin in both places.
 
 It is Linux only. Windows work happens inside WSL. On Termux, Claude Code starts a server itself,
 not through a shell, with `LD_PRELOAD` parked (see "Android Performance"), so the two servers that
@@ -739,7 +740,7 @@ npm installs ship neither shell completions nor the agent skill, so `run_onchang
 
 - **`--no-modify-path` only skips the PATH edit.** The zsh completion step still appends `fpath=("<dir>" $fpath)` to `~/.zshrc` unless the file already contains the completion directory as a quoted absolute path. `dot_zshrc.tmpl` therefore renders `"{{ .chezmoi.homeDir }}/.local/share/zsh/site-functions"` into its own `fpath` line before Oh My Zsh runs compinit. A `$HOME`-based line would not satisfy the check, and the CLI's appended line is exactly what the next apply reverts (observed on a device: a manual run appended it, and `chezmoi diff` wanted it gone).
 - **The setup runs after the files on purpose.** From `run_once_before` it would edit the previous `~/.zshrc` first, and the file application that follows would stop to ask about an externally modified target.
-- **The agent skill lands in `~/.claude/skills/sentry-cli/` only when `~/.claude` exists**: always on Android, where chezmoi manages it; on Linux after Claude Code's first run, added by the next `sentry cli upgrade`, which re-runs the same setup after every upgrade (that is why the scripts are `run_onchange_` and not `run_after_`). aisync leaves the skill alone: its deletion detection covers only files it synced itself, and it prompts before removing anything.
+- **The agent skill lands in `~/.claude/skills/sentry-cli/` only when `~/.claude` exists**: always on Android, where chezmoi manages it; on Linux after Claude Code's first run, added by the next `sentry cli upgrade`, which re-runs the same setup after every upgrade (that is why the scripts are `run_onchange_` and not `run_after_`). aifiles carries the skill too, so a device's first aisync sync replaces the copy the setup wrote (see "AI Rules Sync"); after that, a copy an upgrade rewrites is a local change the hook never publishes, and one that differs from a newer copy in aifiles is a conflict it reports until someone runs `aisync sync`.
 
 ## Neon CLI (npm, no wrapper)
 
@@ -758,9 +759,85 @@ Verified on Linux (the `--ignore-scripts` install, `neon --version`, and esbuild
 
 ## AI Rules Sync
 
-AI assistant rules (Claude Code, OpenCode, etc.) are **not** managed by chezmoi. Everything the harnesses load as AI content lives in their own directories and is synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply): `~/.claude/CLAUDE.md` and `~/.config/opencode/AGENTS.md` carry the per-machine environment reality (WSL facts, the interactive `cp`/`rm`/`mv` guards, quoting rules), and `rules/`, `agents/`, `commands/` and `skills/` under each directory carry the portable content. chezmoi touches only the individual files there that "JSON Patching" and "Claude Code Look" name, plus OpenCode's `opencode.json` and `cli.json`.
+AI content -- Claude Code's and OpenCode's instructions, rules, agents, commands, hooks, scripts and
+skills, Claude's settings, and its project memories and conversations -- is **not** managed by
+chezmoi. It lives in each harness's own directory, and [`aisync`](https://github.com/rios0rios0/aisync)
+syncs it with aifiles, a private repository where every personal file is age-encrypted.
+`install_aisync()` installs aisync in the Linux/WSL and Android dependency scripts (it replaced the
+`run_after_*-install-ai-rules.*` scripts that curled `install-rules.sh` from `rios0rios0/guide`), and
+`run_after_linux-014-sync-aifiles.sh.tmpl` and `run_after_android-008-sync-aifiles.sh.tmpl` pull
+aifiles after every apply, through the body they share, `.chezmoitemplates/lib-aifiles-sync.sh`.
+chezmoi touches only the individual files there that "JSON Patching" and "Claude Code Look" name, plus
+OpenCode's `opencode.json` and `cli.json`. aifiles' `~/.claude/CLAUDE.md` and
+`~/.config/opencode/AGENTS.md` carry the machine's environment reality (WSL facts, the interactive
+`cp`/`rm`/`mv` guards, quoting rules); `rules/`, `agents/`, `commands/` and `skills/` carry the
+portable content.
 
-After the dependency installer finishes, run `aisync init`, `aisync source add guide --source-repo rios0rios0/guide --branch generated`, and `aisync pull` to populate the rules. Subsequent `aisync pull` calls refresh them on demand.
+| Part | Where |
+|------|-------|
+| The key aifiles is encrypted to | `~/.config/aisync/key.txt`, from 1Password's `aisync.age` (see "Age Keys"): `run_before_linux-005` on Linux, rendered into the hook on Android |
+| The clone | `~/.config/aisync/repo`, of `git@github.com-mine:rios0rios0/aifiles.git`, through system git |
+| What a pull fills | `~/.claude` (`CLAUDE.md`, `settings.json`, rules, agents, commands, hooks, scripts, skills), `~/.config/opencode` (`AGENTS.md`, rules, agents, commands, skills, plugins), and, from the `transcripts` branch, Claude's project memories and the last 14 days of conversations |
+| The hook's state | `~/.cache/aifiles-sync/`: the refs it last synced, the last pull's log |
+| Android's exclusions | `~/.config/aisync/exclude`, from `dot_config/private_aisync/exclude` |
+
+**Keep these:**
+
+1. **Pull only.** The hook runs aisync's `version`, `self-update`, `init` and `pull`, and nothing else:
+   never `push` or `sync`, which publish this machine's changes, and never `source add`, which
+   rewrites aifiles' committed `config.yaml` -- a tracked file that differs fails every later
+   `git pull`. Sources belong in that `config.yaml`, and publishing to a person running `aisync sync`
+   in a terminal.
+2. **`init` only for a missing clone, with `--remote-url`, into a staging directory.** A bare
+   `aisync init` takes the create path: it generates a new age key and an empty repository. `init` is
+   not safe to repeat either: cloning onto an existing path fails, and a failed clone retried through
+   an SSH alias deletes the target first. The hook clones beside the target and renames it into
+   place, so a failed clone leaves nothing behind, and puts back the `config.yaml` that `init`
+   re-saves with the tools it detected.
+3. **The personal key's alias, through system git.** aifiles is private. `github.com-mine`, which
+   `dot_ssh/config.tmpl` renders on Windows (read by WSL's `ssh.exe`) and Android, offers only the
+   personal key, where a bare `github.com` offers every key in the agent and may sign in as an
+   account that cannot read aifiles. go-git, aisync's default, ignores the SSH config, so it can
+   neither resolve the alias nor run `ssh.exe`: hence `--use-system-git`.
+4. **No prompts.** `--force` and stdin from `/dev/null` (a prompt reads end-of-file), no git
+   terminal prompt, and SSH through the git config's `sshCommand` with `BatchMode=yes` and
+   `StrictHostKeyChecking=accept-new`. A `git ls-remote` bounded at 90 seconds runs first, so an
+   apply whose 1Password approval nobody gives waits that long and no longer.
+5. **The first sync lets aifiles win, after a backup.** A device that never synced (no
+   `~/.claude/.aisync-manifest.json`, no conversation state in the clone) pulls with
+   `--prefer remote`. Every local file aisync could replace -- its allowlists for both tools, and
+   Claude's memories -- is archived first to a private `aifiles-first-sync.*` directory in `$TMPDIR`,
+   and the hook names the files the pull replaced; a first sync an apply did not finish is finished
+   as one. After that, a pull prefers no side: a change on both sides is skipped, never overwritten,
+   and reported on every apply until someone runs `aisync sync` in a terminal.
+6. **An unchanged aifiles costs one round trip.** After a clean pull the hook records the refs of
+   `main` and `transcripts` and aisync's version, and an apply that finds them unchanged runs no
+   pull: a pull only brings changes in, so local edits never need one.
+7. **Never fail the apply.** Every expected failure -- offline, no approval, no key, no aisync, a pull
+   that fails or times out -- is a WARN, and the body runs with errexit in a subshell of its own, so
+   an unexpected one stops the sync and is a WARN as well. The next apply tries again.
+8. **The key is fetched only when missing, never replaced.** aisync's own `init` and `key generate`
+   write `~/.config/aisync/key.txt`, so another key there may be one aisync generated, with something
+   already encrypted to it; the export warns and keeps it.
+9. **The hook holds the version floor.** 1.6.0 on Linux (conversations, `--prefer` and the
+   `sync.use_system_git` aifiles sets), where an older aisync runs `self-update`; 1.7.0 on Android
+   (the exclusions in 10), where aisync is built from source and releases carry no binary, so an older
+   one is reported with the command that rebuilds it. A floor in `install_aisync` would re-run the
+   whole 45-120 minute installer.
+10. **Android keeps its own `settings.json`, `CLAUDE.md` and OpenCode `AGENTS.md`.** aifiles holds one
+    copy of each for every device, written for Linux/WSL: the settings start a status line (a bash
+    fork on every redraw, against Android's phantom-process budget) and two hooks by Linux paths, and
+    the instructions describe WSL. `~/.config/aisync/exclude` keeps the three out of the phone's sync
+    in both directions, so a manual `aisync sync` there cannot publish the phone's copies either.
+11. **chezmoi manages nothing in aisync's allowlists, and `.chezmoiremove` lists nothing aisync
+    writes**, except `.cursor`: aifiles enables Cursor, but aisync syncs a tool's personal files only
+    where its directory exists, and the apply removes `~/.cursor` before the hook runs.
+
+The first sync on a new machine needs nothing by hand: the apply fetches the key, clones aifiles and
+pulls. To leave aifiles alone for one apply, set `SKIP_AIFILES_SYNC=1`. `make test-aifiles-sync`
+covers the hook on both platforms against a stubbed aisync and a local bare remote,
+`make test-export-keys` the key, and `make test-script-order` that the hook runs after the Sentry
+CLI's skill and the LSP plugins.
 
 ## Claude Code Look
 
@@ -1369,8 +1446,9 @@ writes. `.chezmoidata/age-keys.yaml` names each item and each key's public half:
 |-----|------|------|-------|
 | chezmoi | `~/.ssh/chezmoi` | `chezmoi.age` | Linux/WSL and Windows: decrypts every `encrypted_*.age` file |
 | OmniRoute backups | `~/.ssh/omniroute-backup-key` | `omniroute-backup.age` | WSL alone, where `omniroute-backup` runs |
+| aisync | `~/.config/aisync/key.txt` | `aisync.age` | Linux/WSL and Android: decrypts aifiles, which the aisync hook pulls (see "AI Rules Sync") |
 
-Neither is the SSH key that signs commits. The chezmoi files were encrypted to that key until
+None is the SSH key that signs commits. The chezmoi files were encrypted to that key until
 2026-10-27; they are re-encrypted to `chezmoi.age` now, and that key still opens only the older
 versions in the repository's history.
 
@@ -1381,7 +1459,10 @@ versions in the repository's history.
    `run_before_windows-004-export-private-key.ps1.tmpl` compare each file with the `# public key:`
    comment `age-keygen` writes into it -- no age binary needed, which a first Windows apply has
    only just installed -- and fetch the item when it is missing or holds another key; a key
-   already in place gets a line saying so. As `run_once_` scripts they could not recover: the
+   already in place gets a line saying so. The aisync key is the exception: fetched only when
+   missing, and another key there is kept with a warning (see "AI Rules Sync", 8). Android has no
+   export script: its hook carries the aisync key, rendered from chezmoi's own 1Password session only
+   on an apply that finds none. As `run_once_` scripts they could not recover: the
    Windows one called `op read` without `--account my`, which fails with two accounts in the CLI,
    and reported that as success, because a native command's failure does not fail a PowerShell
    script; chezmoi recorded it as done, and every apply after that died at `.aws/config` with
@@ -1389,8 +1470,9 @@ versions in the repository's history.
 2. **A key is written only once it is the right one.** It is staged beside the target, checked
    for an `AGE-SECRET-KEY-1` line and the expected public key, and renamed over the target, so a
    failed or wrong read leaves the previous file as it was.
-3. **A missing chezmoi key fails the apply; a missing backup key only warns.** The apply decrypts
-   nothing without the first and needs none of the second. Both are retried on the next apply.
+3. **A missing chezmoi key fails the apply; a missing backup or aisync key only warns.** The apply
+   decrypts nothing without the first and needs neither of the others. All are retried on the next
+   apply.
 4. **Nothing deletes `~/.ssh`.** The Linux script used to `rm -rf` it before writing the key; on
    WSL that directory also holds the SSH agent bridge's socket and the backup key.
 5. **`chezmoi add --encrypt` encrypts to `~/.age_recipients`** (`age.recipientsFile` in

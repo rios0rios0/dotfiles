@@ -5,10 +5,11 @@ set -euo pipefail
 # every apply. The template is rendered with two throwaway identities in place of the real
 # public keys, `op.exe` is a stub that serves those identities, and /proc/version is swapped for a
 # file the cases write, so nothing here reaches 1Password and the WSL-only backup key is testable
-# anywhere. Covers the silent pass while both keys match, the first fetch, replacing an older
+# anywhere. Covers the silent pass while every key matches, the first fetch, replacing an older
 # key (the SSH key the repository encrypted to before), a failed or wrong chezmoi key failing the
 # apply without touching the file, a failed backup key only warning, the backup key staying off
-# bare metal, and ~/.ssh never being emptied.
+# bare metal, ~/.ssh never being emptied, and the aisync key: fetched only when missing, never
+# replaced, recognised without age-keygen's comment, and only warning when it cannot be fetched.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TEMPLATE="$REPO_ROOT/.chezmoiscripts/run_before_linux-005-export-private-key.sh.tmpl"
@@ -34,11 +35,14 @@ trap 'rm -rf "$TMP"' EXIT
 age-keygen -o "$TMP/chezmoi.id" 2>/dev/null
 age-keygen -o "$TMP/backup.id" 2>/dev/null
 age-keygen -o "$TMP/other.id" 2>/dev/null
+age-keygen -o "$TMP/aisync.id" 2>/dev/null
 CHEZMOI_REF="op://Private/test-chezmoi/private key"
 BACKUP_REF="op://Private/test-backup/private key"
+AISYNC_REF="op://Private/test-aisync/private key"
 override="$(jq -nc --arg c "$(age-keygen -y "$TMP/chezmoi.id")" --arg b "$(age-keygen -y "$TMP/backup.id")" \
-    --arg cr "$CHEZMOI_REF" --arg br "$BACKUP_REF" \
-    '{ageKeys: {chezmoi: {recipient: $c, privateKey: $cr}, omnirouteBackup: {recipient: $b, privateKey: $br}}}')"
+    --arg a "$(age-keygen -y "$TMP/aisync.id")" --arg cr "$CHEZMOI_REF" --arg br "$BACKUP_REF" --arg ar "$AISYNC_REF" \
+    '{ageKeys: {chezmoi: {recipient: $c, privateKey: $cr}, omnirouteBackup: {recipient: $b, privateKey: $br},
+      aisync: {recipient: $a, privateKey: $ar}}}')"
 printf 'sourceDir: "%s"\n' "$REPO_ROOT" >"$TMP/chezmoi.yaml"
 chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "$override" <"$TEMPLATE" |
     sed "s|/proc/version|$TMP/proc-version|" >"$TMP/export.sh"
@@ -61,19 +65,26 @@ case "$1" in
         case "$ref" in
             *test-chezmoi*) cat "${OP_SERVE_CHEZMOI:-$CHEZMOI_ID}" ;;
             *test-backup*) cat "${OP_SERVE_BACKUP:-$BACKUP_ID}" ;;
+            *test-aisync*) cat "${OP_SERVE_AISYNC:-$AISYNC_ID}" ;;
             *) exit 1 ;;
         esac
         ;;
 esac
 STUB
 chmod +x "$TMP/bin/op.exe"
-export OP_LOG="$TMP/op.log" CHEZMOI_ID="$TMP/chezmoi.id" BACKUP_ID="$TMP/backup.id"
+export OP_LOG="$TMP/op.log" CHEZMOI_ID="$TMP/chezmoi.id" BACKUP_ID="$TMP/backup.id" AISYNC_ID="$TMP/aisync.id"
 
-# reset <wsl|metal>: a fresh home, with the bridge's socket standing in ~/.ssh.
+# reset <wsl|metal> [no-aisync]: a fresh home, with the bridge's socket standing in ~/.ssh and,
+# unless asked otherwise, aisync's key already in place, so the cases about the other two keys see
+# only those.
 reset() {
     rm -rf "${TMP:?}/home" "$OP_LOG"
     mkdir -p "$TMP/home/.ssh"
     : >"$TMP/home/.ssh/agent.sock"
+    if [[ "${2:-}" != no-aisync ]]; then
+        mkdir -p "$TMP/home/.config/aisync"
+        cp "$AISYNC_ID" "$TMP/home/.config/aisync/key.txt"
+    fi
     : >"$OP_LOG"
     if [[ "$1" == wsl ]]; then
         echo "Linux version 6.6.87.2-microsoft-standard-WSL2" >"$TMP/proc-version"
@@ -113,7 +124,7 @@ fi
 # when / then: nothing reaches 1Password, not even a sign-in, and each key is reported as in place
 : >"$OP_LOG"
 rc="$(run)"
-if [[ "$rc" == 0 && ! -s "$OP_LOG" && "$(grep -c 'is already in place' "$TMP/out")" == 2 ]]; then
+if [[ "$rc" == 0 && ! -s "$OP_LOG" && "$(grep -c 'is already in place' "$TMP/out")" == 3 ]]; then
     pass "matching keys are left alone without 1Password, each reported as already in place"
 else
     fail "matching keys: rc=$rc, op calls: $(cat "$OP_LOG")"
@@ -182,6 +193,59 @@ if [[ "$rc" == 0 && ! -e "$TMP/home/.ssh/omniroute-backup-key" && "$(reads)" == 
     pass "bare metal gets the chezmoi key and no backup key"
 else
     fail "bare metal: rc=$rc, reads=$(reads)"
+fi
+
+# given a machine without aisync's key
+reset metal no-aisync
+cp "$CHEZMOI_ID" "$TMP/home/.ssh/chezmoi"
+# when / then: it is fetched into aisync's own directory, private, and nothing else is
+rc="$(run)"
+key="$TMP/home/.config/aisync/key.txt"
+if [[ "$rc" == 0 && "$(reads)" == 1 ]] && same "$key" "$AISYNC_ID" &&
+    [[ "$(stat -c '%a' "$key")" == 600 && "$(stat -c '%a' "${key%/*}")" == 700 ]]; then
+    pass "a missing aisync key is fetched to ~/.config/aisync/key.txt, 0600 in a 0700 directory"
+else
+    fail "aisync key: rc=$rc, reads=$(reads), $(cat "$TMP/out")"
+fi
+
+# given another key where aisync's should be -- one aisync's own init may have generated
+reset metal no-aisync
+cp "$CHEZMOI_ID" "$TMP/home/.ssh/chezmoi"
+mkdir -p "$TMP/home/.config/aisync"
+cp "$TMP/other.id" "$TMP/home/.config/aisync/key.txt"
+# when / then: it is kept, nothing is fetched, and the apply goes on with a warning
+rc="$(run)"
+if [[ "$rc" == 0 && ! -s "$OP_LOG" ]] && same "$TMP/home/.config/aisync/key.txt" "$TMP/other.id" &&
+    grep -q 'WARN: .*key.txt holds another key' "$TMP/out"; then
+    pass "another aisync key is kept and warned about, never replaced"
+else
+    fail "other aisync key: rc=$rc, op calls: $(cat "$OP_LOG"), $(cat "$TMP/out")"
+fi
+
+# given aisync's key without the comment age-keygen writes, as aisync can import one
+reset metal no-aisync
+cp "$CHEZMOI_ID" "$TMP/home/.ssh/chezmoi"
+mkdir -p "$TMP/home/.config/aisync"
+grep '^AGE-SECRET-KEY-1' "$AISYNC_ID" >"$TMP/home/.config/aisync/key.txt"
+# when / then: age-keygen recognises it, and 1Password is left alone
+rc="$(run)"
+if [[ "$rc" == 0 && ! -s "$OP_LOG" ]] && grep -q 'aisync age key .* is already in place' "$TMP/out"; then
+    pass "a key without age-keygen's comment is recognised"
+else
+    fail "bare aisync key: rc=$rc, op calls: $(cat "$OP_LOG"), $(cat "$TMP/out")"
+fi
+
+# given an aisync key that cannot be fetched, then a sign-in that fails
+reset metal no-aisync
+cp "$CHEZMOI_ID" "$TMP/home/.ssh/chezmoi"
+# when / then: both only warn, and leave nothing staged
+rc="$(OP_READ_FAIL="$AISYNC_REF" run)"
+rc2="$(OP_SIGNIN_FAIL=1 run)"
+if [[ "$rc" == 0 && "$rc2" == 0 && ! -e "$TMP/home/.config/aisync/key.txt" ]] &&
+    [[ -z "$(find "$TMP/home/.config/aisync" -name 'key.txt.*')" ]] && grep -q 'WARN: .*key.txt was not fetched' "$TMP/out"; then
+    pass "an aisync key that cannot be fetched only warns"
+else
+    fail "failed aisync key: rc=$rc/$rc2, $(cat "$TMP/out")"
 fi
 
 if [ "$EXIT_CODE" -eq 0 ]; then
