@@ -42,6 +42,7 @@ make test-terra-update              # terra update in both installers carries TE
 make test-yq                        # mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring
 make test-export-keys               # the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key
 make test-export-key-windows        # the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh)
+make test-install-fonts-windows     # the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh)
 ```
 
 ## Essential Commands
@@ -1183,6 +1184,22 @@ GIMP, Codex, yq, ShellCheck, the Copilot CLI and the EA app -- so every run inst
 | A failed install is a `WARN`, never "installed successfully" | The script prints winget's exit code and ends with the list of everything that failed, RustDesk included. It still exits 0, because a failing `run_once_before_` script aborts the apply before any file is written; the cost is that a failed package is retried only when the script changes |
 
 `make test-install-dependencies-windows` runs `Install-PackageList` against a stubbed `winget`.
+
+## Windows Fonts (Per User, Before Every Apply)
+
+`run_before_windows-003-install-fonts.ps1` installs MesloLGS NF -- the face Windows Terminal's
+profiles name -- and the FiraCode and Meslo Nerd Fonts for the current user: into
+`%LOCALAPPDATA%\Microsoft\Windows\Fonts`, registered under `HKCU`, which Windows 10 1809 and
+later load without administrator rights.
+
+| Rule | Why |
+|------|-----|
+| Per user, never `$env:WINDIR\Fonts` | The machine-wide copy needed an elevated shell. The `run_once_` version warned and exited 0 without one, chezmoi recorded it as done, and Windows Terminal opened with "MesloLGS NF" not found for good |
+| `run_before_`, returning at once while every family is installed | A family missing from both the user's and the machine's fonts folder is installed on the next apply, whatever happened before; a family a machine-wide install already provides is left alone |
+| A failed download warns and exits 0 | The next apply retries it anyway, so it never stops an apply |
+| Never `New-Item -Force` on the `HKCU` fonts key | On an existing registry key it recreates the key, dropping every other font registered there |
+
+`make test-install-fonts-windows` covers it under pwsh, with the downloads and the registry stubbed.
 
 ## RustDesk on Windows (GitHub Release, Not winget)
 

@@ -89,11 +89,11 @@ version 2, and `wsl -l -v` lists it as `Stopped` or `Running`, not `Installing`.
 
 ## Phase 3: Windows bootstrap
 
-Run everything in this phase from an **elevated** PowerShell. `run_once_before_windows-003-install-fonts.ps1`
-refuses to run without administrator rights: it prints a warning, exits 0, and chezmoi then records
-it as done, so on a non-elevated first apply the fonts are silently never installed. If that already
-happened, `chezmoi state delete-bucket --bucket=scriptState` makes chezmoi forget every `run_once_`
-script and the next elevated `chezmoi apply` re-runs them all.
+Run everything in this phase from an **elevated** PowerShell, which the font step no longer needs
+but the machine-wide installers still prompt for. `run_before_windows-003-install-fonts.ps1` installs
+the fonts for the current user, without administrator rights, and runs before every apply, so a font
+that is missing -- including after the old `run_once_` version exited 0 without elevation and was
+never run again -- is installed by the next `chezmoi apply`.
 
 ### 3.1 Prerequisites `[manual]`
 
@@ -126,7 +126,7 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 |------|----------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 1    | `run_once_before_windows-001-install-dependencies.ps1`                                       | `[automated]` | 36 packages (Spotify from the Microsoft Store, the rest from winget), skipping any that `winget list` finds under its exact ID, plus RustDesk from its GitHub release (section 3.3). |
 | 2    | `run_once_before_windows-002-configure-dependencies.ps1`                                     | `[partial]`   | Phase 2: installs Kali and makes it the default distro, or runs `wsl --update` where Kali already exists. The reboot after the install is on you.                                   |
-| 3    | `run_once_before_windows-003-install-fonts.ps1`                                              | `[automated]` | MesloLGS NF, Meslo Nerd Font and FiraCode Nerd Font into `$env:WINDIR\Fonts` plus the `HKLM` font registry entries. Needs the elevated shell.                                       |
+| 3    | `run_before_windows-003-install-fonts.ps1`                                                   | `[automated]` | MesloLGS NF, Meslo Nerd Font and FiraCode Nerd Font for the current user, into `%LOCALAPPDATA%\Microsoft\Windows\Fonts` with `HKCU` font entries, whenever a family is missing; no elevation needed. |
 | 4    | `run_before_windows-004-export-private-key.ps1.tmpl`                                         | `[automated]` | Writes the age identity from `op://Private/chezmoi.age/private key` to `~\.ssh\chezmoi`, on every apply where that file is missing or holds another key; a failed read stops the apply. |
 | 5    | Managed files                                                                                | `[automated]` | `.gitconfig`, `.ssh\config`, `.ssh\allowed_signers`, `.ssh\authorized_keys`, `.age_recipients`, `.oh-my-posh.json`, `.wakatime.cfg`, `.aws` and `.azure` (decrypted).               |
 | 6    | `run_once_after_windows-001-create-ssh-known-hosts.ps1`                                      | `[automated]` | Pre-populates `known_hosts` so git over SSH never hangs on a host-key prompt.                                                                                                       |
@@ -167,7 +167,7 @@ desktop-only `Asus.GPUTweak` and `CyberPowerSystems.PowerPanel.Personal`.
 chezmoi doctor
 winget list --id Docker.DockerDesktop
 oh-my-posh version
-Get-ChildItem "$env:WINDIR\Fonts" -Filter 'MesloLGS*'
+Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Fonts" -Filter 'MesloLGS*'
 Test-Path ~\.ssh\chezmoi
 docker run --rm hello-world          # after starting Docker Desktop once and accepting its terms
 Get-Service RustDesk                 # Running once Install-RustDesk has installed it
@@ -400,15 +400,14 @@ signed in.
 Candidates for future issues, in rough order of payoff:
 
 1. **Microsoft Store apps.** winget can install from the Store through its `msstore` source; the IDs for WhatsApp, Telegram, CineBench, draw.io and JW Library need to be looked up with `winget search --source msstore` and added to the Windows installer.
-2. **Fonts on a non-elevated apply.** `windows-003-install-fonts.ps1` exits 0 without administrator rights and chezmoi records it as done. Exiting non-zero, or self-elevating, would make the failure visible instead of silent.
-3. **Hardware profiles.** `$hardwareDesktop` and `$utilitiesDesktop` are commented out; a chezmoi data flag keyed on the hostname could enable them on the desktop only.
-4. **Broken winget manifests**: `Asus.ArmouryCrate`, `Blizzard.BattleNet`, `Ubisoft.Connect`. Re-test them periodically, or install from the vendor URL with a checksum.
-5. **Windows features up front.** A small elevated pre-step could enable Virtual Machine Platform and WSL and run `wsl --set-default-version 2` before winget, instead of relying on `wsl --install` inside `windows-002`.
-6. **Baremetal Linux 1Password.** `linux-001` and `linux-005` assume `op.exe`.
-7. **Post-install steps that need a token**: `aisync` first pull, `ccswitch enroll`, the Claude Code bootstrap on Android. The `cred:` fields on the device note could feed them.
-8. **`imagemagick`, `pdftk` on WSL, PDM**: decide where they belong and add them to the installers or drop them from the checklist.
-9. **Zone.Identifier cleanup** after a backup restore could live in a `dot_scripts` helper.
-10. **Flutter on Termux is unverified.** `install_flutter` in the Android installer was written from `dpkg-deb` inspection of the community package, not from a run on a device. Run one `chezmoi apply` on the phone and record whether `flutter --version`, `flutter precache --web` and `flutter test` work; if the package cannot be made to start, demote the row to `[manual]` and keep only the native `dart`.
+2. **Hardware profiles.** `$hardwareDesktop` and `$utilitiesDesktop` are commented out; a chezmoi data flag keyed on the hostname could enable them on the desktop only.
+3. **Broken winget manifests**: `Asus.ArmouryCrate`, `Blizzard.BattleNet`, `Ubisoft.Connect`. Re-test them periodically, or install from the vendor URL with a checksum.
+4. **Windows features up front.** A small elevated pre-step could enable Virtual Machine Platform and WSL and run `wsl --set-default-version 2` before winget, instead of relying on `wsl --install` inside `windows-002`.
+5. **Baremetal Linux 1Password.** `linux-001` and `linux-005` assume `op.exe`.
+6. **Post-install steps that need a token**: `aisync` first pull, `ccswitch enroll`, the Claude Code bootstrap on Android. The `cred:` fields on the device note could feed them.
+7. **`imagemagick`, `pdftk` on WSL, PDM**: decide where they belong and add them to the installers or drop them from the checklist.
+8. **Zone.Identifier cleanup** after a backup restore could live in a `dot_scripts` helper.
+9. **Flutter on Termux is unverified.** `install_flutter` in the Android installer was written from `dpkg-deb` inspection of the community package, not from a run on a device. Run one `chezmoi apply` on the phone and record whether `flutter --version`, `flutter precache --web` and `flutter test` work; if the package cannot be made to start, demote the row to `[manual]` and keep only the native `dart`.
 
 ## Appendix: the original checklist, item by item
 
@@ -494,7 +493,7 @@ under `.chezmoiscripts/`; winget IDs refer to `run_once_before_windows-001-insta
 | OpenVPN Connect                                             | `[automated]` `OpenVPNTechnologies.OpenVPNConnect`                                                       |
 | K8s Lens                                                    | `[automated]` `Mirantis.Lens`                                                                            |
 | PowerShell 7                                                | `[partial]`, installed by hand as a prerequisite, kept by `Microsoft.PowerShell`                         |
-| `oh-my-posh font install meslo`                             | `[automated]` by `windows-003-install-fonts.ps1` instead                                                 |
+| `oh-my-posh font install meslo`                             | `[automated]` by `run_before_windows-003-install-fonts.ps1` instead                                                 |
 | 1Password CLI                                               | `[automated]` `AgileBits.1Password.CLI`, also a prerequisite                                              |
 | chezmoi on Windows                                          | `[manual]` prerequisite, `twpayne.chezmoi`                                                               |
 | age on Windows                                              | `[automated]` `FiloSottile.age`                                                                          |
