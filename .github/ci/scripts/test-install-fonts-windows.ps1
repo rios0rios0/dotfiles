@@ -106,6 +106,7 @@ Invoke-TestCase "installs every family for the user when none is installed" {
     Assert-That ($script:apiCalls -eq 1) "the release was resolved $($script:apiCalls) times"
     Assert-That (@($script:downloads | Where-Object { $_ -like "*/download/v9.9.9/*" }).Count -eq 2) "the zips do not come from the resolved release: $($script:downloads -join '; ')"
     Assert-That ($output -notmatch "WARN") "warned: $output"
+    Assert-That ($output -match "installing MesloLGS NF\.\.\." -and $output -match "installed MesloLGS NF \(4 files\)") "the install is not reported: $output"
 }
 
 Invoke-TestCase "downloads nothing while every family is installed" {
@@ -116,7 +117,7 @@ Invoke-TestCase "downloads nothing while every family is installed" {
     $output = Get-InstallOutput
     Assert-That ($script:downloads.Count -eq 0 -and $script:apiCalls -eq 0) "downloaded: $($script:downloads -join '; ')"
     Assert-That ($script:registered.Count -eq 0) "registered: $($script:registered -join '; ')"
-    Assert-That ([string]::IsNullOrEmpty($output)) "printed: $output"
+    Assert-That (([regex]::Matches($output, "is already installed, skipping")).Count -eq 3) "expected three already-installed lines: $output"
 }
 
 Invoke-TestCase "counts a family installed for the machine" {

@@ -1,0 +1,16 @@
+# The WSL settings chezmoi keeps in %UserProfile%\.wslconfig on Windows, by section, through
+# modify_dot_wslconfig. Only these keys are managed: anything else in the file -- set by hand or
+# from the WSL Settings app, which writes the same file -- is left as it is. WSL reads the file only
+# when its VM starts, so a change applies after `wsl.exe --shutdown`. See CLAUDE.md, "WSL Settings".
+wslConfig:
+  experimental:
+    # "Auto memory reclaim": hand cached memory back to Windows gradually once the CPU is idle,
+    # rather than letting the VM hold it.
+    autoMemoryReclaim: 'Gradual'
+    # "Enable sparse VHD by default": a newly created distribution's disk shrinks as files are
+    # deleted. An existing one stays as it is until `wsl.exe --manage <distro> --set-sparse true`.
+    sparseVhd: 'true'
+  general:
+    # "Keep WSL running": never stop an idle distribution, so the VM -- and Ollama, the SSH agent
+    # bridge and the tailnet share with it -- stays up after the last terminal closes.
+    instanceIdleTimeout: '-1'

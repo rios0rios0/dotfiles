@@ -3,12 +3,12 @@
 # registered under HKCU, which Windows 10 1809 and later load without administrator rights. Linux
 # and Android get the same fonts through .chezmoitemplates/lib-install-fonts.sh.
 #
-# A `run_before_` script, not `run_once_`: it runs on every apply and returns at once while each
-# family is installed, for this user or for the machine, so a font that is missing is installed
-# on the next apply. The `run_once_` version copied into $env:WINDIR\Fonts, which needs an
-# elevated shell; without one it warned and exited 0, chezmoi recorded it as done, and Windows
-# Terminal opened with "MesloLGS NF" not found from then on. A failed download only warns now,
-# since the next apply retries it anyway.
+# A `run_before_` script, not `run_once_`: it runs on every apply, says which family is already
+# installed (for this user or for the machine), and downloads only the missing ones, so a font
+# that is missing is installed on the next apply. The `run_once_` version copied into
+# $env:WINDIR\Fonts, which needs an elevated shell; without one it warned and exited 0, chezmoi
+# recorded it as done, and Windows Terminal opened with "MesloLGS NF" not found from then on. A
+# failed download only warns now, since the next apply retries it anyway.
 #
 # The folders are parameters for test-install-fonts-windows.ps1, which dot-sources this file;
 # chezmoi passes nothing.
@@ -117,7 +117,15 @@ function Install-FontFamily {
 function Invoke-FontInstall {
     param([string]$UserFolder, [string]$SystemFolder)
 
-    $missing = @($fontFamilies | Where-Object { -not (Test-FontFamily -Pattern $_.Pattern -Folders @($UserFolder, $SystemFolder)) })
+    $missing = @()
+    foreach ($family in $fontFamilies) {
+        if (Test-FontFamily -Pattern $family.Pattern -Folders @($UserFolder, $SystemFolder)) {
+            Write-Host "[$prefix] $($family.Name) is already installed, skipping"
+        }
+        else {
+            $missing += , $family
+        }
+    }
     if ($missing.Count -eq 0) { return }
 
     if (-not $UserFolder) {
@@ -134,6 +142,7 @@ function Invoke-FontInstall {
         $nerdFontsVersion = $null
         foreach ($family in $missing) {
             try {
+                Write-Host "[$prefix] installing $($family.Name)..."
                 if ($family.NerdFontsAsset -and -not $nerdFontsVersion) {
                     $nerdFontsVersion = Get-NerdFontsVersion
                 }

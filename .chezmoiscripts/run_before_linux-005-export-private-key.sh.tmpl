@@ -55,9 +55,17 @@ fetch_key() {
 
 need_chezmoi=false
 need_backup=false
-key_matches "$chezmoi_key" "$chezmoi_recipient" || need_chezmoi=true
+if key_matches "$chezmoi_key" "$chezmoi_recipient"; then
+    echo "[$prefix] the chezmoi age key at $chezmoi_key is already in place" >&2
+else
+    need_chezmoi=true
+fi
 if grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null; then
-    key_matches "$backup_key" "$backup_recipient" || need_backup=true
+    if key_matches "$backup_key" "$backup_recipient"; then
+        echo "[$prefix] the OmniRoute backup key at $backup_key is already in place" >&2
+    else
+        need_backup=true
+    fi
 fi
 if ! $need_chezmoi && ! $need_backup; then
     exit 0

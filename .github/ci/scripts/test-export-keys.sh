@@ -110,11 +110,11 @@ else
 fi
 
 # given both keys already in place
-# when / then: nothing reaches 1Password, not even a sign-in
+# when / then: nothing reaches 1Password, not even a sign-in, and each key is reported as in place
 : >"$OP_LOG"
 rc="$(run)"
-if [[ "$rc" == 0 && ! -s "$OP_LOG" && ! -s "$TMP/out" ]]; then
-    pass "matching keys are left alone, silently and without 1Password"
+if [[ "$rc" == 0 && ! -s "$OP_LOG" && "$(grep -c 'is already in place' "$TMP/out")" == 2 ]]; then
+    pass "matching keys are left alone without 1Password, each reported as already in place"
 else
     fail "matching keys: rc=$rc, op calls: $(cat "$OP_LOG")"
 fi
