@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'kept the OmniRoute stack running across applies on WSL, without ever creating its database: a new run_after script (linux-015) starts a stack whose data volume exists, with `--no-recreate`, failing the apply if it does not become healthy; leaves a running or stopped container alone and warns when it runs another image than the pin; names the newest archive to restore when there is no volume; and says when Docker Desktop does not start at sign-in, which leaves the gateway down after every reboot'
+time: '2026-10-27T23:32:26.967086496Z'
