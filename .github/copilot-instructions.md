@@ -142,7 +142,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 #### Font Installation
 - All platforms install MesloLGS NF (for Powerlevel10k) and Nerd Fonts (FiraCode, Meslo)
 - Linux: `run_once_before_linux-004-install-fonts.sh.tmpl` → installs to `~/.fonts`
-- Windows: `run_once_before_windows-003-install-fonts.ps1` → installs to Windows Fonts directory (requires admin)
+- Windows: `run_before_windows-003-install-fonts.ps1` → installs for the current user (`%LOCALAPPDATA%\Microsoft\Windows\Fonts`, `HKCU` entries, no admin), before every apply where a family is missing
 - Android: `run_once_before_android-003-install-fonts.sh.tmpl`
 - Shared font library: `.chezmoitemplates/lib-install-fonts.sh`
 
