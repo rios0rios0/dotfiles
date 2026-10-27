@@ -46,7 +46,7 @@ check_order() {
     echo "[test-script-order] PASS: $platform (${#actual[@]} scripts in correct order)" >&2
 }
 
-# Android: wrapper → op → gh → golangci-lint → acli → claude → codex wrappers → install deps → fonts
+# Android: wrapper → op → gh → golangci-lint → acli → claude wrappers → install deps → fonts
 check_order "android" \
     "001-create-wrapper" \
     "001a-create-op-wrapper" \
@@ -54,7 +54,6 @@ check_order "android" \
     "001c-create-golangci-lint-wrapper" \
     "001d-create-acli-wrapper" \
     "001e-create-claude-wrapper" \
-    "001f-create-codex-wrapper" \
     "002-install-dependencies" \
     "003-install-fonts"
 

@@ -142,28 +142,24 @@ check_platform "android" \
 # Claude Code's look: Linux gets settings.json and the status line script from ~/.claude and
 # nothing else there; Android keeps the trust dialog and gets no status line. Windows, where
 # Claude Code is no longer installed, gets neither ~/.claude nor ~/.claude.json. The AI content
-# of ~/.claude (CLAUDE.md, rules, agents, commands, skills) is aisync's, not chezmoi's. Codex is
-# installed on Android alone, so ~/.codex/config.toml ships nowhere else.
+# of ~/.claude (CLAUDE.md, rules, agents, commands, skills) is aisync's, not chezmoi's.
 check_platform "linux" \
     --include-line ".claude" \
     --include-line ".claude.json" \
     --include ".claude/settings.json" \
     --include ".claude/statusline-command.sh" \
-    --ignore-line ".claude/.claude.json" \
-    --ignore-line ".codex"
+    --ignore-line ".claude/.claude.json"
 
 check_platform "$WINDOWS_OS" \
     --ignore-line ".claude" \
-    --ignore-line ".claude.json" \
-    --ignore-line ".codex"
+    --ignore-line ".claude.json"
 
 check_platform "android" \
     --include-line ".claude" \
     --include-line ".claude.json" \
     --include ".claude/settings.json" \
     --include ".claude/.claude.json" \
-    --ignore-line ".claude/statusline-command.sh" \
-    --include-line ".codex"
+    --ignore-line ".claude/statusline-command.sh"
 
 # The JetBrains themes are staged for the one script that fans them out, on Linux; Windows lost
 # its counterpart with the Toolbox, and Android never had one.

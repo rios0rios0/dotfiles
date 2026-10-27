@@ -151,11 +151,11 @@ function Invoke-TombstoneList {
 # branch changes when the branch is rebased before merge).
 $tombstones = @(
     # Apps and CLIs no longer used on Windows -- removed in #260 (2026-10-27). jq, bat and
-    # shellcheck still come from apt inside WSL, and yq from its GitHub release (`install_yq`);
-    # Codex and Copilot stay on Android. NVM for Windows served only `nvm install --lts` in
-    # run_once_before_windows-002; nothing on Windows runs Node any more. The tools' own
-    # directories (~\.claude, ~\.claude.json, ~\.codex, ~\.copilot, ~\go, the VirtualBox VMs)
-    # are left in place: they hold logins, history and data, not installs.
+    # shellcheck still come from apt inside WSL, and yq from its GitHub release (`install_yq`).
+    # NVM for Windows served only `nvm install --lts` in run_once_before_windows-002; nothing
+    # on Windows runs Node any more. The tools' own directories (~\.claude, ~\.claude.json,
+    # ~\.codex, ~\.copilot, ~\go, the VirtualBox VMs) are left in place: they hold logins,
+    # history and data, not installs.
     "winget:Anthropic.ClaudeCode",
     "winget:CoreyButler.NVMforWindows",
     "winget:GitHub.Copilot",

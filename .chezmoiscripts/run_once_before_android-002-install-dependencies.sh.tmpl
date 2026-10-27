@@ -285,96 +285,6 @@ install_pyenv() {
     fi
 }
 
-# https://github.com/github/copilot-cli
-# The agentic GitHub Copilot CLI (binary `copilot`), installed via npm so it must run
-# after `install_nvm`. Best-effort: the package ships platform-specific native
-# executables and Termux is bionic (not glibc/musl), so this may end up needing the
-# same wrapper treatment as Claude Code (see android-001e). A failure here must not
-# abort the remaining dependency installs.
-install_copilot_cli() {
-    if command_exists copilot; then
-        echo "[copilot] already installed, skipping" >&2
-        return 0
-    fi
-
-    # `install_nvm` returns early when npm already exists, so this may run under the
-    # Termux-provided Node. Check the major version explicitly rather than letting a
-    # doomed install download and fail (or install a package that breaks at runtime).
-    local nodeMajor
-    nodeMajor="$(node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
-    case "$nodeMajor" in
-        '' | *[!0-9]*)
-            echo "[copilot] WARN: could not determine the Node.js version, skipping" >&2
-            return 0
-            ;;
-    esac
-    if [ "$nodeMajor" -lt 22 ]; then
-        echo "[copilot] WARN: Node.js 22+ is required, found v$nodeMajor, skipping" >&2
-        return 0
-    fi
-
-    npm install -g @github/copilot || {
-        echo "[copilot] WARN: install failed, skipping" >&2
-    }
-}
-
-# https://github.com/openai/codex
-# Codex CLI (binary `codex`). `npm install -g @openai/codex` cannot work on Termux: the
-# package is a Node launcher whose binary comes from one optional dependency per
-# platform, and `@openai/codex-linux-arm64` declares `os: linux` in its package.json
-# while Termux's Node reports `android`, so npm skips it silently and the launcher
-# throws "Missing optional dependency". GitHub publishes the same binary as a static
-# `aarch64-unknown-linux-musl` executable, which the wrapper created by
-# run_once_before_android-001f-create-codex-wrapper.sh downloads on its first launch
-# and keeps updated in the background (`codex update` refuses manual installs). So this
-# function only removes a leftover npm install -- its `$PREFIX/bin/codex` shim would
-# shadow the wrapper in any shell whose PATH lacks ~/.local/bin -- and triggers the
-# wrapper's bootstrap. The wrapper execs through termux-etc-mount, so this must run
-# after install_termux_etc_redirect.
-install_codex_cli() {
-    local wrapper="$HOME/.local/bin/codex"
-
-    if command_exists npm && npm ls -g --depth=0 @openai/codex >/dev/null 2>&1; then
-        echo "[codex] removing the global npm package: its launcher cannot run on Termux" >&2
-        npm uninstall -g @openai/codex \
-            || echo "[codex] WARN: failed to remove the npm package; ~/.local/bin/codex still takes precedence in zsh" >&2
-    fi
-
-    if [ ! -x "$wrapper" ]; then
-        echo "[codex] ERROR: $wrapper is missing; run_once_before_android-001f-create-codex-wrapper.sh should have created it" >&2
-        return 1
-    fi
-
-    # The wrapper downloads the latest release when no version is installed yet and
-    # is a no-op afterwards, so this call doubles as the idempotency check.
-    "$wrapper" --version \
-        || echo "[codex] WARN: bootstrap failed; the wrapper retries on the next codex launch" >&2
-
-    # Verify a build actually landed. `--version` exiting non-zero is not the only
-    # way the bootstrap fails to leave one: the wrapper prunes a download that does
-    # not run and returns to the caller, so the only reliable evidence is a binary
-    # under the versions directory. Report it rather than let the installer finish
-    # claiming success with no Codex CLI on the device.
-    #
-    # The test is `-x`, matching the wrapper's own `list_installed_versions`. A
-    # regular-file test would accept a partial or non-executable download that the
-    # wrapper refuses to run, which is the same false success in a new disguise.
-    local versions_dir="$HOME/.local/share/codex/versions"
-    local candidate
-    local installed=""
-    for candidate in "$versions_dir"/*/codex; do
-        if [ -x "$candidate" ]; then
-            installed="$candidate"
-            break
-        fi
-    done
-    if [ -z "$installed" ]; then
-        echo "[codex] ERROR: no Codex CLI build under $versions_dir after the bootstrap" >&2
-        echo "[codex] ERROR: run 'codex --version' once the device is online to retry the download" >&2
-        return 1
-    fi
-}
-
 # https://github.com/rios0rios0/dev-toolkit
 install_dev_toolkit() {
     install_go_tool_from_source https://github.com/rios0rios0/dev-toolkit.git dev
@@ -780,26 +690,21 @@ install_sdkman
 
 # TODO: same of the line 261
 install_nvm
-install_copilot_cli
 # Claude Code's musl distribution is bootstrapped manually following
 # examples/claude-code.md in rios0rios0/termux-etc-redirect (musl loader
 # seed + initial patchelf). Subsequent updates are handled by the wrapper
 # in .chezmoiscripts/run_once_before_android-001e-create-claude-wrapper.sh,
 # which downloads and patchelfs newer versions in the background.
 
-# Removes a broken global npm install and bootstraps ~/.local/bin/codex from
-# 001f. The release is static, so unlike Claude Code it needs no patchelf.
-#
-# Wrapped in `verify` because this script has no `set -e`: a bare call would let
-# `install_codex_cli`'s failure fall through to the next installer and the final
-# command would decide the exit status. See the definition for why the failure is
-# collected rather than raised on the spot.
+# Installers whose outcome this script verifies rather than assumes. It has no `set -e`, so
+# a bare call would let a `return 1` fall through to the next installer and the final command
+# would decide the exit status; `verify` collects the failure instead, and the script exits
+# non-zero at the end, which makes the next apply run it again.
 verified_failures=()
 verify() {
     "$@" || verified_failures+=("$1")
 }
 
-verify install_codex_cli
 # Sentry CLI from npm, shared with Linux/WSL (lib-install-deps.sh). Termux's native
 # Node runs the plain JavaScript bundle without any wrapper; the official install
 # script's Bun-compiled glibc binary cannot start on bionic at all.

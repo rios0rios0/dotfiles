@@ -306,7 +306,7 @@ and then drop you into zsh: type `exit` to let the installer continue.
 | Step | Script                                                              | Marker        | What it does                                                                                                                                    |
 |------|---------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
 | 1    | `run_once_before_android-001-create-wrapper.sh`                     | `[automated]` | The generic `termux-etc-seccomp` wrapper every tool wrapper uses.                                                                               |
-| 2    | `run_once_before_android-001a` to `001f`                            | `[automated]` | The `op`, `gh`, `golangci-lint`, `acli`, `claude` and `codex` wrappers, plus `claude-zsh`, the shell Claude Code's tool calls start through (from `001e`). They must exist before the installer and the templates call the tools.  |
+| 2    | `run_once_before_android-001a` to `001e`                            | `[automated]` | The `op`, `gh`, `golangci-lint`, `acli` and `claude` wrappers, plus `claude-zsh`, the shell Claude Code's tool calls start through (from `001e`). They must exist before the installer and the templates call the tools.           |
 | 3    | `run_once_before_android-002-install-dependencies.sh.tmpl`          | `[partial]`   | Termux packages and the tools below. 45-120 minutes, with the prompts listed above.                                                             |
 | 4    | `run_once_before_android-003-install-fonts.sh.tmpl`                 | `[automated]` | The fonts into `~/.local/share/fonts` and `~/.termux/font*.ttf`.                                                                                |
 | 5    | Managed files                                                       | `[automated]` | `.zshrc`, `.zshenv`, `.p10k.zsh`, `.tmux.conf`, `.gitconfig`, `.ssh/*`, `.termux/termux.properties`, `.config/mcphub/servers.json`, the `.config/nvim` plugin specs, `.claude/*`, `.local/bin/wrapper`, `.scripts/*`. |
@@ -336,9 +336,7 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 | Node.js                                                           | `install_nvm`                                                                     | `[automated]` | Keeps the native `nodejs` package and enables corepack; NVM is not used.                                                                                                                           |
 | Python                                                            | `install_pyenv`                                                                   | `[automated]` | Keeps the native `python`; pyenv is not used.                                                                                                                                                      |
 | Flutter `3.47.5` (community build)                                | `install_flutter`                                                                 | `[partial]`   | Flutter publishes no Linux arm64 host SDK, so this is [GeneralKaos666/flutter-for-termux](https://github.com/GeneralKaos666/flutter-for-termux) — mumumusuc's bionic cross-build as a Termux `.deb` — pinned to a version and an **integrity-only** SHA-256 computed from the inspected file (the project's README hash did not match its asset; the package's framework revision, engine revision and Dart version equal Google's 3.47.5 tarball, which is the corroboration on record), `apt`-installed under `$PREFIX/opt/flutter` with `x11-repo` for its gtk3 dependency, and fronted by two bash wrappers in `~/.local/bin`. **Not yet run on a device**: `flutter --version` is the hard check, `precache --web` is reported and not fatal. Termux's own `dart` package (above) is the baseline for `dart format` either way. |
-| GitHub Copilot CLI                                                | `install_copilot_cli`                                                             | `[partial]`   | npm, best effort: skipped with a warning when Termux's Node.js is older than 22.                                                                                                                   |
 | Claude Code                                                       | none                                                                              | `[manual]`    | The musl build is bootstrapped by hand following `examples/claude-code.md` in [rios0rios0/termux-etc-redirect](https://github.com/rios0rios0/termux-etc-redirect); the `claude` wrapper from step 2 handles every later update. |
-| Codex CLI                                                         | `install_codex_cli`                                                               | `[automated]` | The `codex` wrapper from step 2 downloads the latest static musl release on its first launch and keeps it updated in the background; a global npm install is removed first, because npm cannot install the `linux-arm64` platform package on Termux. |
 | Sentry CLI                                                        | `install_sentry_cli`                                                              | `[automated]` | npm package under Termux's native Node, no wrapper: the bundle is plain JavaScript. The official install script cannot be used here, its Bun-compiled glibc binary does not start on bionic. Completions and the agent skill come from step 10. |
 | Neon CLI                                                          | `install_neon_cli`                                                                | `[automated]` | npm package under Termux's native Node, no wrapper: the bundle is plain JavaScript; its `--keyring` addon has no android build, so credentials stay in the CLI's config file. On the phone, use an API key: `neon profile create <name> --api-key -` reads it from stdin. |
 | 1Password CLI (ARM64 binary), GitHub CLI, golangci-lint, Atlassian CLI | `install_1password_cli`, `install_github_cli`, `install_golangci_lint`, `install_acli` | `[automated]` | Pinned release downloads into `~/.local/bin`, run through the wrappers.                                                                                                                  |
@@ -352,8 +350,7 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 
 Same `aisync`, `claude` and `sentry auth login` steps as Phase 4, minus `ccswitch` (Linux only), with
 Neon authenticated by an API key rather than the browser flow (`neon profile create <name> --api-key -`
-reads it from stdin). Codex, which only Android installs, logs in with `codex login --device-auth`: it
-prints a code to enter in the phone's browser. Then the Android settings
+reads it from stdin). Then the Android settings
 from the README's known issue on the Phantom Process Killer: **Developer Options > Disable child
 process restrictions**, Termux's battery usage set to Unrestricted, and optionally Termux:Boot with a
 `termux-wake-lock` start script. rclone for OneDrive has its own guide:
@@ -369,13 +366,11 @@ op whoami
 gh auth status
 command -v terra kubectl aws az acli golangci-lint aisync flyctl oci sentry neon
 claude --version
-codex --version
 sentry --version
 neon --version
 ls ~/.local/share/zsh/site-functions/_sentry ~/.claude/skills/sentry-cli/SKILL.md
 ls ~/.local/bin/claude-exec-shim       # built by run_after_android-007
 ls ~/.local/bin/claude-zsh             # written by run_once_before_android-001e
-grep -q 'shell_environment_policy.set.LD_PRELOAD' ~/.local/bin/codex && echo ok   # LD_PRELOAD reaches Codex's tool shells (001f)
 ls ~/.termux/font.ttf
 ```
 

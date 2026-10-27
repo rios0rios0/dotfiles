@@ -15,15 +15,6 @@ make sast    # gitleaks + semgrep secret/code scanning
 
 Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-local-llm`, `make test-tailscale`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
 
-## Codex CLI Shortcut
-
-`dot_zshrc.tmpl` defines `codexx` for Android, the one platform that still installs
-Codex. It runs `command codex --dangerously-bypass-approvals-and-sandbox "$@"`,
-bypassing command approvals and sandboxing while preserving argument boundaries. Keep
-it a function with a preceding `unalias` so re-sourcing handles an existing alias. Keep PATH
-resolution so Android still launches its managed `~/.local/bin/codex` wrapper.
-Reasoning effort remains controlled by Codex configuration.
-
 ## Working Effectively
 
 ### Bootstrap and Apply Dotfiles Configuration
@@ -75,7 +66,7 @@ Scripts execute in this order per platform (numbers = execution priority):
 
 | Order | Linux (WSL)                                            | Windows                          | Android (Termux)                       |
 |-------|--------------------------------------------------------|----------------------------------|----------------------------------------|
-| 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-wrapper.sh` → `001a-f` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`, `codex`) |
+| 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-wrapper.sh` → `001a-e` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`) |
 | 002   | `install-dependencies.sh.tmpl` *(also baremetal variant)* | `configure-dependencies.ps1`     | `install-dependencies.sh.tmpl`         |
 | 003   | `configure-dependencies.sh`                            | `install-fonts.ps1`              | `install-fonts.sh.tmpl`                |
 | 004   | `install-fonts.sh.tmpl`                                | `export-private-key.ps1`         | —                                      |
@@ -85,7 +76,7 @@ On WSL, `run_before_linux-000-enable-wsl-systemd.sh.tmpl` runs ahead of all of t
 
 After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, then `run_after_*` scripts execute on every `chezmoi apply`. `run_onchange_after_*-remove-dependencies.*` scripts (Linux `006`, Windows `005`, Android `004`) re-run whenever their tombstone list changes. `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl` and `run_onchange_after_android-006-setup-sentry-cli.sh.tmpl` raise a CLI older than `0.47.0`, the floor `sentry-ds` needs, with `sentry cli upgrade` (`SENTRY_CLI_MIN_VERSION` in `.chezmoitemplates/lib-sentry-cli.sh`; they fail until it holds), then run `sentry cli setup --no-modify-path` (zsh completion into `~/.local/share/zsh/site-functions`, agent skill into `~/.claude/skills/sentry-cli/`) after the managed files, so the CLI finds the `fpath` line `dot_zshrc.tmpl` renders as an absolute path and does not append its own to `~/.zshrc`. `run_onchange_after_linux-011-setup-chrome.sh` installs Google Chrome from Google's apt repository (key pinned by fingerprint, trusted for that repository only) for the Chrome DevTools MCP server. `run_onchange_after_linux-012-setup-claude-lsp.sh` installs the pinned language servers (`gopls` into `~/.local/bin`; `typescript-language-server`, `typescript` 6.x and `pyright` through npm) and the official `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins that start them, at user scope; see "Claude Code Language Servers" in CLAUDE.md.
 
-On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-managed files under `dot_local/bin/`): the install-dependencies script calls `op`/`gh` during setup, before chezmoi applies managed files. Order: `001-create-wrapper` (generic `termux-etc-seccomp` wrapper) → `001a` `op` → `001b` `gh` → `001c` `golangci-lint` → `001d` `acli` → `001e` `claude` → `001f` `codex` → `002-install-dependencies`. The `codex` wrapper runs the static musl release from GitHub through `termux-etc-mount` and updates it itself; see "Codex CLI on Termux" in `CLAUDE.md` for the five Termux facts it encodes. `001e` also writes `~/.local/bin/claude-zsh`, the `CLAUDE_CODE_SHELL` launcher that restores the parked `LD_PRELOAD` before each of Claude Code's tool-call shells starts, so npm-installed CLIs (`sentry`, any `#!/usr/bin/env node` bin) can be exec'd directly from tool calls. `001f` closes the same gap for Codex from the other side — it passes `-c 'shell_environment_policy.set.LD_PRELOAD=…'`, because Codex spawns its tool shells itself (`bash -lc`, resolved from the password database, never from `$SHELL`) and never sources `~/.zshenv`. See the `LD_PRELOAD` contract in `CLAUDE.md`.
+On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-managed files under `dot_local/bin/`): the install-dependencies script calls `op`/`gh` during setup, before chezmoi applies managed files. Order: `001-create-wrapper` (generic `termux-etc-seccomp` wrapper) → `001a` `op` → `001b` `gh` → `001c` `golangci-lint` → `001d` `acli` → `001e` `claude` → `002-install-dependencies`. `001e` also writes `~/.local/bin/claude-zsh`, the `CLAUDE_CODE_SHELL` launcher that restores the parked `LD_PRELOAD` before each of Claude Code's tool-call shells starts, so npm-installed CLIs (`sentry`, any `#!/usr/bin/env node` bin) can be exec'd directly from tool calls. See the `LD_PRELOAD` contract in `CLAUDE.md`.
 
 #### Linux Dependencies (`.chezmoiscripts/run_once_before_linux-002-install-dependencies.sh.tmpl`)
 - **TIMING**: Takes 45-90 minutes to complete. NEVER CANCEL - Set timeout to 120+ minutes.
@@ -131,7 +122,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Sets up `termux-etc-seccomp` wrapper for running pre-compiled Go binaries natively
 - Installs: Oh My Zsh, GVM, terra (custom wrapper for terraform/terragrunt), kubectl (ARM64), SDKMAN, NVM, pyenv, Termux's `dart` package, Flutter (a pinned community `.deb` under `$PREFIX/opt/flutter`, fronted by bash wrappers in `~/.local/bin` — unverified on a device)
 - Oh My Zsh, SDKMAN, NVM, the Fly.io CLI, the Sentry CLI and the Neon CLI come from the shared `.chezmoitemplates/lib-install-deps.sh`; the login shell is switched with Termux's `chsh -s zsh` right after Oh My Zsh (only when its install succeeded), and NVM is skipped in favour of the native `nodejs` package when `npm` is already present
-- Installs: Claude CLI, GitHub Copilot CLI (npm, best-effort), Codex CLI (static musl release, bootstrapped through the `codex` wrapper from `001f`; a global npm install is removed first because npm skips the `linux-arm64` platform package on Termux), Sentry CLI (`sentry` npm package through the shared `install_sentry_cli`; the plain JavaScript bundle needs no wrapper under Termux's native Node), Neon CLI (`neon` npm package through the shared `install_neon_cli`; file-based credentials under Termux's native Node, its keyring addon has no android build), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
+- Installs: Claude CLI, Sentry CLI (`sentry` npm package through the shared `install_sentry_cli`; the plain JavaScript bundle needs no wrapper under Termux's native Node), Neon CLI (`neon` npm package through the shared `install_neon_cli`; file-based credentials under Termux's native Node, its keyring addon has no android build), 1Password CLI (ARM64 binary), GitHub CLI, Azure CLI (via pip), ruff (via apt), aisync (source build)
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 
@@ -207,9 +198,8 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_age_recipients.tmpl` → `~/.age_recipients`: Age encryption recipients
 - `modify_dot_claude.json` → `~/.claude.json`: MCP servers for Claude Code on Linux and Android (Context7 over HTTP on both, Chrome DevTools on Linux; servers it no longer manages are deleted from existing files through a per-platform retired list); a modify-template, see "MCP Servers" in CLAUDE.md. Windows gets no `~/.claude.json`: Claude Code is not installed there
 - `dot_config/mcphub/modify_servers.json` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android only; same list and merge as `~/.claude.json`, from `.chezmoitemplates/lib-modify-mcp-servers.tmpl`)
-- `dot_claude/modify_settings.json` → `~/.claude/settings.json`: on Linux, Claude Code's look (`dark-ansi` theme, fullscreen renderer, status line) from `.chezmoitemplates/lib-claude-look.tmpl`; on Android, permission rules and `effortLevel`. A modify-template; see "Claude Code and Codex Look" in CLAUDE.md
+- `dot_claude/modify_settings.json` → `~/.claude/settings.json`: on Linux, Claude Code's look (`dark-ansi` theme, fullscreen renderer, status line) from `.chezmoitemplates/lib-claude-look.tmpl`; on Android, permission rules and `effortLevel`. A modify-template; see "Claude Code Look" in CLAUDE.md
 - `dot_claude/executable_statusline-command.sh` → `~/.claude/statusline-command.sh`: the two-line status line styled after p10k, run by Claude Code (Linux only)
-- `dot_codex/modify_private_config.toml` → `~/.codex/config.toml`: Codex's status line items and colours, on Android, the one platform that installs Codex; a TOML modify-template that leaves Codex's own settings alone and keeps the file `0600`
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
 - `dot_config/systemd/user/ssh-agent-bridge.socket` + `ssh-agent-bridge@.service` → `~/.config/systemd/user/`: WSL-only SSH agent bridge (see below)
 - `.chezmoiscripts/run_before_linux-000-enable-wsl-systemd.sh.tmpl`: turns systemd on in `/etc/wsl.conf` on a WSL distribution that boots without it (Kali's image ships no such file), merging into the existing file through `sudo`; renders to nothing once systemd is PID 1
@@ -522,7 +512,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `top-size`, `ocode`, `rebuild-ocode`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `top-size`, `ocode`, `rebuild-ocode`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)

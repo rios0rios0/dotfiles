@@ -116,11 +116,9 @@ pyvenv.cfg
 .zshrc
 {{- end }}
 
-{{- /* Android‑exclusive files – only for Android. When not running Android, ignore them.
-     Codex is installed on Android alone, so its config.toml look ships nowhere else. */ -}}
+{{- /* Android‑exclusive files – only for Android. When not running Android, ignore them. */ -}}
 {{- if ne .chezmoi.os "android" }}
 .chezmoiscripts/android-*.sh
-.codex
 .local/bin/wrapper
 .local/bin/xclip
 .local/bin/clipshot

@@ -477,17 +477,6 @@ source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
 ###### Workspace Aliases ###########################################################
 source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
 
-{{- if eq .chezmoi.os "android" }}
-
-###### Codex CLI ###################################################################
-# Match claudex's permission bypass; keep PATH resolution for the Termux wrapper.
-# Remove any old alias so re-sourcing can safely define the function. Android only:
-# it is the one platform that still installs Codex.
-unalias codexx 2>/dev/null
-codexx() {
-    command codex --dangerously-bypass-approvals-and-sandbox "$@"
-}
-{{- end }}
 {{- if eq .chezmoi.os "linux" }}
 
 ###### OpenCode (ocode) ############################################################

@@ -41,7 +41,7 @@ test_modify \
     "extra-keys" \
     "termux.properties adds extra-keys"
 
-# --- JSON and TOML modify-templates --------------------------------------------
+# --- JSON modify-templates -----------------------------------------------------
 # These run only inside chezmoi -- there is no script to execute -- so each case
 # builds a throwaway source/destination pair, writes the target's current content,
 # and reads the result back with `chezmoi cat`. `--override-data` stands in for
@@ -371,117 +371,6 @@ settings_passes_a_linux_file_with_the_look_through() {
     cmp -s "$SANDBOX/look.json" "$SANDBOX/look.out"
 }
 
-# --- Codex's config.toml -------------------------------------------------------
-# TOML has no jq of its own, so assertions read it through chezmoi's parser, as JSON.
-
-toml_to_json() {
-    local file
-    file=$(mktemp "$SANDBOX/toml.XXXXXX")
-    cat > "$file"
-    chezmoi --config "$SANDBOX/empty.yaml" execute-template "{{ include \"$file\" | fromToml | toJson }}"
-}
-
-codex_creates_only_the_look() {
-    # given no ~/.codex/config.toml
-
-    # when
-    local out
-    out=$(apply_modify_template dot_codex/modify_private_config.toml .codex/config.toml "" | toml_to_json) || return 1
-
-    # then
-    [ "$(jq -c 'keys' <<<"$out")" = '["tui"]' ] &&
-        [ "$(jq -c '.tui | keys' <<<"$out")" = '["status_line","status_line_use_colors"]' ] &&
-        [ "$(jq -r '.tui.status_line[0]' <<<"$out")" = "current-dir" ] &&
-        [ "$(jq -r '.tui.status_line_use_colors' <<<"$out")" = "true" ]
-}
-
-codex_passes_a_matching_file_through() {
-    # given a config that already has the look, between a comment and tables of Codex's own
-    local tui
-    tui=$(apply_modify_template dot_codex/modify_private_config.toml .codex/config.toml "") || return 1
-    {
-        printf '# Written by hand.\nmodel = "gpt-6-luna"\n\n'
-        printf '%s\n\n' "$tui"
-        printf '[projects."/home/someone"]\ntrust_level = "trusted"\n'
-    } > "$SANDBOX/codex.toml"
-
-    # when
-    apply_modify_template dot_codex/modify_private_config.toml .codex/config.toml \
-        "$(cat "$SANDBOX/codex.toml")"$'\n' > "$SANDBOX/codex.out" || return 1
-
-    # then
-    cmp -s "$SANDBOX/codex.toml" "$SANDBOX/codex.out"
-}
-
-codex_sets_the_look_and_keeps_every_setting() {
-    # given a config Codex wrote, with another status line, no colours key, quoted and dotted
-    # keys, and an array of tables
-    cat > "$SANDBOX/codex-live.toml" <<'EOF'
-# Personal preferences.
-model = "gpt-6-luna"
-model_reasoning_effort = "xhigh"
-
-[projects."/home/someone/Development"]
-trust_level = "trusted"
-
-[tui]
-status_line = ["model-with-reasoning", "approval-mode"]
-screen_reader_detection_done = true
-
-[tui.model_availability_nux]
-"gpt-6.1-sol" = 1
-
-[hooks.state."/home/someone/.codex/hooks.json:session_start:0:0"]
-trusted_hash = "sha256:0000"
-
-[[skills.config]]
-path = "/home/someone/.codex/skills/a"
-enabled = false
-EOF
-    local look
-    look=$(apply_modify_template dot_codex/modify_private_config.toml .codex/config.toml "" | toml_to_json |
-        jq -c '.tui') || return 1
-
-    # when
-    local out
-    out=$(apply_modify_template dot_codex/modify_private_config.toml .codex/config.toml \
-        "$(cat "$SANDBOX/codex-live.toml")" | toml_to_json) || return 1
-
-    # then: the same settings, with only the look's two keys changed
-    local expected
-    expected=$(toml_to_json < "$SANDBOX/codex-live.toml" | jq -c --argjson look "$look" '.tui += $look') || return 1
-    [ "$(jq -S -c . <<<"$out")" = "$(jq -S -c . <<<"$expected")" ]
-}
-
-codex_keeps_the_file_private() {
-    # given a config left readable by everyone
-    local case_dir
-    case_dir=$(mktemp -d "$SANDBOX/private.XXXXXX")
-    mkdir -p "$case_dir/src/dot_codex" "$case_dir/dest/.codex" "$case_dir/home"
-    cp "$REPO_ROOT/dot_codex/modify_private_config.toml" "$case_dir/src/dot_codex/"
-    printf 'model = "gpt-6-luna"\n' > "$case_dir/dest/.codex/config.toml"
-    chmod 0644 "$case_dir/dest/.codex/config.toml"
-    : > "$case_dir/chezmoi.yaml"
-
-    # when
-    HOME="$case_dir/home" chezmoi --config "$case_dir/chezmoi.yaml" --source "$case_dir/src" \
-        --destination "$case_dir/dest" --persistent-state "$case_dir/state.boltdb" --cache "$case_dir/cache" \
-        apply --force 2>/dev/null || return 1
-
-    # then
-    [ "$(stat -c '%a' "$case_dir/dest/.codex/config.toml")" = "600" ]
-}
-
-codex_fails_on_invalid_toml() {
-    # given a corrupt ~/.codex/config.toml
-
-    # when
-    if apply_modify_template dot_codex/modify_private_config.toml .codex/config.toml '[tui' >/dev/null; then
-        # then: the template must not have produced a replacement
-        return 1
-    fi
-}
-
 windows_deploys_only_modify_templates() {
     # given the source state as chezmoi resolves it for Windows, which cannot start
     # a #! script: every modify_ file there must be a modify-template
@@ -516,7 +405,7 @@ invalid_json_fails_instead_of_replacing() {
 }
 
 if ! command -v chezmoi &>/dev/null || ! command -v jq &>/dev/null; then
-    echo "[test-modify-scripts] SKIP: JSON and TOML modify-templates (needs chezmoi and jq)" >&2
+    echo "[test-modify-scripts] SKIP: JSON modify-templates (needs chezmoi and jq)" >&2
 else
     SANDBOX=$(mktemp -d)
     trap 'rm -rf "$SANDBOX"' EXIT
@@ -544,11 +433,6 @@ else
     run_case "settings.json: gives Linux the look and none of the rules" settings_gives_linux_the_look_only
     run_case "settings.json: passes a Linux file that has the look through byte for byte" \
         settings_passes_a_linux_file_with_the_look_through
-    run_case "codex config.toml: creates only the look when the file is missing" codex_creates_only_the_look
-    run_case "codex config.toml: passes a matching file through byte for byte" codex_passes_a_matching_file_through
-    run_case "codex config.toml: sets the look and keeps every other setting" codex_sets_the_look_and_keeps_every_setting
-    run_case "codex config.toml: keeps the file 0600" codex_keeps_the_file_private
-    run_case "codex config.toml: fails on invalid TOML instead of replacing the file" codex_fails_on_invalid_toml
     run_case "claude.json: fails on invalid JSON instead of replacing the file" invalid_json_fails_instead_of_replacing
     run_case "every modify_ file that deploys on Windows is a modify-template" windows_deploys_only_modify_templates
 fi

@@ -105,22 +105,7 @@ if [ -f "$docker_tmpl" ]; then
     fi
 fi
 
-# Parse the complete shell template for both supported platforms, then exercise
-# only the shortcut block so tests never load plugins or start account monitors.
-mkdir -p "$TMPDIR/codex-bin"
-cat > "$TMPDIR/codex-bin/codex" <<'EOF'
-#!/bin/sh
-printf '<%s>\n' "$@"
-EOF
-chmod +x "$TMPDIR/codex-bin/codex"
-cat > "$TMPDIR/expected-codex-args" <<'EOF'
-<--dangerously-bypass-approvals-and-sandbox>
-<resume>
-<two words>
-<>
-<*.go>
-EOF
-
+# Parse the complete shell template for both supported platforms.
 for platform in linux android; do
     rendered="$TMPDIR/zshrc-$platform.zsh"
     if ! chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" \
@@ -128,35 +113,8 @@ for platform in linux android; do
         < "$REPO_ROOT/dot_zshrc.tmpl" > "$rendered" || ! zsh -n "$rendered"; then
         echo "[test-template-render] FAIL: $platform zshrc rendering/syntax" >&2
         EXIT_CODE=1
-        continue
-    fi
-    awk '/^###### Codex CLI / { capture=1; next }
-         capture && /^###### / { exit }
-         capture { print }' "$rendered" > "$TMPDIR/codex-shortcut.zsh"
-    # Codex is installed on Android alone, so Linux must not carry a shortcut to nothing.
-    if [ "$platform" = "linux" ]; then
-        if grep -q 'codexx' "$rendered"; then
-            echo "[test-template-render] FAIL: linux zshrc still defines codexx" >&2
-            EXIT_CODE=1
-        else
-            echo "[test-template-render] PASS: linux zshrc syntax, and no codexx" >&2
-        fi
-        continue
-    fi
-    # An inherited alias must be replaced; repeated sourcing must be harmless.
-    # A shell function named codex must not intercept the executable on PATH.
-    if ! PATH="$TMPDIR/codex-bin:$PATH" zsh -f -c '
-        alias codexx="false"
-        source "$1"
-        source "$1"
-        codex() { return 97; }
-        codexx resume "two words" "" "*.go"
-    ' test "$TMPDIR/codex-shortcut.zsh" > "$TMPDIR/actual-codex-args" || \
-        ! diff -u "$TMPDIR/expected-codex-args" "$TMPDIR/actual-codex-args"; then
-        echo "[test-template-render] FAIL: $platform codexx behavior" >&2
-        EXIT_CODE=1
     else
-        echo "[test-template-render] PASS: $platform zshrc syntax and codexx behavior" >&2
+        echo "[test-template-render] PASS: $platform zshrc rendering and syntax" >&2
     fi
 done
 

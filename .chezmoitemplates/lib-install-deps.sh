@@ -222,8 +222,7 @@ install_sentry_cli() {
 
     # The package declares `engines.node >= 20`; skip early instead of installing a
     # launcher that fails on every run. Both skips are deliberate best-effort outcomes,
-    # so they return success like the Android copilot install does -- only a failed
-    # install is reported as a failure.
+    # so they return success -- only a failed install is reported as a failure.
     local node_major
     node_major="$(node --version 2>/dev/null | sed -E 's/^v([0-9]+).*/\1/')"
     if [[ ! "$node_major" =~ ^[0-9]+$ ]]; then
