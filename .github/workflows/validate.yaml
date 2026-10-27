@@ -555,6 +555,27 @@ jobs:
       - name: 'Test the Windows font install'
         run: 'make test-install-fonts-windows'
 
+  test-powershell-profile-windows:
+    name: 'Test (PowerShell profile, Windows)'
+    # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
+    # install step fails with 'Unable to locate package powershell' there.
+    runs-on: 'ubuntu-24.04'
+    permissions:
+      contents: 'read'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Install PowerShell'
+        run: |
+          sudo apt-get install -y wget apt-transport-https software-properties-common
+          source /etc/os-release
+          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          rm packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
+      - name: 'Test the Oh My Posh block in the PowerShell profile'
+        run: 'make test-powershell-profile-windows'
+
   sast:
     name: SAST
     runs-on: ubuntu-latest

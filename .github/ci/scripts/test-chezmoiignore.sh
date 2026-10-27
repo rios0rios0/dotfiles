@@ -161,6 +161,11 @@ check_platform "android" \
     --include ".claude/.claude.json" \
     --ignore-line ".claude/statusline-command.sh"
 
+# WSL's settings live in Windows' %UserProfile%\.wslconfig, so only Windows gets the file.
+check_platform "$WINDOWS_OS" --include-line ".wslconfig"
+check_platform "linux" --ignore-line ".wslconfig"
+check_platform "android" --ignore-line ".wslconfig"
+
 # The JetBrains themes are staged for the one script that fans them out, on Linux; Windows lost
 # its counterpart with the Toolbox, and Android never had one.
 check_platform "linux" --include ".local/share/jetbrains-themes"

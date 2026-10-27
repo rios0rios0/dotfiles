@@ -43,6 +43,7 @@ make test-yq                        # mikefarah's yq: the pin, the Python yq it 
 make test-export-keys               # the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key
 make test-export-key-windows        # the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh)
 make test-install-fonts-windows     # the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh)
+make test-powershell-profile-windows # the Oh My Posh block in PowerShell 7's profile: created, kept, already set up, replaced (needs pwsh)
 ```
 
 ## Essential Commands
@@ -223,7 +224,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `powershell-profile`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -265,6 +266,8 @@ from the file extension (`.json` has none), Windows has no `#!`, and the apply a
 | Output `.chezmoi.stdin` unchanged when nothing managed is missing | Go maps keep no order, so `toPrettyJson` emits sorted keys. Passing the content through keeps the layout Claude Code wrote, and a real change is the only time a file is re-serialised |
 | Compare with `toJson`, never `eq` on decoded values | A missing key decodes to `""`, and `eq` between a string and a bool is an error rather than `false` |
 | Invalid JSON fails the template | The old scripts started from `{}` and replaced the file; failing leaves it for a person to repair |
+
+`modify_dot_wslconfig` applies the same rules to an INI file, line by line (see "WSL Settings").
 
 `make test-modify-scripts` runs each one through `chezmoi cat` in a sandbox, and fails when
 any `modify_` file that chezmoi resolves for Windows is not a modify-template.
@@ -1019,12 +1022,13 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
    package is the same static build for every release.
 9. **The installer tracks `tailscale-up`'s rendered digest**, so switching `shareOnTailnet` or the
    local model on or off re-runs it, and the share follows.
-10. **A WSL machine serves only while its WSL runs.** Windows stops WSL a few seconds after the
-    last WSL terminal closes, and the Ollama unit with it; Windows' share then forwards to a port
-    nothing listens on. Nothing here keeps WSL running, by choice: whoever wants the desktop's GPU
-    opens a terminal there (RustDesk) and leaves it open. Windows' client keeps the machine on the
-    tailnet meanwhile, and `tailscale set --unattended=true` keeps it there after its user signs
-    out and before the first sign-in after a reboot.
+10. **A WSL machine serves only while its WSL runs.** `.wslconfig`'s `instanceIdleTimeout=-1`
+    ("Keep WSL running", see "WSL Settings") stops Windows shutting WSL down once the last WSL
+    terminal closes, so Ollama keeps serving the tailnet share. WSL still starts only when
+    something launches it, though, so after a reboot or a sign-out the share forwards to a port
+    nothing listens on until a WSL terminal opens once (RustDesk, on the desktop). Windows'
+    client keeps the machine on the tailnet meanwhile, and `tailscale set --unattended=true`
+    keeps it there after its user signs out and before the first sign-in after a reboot.
 
 What the Linux client leaves behind on WSL is root's, so no tombstone reaches it:
 `sudo apt-get purge -y tailscale` also removes `/var/lib/tailscale`, and
@@ -1195,11 +1199,56 @@ later load without administrator rights.
 | Rule | Why |
 |------|-----|
 | Per user, never `$env:WINDIR\Fonts` | The machine-wide copy needed an elevated shell. The `run_once_` version warned and exited 0 without one, chezmoi recorded it as done, and Windows Terminal opened with "MesloLGS NF" not found for good |
-| `run_before_`, returning at once while every family is installed | A family missing from both the user's and the machine's fonts folder is installed on the next apply, whatever happened before; a family a machine-wide install already provides is left alone |
+| `run_before_`, reporting each family as already installed or installing it | A family missing from both the user's and the machine's fonts folder is installed on the next apply, whatever happened before; a family a machine-wide install already provides is left alone |
 | A failed download warns and exits 0 | The next apply retries it anyway, so it never stops an apply |
 | Never `New-Item -Force` on the `HKCU` fonts key | On an existing registry key it recreates the key, dropping every other font registered there |
 
 `make test-install-fonts-windows` covers it under pwsh, with the downloads and the registry stubbed.
+
+## PowerShell Profile (Oh My Posh)
+
+`run_after_windows-006-setup-powershell-profile.ps1` makes PowerShell 7 start with Oh My Posh and
+the `~/.oh-my-posh.json` theme: a block between `# >>> rios0rios0/dotfiles: oh-my-posh >>>` markers
+in its all-hosts profile, `Documents\PowerShell\profile.ps1`. Without it nothing ever ran
+`oh-my-posh init`, and the theme chezmoi deployed was never loaded.
+
+| Rule | Why |
+|------|-----|
+| Documents comes from Windows' known folder, never a path under `$HOME` | OneDrive moves it -- on alien-a51 to `OneDrive - ARANCIA\Documents` -- so `$HOME\Documents` would write a profile PowerShell never reads |
+| Only the block between the markers is the repository's | Everything else in the profile stays; a block that differs is replaced in place, one that matches is reported as already set up |
+| PowerShell 7 only | Windows PowerShell 5.1 runs no profile under its default execution policy (`Restricted`) -- `oh-my-posh init` failed there with `UnauthorizedAccess` -- and loosening that policy is the user's decision, not an apply's |
+| `run_after_`, warning on a failure | It runs once the theme is written, and the next apply retries a profile it could not write |
+
+`make test-powershell-profile-windows` covers it under pwsh, against a scratch Documents folder.
+
+## WSL Settings (.wslconfig)
+
+`modify_dot_wslconfig` keeps the WSL settings `.chezmoidata/wsl.yaml` names in Windows'
+`%UserProfile%\.wslconfig`, the file the WSL Settings app writes:
+
+| Section | Key | Value | The app calls it |
+|---------|-----|-------|------------------|
+| `[experimental]` | `autoMemoryReclaim` | `Gradual` | Auto memory reclaim |
+| `[experimental]` | `sparseVhd` | `true` | Enable sparse VHD by default |
+| `[general]` | `instanceIdleTimeout` | `-1` | Keep WSL running |
+
+**Keep these:**
+
+1. **Merged, never written whole.** The app rewrites the same file, and another key -- a memory
+   limit, a networking mode -- may be set there or by hand per machine. A managed key whose value
+   differs is set back in place, a missing one joins the end of its section, and every other line
+   stays; when nothing differs the file passes through byte for byte.
+2. **Keys and values compare case-insensitively**, as WSL reads them: the app writes `Gradual`,
+   the documentation `gradual`, and neither should rewrite the other.
+3. **The file's own line endings stay.** The app writes CRLF with no final newline; a rewrite keeps
+   whichever the file had, and a new file gets CRLF.
+4. **Nothing restarts WSL.** WSL reads the file only when its VM starts, and `wsl.exe --shutdown`
+   would end every WSL process, the apply's own among them; the apply's line says so instead.
+   `sparseVhd` applies to distributions created afterwards; an existing one is made sparse with
+   `wsl.exe --manage <distro> --set-sparse true` while WSL is stopped.
+
+`make test-modify-scripts` covers the merge (a new file, the app's file passing through, a value
+set back with every other line kept); `make test-chezmoiignore` covers that only Windows gets it.
 
 ## RustDesk on Windows (GitHub Release, Not winget)
 
@@ -1244,11 +1293,12 @@ versions in the repository's history.
    `run_before_linux-005-export-private-key.sh.tmpl` and
    `run_before_windows-004-export-private-key.ps1.tmpl` compare each file with the `# public key:`
    comment `age-keygen` writes into it -- no age binary needed, which a first Windows apply has
-   only just installed -- and fetch the item when it is missing or holds another key. As
-   `run_once_` scripts they could not recover: the Windows one called `op read` without
-   `--account my`, which fails with two accounts in the CLI, and reported that as success, because
-   a native command's failure does not fail a PowerShell script; chezmoi recorded it as done, and
-   every apply after that died at `.aws/config` with `age: error: reading ".../.ssh/chezmoi"`.
+   only just installed -- and fetch the item when it is missing or holds another key; a key
+   already in place gets a line saying so. As `run_once_` scripts they could not recover: the
+   Windows one called `op read` without `--account my`, which fails with two accounts in the CLI,
+   and reported that as success, because a native command's failure does not fail a PowerShell
+   script; chezmoi recorded it as done, and every apply after that died at `.aws/config` with
+   `age: error: reading ".../.ssh/chezmoi"`.
 2. **A key is written only once it is the right one.** It is staged beside the target, checked
    for an `AGE-SECRET-KEY-1` line and the expected public key, and renamed over the target, so a
    failed or wrong read leaves the previous file as it was.

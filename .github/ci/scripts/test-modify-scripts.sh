@@ -68,6 +68,7 @@ apply_modify_template() {
     case_dir=$(mktemp -d "$SANDBOX/case.XXXXXX")
     mkdir -p "$case_dir/src/$(dirname "$source_file")" "$case_dir/dest/$(dirname "$target")" "$case_dir/home"
     cp -r "$REPO_ROOT/.chezmoitemplates" "$case_dir/src/"
+    cp -r "$REPO_ROOT/.chezmoidata" "$case_dir/src/"
     cp "$REPO_ROOT/$source_file" "$case_dir/src/$source_file"
     if [ -n "$content" ]; then
         printf '%s' "$content" > "$case_dir/dest/$target"
@@ -371,6 +372,47 @@ settings_passes_a_linux_file_with_the_look_through() {
     cmp -s "$SANDBOX/look.json" "$SANDBOX/look.out"
 }
 
+# --- WSL's .wslconfig ----------------------------------------------------------
+# An INI file the WSL Settings app writes too: the template keeps .chezmoidata/wsl.yaml's keys and
+# every other line, comparing case-insensitively and keeping the file's line endings.
+
+wslconfig_creates_the_settings() {
+    # given no ~/.wslconfig
+
+    # when
+    local out
+    out=$(apply_modify_template modify_dot_wslconfig .wslconfig "") || return 1
+
+    # then: both sections, in the CRLF the WSL Settings app writes
+    [ "$out" = $'[experimental]\r\nautoMemoryReclaim=Gradual\r\nsparseVhd=true\r\n[general]\r\ninstanceIdleTimeout=-1\r' ]
+}
+
+wslconfig_passes_the_apps_file_through() {
+    # given the file exactly as the WSL Settings app wrote it: CRLF, no final newline, and a
+    # lowercase value the app would write capitalised
+    printf '[experimental]\r\nautoMemoryReclaim=gradual\r\nsparseVhd=true\r\n[general]\r\ninstanceIdleTimeout=-1' \
+        > "$SANDBOX/wslconfig.app"
+
+    # when
+    apply_modify_template modify_dot_wslconfig .wslconfig "$(cat "$SANDBOX/wslconfig.app")" \
+        > "$SANDBOX/wslconfig.out" || return 1
+
+    # then
+    cmp -s "$SANDBOX/wslconfig.app" "$SANDBOX/wslconfig.out"
+}
+
+wslconfig_keeps_everything_else() {
+    # given hand-written settings, a comment, a wrong value under another case, and an empty section
+    local input=$'# mine\n[wsl2]\nmemory=16GB\n\n[experimental]\nAutoMemoryReclaim=dropcache\nnetworkingMode=mirrored\n\n[general]\n'
+
+    # when
+    local out
+    out=$(apply_modify_template modify_dot_wslconfig .wslconfig "$input") || return 1
+
+    # then: the value is set back in place, the missing keys join their sections, and the rest stays
+    [ "$out" = $'# mine\n[wsl2]\nmemory=16GB\n\n[experimental]\nautoMemoryReclaim=Gradual\nnetworkingMode=mirrored\nsparseVhd=true\n\n[general]\ninstanceIdleTimeout=-1' ]
+}
+
 windows_deploys_only_modify_templates() {
     # given the source state as chezmoi resolves it for Windows, which cannot start
     # a #! script: every modify_ file there must be a modify-template
@@ -434,6 +476,9 @@ else
     run_case "settings.json: passes a Linux file that has the look through byte for byte" \
         settings_passes_a_linux_file_with_the_look_through
     run_case "claude.json: fails on invalid JSON instead of replacing the file" invalid_json_fails_instead_of_replacing
+    run_case "wslconfig: creates both sections when the file is missing" wslconfig_creates_the_settings
+    run_case "wslconfig: passes the WSL Settings app's file through byte for byte" wslconfig_passes_the_apps_file_through
+    run_case "wslconfig: sets a value back and keeps every other line" wslconfig_keeps_everything_else
     run_case "every modify_ file that deploys on Windows is a modify-template" windows_deploys_only_modify_templates
 fi
 

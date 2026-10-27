@@ -28,7 +28,10 @@ function Test-KeyFile {
     return [bool](Select-String -LiteralPath $Path -SimpleMatch -Pattern "# public key: $recipient" -Quiet)
 }
 
-if (Test-KeyFile $keyPath) { exit 0 }
+if (Test-KeyFile $keyPath) {
+    Write-Host "[$prefix] the chezmoi age key at $keyPath is already in place"
+    exit 0
+}
 
 if (-not (Test-Path -LiteralPath $SshFolder)) {
     New-Item -ItemType Directory -Path $SshFolder | Out-Null

@@ -1,0 +1,89 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Keeps the WSL settings .chezmoidata/wsl.yaml names in %UserProfile%\.wslconfig, an INI file the
+  WSL Settings app writes too. A managed key whose value differs is set back in place, a missing one
+  is added at the end of its section, and a missing section is added at the end of the file. Keys
+  and values compare case-insensitively, as WSL reads them (the app writes `Gradual`, the docs
+  `gradual`), and every other line -- other keys, sections, comments -- stays as it is.
+
+  Two passes, because a template defines no functions: the first finds each section's last line
+  and the keys already present, the second rewrites. When nothing differs, the current content is
+  returned byte for byte; a real change keeps the file's line endings (CRLF from the app) and its
+  final newline or the lack of one. Windows only, through .chezmoiignore.
+*/ -}}
+{{- $want := .wslConfig -}}
+{{- $text := .chezmoi.stdin | replace "\r\n" "\n" -}}
+{{- $eol := "\r\n" -}}
+{{- if and $text (not (contains "\r\n" .chezmoi.stdin)) -}}
+{{-   $eol = "\n" -}}
+{{- end -}}
+{{- $finalNewline := or (not $text) (hasSuffix "\n" $text) -}}
+{{- $lines := list -}}
+{{- if $text -}}
+{{-   $lines = splitList "\n" (trimSuffix "\n" $text) -}}
+{{- end -}}
+{{- /* Pass 1: the last non-blank line of each section, and the keys present in it. */ -}}
+{{- $section := "" -}}
+{{- $lastLine := dict -}}
+{{- $present := dict -}}
+{{- range $i, $line := $lines -}}
+{{-   $t := trim $line -}}
+{{-   if regexMatch `^\[.*\]$` $t -}}
+{{-     $section = $t | trimPrefix "[" | trimSuffix "]" | trim | lower -}}
+{{-     $_ := set $lastLine $section $i -}}
+{{-   else if $t -}}
+{{-     $_ := set $lastLine $section $i -}}
+{{-     if regexMatch `^[^#;=\s][^=]*=` $t -}}
+{{-       $_ := set $present (printf "%s.%s" $section (regexReplaceAll `\s*=.*$` $t "" | lower)) true -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+{{- /* Pass 2: rewrite managed values, and add missing keys after their section's last line. */ -}}
+{{- $section = "" -}}
+{{- $out := list -}}
+{{- $changes := list -}}
+{{- range $i, $line := $lines -}}
+{{-   $t := trim $line -}}
+{{-   $written := false -}}
+{{-   if regexMatch `^\[.*\]$` $t -}}
+{{-     $section = $t | trimPrefix "[" | trimSuffix "]" | trim | lower -}}
+{{-   else if and (hasKey $want $section) (regexMatch `^[^#;=\s][^=]*=` $t) -}}
+{{-     $key := regexReplaceAll `\s*=.*$` $t "" -}}
+{{-     $value := regexReplaceAll `^[^=]*=\s*` $t "" -}}
+{{-     range $name, $wanted := get $want $section -}}
+{{-       if and (eq (lower $name) (lower $key)) (ne (lower $value) (lower (toString $wanted))) -}}
+{{-         $out = append $out (printf "%s=%s" $name (toString $wanted)) -}}
+{{-         $changes = append $changes (printf "%s.%s" $section $name) -}}
+{{-         $written = true -}}
+{{-       end -}}
+{{-     end -}}
+{{-   end -}}
+{{-   if not $written -}}
+{{-     $out = append $out $line -}}
+{{-   end -}}
+{{-   range $name, $keys := $want -}}
+{{-     if and (hasKey $lastLine $name) (eq (get $lastLine $name) $i) -}}
+{{-       range $key, $wanted := $keys -}}
+{{-         if not (hasKey $present (printf "%s.%s" $name (lower $key))) -}}
+{{-           $out = append $out (printf "%s=%s" $key (toString $wanted)) -}}
+{{-           $changes = append $changes (printf "%s.%s" $name $key) -}}
+{{-         end -}}
+{{-       end -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+{{- range $name, $keys := $want -}}
+{{-   if not (hasKey $lastLine $name) -}}
+{{-     $out = append $out (printf "[%s]" $name) -}}
+{{-     range $key, $wanted := $keys -}}
+{{-       $out = append $out (printf "%s=%s" $key (toString $wanted)) -}}
+{{-       $changes = append $changes (printf "%s.%s" $name $key) -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+{{- if $changes -}}
+{{-   warnf "[wslconfig] set %s in ~/.wslconfig; WSL reads it at its next start (wsl.exe --shutdown)" (join ", " $changes) -}}
+{{-   join $eol $out -}}{{ if $finalNewline }}{{ $eol }}{{ end }}
+{{- else -}}
+{{-   .chezmoi.stdin -}}
+{{- end -}}
