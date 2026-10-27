@@ -178,7 +178,8 @@ echo "build|$0|$PWD|$(command -v bun)|$*" >>"${BUN_LOG:?}"
 echo "$*" >>"${BUN_CALLS:?}"
 echo "${OPENCODE_CHANNEL:-unset}/${OPENCODE_VERSION:-unset}" >>"${BUN_ENV:?}"
 if [ -n "${BUN_STUB_RACE:-}" ]; then
-    "$HOME/.local/bin/ocode" 300 &
+    # the installed binary is still the copy of bash that start_running_ocode put there
+    "$HOME/.local/bin/ocode" -c 'read -r -t 300 <>"$1"' ocode "${BUN_RACE_FIFO:?}" &
     echo "$!" >"${BUN_RACE_PID:?}"
 fi
 for arg in "$@"; do
@@ -573,12 +574,22 @@ else
     fi
 fi
 
+# A copy of bash at ~/.local/bin/ocode stands in for a running ocode: the process executes that
+# file, which is what the builder finds through /proc/<pid>/exe, and waits on a FIFO that nothing
+# writes to. A copy of sleep cannot: uutils coreutils, Ubuntu's default since 25.10, is one
+# multi-call binary that picks the utility from its own file name, whatever argv[0] says, so a copy
+# named ocode exits at once with "coreutils: unknown program 'ocode'". $! is the running copy.
+mkfifo "$TMP/never-written"
+start_running_ocode() {
+    cp "$BASH" "$HOME/.local/bin/ocode"
+    "$HOME/.local/bin/ocode" -c 'read -r -t 300 <>"$1"' ocode "$TMP/never-written" &
+}
+
 # 18) A running ocode executes the installed binary, so the prompt appears; with nothing on stdin
 #     to answer it (an unattended apply), the session is left alone and the build runs anyway --
 #     the staged rename replaces the file under a running process without disturbing it.
 printf 'fake7890\n' >"$CHECKOUT/.git/HEAD"
-cp /bin/sleep "$HOME/.local/bin/ocode"
-"$HOME/.local/bin/ocode" 300 &
+start_running_ocode
 unanswered_pid=$!
 before="$(calls)"
 run_script
@@ -595,8 +606,7 @@ pass "a running ocode is asked about, and an unanswered prompt builds anyway wit
 
 # 19) The same situation answered no: the session is still left alone and the build still runs.
 printf 'fakeabcd\n' >"$CHECKOUT/.git/HEAD"
-cp /bin/sleep "$HOME/.local/bin/ocode"
-"$HOME/.local/bin/ocode" 300 &
+start_running_ocode
 declined_pid=$!
 before="$(calls)"
 printf 'n\n' >"$TMP/answer"
@@ -613,8 +623,7 @@ pass "a running ocode survives a decline, and the build proceeds"
 
 # 20) Answered yes: the process is killed first, and then the build runs.
 printf 'fakefade\n' >"$CHECKOUT/.git/HEAD"
-cp /bin/sleep "$HOME/.local/bin/ocode"
-"$HOME/.local/bin/ocode" 300 &
+start_running_ocode
 accepted_pid=$!
 printf 'y\n' >"$TMP/answer"
 before="$(calls)"
@@ -631,8 +640,7 @@ fi
 pass "a running ocode is killed when the prompt is accepted, and the build proceeds"
 
 # 21) An unchanged head needs no build, so a running ocode is not asked about at all.
-cp /bin/sleep "$HOME/.local/bin/ocode"
-"$HOME/.local/bin/ocode" 300 &
+start_running_ocode
 unchanged_pid=$!
 before="$(calls)"
 run_script
@@ -649,10 +657,10 @@ pass "a running ocode is not prompted about when the head is unchanged"
 # 22) One started *while* the build runs (the stub starts it mid-build) must not fail the install:
 #     a direct cp onto it would die with "Text file busy", the staged rename replaces it.
 printf 'fake9999\n' >"$CHECKOUT/.git/HEAD"
-export BUN_STUB_RACE=1 BUN_RACE_PID="$TMP/race-pid"
+export BUN_STUB_RACE=1 BUN_RACE_PID="$TMP/race-pid" BUN_RACE_FIFO="$TMP/never-written"
 before="$(calls)"
 run_script
-unset BUN_STUB_RACE BUN_RACE_PID
+unset BUN_STUB_RACE BUN_RACE_PID BUN_RACE_FIFO
 race_pid="$(cat "$TMP/race-pid")"
 [ "$(rc)" -eq 0 ] || fail "a process started mid-build must not fail the install"
 if grep -q "Text file busy" "$TMP/out"; then
