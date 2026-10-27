@@ -28,7 +28,8 @@ repository itself never holds it.
 
 AI content is not part of this configuration. `~/.config/opencode/AGENTS.md`, `rules/`,
 `agents/`, `commands/` and `skills/` are synced by aisync (the `opencode` tool in the aifiles
-config), like the equivalent `~/.claude` tree; chezmoi renders only
+config), like the equivalent `~/.claude` tree, which the apply pulls every time (see "AI Rules
+Sync" in CLAUDE.md); chezmoi renders only
 `opencode.json` and `cli.json` here. The local plugin
 `~/.config/opencode/plugins/no-claude-skills.ts` filters the Claude-compatible
 `~/.claude/skills` source out of the skill catalog (OpenCode V2 ignores the

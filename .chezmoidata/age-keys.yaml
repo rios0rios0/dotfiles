@@ -5,6 +5,7 @@
 # The export scripts (run_before_linux-005 and run_before_windows-004) compare the key on disk
 # against `recipient` on every apply and fetch `privateKey` when it differs, so rotating a key is
 # a new item, its references and public key here, and re-encrypting what the old key protected.
+# The aisync key is the exception: it is fetched only when missing (see its entry).
 ageKeys:
   # Decrypts every encrypted_*.age file in this repository, at ~/.ssh/chezmoi on Linux/WSL and
   # Windows; ~/.age_recipients holds `recipient` for `chezmoi add --encrypt`. Not the SSH key that
@@ -17,3 +18,11 @@ ageKeys:
   omnirouteBackup:
     recipient: 'age142st2urc08ttscnrl3qsryd0gn6364kyftmm8uwrnz4jduxx3ccq5n865l'
     privateKey: 'op://Private/omniroute-backup.age/private key'
+  # Decrypts aifiles, the private repository aisync syncs ~/.claude and ~/.config/opencode
+  # through, at ~/.config/aisync/key.txt on Linux/WSL and Android (run_before_linux-005 and
+  # run_after_android-008). `recipient` must stay in aifiles' config.yaml `encryption.recipients`,
+  # which every device encrypts to. Fetched only when the file is missing, never replaced: aisync's
+  # own `init` and `key generate` write that file, and something may be encrypted to such a key.
+  aisync:
+    recipient: 'age1a69w87jjawyun9mxwfhj0lvf7jyg9t7sa4u3a8qhjcukvr04hussnktszn'
+    privateKey: 'op://Private/aisync.age/private key'
