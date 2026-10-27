@@ -61,6 +61,13 @@ ocode models                   # the full catalog, with the omniroute/* entries 
 Model ids are OmniRoute's own behind the provider's `omniroute/` prefix: `omniroute/auto/coding`,
 `omniroute/codex/...`, `omniroute/nvidia/...`.
 
+A reasoning model is listed once, and its effort is a variant of it: `ctrl+t` cycles the variants
+in the TUI, and `ocode run -m omniroute/<model>#high` picks one for a single run. The variants are
+the `capabilities.effort_tiers` the gateway reports for the model, so a model that reports none has
+none. OmniRoute would also list each tier as a model of its own (`<model>-high`), which the Compose
+file turns off with `OMNIROUTE_DISABLE_THINKING_LEVEL_VARIANTS`. Providers whose own model ids carry
+the tier, such as Codex's `*-high`, keep those rows: they are models, not variants.
+
 ## The fork build (`ocode`)
 
 `run_after_linux-006-build-ocode.sh` rebuilds `ocode` from the checkout at
@@ -100,6 +107,64 @@ every path of the prompt and the mid-build race.
 The `rebuild-ocode` zsh function runs the same script on demand, resolving it through
 `chezmoi source-path`, so a build can be caught up after pulling the fork checkout -- or when an
 apply found nothing to build -- without a whole apply. `make test-zshrc-functions` covers it.
+
+## The web UI on the tailnet
+
+OpenCode's web UI is the client a phone uses: the server renders it, and the official binary is
+a glibc build Termux's bionic cannot start, so there is nothing to install on the phone. What the
+phone needs is a reachable server and a session.
+
+`tailscale-up` shares it, the same way it shares Ollama and for the same reason: `tailscale serve
+--bg --tcp=<port>` puts the forward in the client's own state, so it comes back with the service,
+and it never uses Funnel. Both settings live in `.chezmoidata/opencode.yaml`, read through
+`.chezmoitemplates/lib-opencode.tmpl`:
+
+| Key | Default | What it does |
+|-----|---------|--------------|
+| `shareOnTailnet` | `true` | whether `tailscale-up` forwards the port |
+| `webPort` | `41320` | the port the fork's service listens on: the default it derives from the build's channel |
+| `devices.<deviceName>` | `{}` | per-device overrides, laid over key by key like `local-llm.yaml`'s |
+
+**The port follows the channel.** The fork's service listens on
+`10000 + (<first 8 hex digits of the channel's SHA-1> mod 50000)`, and the build stamps the
+channel (`OPENCODE_CHANNEL=feat-provider-omniroute` in `run_after_linux-006-build-ocode.sh`), which
+gives 41320. Renaming the channel moves the port, so `make test-tailscale` recomputes it from the
+build script and fails until `webPort` follows. A port pinned with `ocode service set port` needs a
+device override of `webPort` as well.
+
+**The service keeps listening on loopback.** `ocode service set hostname 0.0.0.0` is not part of
+this: on WSL, Windows' client forwards to Windows' `localhost`, which WSL's localhost relay hands
+to the service's `127.0.0.1` socket, and on bare metal the forward names `127.0.0.1` directly. The
+port therefore stays closed to the Wi-Fi network, and the tailnet's ACLs decide who reaches it.
+
+**The service runs once something starts it.** The first `ocode`, `ocode pair` or
+`ocode service start` does; nothing starts it at boot. Until then -- and on WSL whenever WSL itself
+is not running (see "Tailscale" in `CLAUDE.md`) -- the share forwards to nothing, which is
+harmless: a connection simply gets no answer.
+
+Pair a device with an address it can dial in the link. `ocode pair` alone prints the loopback
+address the service listens on and leaves the QR code out, since no other device can use it;
+`--url` puts the tailnet name in both:
+
+```bash
+ocode pair --url "http://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")'):41320"
+```
+
+That name is `<machine>.<tailnet>.ts.net`; `tailscale ip -4` gives the `100.x.y.z` form, which
+works as well. Opening the link on the phone signs it in with a session cookie and loads the UI.
+
+The link works once and expires in 5 minutes; the session it grants lasts 30 days. Sessions are
+signed with the server password, which the service picks at random on its first start and keeps,
+so they survive restarts and rebuilds. `ocode service unset password` signs every device out: it
+stops the service, and the next start picks and keeps a new password, which the local TUI reads
+from the service's registration on its own. `ocode service set password <value>` would do the same
+with a password of your choosing, but on a command line, where other local users can read it. The
+pairing page is a navigation, and the cookie carries no `Secure` flag, which is why the plain-TCP
+forward is enough here.
+
+Switching `shareOnTailnet` off stops `tailscale-up` from re-creating the forward; it does not
+remove the one already in the client, because a `serve` entry outlives the repository that set it.
+Remove it with `tailscale serve --tcp=41320 off`.
 
 ## When models are missing
 

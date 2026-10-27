@@ -3,16 +3,16 @@
 # Installs the relay behind the SSH agent bridge and activates its socket unit.
 #
 # On WSL every SSH key lives in 1Password on the Windows side, reachable only through the
-# named pipe \\.\pipe\openssh-ssh-agent. Two mechanisms carry that across the boundary today
-# and both work by running a Windows binary: the `ssh` -> `ssh.exe` wrapper in ~/.local/bin,
-# and `gpg.ssh.program = op-ssh-sign-wsl` in ~/.gitconfig, which is what signs every commit.
+# named pipe \\.\pipe\openssh-ssh-agent. The `ssh` -> `ssh.exe` wrapper in ~/.local/bin carries
+# that across the boundary by running a Windows binary, and commit signing goes through this
+# bridge: ~/.gitconfig signs with Linux's ssh-keygen, which takes the signature from the agent.
 #
-# Neither reaches a program that does SSH *itself* instead of shelling out to `ssh`. go-git
+# The wrapper does not reach a program that does SSH *itself* instead of shelling out to `ssh`. go-git
 # (AutoBump), Go's x/crypto/ssh, and libgit2 all authenticate by dialing an AF_UNIX socket
 # and speaking the agent protocol; `core.sshCommand` is never consulted, because no binary
 # is ever executed. Go cannot dial a Windows named pipe, so for those tools the keys simply
-# do not exist -- which is why signing succeeds and `git push` succeeds while AutoBump alone
-# reports no usable SSH credential.
+# do not exist -- which is why `git push` succeeds while AutoBump alone reports no usable SSH
+# credential.
 #
 # npiperelay copies bytes between stdio and the pipe; ssh-agent-bridge.socket supplies the
 # AF_UNIX listener and hands each accepted connection over on stdio. That is the job socat

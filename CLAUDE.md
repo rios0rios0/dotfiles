@@ -34,7 +34,7 @@ make test-zshrc-functions           # top-size, sentry-ds and rebuild-ocode in d
 make test-sentry-setup              # the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds
 make test-local-llm                 # the local model server: its settings, the window its unit allocates, the installer's gate
 make test-opencode                  # OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference
-make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server
+make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server and the ocode web UI
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: with and without a login, no refresh without one, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
@@ -43,6 +43,7 @@ make test-omniroute-image           # the custom OmniRoute image pin: the switch
 make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the dependency install, the pinned bun (cache, verified download, fallbacks), the ~/.bun/bin fallback, the bun installer and its PATH block
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
 make test-yq                        # mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring
+make test-chlog                     # chlog from upstream's pinned tag: the go install, the skip, the replacement, the failures, the wiring
 make test-export-keys               # the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key
 make test-export-key-windows        # the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh)
 make test-install-fonts-windows     # the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh)
@@ -407,9 +408,11 @@ apply's bash, which has to find GVM's newest Go and NVM's default Node on its ow
 
 ## Shared Install Library
 
-`.chezmoitemplates/lib-install-deps.sh` holds the install functions whose body is correct on both Linux/WSL and Android without a conditional: `command_exists`, `install_oh_my_zsh`, `install_sdkman`, `install_nvm`, `install_fly_cli`, `install_sentry_cli`, `install_neon_cli`, plus the `run_remote_installer` helper they use to download an installer script to a temp file and run it (never pipe `curl` into `bash`; without `pipefail` an HTTP error page runs silently). Both dependency installers pull it in with `{{ template "lib-install-deps.sh" }}`, which is the only reason the Linux installer is a `.sh.tmpl`.
+`.chezmoitemplates/lib-install-deps.sh` holds the install functions whose body is correct on both Linux/WSL and Android without a conditional: `command_exists`, `install_oh_my_zsh`, `install_sdkman`, `install_nvm`, `install_fly_cli`, `install_sentry_cli`, `install_neon_cli`, `install_chlog`, plus the `run_remote_installer` helper they use to download an installer script to a temp file and run it (never pipe `curl` into `bash`; without `pipefail` an HTTP error page runs silently). Both dependency installers pull it in with `{{ template "lib-install-deps.sh" }}`, which is the only reason the Linux installer is a `.sh.tmpl`.
 
 Keep platform-specific provisioning in the platform installers: apt repositories versus binary downloads (`gh`, `kubectl`), upstream install scripts versus source builds (`terra`, `dev-toolkit`, `aisync`), pyenv versus Termux's native Python. A function moves into the library only when the same body is right on both platforms. The library is pure bash (no template directives), so `make lint-shellcheck` lints it as a plain `.sh` file, and its messages use the `[install-deps]` prefix.
+
+`install_chlog` builds chlog with `go install` from upstream's module, `github.com/luizjhonata/chlog`, at a pinned tag, stamping the version upstream's release builds carry so that a later run tells the pinned build from an older one, into `~/.local/bin` (GVM keeps only the newest Go on `PATH`). Not from the `rios0rios0/chlog` fork: it only adds a `.gitignore` change, and its `go.mod` still names upstream, so it cannot be installed under its own name. On Termux the local build is a `GOOS=android` binary, which needs no wrapper. `make test-chlog` covers it against a stubbed `go`.
 
 Oh My Zsh is installed with `--unattended` on both platforms, so the login shell is switched explicitly right after it, and only when the install succeeded: `usermod` on Linux, Termux's `chsh -s zsh` on Android. Every remote installer in the library (Oh My Zsh, SDKMAN, NVM) goes through `run_remote_installer`, which forwards extra arguments to the script; do not reintroduce `sh -c "$(curl ...)"`, because a failed download becomes an empty command that exits 0. On Termux `install_nvm` keeps the native `nodejs` package and only enables corepack; the check is on Termux's prefix, not on where `npm` resolves from, because WSL exposes Windows' `npm` through PATH interop.
 
@@ -894,11 +897,12 @@ OpenCode runs on the OmniRoute gateway: `dot_config/opencode/opencode.json.tmpl`
 | Look | `dot_config/opencode/cli.json` |
 | Rules | `~/.config/opencode/AGENTS.md` and `rules/`, synced by aisync, not chezmoi; each project's `CLAUDE.md` arrives through `instructions` |
 | Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported by the credential loader and read at config load as `{env:OMNIROUTE_API_KEY}` |
+| Web UI on the tailnet | `.chezmoidata/opencode.yaml` (port, share switch) read through `lib-opencode.tmpl`; `tailscale-up` forwards it as a plain-TCP `serve` entry, on loopback. Pair with `ocode pair --url http://<machine>.<tailnet>.ts.net:<webPort>`; see `.docs/opencode-local.md` |
 
 **Keep these, each prevents a failure that was observed or measured:**
 
 1. **`{env:VAR}` is load-time substitution; a `${VAR}` key is a silent 401.** OpenCode expands `{env:...}` and `{file:...}` anywhere in the document when it loads it, and `${...}` only inside a provider's `settings.baseURL`. Measured against the live gateway: with `${OMNIROUTE_API_KEY}` as the apiKey, discovery returns no models at all; with `{env:OMNIROUTE_API_KEY}`, the key's whole catalog.
-2. **The model list is discovered, and the key policy is the source of truth.** `/v1/models` serves the ids the key's rules allow, so the repository holds no list to drift; allow a model in OmniRoute's dashboard, never here. The plugin drops `type: "image"` rows, keeps `context_length` as the window and `capabilities.tool_calling` as tool support; measured: 158 chat models of the key's 162 rows.
+2. **The model list is discovered, and the key policy is the source of truth.** `/v1/models` serves the ids the key's rules allow, so the repository holds no list to drift; allow a model in OmniRoute's dashboard, never here. The plugin drops `type: "image"` rows, keeps `context_length` as the window and `capabilities.tool_calling` as tool support; measured: 158 chat models of the key's 162 rows. It also turns `capabilities.effort_tiers` into the model's variants, which is why `local-services/omniroute/compose.yaml` sets `OMNIROUTE_DISABLE_THINKING_LEVEL_VARIANTS`: the `<model>-<tier>` rows OmniRoute adds by default listed every reasoning model once more per tier. A dashboard override of that flag wins over the Compose value.
 3. **The MCP field is `environment`.** V2 reads `environment` on a local MCP server; an `env` key is ignored with no diagnostic, and the variable silently never reaches the server. `make test-opencode` asserts `environment` and the absence of `env` on every server.
 4. **The `dotfiles` reference is absolute on purpose.** A local reference path resolves against the config document's directory unless absolute; the template renders `{{ .chezmoi.sourceDir }}`, so a session reads the actual dotfiles checkout (usually `~/.local/share/chezmoi`).
 5. **Permissions are V2 ordered entries** (`{action, resource, effect}`), the same allowances as the Claude Code side; what the list does not allow, the TUI still asks for.
@@ -1012,6 +1016,7 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
 | `tailscale` in a shell | `dot_local/bin/executable_tailscale`, a wrapper for `tailscale.exe` | the package's |
 | Login | the Tailscale app on Windows | `tailscale-up`, which waits for the browser |
 | Sharing the model's server | `tailscale-up`, through Windows' `tailscale serve` | `tailscale-up`, through `tailscale serve` |
+| Sharing the ocode web UI | `tailscale-up`, the same way (`.chezmoidata/opencode.yaml`) | `tailscale-up`, the same way |
 | `.chezmoiscripts/run_onchange_after_linux-010-setup-tailscale.sh.tmpl` | runs `tailscale-up --no-login`, nothing else | installs, enables `tailscaled`, logs in |
 | Shell hook (`dot_zshrc.tmpl`, "Tailscale") | none | `tailscale-up --no-login` in every interactive zsh |
 
@@ -1036,8 +1041,7 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
    appears on Windows' `127.0.0.1`, and a dual-stack bind would put it on `::1` alone. `localhost`
    reaches whichever it is, so the share survives such a change unedited; WSL's own address would
    answer too, but it changes whenever WSL starts. A share left on the other literal is moved by the
-   next apply (9). The wrapper's path is fixed, as `op-ssh-sign-wsl`'s is in `dot_gitconfig.tmpl`;
-   `TAILSCALE_EXE` names another.
+   next apply (9). The wrapper's path is fixed; `TAILSCALE_EXE` names another.
 4. **Bare metal: the shell's pass never waits and never asks for a password.** It runs in every
    interactive zsh, so a logged-out machine gets a one-line hint pointing at `tailscale-up`, not a
    login that blocks the prompt, and a failed daemon gets a hint, not `sudo systemctl`. A daemon
@@ -1058,8 +1062,9 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
    Tailscale's fingerprint. A keyring carrying a second key would make apt trust that one too.
    Upstream's `install.sh` maps every Kali release since 2021 to the Debian bullseye suite; the
    package is the same static build for every release.
-9. **The installer tracks `tailscale-up`'s rendered digest**, so switching `shareOnTailnet` or the
-   local model on or off re-runs it, and the share follows.
+9. **The installer tracks `tailscale-up`'s rendered digest**, so switching either `shareOnTailnet`
+   (`local-llm.yaml`'s or `opencode.yaml`'s) or the local model on or off re-runs it, and the
+   shares follow.
 10. **A WSL machine serves only while its WSL runs.** `.wslconfig`'s `instanceIdleTimeout=-1`
     ("Keep WSL running", see "WSL Settings") stops Windows shutting WSL down once the last WSL
     terminal closes, so Ollama keeps serving the tailnet share. WSL still starts only when
@@ -1067,6 +1072,20 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
     nothing listens on until a WSL terminal opens once (RustDesk, on the desktop). Windows'
     client keeps the machine on the tailnet meanwhile, and `tailscale set --unattended=true`
     keeps it there after its user signs out and before the first sign-in after a reboot.
+11. **The ocode web UI is a plain-TCP forward to loopback, on the port its channel implies.**
+    `.chezmoidata/opencode.yaml` (through `lib-opencode.tmpl`) decides the port and whether it is
+    shared, and `tailscale-up` forwards it exactly as it forwards Ollama's -- `serve --tcp`, never
+    Funnel, to `localhost` on WSL and `127.0.0.1` on bare metal -- so the service keeps listening
+    on loopback, and `ocode service set hostname 0.0.0.0`, which would open the port to the Wi-Fi
+    network, is not needed. The fork derives the service's port from the channel the build stamps,
+    so `webPort` has to follow `OPENCODE_CHANNEL` in the build script, which `make test-tailscale`
+    checks. A phone pairs with `ocode pair --url http://<machine>.<tailnet>.ts.net:<webPort>`, the
+    one way a reachable host gets into the one-time link and its QR code. The 30-day session that
+    grants is signed with the service's password, which the service keeps across restarts, so
+    `ocode service unset password` revokes every session, without putting a secret on a command
+    line as `set password` would. Nothing starts the service at boot (the first `ocode`, `ocode
+    pair` or `ocode service start` does), and a `serve` entry outlives the repository that set it:
+    switching `shareOnTailnet` off leaves `tailscale serve --tcp=<webPort> off` to a person.
 
 What the Linux client leaves behind on WSL is root's, so no tombstone reaches it:
 `sudo apt-get purge -y tailscale` also removes `/var/lib/tailscale`, and
@@ -1074,7 +1093,7 @@ What the Linux client leaves behind on WSL is root's, so no tombstone reaches it
 drops the repository. Delete that machine in the admin console too, so that Windows' node can
 take its name.
 
-`make test-tailscale` covers 1 to 6 and 9 against stubs of both clients, `systemctl` and `sudo`,
+`make test-tailscale` covers 1 to 7, 9 and 11 against stubs of both clients, `systemctl` and `sudo`,
 and the removal on WSL alone; `make test-chezmoiignore` covers the gates.
 
 ## systemd on WSL (Turned On by chezmoi)
@@ -1155,17 +1174,16 @@ If SoX picks the wrong driver, force it with `AUDIODRIVER=pulse`.
 
 ## SSH Agent Bridge (WSL)
 
-Every SSH key on this setup lives in 1Password on the Windows side. Two mechanisms carry that
-across the WSL boundary, and **both work by executing a Windows binary**: the `ssh` →
-`ssh.exe` wrapper in `dot_local/bin/executable_ssh`, and `gpg.ssh.program = op-ssh-sign-wsl`
-in `dot_gitconfig.tmpl`, which signs every commit.
+Every SSH key on this setup lives in 1Password on the Windows side. The `ssh` → `ssh.exe`
+wrapper in `dot_local/bin/executable_ssh` carries that across the WSL boundary by **executing a
+Windows binary**, and commits are signed through the bridge below.
 
-Neither reaches a program that does SSH *itself* rather than shelling out to `ssh`. go-git
+The wrapper does not reach a program that does SSH *itself* rather than shelling out to `ssh`. go-git
 ([AutoBump](https://github.com/rios0rios0/autobump)), Go's `x/crypto/ssh`, and libgit2
 authenticate by dialing an `AF_UNIX` socket and speaking the agent protocol; they never
 execute a binary, so `core.sshCommand` is never consulted and the wrapper is never invoked.
 Go cannot dial a Windows named pipe, so for those tools the keys simply do not exist. That is
-the whole shape of the bug it produces: signing works, `git push` works, and one tool reports
+the whole shape of the bug it produces: `git push` works, and one tool reports
 no usable SSH credential — which reads as that tool losing a key that demonstrably exists.
 
 `dot_config/systemd/user/ssh-agent-bridge.socket` closes the gap. It listens on
@@ -1210,6 +1228,23 @@ systemctl --user status ssh-agent-bridge.socket  # should be active (listening)
 The bridge needs systemd in WSL, which `chezmoi apply` turns on (see "systemd on WSL"). Until
 WSL boots with it, the installer warns and exits 0, leaving `SSH_AUTH_SOCK` pointing at nothing,
 and the first apply after the restart sets the bridge up.
+
+**Commits are signed through the bridge too.** On WSL `dot_gitconfig.tmpl` sets
+`gpg.ssh.program = ssh-keygen`: git hands it the public key from `user.signingkey`, and Linux's
+`ssh-keygen -Y sign` takes the signature from the agent at `SSH_AUTH_SOCK`, the way Android signs
+with its own agent at the same path; verification runs the same `ssh-keygen` against
+`~/.config/git/allowed_signers`, Linux's copy of the file (Linux gets no `.ssh` from chezmoi).
+Signing used to run 1Password's `op-ssh-sign-wsl` from `C:\Program Files\1Password\app\8\`, a
+path only the machine-wide installer creates: the per-user installer puts it under
+`%LOCALAPPDATA%\1Password`, and the Microsoft Store build exposes it as an app execution alias in
+`%LOCALAPPDATA%\Microsoft\WindowsApps`, both under the *Windows* user's name, which WSL does not
+know. On a machine with the Store build every commit failed with `cannot exec
+'…/op-ssh-sign-wsl': No such file or directory` while `/usr/bin/ssh-add -l` listed every key
+through the bridge. Signing now needs the bridge, so until WSL boots with systemd, `git commit`
+fails with `Couldn't get agent socket`. Windows' own Git keeps 1Password's `op-ssh-sign.exe`,
+found with `lookPath` -- the Store build's alias is on `PATH` -- and otherwise under Program Files
+or in the per-user install, whichever exists. `make test-template-render` covers each
+platform's signer and allowed-signers file.
 
 ## Windows Package Detection (winget list, Not export)
 

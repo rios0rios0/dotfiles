@@ -185,6 +185,12 @@ check_platform "linux" --include-line ".config/git/ignore"
 check_platform "$WINDOWS_OS" --ignore-line ".config/git/ignore"
 check_platform "android" --ignore-line ".config/git/ignore"
 
+# Git checks commit signatures against an allowed-signers file. .ssh is not deployed on Linux, so
+# Linux gets its copy beside .config/git/ignore, and Windows and Android read the one in .ssh.
+check_platform "linux" --include-line ".config/git/allowed_signers"
+check_platform "$WINDOWS_OS" --ignore-line ".config/git/allowed_signers"
+check_platform "android" --ignore-line ".config/git/allowed_signers"
+
 # WSL vs bare-metal Linux. The SSH agent bridge relays a Windows named pipe, so it must ship
 # on WSL and nowhere else -- on bare metal its unit would point at an npiperelay.exe that is
 # never installed. The only signal separating the two is the kernel release string.

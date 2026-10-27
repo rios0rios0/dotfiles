@@ -22,8 +22,8 @@ set -euo pipefail
 {{- if $wsl }}
 
 # Windows' client is this machine's, and its app owns the login, so the apply never waits for it:
-# --no-login shares the model's server once Windows is on the tailnet, and otherwise only says
-# what is missing. The Linux client an older revision installed here is removed by
+# --no-login shares what this machine shares -- the model's server, the ocode web UI -- once
+# Windows is on the tailnet, and otherwise only says what is missing. The Linux client an older revision installed here is removed by
 # run_onchange_after_linux-006-remove-dependencies, which runs before this.
 "$HOME/.local/bin/tailscale-up" --no-login
 {{- else }}

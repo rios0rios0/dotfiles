@@ -31,6 +31,7 @@ declare -A TEMPLATE_CHECKS=(
     ["dot_gitconfig.tmpl"]="\\[user\\]"
     ["dot_ssh/config.tmpl"]="Host"
     ["dot_ssh/allowed_signers.tmpl"]=""
+    ["dot_config/git/allowed_signers.tmpl"]=""
     ["dot_ssh/authorized_keys.tmpl"]=""
     ["dot_age_recipients.tmpl"]="^age1"
     ["dot_wakatime.cfg.tmpl"]="api_key"
@@ -175,6 +176,59 @@ elif grep -q 'run `chezmoi init`' <<<"$output"; then
     echo "[test-template-render] PASS: config guard stops a config without deviceName and names chezmoi init" >&2
 else
     echo "[test-template-render] FAIL: config guard failed without pointing at chezmoi init: $output" >&2
+    EXIT_CODE=1
+fi
+
+# Commit signing, per platform: the program git signs and verifies with, and the allowed-signers
+# file it verifies against. WSL signs with Linux's ssh-keygen through the SSH agent bridge rather
+# than a Windows path that depends on how 1Password was installed; Linux reads the copy in
+# ~/.config/git, since .ssh is not deployed there; Windows takes the op-ssh-sign.exe on PATH (the
+# Microsoft Store build's alias) before falling back to Program Files. Each render gets its own
+# PATH -- the signer's directory, plus /usr/bin and /bin for the mock op -- so a WSL host, whose PATH
+# reaches Windows' own WindowsApps through /mnt/c, decides nothing.
+CHEZMOI="$(command -v chezmoi)"
+home="$("$CHEZMOI" execute-template --config="$TMPDIR/chezmoi.yaml" '{{ .chezmoi.homeDir }}')"
+mkdir -p "$TMPDIR/no-signer" "$TMPDIR/signer"
+printf '#!/bin/sh\nexit 0\n' > "$TMPDIR/signer/op-ssh-sign.exe"
+chmod +x "$TMPDIR/signer/op-ssh-sign.exe"
+# signing <label> <PATH> <override data> <program> <allowed-signers file, as a glob>
+signing() {
+    local rendered program allowed
+    rendered="$(PATH="$2:/usr/bin:/bin" "$CHEZMOI" execute-template --config="$TMPDIR/chezmoi.yaml" --override-data "$3" \
+        < "$REPO_ROOT/dot_gitconfig.tmpl" 2>/dev/null)" || {
+        echo "[test-template-render] FAIL: $1 gitconfig does not render" >&2
+        EXIT_CODE=1
+        return
+    }
+    program="$(sed -n 's/^    program = "\(.*\)"$/\1/p' <<<"$rendered")"
+    allowed="$(sed -n 's/^    allowedSignersFile = "\(.*\)"$/\1/p' <<<"$rendered")"
+    # shellcheck disable=SC2053 # the expected file is a glob on purpose
+    if [[ "$program" == "$4" && "$allowed" == $5 ]]; then
+        echo "[test-template-render] PASS: $1 signs with $4 and verifies against $allowed" >&2
+    else
+        echo "[test-template-render] FAIL: $1 signs with '$program' and verifies against '$allowed'" >&2
+        EXIT_CODE=1
+    fi
+}
+wsl_kernel='"kernel":{"osrelease":"6.18.33.2-microsoft-standard-WSL2","ostype":"Linux","version":"#1 SMP"}'
+metal_kernel='"kernel":{"osrelease":"6.11.0-generic","ostype":"Linux","version":"#1 SMP"}'
+signing "WSL" "$TMPDIR/no-signer" "{\"chezmoi\":{\"os\":\"linux\",$wsl_kernel}}" \
+    "ssh-keygen" "$home/.config/git/allowed_signers"
+signing "bare-metal Linux" "$TMPDIR/no-signer" "{\"chezmoi\":{\"os\":\"linux\",$metal_kernel}}" \
+    "op-ssh-sign" "$home/.config/git/allowed_signers"
+signing "Android" "$TMPDIR/no-signer" '{"chezmoi":{"os":"android"}}' \
+    "ssh-keygen" "$home/.ssh/allowed_signers"
+signing "Windows with op-ssh-sign.exe on PATH" "$TMPDIR/signer" '{"chezmoi":{"os":"windows"}}' \
+    "$TMPDIR/signer/op-ssh-sign.exe" 'C:/Users/*/.ssh/allowed_signers'
+signing "Windows without it" "$TMPDIR/no-signer" '{"chezmoi":{"os":"windows"}}' \
+    "C:/Program Files/1Password/app/8/op-ssh-sign.exe" 'C:/Users/*/.ssh/allowed_signers'
+
+# The Linux allowed-signers file and the .ssh one render from the same fragment.
+if cmp -s <("$CHEZMOI" execute-template --config="$TMPDIR/chezmoi.yaml" < "$REPO_ROOT/dot_ssh/allowed_signers.tmpl" 2>/dev/null) \
+    <("$CHEZMOI" execute-template --config="$TMPDIR/chezmoi.yaml" < "$REPO_ROOT/dot_config/git/allowed_signers.tmpl" 2>/dev/null); then
+    echo "[test-template-render] PASS: the Linux allowed-signers file matches the .ssh one" >&2
+else
+    echo "[test-template-render] FAIL: the Linux allowed-signers file differs from the .ssh one" >&2
     EXIT_CODE=1
 fi
 

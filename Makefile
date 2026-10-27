@@ -26,9 +26,9 @@ lint-syntax:
 
 # === Test targets ===
 
-.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-extract-folders test-shell-credentials test-nvm-resolution test-install-nvm test-claude-install test-zshrc-functions test-sentry-setup test-local-llm test-opencode test-tailscale test-wsl-systemd test-statusline test-claude-lsp test-omniroute-backup test-omniroute-image test-ocode test-terra-update test-yq test-export-keys test-export-key-windows test-install-fonts-windows test-powershell-profile-windows
+.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-extract-folders test-shell-credentials test-nvm-resolution test-install-nvm test-claude-install test-zshrc-functions test-sentry-setup test-local-llm test-opencode test-tailscale test-wsl-systemd test-statusline test-claude-lsp test-omniroute-backup test-omniroute-image test-ocode test-terra-update test-yq test-chlog test-export-keys test-export-key-windows test-install-fonts-windows test-powershell-profile-windows
 
-test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-extract-folders test-shell-credentials test-clipboard-shim test-nvm-resolution test-install-nvm test-claude-install test-zshrc-functions test-sentry-setup test-local-llm test-opencode test-tailscale test-wsl-systemd test-statusline test-claude-lsp test-omniroute-backup test-omniroute-image test-ocode test-terra-update test-yq test-export-keys test-export-key-windows test-install-fonts-windows test-powershell-profile-windows
+test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-extract-folders test-shell-credentials test-clipboard-shim test-nvm-resolution test-install-nvm test-claude-install test-zshrc-functions test-sentry-setup test-local-llm test-opencode test-tailscale test-wsl-systemd test-statusline test-claude-lsp test-omniroute-backup test-omniroute-image test-ocode test-terra-update test-yq test-chlog test-export-keys test-export-key-windows test-install-fonts-windows test-powershell-profile-windows
 
 test-template-render:
 	@bash $(CI_DIR)/scripts/test-template-render.sh
@@ -118,6 +118,9 @@ test-terra-update:
 
 test-yq:
 	@bash $(CI_DIR)/scripts/test-yq.sh
+
+test-chlog:
+	@bash $(CI_DIR)/scripts/test-chlog.sh
 
 test-export-keys:
 	@bash $(CI_DIR)/scripts/test-export-keys.sh
