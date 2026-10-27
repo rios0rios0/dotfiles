@@ -150,15 +150,16 @@ Encrypted files end in `.age` and are automatically decrypted during `chezmoi ap
 
 ## SSH Agent Bridge (WSL)
 
-On WSL the SSH keys live in 1Password on the Windows side, and both mechanisms that reach them
-work by running a Windows binary: the `ssh` -> `ssh.exe` wrapper in `~/.local/bin`, and
-`gpg.ssh.program = op-ssh-sign-wsl`, which signs commits.
+On WSL the SSH keys live in 1Password on the Windows side, and the `ssh` -> `ssh.exe` wrapper in
+`~/.local/bin` reaches them by running a Windows binary.
 
-Neither helps a program that speaks SSH itself instead of shelling out to `ssh`. go-git
+That does not help a program that speaks SSH itself instead of shelling out to `ssh`. go-git
 ([AutoBump](https://github.com/rios0rios0/autobump)), Go's `x/crypto/ssh`, and libgit2
 authenticate by dialing an `AF_UNIX` socket, never execute a binary, and cannot dial the
-Windows named pipe the agent listens on. Signing succeeds, `git push` succeeds, and those
-tools alone report that no SSH key can be found.
+Windows named pipe the agent listens on. `git push` succeeds, and those tools alone report that
+no SSH key can be found. Commits are signed through the same bridge: on WSL git runs Linux's
+`ssh-keygen`, which takes the signature from the agent, so signing does not depend on where
+1Password is installed on Windows.
 
 A systemd user socket bridges the gap: `~/.ssh/agent.sock` is relayed to
 `\\.\pipe\openssh-ssh-agent` by [npiperelay](https://github.com/jstarks/npiperelay), one
