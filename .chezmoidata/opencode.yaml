@@ -1,5 +1,5 @@
-# OpenCode V2 on this machine: the official `opencode` and the fork build `ocode`. See
-# .docs/opencode-local.md and CLAUDE.md, "OpenCode V2 Through OmniRoute".
+# The web UI of `ocode`, the OpenCode fork build, on the tailnet. See .docs/opencode-local.md, "The
+# web UI on the tailnet", and CLAUDE.md, "Tailscale".
 #
 # chezmoi reads this file on every apply -- unlike `data:` in .chezmoi.yaml.tmpl, which only
 # `chezmoi init` regenerates -- so an edit reaches tailscale-up on the next apply. It is read
@@ -13,9 +13,12 @@ opencode:
   # protected, and a device joins it with a one-time pairing link: `ocode pair --url
   # http://<machine>.<tailnet>.ts.net:<webPort>` prints the link and a QR code for it.
   shareOnTailnet: true
-  # The port the fork's service listens on: its channel's default. `ocode service status` prints
-  # the live one, and a port pinned with `ocode service set port` has to match this, or the share
-  # forwards to nothing.
+  # The port the fork's service listens on. The fork derives it from the channel the build stamps
+  # (OPENCODE_CHANNEL in .chezmoiscripts/run_after_linux-006-build-ocode.sh) as 10000 plus the first
+  # eight hex digits of the channel's SHA-1 modulo 50000: 41320 for feat-provider-omniroute.
+  # Renaming the channel moves it, and `make test-tailscale` fails until this follows. A port
+  # pinned with `ocode service set port` has to be set here too, as a device override, or the share
+  # forwards to nothing; `ocode service status` prints the address while the service runs.
   webPort: 41320
   # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
   #   devices:

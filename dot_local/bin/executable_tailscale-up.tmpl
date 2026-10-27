@@ -198,8 +198,8 @@ tailscale set "${prefs[@]}" 2>/dev/null || sudo tailscale set "${prefs[@]}"
 
 # What this machine shares on the tailnet: forwards the client keeps in its own state, so they come
 # back with the service. Each is set here when it is missing or forwards anywhere else, as the one
-# an older revision set does. One `serve status` answers for all of them, so the pass a new shell
-# runs costs one call, not one per share.
+# an older revision set does. One `serve status` answers for all of them: on WSL each `tailscale`
+# call starts a Windows process.
 serve_json="$(tailscale serve status --json 2>/dev/null || true)"
 [[ -n "$serve_json" ]] || serve_json='{}'
 {{- if $share_ollama }}
@@ -209,9 +209,9 @@ serve_json="$(tailscale serve status --json 2>/dev/null || true)"
 #
 # Windows' client forwards to Windows' loopback, where WSL's localhost relay hands each connection
 # on to Ollama, and while WSL is stopped nothing answers behind it. The relay listens on the
-# loopback of the family Ollama listens on, and Go makes Ollama's 0.0.0.0 a dual-stack IPv6
-# socket, so that is ::1 alone and 127.0.0.1 refuses every connection. `localhost` names both, and
-# the client tries each; WSL's own address would answer too, but it changes whenever WSL starts.
+# loopback of the family Ollama listens on: 127.0.0.1, since Ollama binds IPv4 loopback, where a
+# dual-stack bind would put it on ::1 alone. `localhost` names both, and the client tries each, so
+# the share survives either; WSL's own address would answer too, but it changes whenever WSL starts.
 target="localhost:11434"
 {{- else }}
 target="127.0.0.1:11434"
@@ -231,9 +231,10 @@ fi
 {{- if $oc.shareOnTailnet }}
 
 # The ocode web UI, on the tailnet's port {{ $oc.webPort }}: where a phone or another machine opens
-# it, and pairs with `ocode pair --url http://<machine>.<tailnet>.ts.net:{{ $oc.webPort }}`. The
-# service keeps listening on loopback -- Windows' client forwards to Windows' `localhost`, which
-# WSL hands on to it -- so nothing else on the network reaches it.
+# it, once paired with `ocode pair --url http://<machine>.<tailnet>.ts.net:{{ $oc.webPort }}`. The
+# service listens on 127.0.0.1, so nothing else on the network reaches it; on WSL, Windows'
+# `localhost` reaches it through the same relay as Ollama. Nothing starts the service at boot: until
+# the first `ocode`, `ocode pair` or `ocode service start`, the share forwards to nothing.
 {{- if $wsl }}
 ocode_target="localhost:{{ $oc.webPort }}"
 {{- else }}

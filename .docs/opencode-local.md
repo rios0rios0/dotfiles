@@ -122,35 +122,49 @@ and it never uses Funnel. Both settings live in `.chezmoidata/opencode.yaml`, re
 | Key | Default | What it does |
 |-----|---------|--------------|
 | `shareOnTailnet` | `true` | whether `tailscale-up` forwards the port |
-| `webPort` | `41320` | the port the fork's service listens on -- its channel's default |
+| `webPort` | `41320` | the port the fork's service listens on: the default it derives from the build's channel |
 | `devices.<deviceName>` | `{}` | per-device overrides, laid over key by key like `local-llm.yaml`'s |
+
+**The port follows the channel.** The fork's service listens on
+`10000 + (<first 8 hex digits of the channel's SHA-1> mod 50000)`, and the build stamps the
+channel (`OPENCODE_CHANNEL=feat-provider-omniroute` in `run_after_linux-006-build-ocode.sh`), which
+gives 41320. Renaming the channel moves the port, so `make test-tailscale` recomputes it from the
+build script and fails until `webPort` follows. A port pinned with `ocode service set port` needs a
+device override of `webPort` as well.
 
 **The service keeps listening on loopback.** `ocode service set hostname 0.0.0.0` is not part of
 this: on WSL, Windows' client forwards to Windows' `localhost`, which WSL's localhost relay hands
 to the service's `127.0.0.1` socket, and on bare metal the forward names `127.0.0.1` directly. The
 port therefore stays closed to the Wi-Fi network, and the tailnet's ACLs decide who reaches it.
 
-Pair a device with the reachable address in the link, never the loopback one the TUI prints:
+**The service runs once something starts it.** The first `ocode`, `ocode pair` or
+`ocode service start` does; nothing starts it at boot. Until then -- and on WSL whenever WSL itself
+is not running (see "Tailscale" in `CLAUDE.md`) -- the share forwards to nothing, which is
+harmless: a connection simply gets no answer.
+
+Pair a device with an address it can dial in the link. `ocode pair` alone prints the loopback
+address the service listens on and leaves the QR code out, since no other device can use it;
+`--url` puts the tailnet name in both:
 
 ```bash
-tailscale status --json | jq -r '.Self.DNSName'   # <machine>.<tailnet>.ts.net.
-ocode pair --url "http://<machine>.<tailnet>.ts.net:41320"
+ocode pair --url "http://$(tailscale status --json | jq -r '.Self.DNSName | rtrimstr(".")'):41320"
 ```
 
-`--url` is what replaces `127.0.0.1` in the link, so the QR code carries the address the phone can
-actually dial (`tailscale ip -4` gives the `100.x.y.z` form, which works as well). Opening the link
-on the phone signs it in with a session cookie and loads the UI.
+That name is `<machine>.<tailnet>.ts.net`; `tailscale ip -4` gives the `100.x.y.z` form, which
+works as well. Opening the link on the phone signs it in with a session cookie and loads the UI.
 
-The link is one-time and expires in 5 minutes; the session it grants lasts 30 days. Changing the
-server password signs every session out, and `ocode service set password ...` is how a session is
-revoked. The pairing page is a navigation, and the cookie carries no `Secure` flag, which is why
-the plain-TCP forward is enough here.
+The link works once and expires in 5 minutes; the session it grants lasts 30 days. Sessions are
+signed with the server password, which the service picks at random on its first start and keeps,
+so they survive restarts and rebuilds. `ocode service unset password` signs every device out: it
+stops the service, and the next start picks and keeps a new password, which the local TUI reads
+from the service's registration on its own. `ocode service set password <value>` would do the same
+with a password of your choosing, but on a command line, where other local users can read it. The
+pairing page is a navigation, and the cookie carries no `Secure` flag, which is why the plain-TCP
+forward is enough here.
 
 Switching `shareOnTailnet` off stops `tailscale-up` from re-creating the forward; it does not
 remove the one already in the client, because a `serve` entry outlives the repository that set it.
-Remove it with `tailscale serve --tcp=41320 off`. A share left pointing at a stopped service
-answers connections with nothing behind them, which is harmless: the next `ocode` start serves the
-UI again.
+Remove it with `tailscale serve --tcp=41320 off`.
 
 ## When models are missing
 

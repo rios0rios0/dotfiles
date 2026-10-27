@@ -1022,8 +1022,9 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
    Tailscale's fingerprint. A keyring carrying a second key would make apt trust that one too.
    Upstream's `install.sh` maps every Kali release since 2021 to the Debian bullseye suite; the
    package is the same static build for every release.
-9. **The installer tracks `tailscale-up`'s rendered digest**, so switching `shareOnTailnet` or the
-   local model on or off re-runs it, and the share follows.
+9. **The installer tracks `tailscale-up`'s rendered digest**, so switching either `shareOnTailnet`
+   (`local-llm.yaml`'s or `opencode.yaml`'s) or the local model on or off re-runs it, and the
+   shares follow.
 10. **A WSL machine serves only while its WSL runs.** `.wslconfig`'s `instanceIdleTimeout=-1`
     ("Keep WSL running", see "WSL Settings") stops Windows shutting WSL down once the last WSL
     terminal closes, so Ollama keeps serving the tailnet share. WSL still starts only when
@@ -1031,16 +1032,20 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
     nothing listens on until a WSL terminal opens once (RustDesk, on the desktop). Windows'
     client keeps the machine on the tailnet meanwhile, and `tailscale set --unattended=true`
     keeps it there after its user signs out and before the first sign-in after a reboot.
-11. **The ocode web UI is a plain-TCP forward on loopback, and the pairing link names the tailnet.**
+11. **The ocode web UI is a plain-TCP forward to loopback, on the port its channel implies.**
     `.chezmoidata/opencode.yaml` (through `lib-opencode.tmpl`) decides the port and whether it is
     shared, and `tailscale-up` forwards it exactly as it forwards Ollama's -- `serve --tcp`, never
-    Funnel, on `localhost` on WSL and `127.0.0.1` on bare metal. The service therefore keeps
-    listening on loopback, so `ocode service set hostname 0.0.0.0` is not needed and would open the
-    port to the Wi-Fi network; the phone pairs with `ocode pair --url
-    http://<machine>.<tailnet>.ts.net:<webPort>`, which is what puts a reachable host in the
-    one-time link and the QR code. The session that link grants lasts 30 days and rotating the
-    server password revokes it; a `serve` entry outlives the repository that set it, so switching
-    `shareOnTailnet` off leaves `tailscale serve --tcp=<webPort> off` to a person.
+    Funnel, to `localhost` on WSL and `127.0.0.1` on bare metal -- so the service keeps listening
+    on loopback, and `ocode service set hostname 0.0.0.0`, which would open the port to the Wi-Fi
+    network, is not needed. The fork derives the service's port from the channel the build stamps,
+    so `webPort` has to follow `OPENCODE_CHANNEL` in the build script, which `make test-tailscale`
+    checks. A phone pairs with `ocode pair --url http://<machine>.<tailnet>.ts.net:<webPort>`, the
+    one way a reachable host gets into the one-time link and its QR code. The 30-day session that
+    grants is signed with the service's password, which the service keeps across restarts, so
+    `ocode service unset password` revokes every session, without putting a secret on a command
+    line as `set password` would. Nothing starts the service at boot (the first `ocode`, `ocode
+    pair` or `ocode service start` does), and a `serve` entry outlives the repository that set it:
+    switching `shareOnTailnet` off leaves `tailscale serve --tcp=<webPort> off` to a person.
 
 What the Linux client leaves behind on WSL is root's, so no tombstone reaches it:
 `sudo apt-get purge -y tailscale` also removes `/var/lib/tailscale`, and
