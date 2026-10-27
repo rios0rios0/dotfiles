@@ -797,6 +797,20 @@ install_aisync() {
     return "$status"
 }
 
+# https://github.com/rios0rios0/autobump
+# `autobump` bumps a repository's version and turns its `[Unreleased]` entries -- or its chlog
+# fragments, which it reads without chlog itself -- into a release. Installed like `aisync`: the
+# upstream `install.sh` downloads the pre-built `linux-<arch>` binary of the latest release into
+# ~/.local/bin.
+install_autobump() {
+    if command -v autobump &>/dev/null; then
+        echo "[configure-deps] autobump is already installed, skipping" >&2
+        return
+    fi
+
+    run_remote_installer "autobump" "https://raw.githubusercontent.com/rios0rios0/autobump/main/install.sh"
+}
+
 # https://github.com/rios0rios0/ccswitch
 # `ccswitch` monitors Claude Code usage and rotates between backup Claude accounts
 # when the active account's limits are exhausted. Installed like `aisync`: fetch the
@@ -930,6 +944,10 @@ install_ruff
 # mikefarah's yq; Kali's apt `yq` is a different tool (see the function).
 verify install_yq
 install_aisync
+install_autobump
+# chlog writes the changelog fragments AutoBump releases; built with the Go install_gvm set up
+# (lib-install-deps.sh).
+verify install_chlog
 
 install_acli
 
