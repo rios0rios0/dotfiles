@@ -24,9 +24,12 @@ make test-remove-dependencies       # dependency removal library (tombstones, $H
 make test-remove-dependencies-windows # Windows removal script, failed removals reported (needs pwsh)
 make test-install-dependencies-windows # Windows installer: detection by exact ID, failed installs reported (needs pwsh)
 make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
+make test-extract-folders           # the watcher's archived folders restored on a first apply: names, layouts, existing folders, failures
 make test-shell-credentials         # 1Password credential/workspace loading and removal
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
+make test-install-nvm               # install_nvm: npm upgraded after the LTS, before the first global install; --reinstall-packages-from
+make test-claude-install            # Claude Code's native build: the launcher check, both failures, the verify and the npm tombstone
 make test-zshrc-functions           # top-size, sentry-ds and rebuild-ocode in dot_zshrc: arguments, sudo, the work store, completion, the resolved build script
 make test-sentry-setup              # the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds
 make test-local-llm                 # the local model server: its settings, the window its unit allocates, the installer's gate
@@ -528,7 +531,7 @@ sort ranks it above the LTS the chain points at.
 
 The consequence is invisible, which is what makes it worth a test. Global npm
 packages live inside the active version's tree, so the dependency installer (which
-runs the real `nvm`) puts `sentry` and Claude Code under the LTS, while a shell that
+runs the real `nvm`) puts `sentry` and `neon` under the LTS, while a shell that
 picked the higher Current release sees none of them. Every one of those
 CLIs is installed correctly and missing from PATH, and nothing anywhere reports an
 error — `install_codex_cli` had been running `npm install -g @openai/codex`
@@ -543,6 +546,41 @@ Two halves keep it fixed, and both are needed:
 
 `make test-nvm-resolution` covers the resolver, including the exact shape that
 produced the bug: an LTS and a newer Current release installed side by side.
+
+## npm Is the Latest, So Claude Code Is the Native Build (Linux)
+
+`install_nvm` upgrades npm with `nvm install-latest-npm` after the LTS, whether that LTS was
+already installed or not: Node ships the npm that was current at its release, and every
+`npm install -g` after it printed `New major version of npm available!`. The latest npm is 12,
+which blocks the install scripts of global packages by default, and that is why Claude Code on
+Linux is Anthropic's native build (`claude.ai/install.sh`, behind `~/.local/bin/claude`) and not
+the npm package. The package's postinstall is what copies the native binary over its
+`bin/claude.exe` placeholder, so under npm 12 `claude` is a 500-byte stub that exits 1 with
+`claude native binary not installed`, and Claude Code's own updater, which runs a plain
+`npm install -g`, reports `native_binary_missing`. The native build updates itself without npm.
+
+**Keep these:**
+
+1. **Every other global npm install passes `--ignore-scripts`.** None of those CLIs needs its
+   scripts, so npm 12's block costs nothing; one that does needs another route, as Claude Code
+   did. An `allow-scripts` entry would not be that route here: npm 12 reads it from `~/.npmrc`
+   (encrypted in this repository) or the environment, and ignores it in npm's global config file.
+2. **`install_claude_cli` checks the launcher, not `command -v claude`**, so a machine still on the
+   npm package gets the native build too.
+3. **The native build is installed before the npm package is removed.** `install_claude_cli` is
+   called through `verify`, so a failed install fails the apply before
+   `run_onchange_after_linux-006` reaches its `npm_global:@anthropic-ai/claude-code` tombstone,
+   which would otherwise leave the machine without any `claude`.
+4. **`~/.local/bin` is on PATH for the installer**, so `claude install` prints no note about adding
+   it to an rc file: chezmoi owns `~/.zshrc`, and `dot_zshenv.tmpl` already puts it on PATH. The
+   one rc-file edit `claude install` makes, removing an `alias claude=` that points at Anthropic's
+   old local install, matches nothing in the managed `.zshrc`, whose `claude` is a function.
+
+Android is unaffected: its Claude Code is the musl build behind the `claude` wrapper (see "Android
+Wrapper Timing"), and its Node is Termux's `nodejs`, whose npm `install_nvm` leaves alone.
+
+`make test-install-nvm` covers the npm upgrade on both branches and its order;
+`make test-claude-install` covers 2 and 3 against a stubbed installer.
 
 ## Important Timing Constraints
 

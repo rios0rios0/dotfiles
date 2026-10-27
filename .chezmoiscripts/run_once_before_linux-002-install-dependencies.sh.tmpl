@@ -235,6 +235,12 @@ install_pyenv() {
 
     # Rehash to make pyenv/pip available
     eval "$(pyenv init -)"
+
+    # A Python build ships the pip that was current at its release (3.13.2 came with 24.3.1), so
+    # every `pip install` after this ended with "A new release of pip is available". It runs on
+    # every pass, so a Python that was already installed is upgraded too. Only this interpreter's
+    # pip moves; pipx keeps its own for the virtualenvs it manages.
+    python -m pip install --upgrade pip || echo "[configure-deps] WARN: pip upgrade failed; continuing" >&2
 }
 
 # https://docs.flutter.dev/install/manual
@@ -382,13 +388,32 @@ install_flutter() {
     "$flutter_root/bin/flutter" --version
 }
 
-# https://github.com/anthropics/claude-code
+# https://code.claude.com/docs/en/setup
+#
+# Anthropic's native build, not the npm package. npm 12 blocks the install scripts of global
+# packages by default, and the package's postinstall is what copies the native binary over its
+# `bin/claude.exe` placeholder: without it `claude` is a stub that exits 1, and Claude Code's own
+# updater, which runs a plain `npm install -g`, fails the same way. The native build lives in
+# ~/.local/share/claude behind the launcher ~/.local/bin/claude and updates itself, with no npm
+# involved; install.sh checks it against the SHA-256 in Anthropic's release manifest.
+#
+# The check is on that launcher, not `command -v claude`, so a machine that still has the npm
+# package gets the native build too. The removal script then uninstalls the package, and a
+# failure here fails this installer -- it is called through `verify` -- which stops the apply
+# before that removal can leave the machine without any `claude`.
 install_claude_cli() {
-    if command -v claude &>/dev/null; then
-        echo "[configure-deps] Claude CLI is already installed, skipping" >&2
+    if [[ -x "$HOME/.local/bin/claude" ]]; then
+        echo "[configure-deps] Claude Code (native build) is already installed, skipping" >&2
         return
     fi
-    npm install -g @anthropic-ai/claude-code
+
+    # On PATH for this call, so `claude install` finds its launcher directory there and prints no
+    # note about adding it to a shell rc file: dot_zshenv.tmpl does that for every later shell.
+    PATH="$HOME/.local/bin:$PATH" run_remote_installer "Claude Code" "https://claude.ai/install.sh" || return 1
+    if [[ ! -x "$HOME/.local/bin/claude" ]]; then
+        echo "[configure-deps] ERROR: the Claude Code installer finished without ~/.local/bin/claude" >&2
+        return 1
+    fi
 }
 
 # https://github.com/rios0rios0/dev-toolkit
@@ -922,7 +947,9 @@ verify() {
 # SDK that `flutter --version` happens to answer for.
 verify install_flutter
 
-install_claude_cli
+# Verified because the removal script uninstalls Claude Code's npm package after this: a native
+# build that failed to install must stop the apply first (see the function).
+verify install_claude_cli
 install_ccswitch
 install_sentry_cli
 install_neon_cli

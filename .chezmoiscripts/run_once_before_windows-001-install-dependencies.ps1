@@ -154,7 +154,7 @@ Install-PackageList $hardware
 # =========================================================================================================
 # Utilities
 $utilities = @(
-    "Adobe.Acrobat.Reader.64-bit",
+    "BleachBit.BleachBit",              # junk and privacy cleaner in place of CCleaner; open source (GPL-3.0), as on baremetal Linux
     "CharlesMilette.TranslucentTB",
     "EaseUS.PartitionMaster",
     "GIMP.GIMP",
@@ -162,9 +162,9 @@ $utilities = @(
     "Microsoft.OneDrive",
     "Notepad++.Notepad++",
     "PDFLabs.PDFtk.Free",
-    "Piriform.CCleaner",
     "Piriform.Recuva",
     "RevoUninstaller.RevoUninstallerPro",
+    "SumatraPDF.SumatraPDF",            # PDF reader in place of Adobe Acrobat Reader; open source (GPL-3.0). It fills no forms: Edge's built-in viewer does
     "msstore:9NCBCSZSJRSB"              # Spotify, the Microsoft Store edition: the Spotify.Spotify installer refuses to run beside it (exit code 29)
 )
 Install-PackageList $utilities

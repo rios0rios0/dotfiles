@@ -235,6 +235,16 @@ jobs:
       - name: Test TMPDIR module cache pruning
         run: make test-prune-tmp-modcache
 
+  test-extract-folders:
+    name: Test (archived folder restore)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test the restore of archived folders
+        run: make test-extract-folders
+
   test-shell-credentials:
     name: Test (shell credentials)
     runs-on: ubuntu-latest
@@ -268,6 +278,26 @@ jobs:
         run: sudo apt-get install -y zsh
       - name: Test NVM version resolution
         run: make test-nvm-resolution
+
+  test-install-nvm:
+    name: Test (Node.js LTS and npm install)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test the Node.js LTS and npm install
+        run: make test-install-nvm
+
+  test-claude-install:
+    name: Test (Claude Code native install)
+    runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - name: Test the Claude Code install
+        run: make test-claude-install
 
   test-zshrc-functions:
     name: Test (zshrc functions)

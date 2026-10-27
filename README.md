@@ -45,7 +45,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 ### Development Tools
 
-- AI coding assistant: **Claude Code** (Linux/WSL and Android)
+- AI coding assistant: **Claude Code** (Linux/WSL and Android; on Linux, Anthropic's native build, which updates itself)
 - **OpenCode**, as `ocode` on Linux: a build of the [`rios0rios0/opencode`](https://github.com/rios0rios0/opencode) fork that `chezmoi apply` makes from a local checkout, with a local **OmniRoute** gateway as its primary provider -- a digest-pinned build of the [`rios0rios0/OmniRoute`](https://github.com/rios0rios0/OmniRoute) fork, published to GHCR, in front of a GPU's Ollama model and cloud providers such as NVIDIA NIM and OpenRouter -- discovering the models the API key allows from the gateway itself, with the Claude Code permission set, the context7 and Chrome DevTools (Linux) MCP servers and the terminal look; see the [OpenCode guide](.docs/opencode-local.md) and the [OmniRoute guide](.docs/omniroute-local.md)
 - **Tailscale**: Windows' client on Windows and its WSL, which reaches it through a `tailscale` wrapper; `tailscaled` on bare-metal Linux, installed and logged in by `chezmoi apply` and rejoined by every interactive zsh; OmniRoute reaches another machine's GPU across it
 - **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm); `sentry-ds` runs it on the work account, from a login store of its own (log in once with `sentry-ds auth login`), which needs CLI `0.47.0` or newer: `chezmoi apply` upgrades an older one
@@ -91,6 +91,14 @@ sh -c "$(curl -fsLS get.chezmoi.io/lb)" -- init --apply rios0rios0
 ```
 
 ### PowerShell 7 on Windows
+
+Everything here is installed with winget, so set it up first, from Windows PowerShell:
+
+1. **Install winget.** Download `Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle` from the [latest winget-cli release](https://github.com/microsoft/winget-cli/releases/latest) and install it with `Add-AppxPackage .\Microsoft.DesktopAppInstaller_8wekyb3d8bbwe.msixbundle`. If that reports a missing dependency, run `Add-AppxPackage` on each `x64` package in `DesktopAppInstaller_Dependencies.zip`, from the same release, and then try again.
+2. **Put it on `PATH`.** Add `C:\Users\<USER>\AppData\Local\Microsoft\WindowsApps` to your user `Path` variable, where `<USER>` is your Windows user name: Start > "Edit environment variables for your account" > `Path` > Edit > New. The `winget.exe` alias lives in that folder.
+3. **Restart the terminal.** Close it and open a new one, which reads the new `Path`, and check that `winget --version` answers.
+
+Then install the rest and apply:
 
 ```powershell
 winget install Microsoft.PowerShell

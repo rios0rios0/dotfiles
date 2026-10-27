@@ -150,6 +150,10 @@ function Invoke-TombstoneList {
 # can be retired once every machine has converged (a commit hash from the feature
 # branch changes when the branch is rebased before merge).
 $tombstones = @(
+    # Adobe Acrobat Reader and CCleaner -- replaced by SumatraPDF and BleachBit in #269 (2026-10-27)
+    "winget:Adobe.Acrobat.Reader.64-bit",
+    "winget:Piriform.CCleaner",
+
     # Apps and CLIs no longer used on Windows -- removed in #260 (2026-10-27). jq, bat and
     # shellcheck still come from apt inside WSL, and yq from its GitHub release (`install_yq`).
     # NVM for Windows served only `nvm install --lts` in run_once_before_windows-002; nothing
