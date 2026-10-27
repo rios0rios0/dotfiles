@@ -11,10 +11,16 @@ env:
   # against the checksums file published with that release before it is installed.
   CHEZMOI_VERSION: '2.72.1'
 
+# Every job declares `permissions: contents: 'read'`: none needs more than to check out the
+# repository and run its tools, whatever the repository's default token. Per job, as in
+# checks.yaml, so a broader grant one job may need later never reaches the rest; a new job
+# declares its own, and CodeQL's missing-workflow-permissions check flags one that does not.
 jobs:
   lint-shellcheck:
     name: Lint (shellcheck)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install shellcheck
@@ -25,6 +31,8 @@ jobs:
   lint-templates:
     name: Lint (Go templates)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
@@ -40,6 +48,8 @@ jobs:
   lint-python:
     name: Lint (Python)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install ruff
@@ -53,6 +63,8 @@ jobs:
     # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
     # install step fails with 'Unable to locate package powershell' there.
     runs-on: ubuntu-24.04
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install PowerShell
@@ -72,6 +84,8 @@ jobs:
   lint-syntax:
     name: Lint (YAML/JSON)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install tools
@@ -87,6 +101,8 @@ jobs:
   test-template-render:
     name: Test (template rendering)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install chezmoi
@@ -107,6 +123,8 @@ jobs:
   test-chezmoiignore:
     name: Test (chezmoiignore logic)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install chezmoi
@@ -125,6 +143,8 @@ jobs:
   test-script-order:
     name: Test (script ordering)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Verify script dependency order
@@ -133,6 +153,8 @@ jobs:
   test-modify-scripts:
     name: Test (modify scripts)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       # The JSON modify_ files are modify-templates, which only run inside chezmoi.
@@ -154,6 +176,8 @@ jobs:
   test-remove-dependencies:
     name: Test (dependency removal)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test dependency removal library
@@ -164,6 +188,8 @@ jobs:
     # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
     # install step fails with 'Unable to locate package powershell' there.
     runs-on: 'ubuntu-24.04'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install PowerShell'
@@ -183,6 +209,8 @@ jobs:
     # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
     # install step fails with 'Unable to locate package powershell' there.
     runs-on: 'ubuntu-24.04'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install PowerShell'
@@ -200,6 +228,8 @@ jobs:
   test-prune-tmp-modcache:
     name: Test (TMPDIR module cache pruning)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test TMPDIR module cache pruning
@@ -208,6 +238,8 @@ jobs:
   test-shell-credentials:
     name: Test (shell credentials)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install tools
@@ -218,6 +250,8 @@ jobs:
   test-clipboard-shim:
     name: Test (clipboard shim)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Test the Claude Code clipboard shim
@@ -226,6 +260,8 @@ jobs:
   test-nvm-resolution:
     name: Test (NVM resolution)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install tools
@@ -236,6 +272,8 @@ jobs:
   test-zshrc-functions:
     name: Test (zshrc functions)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install chezmoi
@@ -256,6 +294,8 @@ jobs:
   test-sentry-setup:
     name: Test (Sentry CLI setup)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install chezmoi
@@ -274,6 +314,8 @@ jobs:
   test-local-llm:
     name: Test (local model server)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install chezmoi
@@ -294,6 +336,8 @@ jobs:
   test-opencode:
     name: Test (OpenCode V2 through OmniRoute)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install chezmoi
@@ -314,6 +358,8 @@ jobs:
   test-tailscale:
     name: Test (Tailscale)
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - name: Install chezmoi
@@ -334,6 +380,8 @@ jobs:
   test-wsl-systemd:
     name: 'Test (systemd on WSL)'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install chezmoi'
@@ -352,6 +400,8 @@ jobs:
   test-statusline:
     name: 'Test (Claude Code status line)'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install jq'
@@ -362,6 +412,8 @@ jobs:
   test-claude-lsp:
     name: 'Test (Claude Code language servers)'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Test the language servers and the plugins that start them'
@@ -370,6 +422,8 @@ jobs:
   test-omniroute-backup:
     name: 'Test (OmniRoute encrypted backups)'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install chezmoi'
@@ -390,6 +444,8 @@ jobs:
   test-omniroute-image:
     name: 'Test (OmniRoute fork image pin)'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Test the image pin updater and its failure paths'
@@ -398,6 +454,8 @@ jobs:
   test-ocode:
     name: 'Test (ocode fork build)'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install chezmoi'
@@ -416,6 +474,8 @@ jobs:
   test-terra-update:
     name: 'Test (terra update)'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Test the unattended terra update calls'
@@ -424,6 +484,8 @@ jobs:
   test-yq:
     name: 'Test (yq install)'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Test the pinned install of mikefarah''s yq'
@@ -432,6 +494,8 @@ jobs:
   test-export-keys:
     name: 'Test (age key export, Linux)'
     runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install chezmoi'
@@ -454,6 +518,8 @@ jobs:
     # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
     # install step fails with 'Unable to locate package powershell' there.
     runs-on: 'ubuntu-24.04'
+    permissions:
+      contents: 'read'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install PowerShell'
@@ -471,6 +537,8 @@ jobs:
   sast:
     name: SAST
     runs-on: ubuntu-latest
+    permissions:
+      contents: 'read'
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
