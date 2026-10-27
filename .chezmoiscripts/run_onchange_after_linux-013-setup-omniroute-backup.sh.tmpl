@@ -17,7 +17,7 @@
 # WSL").
 #
 # The backups use a key of their own -- never the chezmoi identity -- so neither key's loss or
-# rotation touches the other.
+# rotation touches the other. run_before_linux-005 fetches it from 1Password before this runs.
 
 set -euo pipefail
 
@@ -41,8 +41,8 @@ if ! systemctl --user show-environment >/dev/null 2>&1; then
 fi
 
 if [[ ! -f "$identity" ]]; then
-    echo "[$prefix] WARN: $identity is missing, so the timer will start a backup that fails until it exists:" >&2
-    echo "[$prefix] WARN:   age-keygen -o \"$identity\"   (then keep a copy of the file off this machine)" >&2
+    echo "[$prefix] WARN: $identity is missing, so the timer will start a backup that fails until it exists;" >&2
+    echo "[$prefix] WARN: the next apply fetches it from 1Password ({{ .ageKeys.omnirouteBackup.privateKey }}) -- never generate a new one" >&2
 fi
 
 systemctl --user daemon-reload

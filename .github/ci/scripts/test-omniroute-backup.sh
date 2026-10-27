@@ -301,8 +301,8 @@ for call in "daemon-reload" "enable omniroute-backup.timer" "start omniroute-bac
 done
 
 if HOME="$TMP/emptyhome" bash "$TMP/installer.sh" 2>"$TMP/install-keywarn.log"; then
-    if grep -q "age-keygen -o" "$TMP/install-keywarn.log"; then
-        pass "the installer warns when the backup key is missing"
+    if grep -q "fetches it from 1Password (op://" "$TMP/install-keywarn.log"; then
+        pass "the installer warns when the backup key is missing, and names the item"
     else
         fail "the installer does not warn when the backup key is missing"
     fi

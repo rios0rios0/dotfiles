@@ -6,9 +6,10 @@
 # The snapshot is taken inside the container with `VACUUM INTO` over node:sqlite. Copying
 # storage.sqlite out of the volume while the gateway writes it can tear pages -- SQLite runs in
 # WAL mode here -- and the image ships no sqlite3 CLI. The archive is then encrypted with the age
-# identity at ~/.ssh/omniroute-backup-key: a key generated for these backups alone, so losing or
-# rotating the chezmoi identity never strands them, and the other way around. Keep a copy of that
-# key off this machine -- backups without it are unrecoverable.
+# identity at ~/.ssh/omniroute-backup-key: a key for these backups alone, so losing or rotating
+# the chezmoi identity never strands them, and the other way around. Its only copy off this machine
+# is the `omniroute-backup.age` item in 1Password, which `chezmoi apply` fetches it from
+# (run_before_linux-005) -- backups without it are unrecoverable.
 #
 # The newest archives are kept; older ones are removed after every successful run. The systemd
 # user timer omniroute-backup.timer runs this daily; run it by hand after any doubt.
@@ -56,7 +57,7 @@ command -v docker >/dev/null 2>&1 || {
     exit 0
 }
 command -v age >/dev/null 2>&1 || fail "age is not on PATH; the dependency installer provides it"
-[[ -f "$identity" ]] || fail "no age identity at $identity; create one with 'age-keygen -o \"$identity\"' and keep a copy of it off this machine"
+[[ -f "$identity" ]] || fail "no age identity at $identity; 'chezmoi apply' fetches it from 1Password (op://Private/omniroute-backup.age/private key) -- never generate a new one, which would not decrypt the backups already taken"
 
 running="$(docker inspect --format '{{.State.Running}}' "$container" 2>/dev/null)" || running="false"
 if [[ "$running" != "true" ]]; then

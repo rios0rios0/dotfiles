@@ -7,7 +7,12 @@ onePassword:
   command: "{{ .chezmoi.homeDir }}/.local/bin/op"
 {{- end }}
 encryption: "age"
+# The chezmoi age key, which the export-private-key scripts fetch from 1Password before every
+# apply that needs it (.chezmoidata/age-keys.yaml). recipientsFile is what `chezmoi add
+# --encrypt` encrypts to -- without one, age stops with "missing recipients"; decrypting never
+# reads it, so a first apply works before the file exists.
 age:
   identity: "{{ .chezmoi.homeDir }}/.ssh/chezmoi"
+  recipientsFile: "{{ .chezmoi.homeDir }}/.age_recipients"
 data:
   deviceName: "{{ default .chezmoi.hostname (env "CHEZMOI_DEVICE") | replaceAllRegex " " "-" | trim | lower }}"

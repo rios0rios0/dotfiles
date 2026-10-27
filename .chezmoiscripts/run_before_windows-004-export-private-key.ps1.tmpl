@@ -1,0 +1,51 @@
+# Puts the chezmoi age key at ~\.ssh\chezmoi, from 1Password, before any file is applied: every
+# encrypted file Windows gets (.aws, .azure) is decrypted with it. .chezmoidata/age-keys.yaml
+# names the item and the key's public half; see CLAUDE.md, "Age Keys".
+#
+# A `run_before_` script, not `run_once_`: it runs on every apply and returns at once while the
+# file holds that key, so a key that never arrived, was deleted, or is an older one -- the SSH key
+# this repository encrypted to until 2026-10-27 -- is fetched on the next apply. As a `run_once_`
+# script it was recorded as done even when `op read` failed, because a native command's failure
+# does not fail a PowerShell script, and every later apply died at the first encrypted file with
+# `age: error: reading ".../.ssh/chezmoi": ... cannot find the file specified`.
+#
+# `--account my`, as on Linux: with more than one account in the 1Password CLI, `op read` without
+# it fails. -SshFolder exists for test-export-key-windows.ps1; chezmoi passes nothing.
+
+param([string]$SshFolder = (Join-Path $HOME ".ssh"))
+
+$prefix = "export-key"
+$recipient = {{ .ageKeys.chezmoi.recipient | squote }}
+$reference = {{ .ageKeys.chezmoi.privateKey | squote }}
+$keyPath = Join-Path $SshFolder "chezmoi"
+
+# An identity written by age-keygen names its public key in a comment, so the check needs no age
+# binary, which a first apply installs only moments earlier, on a PATH this process cannot see.
+function Test-KeyFile {
+    param([string]$Path)
+
+    if (-not (Test-Path -LiteralPath $Path)) { return $false }
+    return [bool](Select-String -LiteralPath $Path -SimpleMatch -Pattern "# public key: $recipient" -Quiet)
+}
+
+if (Test-KeyFile $keyPath) { exit 0 }
+
+if (-not (Test-Path -LiteralPath $SshFolder)) {
+    New-Item -ItemType Directory -Path $SshFolder | Out-Null
+}
+
+Write-Host "[$prefix] writing the chezmoi age key to $keyPath from 1Password..."
+$lines = op read --no-newline $reference --account my
+$exitCode = $LASTEXITCODE
+$key = $lines -join "`n"
+if ($exitCode -ne 0 -or $key -notmatch "(?m)^AGE-SECRET-KEY-1" -or -not $key.Contains("# public key: $recipient")) {
+    Write-Host "[$prefix] ERROR: 1Password did not return the chezmoi age key (op exit code $exitCode)"
+    Write-Host "[$prefix] ERROR: unlock the 1Password app, check that 'op read `"$reference`" --account my' prints it, and apply again"
+    exit 1
+}
+
+# Staged beside the target and moved over it, so an interrupted write never leaves half a key.
+$staged = "$keyPath.tmp"
+Set-Content -LiteralPath $staged -Value $key -NoNewline
+Move-Item -LiteralPath $staged -Destination $keyPath -Force
+Write-Host "[$prefix] wrote the chezmoi age key to $keyPath"

@@ -40,6 +40,8 @@ make test-omniroute-image           # the custom OmniRoute image pin: the switch
 make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the dependency install, the pinned bun (cache, verified download, fallbacks), the ~/.bun/bin fallback, the bun installer and its PATH block
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
 make test-yq                        # mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring
+make test-export-keys               # the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key
+make test-export-key-windows        # the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh)
 ```
 
 ## Essential Commands
@@ -1204,11 +1206,54 @@ The MSI is per-machine (`ALLUSERS=1`) and registers the `RustDesk` service, so i
 silently. To bump the pin, take the new MSI's `digest` from the release API; the signer check
 needs no change unless RustDesk changes certificates.
 
-## Encryption Setup
+## Age Keys (One Per Purpose)
 
-- Private key: `~/.ssh/chezmoi`
-- Recipients file: `~/.age_recipients` (template at `dot_age_recipients.tmpl`)
-- Encrypted files end in `.age` and must show `"age encrypted file, ASCII armored"` when checked with `file`
+Every age key `chezmoi apply` puts on a machine has one job, and lives in 1Password's `Private`
+vault as a Secure Note whose `private key` field holds the whole identity file `age-keygen -o`
+writes. `.chezmoidata/age-keys.yaml` names each item and each key's public half:
+
+| Key | File | Item | Where |
+|-----|------|------|-------|
+| chezmoi | `~/.ssh/chezmoi` | `chezmoi.age` | Linux/WSL and Windows: decrypts every `encrypted_*.age` file |
+| OmniRoute backups | `~/.ssh/omniroute-backup-key` | `omniroute-backup.age` | WSL alone, where `omniroute-backup` runs |
+
+Neither is the SSH key that signs commits. The chezmoi files were encrypted to that key until
+2026-10-27; they are re-encrypted to `chezmoi.age` now, and that key still opens only the older
+versions in the repository's history.
+
+**Keep these:**
+
+1. **The export scripts run before every apply, and touch 1Password only when a key differs.**
+   `run_before_linux-005-export-private-key.sh.tmpl` and
+   `run_before_windows-004-export-private-key.ps1.tmpl` compare each file with the `# public key:`
+   comment `age-keygen` writes into it -- no age binary needed, which a first Windows apply has
+   only just installed -- and fetch the item when it is missing or holds another key. As
+   `run_once_` scripts they could not recover: the Windows one called `op read` without
+   `--account my`, which fails with two accounts in the CLI, and reported that as success, because
+   a native command's failure does not fail a PowerShell script; chezmoi recorded it as done, and
+   every apply after that died at `.aws/config` with `age: error: reading ".../.ssh/chezmoi"`.
+2. **A key is written only once it is the right one.** It is staged beside the target, checked
+   for an `AGE-SECRET-KEY-1` line and the expected public key, and renamed over the target, so a
+   failed or wrong read leaves the previous file as it was.
+3. **A missing chezmoi key fails the apply; a missing backup key only warns.** The apply decrypts
+   nothing without the first and needs none of the second. Both are retried on the next apply.
+4. **Nothing deletes `~/.ssh`.** The Linux script used to `rm -rf` it before writing the key; on
+   WSL that directory also holds the SSH agent bridge's socket and the backup key.
+5. **`chezmoi add --encrypt` encrypts to `~/.age_recipients`** (`age.recipientsFile` in
+   `.chezmoi.yaml.tmpl`, rendered from `age-keys.yaml` by `dot_age_recipients.tmpl`). Without a
+   recipient age stops with `missing recipients`. Like any config change it reaches a machine
+   only with `chezmoi init` (see "Config Data Comes From `chezmoi init`"); decrypting never reads
+   it. Encrypted files end in `.age` and must show `"age encrypted file, ASCII armored"` when
+   checked with `file`.
+
+**Rotating a key:** create the new item the same way (`age-keygen`, then `op item create` from a
+JSON template on stdin, so the private key never reaches an argument list), put its reference and
+public key in `age-keys.yaml`, and re-encrypt what the old key protected: for the chezmoi key, pipe
+each `encrypted_*.age` through `age -d -i <old> | age -e -a -r <new>` and check the new file
+decrypts to the same SHA-256. The next apply on each machine replaces the key file by itself.
+
+`make test-export-keys` covers the Linux script against a stubbed `op.exe`, and
+`make test-export-key-windows` the Windows one under pwsh.
 
 ## Kubeconfig Permissions (the Tarball Stays Non-Private)
 

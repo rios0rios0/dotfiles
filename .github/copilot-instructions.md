@@ -9,7 +9,7 @@ The "build" is `chezmoi apply`; there is no compilation step. Repo *changes* (te
 
 ```bash
 make lint    # shellcheck, Go template syntax, Python (ruff), PowerShell, YAML/JSON
-make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, the Windows installer, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution, zshrc functions, Sentry CLI setup, local model server, OpenCode config, Tailscale, systemd on WSL, status line, Claude Code language servers, OmniRoute backups and image pin, ocode build, terra update, yq install
+make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, the Windows installer, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution, zshrc functions, Sentry CLI setup, local model server, OpenCode config, Tailscale, systemd on WSL, status line, Claude Code language servers, OmniRoute backups and image pin, ocode build, terra update, yq install, age key export (Linux and Windows)
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
@@ -147,8 +147,8 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Shared font library: `.chezmoitemplates/lib-install-fonts.sh`
 
 #### Private Key Export
-- Linux: `run_once_before_linux-005-export-private-key.sh` — reads `op://personal/Chezmoi Key/private key` from 1Password, writes to `~/.ssh/chezmoi`
-- Windows: `run_once_before_windows-004-export-private-key.ps1` — same, writes to `~\.ssh\chezmoi`
+- Linux: `run_before_linux-005-export-private-key.sh.tmpl` — before every apply, writes `op://Private/chezmoi.age/private key` to `~/.ssh/chezmoi` when that file is missing or holds another key, and on WSL `op://Private/omniroute-backup.age/private key` to `~/.ssh/omniroute-backup-key`; `.chezmoidata/age-keys.yaml` names both items and both public keys (see "Age Keys" in CLAUDE.md)
+- Windows: `run_before_windows-004-export-private-key.ps1.tmpl` — the same for the chezmoi key, to `~\.ssh\chezmoi`, with `--account my`; a failed read stops the apply
 - Android: Key is retrieved by the `op` wrapper during chezmoi template rendering
 
 #### Post-Apply Scripts (`run_once_after_*` and `run_after_*`)

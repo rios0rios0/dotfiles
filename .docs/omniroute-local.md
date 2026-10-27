@@ -202,8 +202,10 @@ lost machine takes it with them. `omniroute-backup` writes a daily, age-encrypte
 - **Where**: `~/.local/share/omniroute-backups/`, the newest 14 kept; `OMNIROUTE_BACKUP_DIR`,
   `OMNIROUTE_BACKUP_KEEP` and `OMNIROUTE_CONTAINER` adjust that in the environment.
 - **How**: the tar is encrypted with the age identity at `~/.ssh/omniroute-backup-key`, a key of
-  its own -- never the chezmoi one -- so neither key's loss or rotation touches the other. **Keep a
-  copy of it off this machine: without it every backup is unreadable.** A systemd user timer
+  its own -- never the chezmoi one -- so neither key's loss or rotation touches the other. Its copy
+  off this machine is the `omniroute-backup.age` item in 1Password, which `chezmoi apply` writes
+  back whenever the file is missing (see "Age Keys" in `CLAUDE.md`). **Without it every backup is
+  unreadable, so never replace it with a newly generated key.** A systemd user timer
   (`omniroute-backup.timer`, enabled by `chezmoi apply` on WSL) runs it daily at 03:30, or at the
   next boot when 03:30 was missed; run `omniroute-backup` by hand after any doubt.
 

@@ -13,14 +13,17 @@ check_order() {
     shift
     local expected=("$@")
 
-    # Get actual sorted order of run_once_before scripts for this platform
+    # Get actual sorted order of the platform's before scripts, run_once_ and run_before_ alike.
+    # chezmoi orders scripts by target name, which drops the `run_*_` attributes, so the sort
+    # key is the name without them.
     local actual=()
     while IFS= read -r line; do
-        actual+=("$(basename "$line")")
+        actual+=("$line")
     # LC_ALL=C is required: chezmoi orders scripts by Go byte comparison, whereas
     # a locale-aware sort (e.g. en_US.UTF-8) ignores the '-' separator and would
     # place "001a-create-op-wrapper" before "001-create-wrapper".
-    done < <(find "$SCRIPTS_DIR" -name "run_once_before_${platform}-*" -type f | LC_ALL=C sort)
+    done < <(find "$SCRIPTS_DIR" \( -name "run_once_before_${platform}-*" -o -name "run_before_${platform}-*" \) -type f \
+        -printf '%f\n' | sed -E 's/^run_(once_)?before_//' | LC_ALL=C sort)
 
     # Verify each expected prefix appears in order
     local last_idx=-1
