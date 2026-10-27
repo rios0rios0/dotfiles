@@ -1,0 +1,27 @@
+# The web UI of `ocode`, the OpenCode fork build, on the tailnet. See .docs/opencode-local.md, "The
+# web UI on the tailnet", and CLAUDE.md, "Tailscale".
+#
+# chezmoi reads this file on every apply -- unlike `data:` in .chezmoi.yaml.tmpl, which only
+# `chezmoi init` regenerates -- so an edit reaches tailscale-up on the next apply. It is read
+# through .chezmoitemplates/lib-opencode.tmpl.
+opencode:
+  # Share the ocode web UI with the tailnet, so that a phone or another machine can open it:
+  # tailscale-up forwards the tailnet's port `webPort` to it with `tailscale serve` (never Funnel).
+  # On WSL, Windows' client forwards to Windows' `localhost`, which WSL hands on to the service's
+  # loopback socket, so the server keeps listening on loopback alone -- `service set hostname
+  # 0.0.0.0` is not needed and would expose it to every interface as well. The UI is password
+  # protected, and a device joins it with a one-time pairing link: `ocode pair --url
+  # http://<machine>.<tailnet>.ts.net:<webPort>` prints the link and a QR code for it.
+  shareOnTailnet: true
+  # The port the fork's service listens on. The fork derives it from the channel the build stamps
+  # (OPENCODE_CHANNEL in .chezmoiscripts/run_after_linux-006-build-ocode.sh) as 10000 plus the first
+  # eight hex digits of the channel's SHA-1 modulo 50000: 41320 for feat-provider-omniroute.
+  # Renaming the channel moves it, and `make test-tailscale` fails until this follows. A port
+  # pinned with `ocode service set port` has to be set here too, as a device override, or the share
+  # forwards to nothing; `ocode service status` prints the address while the service runs.
+  webPort: 41320
+  # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
+  #   devices:
+  #     some-desktop:
+  #       shareOnTailnet: false
+  devices: {}

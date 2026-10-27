@@ -3,13 +3,14 @@ set -euo pipefail
 
 # Tests tailscale-up in both of its renders. On bare metal, against a stubbed tailscale, systemctl
 # and sudo: the pass every interactive zsh runs, which must never wait or ask for a password, and
-# the direct call, which logs in, sets the two preferences and shares the local model's server. On
-# WSL, against a stub of Windows' client: nothing waits, nothing runs as root, and the model's
-# server is shared through Windows to `localhost`, never to the `127.0.0.1` where WSL's relay no
-# longer listens, moving a share an older revision left there. Also checks the wrapper that gives
-# WSL Windows' CLI, that the installer runs again when what the machine shares changes and installs
-# nothing on WSL, that WSL removes the Linux client an older revision installed, and that only bare
-# metal's zsh runs the quiet pass.
+# the direct call, which logs in, sets the two preferences and shares what .chezmoidata says this
+# machine shares -- the local model's server and the ocode web UI. On WSL, against a stub of
+# Windows' client: nothing waits, nothing runs as root, and both are shared through Windows to
+# `localhost`, moving a share an older revision left on a literal address. Also checks that the web
+# UI's port is the one the fork's service derives from the channel the build stamps, the wrapper
+# that gives WSL Windows' CLI, that the installer runs again when what the machine shares changes
+# and installs nothing on WSL, that WSL removes the Linux client an older revision installed, and
+# that only bare metal's zsh runs the quiet pass.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -41,19 +42,24 @@ ln -s "$CHEZMOI" "$TMP/bin-nogpu/chezmoi"
 printf '#!/bin/sh\necho "NVIDIA Test GPU, 24576 MiB"\n' > "$TMP/bin-gpu/nvidia-smi"
 chmod +x "$TMP/bin-gpu/nvidia-smi"
 
-# render <gpu|nogpu> <metal|wsl|android> <source file>. The OS and the kernel are set for every
-# render, so the host running the suite -- WSL on a developer's machine, bare metal on CI --
-# decides nothing.
+# render <gpu|nogpu> <metal|wsl|android> <source file> [noshare]. The OS and the kernel are set for
+# every render, so the host running the suite -- WSL on a developer's machine, bare metal on CI --
+# decides nothing. `noshare` switches the ocode web UI share off, as a device can in
+# .chezmoidata/opencode.yaml; chezmoi merges --override-data into that file's data key by key.
 render() {
-    local os="linux" osrelease="6.11.0-generic"
+    local os="linux" osrelease="6.11.0-generic" share=true
     case "$2" in
         wsl) osrelease="6.18.33.2-microsoft-standard-WSL2" ;;
         android) os="android" ;;
     esac
+    [[ "${4:-}" != noshare ]] || share=false
     PATH="$TMP/bin-$1" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
-        --override-data "{\"chezmoi\":{\"os\":\"$os\",\"kernel\":{\"osrelease\":\"$osrelease\",\"ostype\":\"Linux\",\"version\":\"#1 SMP\"}}}" \
+        --override-data "{\"opencode\":{\"shareOnTailnet\":$share},\"chezmoi\":{\"os\":\"$os\",\"kernel\":{\"osrelease\":\"$osrelease\",\"ostype\":\"Linux\",\"version\":\"#1 SMP\"}}}" \
         < "$3"
 }
+
+# The ocode web UI's port, as .chezmoidata/opencode.yaml declares it for this device.
+PORT="$(chezmoi execute-template --config "$TMP/chezmoi.yaml" '{{ (includeTemplate "lib-opencode.tmpl" . | fromJson).webPort }}')"
 
 HELPER="$REPO_ROOT/dot_local/bin/executable_tailscale-up.tmpl"
 INSTALLER="$REPO_ROOT/.chezmoiscripts/run_onchange_after_linux-010-setup-tailscale.sh.tmpl"
@@ -62,7 +68,8 @@ WRAPPER="$REPO_ROOT/dot_local/bin/executable_tailscale"
 for gpu in gpu nogpu; do
     for kind in metal wsl; do
         render "$gpu" "$kind" "$HELPER" > "$TMP/tailscale-up-$kind-$gpu"
-        chmod +x "$TMP/tailscale-up-$kind-$gpu"
+        render "$gpu" "$kind" "$HELPER" noshare > "$TMP/tailscale-up-$kind-$gpu-noshare"
+        chmod +x "$TMP/tailscale-up-$kind-$gpu" "$TMP/tailscale-up-$kind-$gpu-noshare"
     done
 done
 
@@ -141,37 +148,39 @@ exit 1
 EOF
 chmod +x "$WSL_STUBS"/*
 
-# reset <state> [down] [enabled] [failed] [operator] [shared=<forward target>] [win-down]
-#       [win-missing] [linux-tailscaled]
+# reset <state> [down] [enabled] [failed] [operator] [shared=<forward target>]
+#       [ocode=<forward target>] [win-down] [win-missing] [linux-tailscaled]
 reset() {
     rm -f "$TMP/calls" "$TMP/ts-down" "$TMP/ts-enabled" "$TMP/ts-failed" "$TMP/ts-operator" "$TMP/ts-serve.json" \
         "$TMP/win-down" "$TMP/win-missing" "$TMP/linux-tailscaled"
     touch "$TMP/calls"
     echo "$1" > "$TMP/ts-state"
     shift
-    local flag
+    local flag serve='{}'
     for flag in "$@"; do
         case "$flag" in
             down) touch "$TMP/ts-down" ;;
             enabled) touch "$TMP/ts-enabled" ;;
             failed) touch "$TMP/ts-failed" ;;
             operator) touch "$TMP/ts-operator" ;;
-            shared=*) printf '{"TCP":{"11434":{"TCPForward":"%s"}}}\n' "${flag#shared=}" > "$TMP/ts-serve.json" ;;
+            shared=*) serve="$(jq -c --arg t "${flag#shared=}" '.TCP["11434"].TCPForward = $t' <<<"$serve")" ;;
+            ocode=*) serve="$(jq -c --arg t "${flag#ocode=}" --arg p "$PORT" '.TCP[$p].TCPForward = $t' <<<"$serve")" ;;
             win-down) touch "$TMP/win-down" ;;
             win-missing) touch "$TMP/win-missing" ;;
             linux-tailscaled) touch "$TMP/linux-tailscaled" ;;
         esac
     done
+    [[ "$serve" == '{}' ]] || echo "$serve" > "$TMP/ts-serve.json"
 }
 
-# helper <gpu|nogpu> [args]: the bare-metal render; stderr and stdout together
+# helper <gpu|nogpu>[-noshare] [args]: the bare-metal render; stderr and stdout together
 helper() {
     local gpu="$1"
     shift
     PATH="$STUBS:/usr/bin:/bin" USER=tester "$TMP/tailscale-up-metal-$gpu" "$@" 2>&1
 }
 
-# wsl <gpu|nogpu> [args]: the WSL render, with Windows' client behind the tailscale on PATH
+# wsl <gpu|nogpu>[-noshare] [args]: the WSL render, with Windows' client behind the tailscale on PATH
 wsl() {
     local gpu="$1"
     shift
@@ -266,14 +275,15 @@ expected="sudo tailscale up --operator=tester --accept-dns=false"
 if [[ "$status" -eq 0 && "$output" == *"this waits until you have"* && "$output" == *"on the tailnet as 100.64.0.5"* ]] &&
     grep -qx -- "$expected" "$TMP/calls" &&
     grep -qx -- 'tailscale set --operator=tester --accept-dns=false' "$TMP/calls" &&
-    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434' "$TMP/calls"; then
-    pass "tailscale-up logs in with both preferences and shares the model's server"
+    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434' "$TMP/calls" &&
+    grep -qx -- "tailscale serve --bg --tcp=$PORT tcp://127.0.0.1:$PORT" "$TMP/calls"; then
+    pass "tailscale-up logs in with both preferences and shares the model's server and the web UI"
 else
     fail "a fresh login: status=$status output=$output calls=$(calls)"
 fi
 
-# given a node already on the tailnet and already sharing
-reset Running operator shared=127.0.0.1:11434
+# given a node already on the tailnet and already sharing both
+reset Running operator shared=127.0.0.1:11434 "ocode=127.0.0.1:$PORT"
 # when
 output="$(helper gpu)" && status=0 || status=$?
 # then: nothing to log in and nothing to share again
@@ -285,10 +295,30 @@ output="$(helper gpu)" && status=0 || status=$?
 reset NeedsLogin
 # when
 output="$(helper nogpu)" && status=0 || status=$?
-# then
-[[ "$status" -eq 0 ]] && ! grep -q 'serve' "$TMP/calls" &&
-    pass "a machine without the local model shares nothing" ||
+# then: the model has nothing to serve here, and the web UI still reaches the tailnet
+[[ "$status" -eq 0 ]] && ! grep -q -- '--tcp=11434' "$TMP/calls" &&
+    grep -qx -- "tailscale serve --bg --tcp=$PORT tcp://127.0.0.1:$PORT" "$TMP/calls" &&
+    pass "a machine without the local model shares only the web UI" ||
     fail "a machine without a GPU: status=$status calls=$(calls)"
+
+# given .chezmoidata/opencode.yaml switching the web UI share off
+reset NeedsLogin
+# when
+output="$(helper gpu-noshare)" && status=0 || status=$?
+# then: the model's server alone
+[[ "$status" -eq 0 ]] && ! grep -q -- "--tcp=$PORT" "$TMP/calls" &&
+    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://127.0.0.1:11434' "$TMP/calls" &&
+    pass "a machine that switches the web UI share off shares only the model's server" ||
+    fail "web UI share off: status=$status calls=$(calls)"
+
+# given a machine without a GPU that switches the web UI share off as well
+reset NeedsLogin
+# when
+output="$(helper nogpu-noshare)" && status=0 || status=$?
+# then: nothing to share, so the shares are not even asked for
+[[ "$status" -eq 0 ]] && ! grep -q 'serve' "$TMP/calls" &&
+    pass "a machine that shares neither runs no tailscale serve at all" ||
+    fail "nothing to share: status=$status calls=$(calls)"
 
 # given tailscaled switched off
 reset NeedsLogin down
@@ -305,15 +335,17 @@ output="$(helper gpu)" && status=0 || status=$?
 reset Running
 # when: the pass the apply runs
 output="$(wsl gpu --no-login)" && status=0 || status=$?
-# then: the model's server is shared through Windows' client, to Windows' localhost, which names
-# the ::1 that WSL's relay listens on for Ollama's dual-stack socket
-[[ "$status" -eq 0 && "$output" == *"sharing Ollama"* && "$output" == *"on the tailnet as 100.64.0.7"* ]] &&
-    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://localhost:11434' "$TMP/calls" && ! grep -q ' up' "$TMP/calls" &&
-    pass "on WSL the apply shares the model's server through Windows' client" ||
+# then: both are shared through Windows' client, to Windows' localhost, which reaches WSL's relay
+# whichever loopback family it listens on
+[[ "$status" -eq 0 && "$output" == *"sharing Ollama"* && "$output" == *"sharing the ocode web UI"* &&
+    "$output" == *"on the tailnet as 100.64.0.7"* ]] &&
+    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://localhost:11434' "$TMP/calls" &&
+    grep -qx -- "tailscale serve --bg --tcp=$PORT tcp://localhost:$PORT" "$TMP/calls" && ! grep -q ' up' "$TMP/calls" &&
+    pass "on WSL the apply shares the model's server and the web UI through Windows' client" ||
     fail "WSL sharing: status=$status output=$output calls=$(calls)"
 
-# given Windows on the tailnet and already sharing
-reset Running shared=localhost:11434
+# given Windows on the tailnet and already sharing both
+reset Running shared=localhost:11434 "ocode=localhost:$PORT"
 # when
 output="$(wsl gpu)" && status=0 || status=$?
 # then
@@ -321,16 +353,17 @@ output="$(wsl gpu)" && status=0 || status=$?
     pass "on WSL tailscale-up leaves a share that is in place as it is" ||
     fail "WSL already sharing: status=$status calls=$(calls)"
 
-# given the share an older revision set, to Windows' 127.0.0.1, where WSL's relay no longer listens
-# since Ollama listens on every interface
-reset Running shared=127.0.0.1:11434
+# given the shares an older revision set on a literal address, Windows' 127.0.0.1, which reaches
+# WSL's relay only while what listens behind it binds IPv4
+reset Running shared=127.0.0.1:11434 "ocode=127.0.0.1:$PORT"
 # when: the pass the apply runs, which the installer repeats whenever tailscale-up changes
 output="$(wsl gpu --no-login)" && status=0 || status=$?
-# then: the share is moved to localhost
-[[ "$status" -eq 0 && "$output" == *"sharing Ollama"* ]] &&
+# then: both are moved to localhost
+[[ "$status" -eq 0 && "$output" == *"sharing Ollama"* && "$output" == *"sharing the ocode web UI"* ]] &&
     grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://localhost:11434' "$TMP/calls" &&
-    pass "on WSL the apply moves a share an older revision left on 127.0.0.1 to localhost" ||
-    fail "WSL share on 127.0.0.1: status=$status output=$output calls=$(calls)"
+    grep -qx -- "tailscale serve --bg --tcp=$PORT tcp://localhost:$PORT" "$TMP/calls" &&
+    pass "on WSL the apply moves shares an older revision left on 127.0.0.1 to localhost" ||
+    fail "WSL shares on 127.0.0.1: status=$status output=$output calls=$(calls)"
 
 # given Windows not logged in
 reset NeedsLogin
@@ -354,9 +387,10 @@ output="$(wsl gpu --no-login)" && status=0 || status=$?
 reset Stopped
 # when: asked for directly
 output="$(wsl gpu)" && status=0 || status=$?
-# then: a bare `tailscale up` switches it back on, and the server is shared
+# then: a bare `tailscale up` switches it back on, and both are shared
 [[ "$status" -eq 0 ]] && grep -qx 'tailscale up' "$TMP/calls" &&
     grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://localhost:11434' "$TMP/calls" &&
+    grep -qx -- "tailscale serve --bg --tcp=$PORT tcp://localhost:$PORT" "$TMP/calls" &&
     pass "on WSL tailscale-up switches Windows' client back on" ||
     fail "WSL switched off: status=$status output=$output calls=$(calls)"
 
@@ -410,9 +444,29 @@ reset Running
 # when
 output="$(wsl nogpu)" && status=0 || status=$?
 # then
-[[ "$status" -eq 0 ]] && ! grep -q 'serve' "$TMP/calls" &&
-    pass "on WSL a machine without the local model shares nothing" ||
+[[ "$status" -eq 0 ]] && ! grep -q -- '--tcp=11434' "$TMP/calls" &&
+    grep -qx -- "tailscale serve --bg --tcp=$PORT tcp://localhost:$PORT" "$TMP/calls" &&
+    pass "on WSL a machine without the local model shares only the web UI" ||
     fail "WSL without a GPU: status=$status calls=$(calls)"
+
+# given .chezmoidata/opencode.yaml switching the web UI share off
+reset Running
+# when
+output="$(wsl gpu-noshare --no-login)" && status=0 || status=$?
+# then
+[[ "$status" -eq 0 ]] && ! grep -q -- "--tcp=$PORT" "$TMP/calls" &&
+    grep -qx -- 'tailscale serve --bg --tcp=11434 tcp://localhost:11434' "$TMP/calls" &&
+    pass "on WSL a machine that switches the web UI share off shares only the model's server" ||
+    fail "WSL web UI share off: status=$status calls=$(calls)"
+
+# given a machine without a GPU that switches the web UI share off as well
+reset Running
+# when
+output="$(wsl nogpu-noshare --no-login)" && status=0 || status=$?
+# then
+[[ "$status" -eq 0 ]] && ! grep -q 'serve' "$TMP/calls" &&
+    pass "on WSL a machine that shares neither runs no tailscale serve at all" ||
+    fail "WSL nothing to share: status=$status calls=$(calls)"
 
 # then, across every WSL case: nothing ran as root
 if grep -q '^sudo\|tailscale set' "$TMP/wsl-all-calls"; then
@@ -441,16 +495,30 @@ output="$(TAILSCALE_EXE="$TMP/missing/tailscale.exe" bash "$WRAPPER" status 2>&1
     pass "the wrapper reports Tailscale missing on Windows" ||
     fail "the wrapper without Windows' CLI: status=$status output=$output"
 
+# --- the ocode web UI's port --------------------------------------------------------------------
+
+# given the channel the fork build stamps, from which the fork's service derives its port: 10000
+# plus the first eight hex digits of the channel's SHA-1, modulo 50000 (defaultPort in the fork's
+# packages/cli/src/services/service-config.ts)
+channel="$(sed -n 's/^OPENCODE_CHANNEL="\(.*\)"$/\1/p' "$REPO_ROOT/.chezmoiscripts/run_after_linux-006-build-ocode.sh")"
+digits="$(printf '%s' "$channel" | sha1sum | cut -c1-8)"
+derived=$((10000 + 16#$digits % 50000))
+# then: the share forwards that port, so a channel renamed without moving webPort fails here
+[[ -n "$channel" && "$PORT" == "$derived" ]] &&
+    pass "the web UI is shared on the port the fork's service derives from its channel" ||
+    fail "webPort is '$PORT', but the channel '$channel' makes the service listen on $derived"
+
 # --- installer, removal and shell ---------------------------------------------------------------
 
-# given a machine that starts or stops sharing a GPU
+# given a machine that starts or stops sharing a GPU, or the web UI
 for kind in metal wsl; do
     gpu_hash="$(render gpu "$kind" "$INSTALLER" | grep -o 'tailscale-up [0-9a-f]\{64\}')"
     nogpu_hash="$(render nogpu "$kind" "$INSTALLER" | grep -o 'tailscale-up [0-9a-f]\{64\}')"
+    noshare_hash="$(render gpu "$kind" "$INSTALLER" noshare | grep -o 'tailscale-up [0-9a-f]\{64\}')"
     # then: the installer's own content changes, so it runs again
-    [[ -n "$gpu_hash" && "$gpu_hash" != "$nogpu_hash" ]] &&
+    [[ -n "$gpu_hash" && "$gpu_hash" != "$nogpu_hash" && "$gpu_hash" != "$noshare_hash" ]] &&
         pass "the $kind installer runs again when what this machine shares changes" ||
-        fail "the $kind installer does not track tailscale-up: '$gpu_hash' / '$nogpu_hash'"
+        fail "the $kind installer does not track tailscale-up: '$gpu_hash' / '$nogpu_hash' / '$noshare_hash'"
 done
 
 # then: on WSL the installer installs nothing and runs only the apply's pass; on bare metal it
