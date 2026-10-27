@@ -65,9 +65,9 @@ AppData
      meaningless on bare-metal Linux -- there is no Windows agent to reach, and the unit would
      point at an npiperelay.exe that is never installed. The tailscale wrapper runs Windows'
      Tailscale CLI, which is WSL's tailnet client; on bare metal it would shadow tailscaled's own
-     CLI. The OmniRoute backups serve the local stack, which runs from a checkout on WSL alone.
-     Gated on the kernel rather than the OS because "linux" alone does not distinguish WSL from
-     bare metal. */ -}}
+     CLI. The OmniRoute backups and their restore serve the local stack, which runs from a checkout
+     on WSL alone. Gated on the kernel rather than the OS because "linux" alone does not
+     distinguish WSL from bare metal. */ -}}
 {{- if not $wsl }}
 .config/systemd/user/ssh-agent-bridge.socket
 .config/systemd/user/ssh-agent-bridge@.service
@@ -75,6 +75,7 @@ AppData
 .config/systemd/user/omniroute-backup.timer
 .local/bin/tailscale
 .local/bin/omniroute-backup
+.local/bin/omniroute-restore
 {{- end }}
 
 {{- /* The local model server (Ollama): Linux with an NVIDIA driver, unless

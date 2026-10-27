@@ -9,3 +9,20 @@ omniroute:
   # The gateway. Its API key is the `cred:OMNIROUTE_API_KEY` field of this device's 1Password note,
   # which the shell exports as OMNIROUTE_API_KEY; it never appears in this repository.
   baseUrl: 'http://127.0.0.1:20128'
+  # The daily backups (omniroute-backup, WSL only; see "OmniRoute Backups, Mirror and Restore" in
+  # CLAUDE.md). The newest `keep` archives stay on this machine. Each run also copies its archive to
+  # `<mirror>/<deviceName>/`, where the newest `mirrorKeep` stay, plus the newest archive of each of
+  # the `mirrorMonthly` most recent months. `mirror` is 'onedrive-personal' -- the folder Windows
+  # names in %OneDriveConsumer%, never %OneDrive%, which on a machine also signed in to a work
+  # account names that one -- an absolute path, or '' for no copy off this machine.
+  backup:
+    keep: 14
+    mirror: 'onedrive-personal'
+    mirrorKeep: 14
+    mirrorMonthly: 12
+  # The stack's `.env` -- whose STORAGE_ENCRYPTION_KEY decrypts the provider credentials in the
+  # database -- and the CA bundle its OMNIROUTE_CA_BUNDLE names, as 1Password keeps them.
+  # `omniroute-restore` reads them only when the checkout has no `.env` and the archive carries none.
+  env:
+    file: 'op://Private/OmniRouter/notesPlain'
+    caBundle: 'op://Private/OmniRouter/ca-bundle.pem'
