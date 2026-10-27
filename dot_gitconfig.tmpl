@@ -1,4 +1,3 @@
-{{- /* TODO: when the Windows username is different than WSL username, the 1Password path is different breaking the commit signing */ -}}
 {{- $deviceName := .deviceName -}}
 {{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 
@@ -7,21 +6,40 @@
 {{- $defaultHome := .chezmoi.homeDir -}}
 
 {{- $program := "op-ssh-sign" -}}
-{{- $allowedSignersFile := printf "%s/.ssh/allowed_signers" $defaultHome -}}
+{{- /* Linux keeps the file git checks signatures against beside ~/.config/git/ignore, because .ssh
+       is not deployed there; Windows and Android keep theirs in ~/.ssh. */ -}}
+{{- $allowedSignersFile := printf "%s/.config/git/allowed_signers" $defaultHome -}}
 {{- $excludesFile := printf "%s/.gitignore" $defaultHome -}}
 {{- $sshCommand := "ssh" -}}
 
 {{- if eq .chezmoi.os "windows" -}}
+    {{- /* 1Password's signer is wherever its installer put it: an app execution alias in
+           %LOCALAPPDATA%\Microsoft\WindowsApps, which is on PATH, for the Microsoft Store build;
+           Program Files for the machine-wide installer; %LOCALAPPDATA%\1Password for the per-user
+           one. A path that does not exist fails every commit with "cannot exec", so the one that
+           exists wins, and Program Files is only the fallback. */ -}}
     {{- $program = "C:/Program Files/1Password/app/8/op-ssh-sign.exe" -}}
+    {{- $perUser := printf "%s/1Password/app/8/op-ssh-sign.exe" (env "LOCALAPPDATA" | replace "\\" "/") -}}
+    {{- with lookPath "op-ssh-sign.exe" -}}
+        {{- $program = . | replace "\\" "/" -}}
+    {{- else -}}
+        {{- if and (not (stat $program)) (stat $perUser) -}}
+            {{- $program = $perUser -}}
+        {{- end -}}
+    {{- end -}}
     {{- $allowedSignersFile = printf "%s/.ssh/allowed_signers" $windowsHome -}}
     {{- $excludesFile = printf "%s/.gitignore" $windowsHome -}}
     {{- $sshCommand = "C:/Windows/System32/OpenSSH/ssh.exe" -}}
 {{- else if and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
-    {{- $program = "/mnt/c/Program Files/1Password/app/8/op-ssh-sign-wsl" -}}
-    {{- $allowedSignersFile = printf "/mnt/c/Users/%s/.ssh/allowed_signers" $username -}}
+    {{- /* Linux's ssh-keygen signs with the key in 1Password's agent, which the SSH agent bridge
+           serves at ~/.ssh/agent.sock (SSH_AUTH_SOCK, from dot_zshenv.tmpl) -- the way Android signs
+           with its own agent at the same path. 1Password's Windows signer would need to know where
+           1Password is installed and the Windows user's name, and WSL can tell neither. */ -}}
+    {{- $program = "ssh-keygen" -}}
     {{- $sshCommand = "ssh.exe" -}}
 {{- else if eq .chezmoi.os "android" -}}
     {{- $program = "ssh-keygen" -}}
+    {{- $allowedSignersFile = printf "%s/.ssh/allowed_signers" $defaultHome -}}
     {{- $sshCommand = "ssh" -}}
 {{- end -}}
 

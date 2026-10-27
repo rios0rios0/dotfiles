@@ -1000,8 +1000,7 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
    appears on Windows' `127.0.0.1`, and a dual-stack bind would put it on `::1` alone. `localhost`
    reaches whichever it is, so the share survives such a change unedited; WSL's own address would
    answer too, but it changes whenever WSL starts. A share left on the other literal is moved by the
-   next apply (9). The wrapper's path is fixed, as `op-ssh-sign-wsl`'s is in `dot_gitconfig.tmpl`;
-   `TAILSCALE_EXE` names another.
+   next apply (9). The wrapper's path is fixed; `TAILSCALE_EXE` names another.
 4. **Bare metal: the shell's pass never waits and never asks for a password.** It runs in every
    interactive zsh, so a logged-out machine gets a one-line hint pointing at `tailscale-up`, not a
    login that blocks the prompt, and a failed daemon gets a hint, not `sudo systemctl`. A daemon
@@ -1134,17 +1133,16 @@ If SoX picks the wrong driver, force it with `AUDIODRIVER=pulse`.
 
 ## SSH Agent Bridge (WSL)
 
-Every SSH key on this setup lives in 1Password on the Windows side. Two mechanisms carry that
-across the WSL boundary, and **both work by executing a Windows binary**: the `ssh` →
-`ssh.exe` wrapper in `dot_local/bin/executable_ssh`, and `gpg.ssh.program = op-ssh-sign-wsl`
-in `dot_gitconfig.tmpl`, which signs every commit.
+Every SSH key on this setup lives in 1Password on the Windows side. The `ssh` → `ssh.exe`
+wrapper in `dot_local/bin/executable_ssh` carries that across the WSL boundary by **executing a
+Windows binary**, and commits are signed through the bridge below.
 
-Neither reaches a program that does SSH *itself* rather than shelling out to `ssh`. go-git
+The wrapper does not reach a program that does SSH *itself* rather than shelling out to `ssh`. go-git
 ([AutoBump](https://github.com/rios0rios0/autobump)), Go's `x/crypto/ssh`, and libgit2
 authenticate by dialing an `AF_UNIX` socket and speaking the agent protocol; they never
 execute a binary, so `core.sshCommand` is never consulted and the wrapper is never invoked.
 Go cannot dial a Windows named pipe, so for those tools the keys simply do not exist. That is
-the whole shape of the bug it produces: signing works, `git push` works, and one tool reports
+the whole shape of the bug it produces: `git push` works, and one tool reports
 no usable SSH credential — which reads as that tool losing a key that demonstrably exists.
 
 `dot_config/systemd/user/ssh-agent-bridge.socket` closes the gap. It listens on
@@ -1189,6 +1187,23 @@ systemctl --user status ssh-agent-bridge.socket  # should be active (listening)
 The bridge needs systemd in WSL, which `chezmoi apply` turns on (see "systemd on WSL"). Until
 WSL boots with it, the installer warns and exits 0, leaving `SSH_AUTH_SOCK` pointing at nothing,
 and the first apply after the restart sets the bridge up.
+
+**Commits are signed through the bridge too.** On WSL `dot_gitconfig.tmpl` sets
+`gpg.ssh.program = ssh-keygen`: git hands it the public key from `user.signingkey`, and Linux's
+`ssh-keygen -Y sign` takes the signature from the agent at `SSH_AUTH_SOCK`, the way Android signs
+with its own agent at the same path; verification runs the same `ssh-keygen` against
+`~/.config/git/allowed_signers`, Linux's copy of the file (Linux gets no `.ssh` from chezmoi).
+Signing used to run 1Password's `op-ssh-sign-wsl` from `C:\Program Files\1Password\app\8\`, a
+path only the machine-wide installer creates: the per-user installer puts it under
+`%LOCALAPPDATA%\1Password`, and the Microsoft Store build exposes it as an app execution alias in
+`%LOCALAPPDATA%\Microsoft\WindowsApps`, both under the *Windows* user's name, which WSL does not
+know. On a machine with the Store build every commit failed with `cannot exec
+'…/op-ssh-sign-wsl': No such file or directory` while `/usr/bin/ssh-add -l` listed every key
+through the bridge. Signing now needs the bridge, so until WSL boots with systemd, `git commit`
+fails with `Couldn't get agent socket`. Windows' own Git keeps 1Password's `op-ssh-sign.exe`,
+found with `lookPath` -- the Store build's alias is on `PATH` -- and otherwise under Program Files
+or in the per-user install, whichever exists. `make test-template-render` covers each
+platform's signer and allowed-signers file.
 
 ## Windows Package Detection (winget list, Not export)
 
