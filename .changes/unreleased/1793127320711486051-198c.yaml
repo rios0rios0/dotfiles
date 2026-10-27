@@ -1,0 +1,3 @@
+kind: 'Security'
+body: 'restricted the `GITHUB_TOKEN` of every job in `validate.yaml` to `contents: read`, declared per job as `checks.yaml` does: none of the 32 jobs needs more than to check out the repository, the token was read-only only through the repository''s default setting, and CodeQL flagged every job with `actions/missing-workflow-permissions`'
+time: '2026-10-27T18:55:20.711486051Z'
