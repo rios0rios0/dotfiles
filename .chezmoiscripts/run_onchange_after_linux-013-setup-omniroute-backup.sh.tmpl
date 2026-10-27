@@ -4,12 +4,13 @@
 #
 # `run_onchange_` rather than `run_once_`: the digest lines below change whenever the service,
 # the timer or the backup script changes, and the systemd line when systemd starts, so any of
-# those re-runs this script, which reloads systemd and restarts the timer. `include`, not
-# `includeTemplate`: the three deploy verbatim, and the script carries a docker `--format` string
-# that template execution would mistake for syntax:
+# those re-runs this script, which reloads systemd and restarts the timer. The units deploy
+# verbatim, so their digests are of the files; the script is a template -- its device, retention
+# and mirror come from .chezmoidata/omniroute.yaml, its shared half from lib-omniroute.sh -- so its
+# digest is of what it renders to, and editing either re-runs this too:
 #   service {{ include "dot_config/systemd/user/omniroute-backup.service" | sha256sum }}
 #   timer {{ include "dot_config/systemd/user/omniroute-backup.timer" | sha256sum }}
-#   script {{ include "dot_local/bin/executable_omniroute-backup" | sha256sum }}
+#   script {{ includeTemplate "dot_local/bin/executable_omniroute-backup.tmpl" . | sha256sum }}
 #   systemd {{ if stat "/run/systemd/system" }}running{{ else }}not running{{ end }}
 #
 # Without systemd it stops early and exits 0, which chezmoi records as done; the systemd line
@@ -24,6 +25,9 @@ set -euo pipefail
 prefix="omniroute-backup"
 unit="omniroute-backup.timer"
 identity="$HOME/.ssh/omniroute-backup-key"
+mirror={{ .omniroute.backup.mirror | squote }}
+
+{{ includeTemplate "lib-omniroute.sh" }}
 
 # The backups only mean anything on WSL: elsewhere the stack runs from no checkout of this
 # repository, and the unit files are not deployed at all (see .chezmoiignore).
@@ -56,3 +60,13 @@ fi
 systemctl --user start "$unit"
 
 echo "[$prefix] enabled $unit; it backs up daily at 03:30 (or at the next boot after that), see 'systemctl --user list-timers omniroute-backup.timer'" >&2
+
+# Where the archives go off this machine, resolved here as well, so that a missing personal OneDrive
+# shows at the apply that enables the timer rather than as a failed unit at 03:30.
+if [[ -z "$mirror" ]]; then
+    echo "[$prefix] WARN: no mirror is configured (omniroute.backup.mirror), so the archives never leave this machine" >&2
+elif omniroute_mirror_resolve "$mirror"; then
+    echo "[$prefix] each archive is also copied to $OMNIROUTE_MIRROR_ROOT/{{ .deviceName }}" >&2
+else
+    echo "[$prefix] WARN: the archives cannot be copied off this machine until this is fixed: $OMNIROUTE_MIRROR_ERROR" >&2
+fi

@@ -22,11 +22,11 @@ Generate and set four values in `.env`:
 | Variable | Generate with | Purpose |
 |----------|---------------|---------|
 | `JWT_SECRET` | `openssl rand -base64 48` | Signs dashboard sessions |
-| `API_KEY_SECRET` | `openssl rand -hex 32` | Encrypts provider API keys |
+| `API_KEY_SECRET` | `openssl rand -hex 32` | Signs the check digits of the `sk-…` API keys the dashboard creates |
 | `INITIAL_PASSWORD` | `openssl rand -hex 24` | First dashboard login password |
-| `STORAGE_ENCRYPTION_KEY` | `openssl rand -hex 32` | Encrypts the local database |
+| `STORAGE_ENCRYPTION_KEY` | `openssl rand -hex 32` | Encrypts the provider credentials (API keys, OAuth tokens) stored in the database; the database file itself is plain SQLite |
 
-Keep these values private and preserve them across restarts. Changing the encryption keys can make stored data or provider credentials unreadable.
+Keep these values private and preserve them across restarts. A different `STORAGE_ENCRYPTION_KEY` leaves every stored provider credential unreadable: the gateway still starts, and every cloud provider fails. Keep a copy of the finished `.env` in 1Password -- the `OmniRouter` item in `Private`, with the file `OMNIROUTE_CA_BUNDLE` names attached as `ca-bundle.pem` -- which is where `omniroute-restore` looks when neither the checkout nor the archive has one (`env:` in `.chezmoidata/omniroute.yaml`).
 
 Start the services and open the dashboard:
 
@@ -38,6 +38,8 @@ docker compose logs -f omniroute
 Open `http://127.0.0.1:20128`. The initial dashboard setup may ask for a bootstrap token; find it in the `omniroute` service logs. Create an API key for OpenCode after signing in; see [Connect OpenCode](#connect-opencode).
 
 The Compose file pins a custom build of the fork (`ghcr.io/rios0rios0/omniroute`) by digest rather than the official image; see [The custom fork image](#the-custom-fork-image). Both services use `restart: always`, so Docker starts them automatically when its daemon starts. All published ports bind to `127.0.0.1`; Redis has no host-published port. `docker compose down` preserves the named data volumes. `docker compose down -v` deletes the database, Redis data, and configured provider credentials.
+
+This first `docker compose up` is the only start that creates a database. From then on, every `chezmoi apply` on WSL keeps the stack running (`run_after_linux-015-start-omniroute.sh.tmpl`): it starts a stack whose data volume exists but whose containers do not, leaves a running or stopped container alone, and only prints what to do -- restore an archive, or run that first `up` -- when there is no data volume. Docker starts the stack only when Docker Desktop runs, so turn on **Start Docker Desktop when you sign in to your computer** in Docker Desktop's **Settings > General**; while it is off, the gateway stays down after every reboot, and the apply says so when it finds Docker down.
 
 ## The custom fork image
 
@@ -72,7 +74,7 @@ omniroute-backup
 docker compose up -d omniroute
 ```
 
-Rolling the image reference back is not enough once migrations have run; restore the database and `server.env` from the backup (see [Encrypted backups](#encrypted-backups)). Keep both the previous digest from `git diff` and the archive taken just before the switch.
+Rolling the image reference back is not enough once migrations have run; put the previous digest back and restore the archive taken just before the switch with `omniroute-restore` (see [Restore](#restore)). Keep both the previous digest from `git diff` and that archive.
 
 ### Package visibility
 
@@ -200,13 +202,27 @@ before suspecting the image.
 ## Encrypted backups
 
 The stack's state lives in a Docker volume, where `docker compose down -v`, a corrupted volume or a
-lost machine takes it with them. `omniroute-backup` writes a daily, age-encrypted snapshot of it:
+lost machine takes it with them. `omniroute-backup` writes a daily, age-encrypted archive of it that
+restores the gateway on its own, and copies it off the machine:
 
 - **What**: a consistent copy of `storage.sqlite`, taken with `VACUUM INTO` inside the running
-  container -- copying a live WAL database file can tear it -- plus the `server.env` the bootstrap
-  wrote, with the storage-key version it records. Call logs are not included.
-- **Where**: `~/.local/share/omniroute-backups/`, the newest 14 kept; `OMNIROUTE_BACKUP_DIR`,
-  `OMNIROUTE_BACKUP_KEEP` and `OMNIROUTE_CONTAINER` adjust that in the environment.
+  container -- copying a live WAL database file can tear it -- the `server.env` the bootstrap wrote;
+  `compose.env`, the secrets `.env` gave the gateway, without which the stored provider credentials
+  never decrypt again; a `manifest` naming the device, the image, the schema and how many providers
+  and API keys the database holds; and the CA bundle `OMNIROUTE_CA_BUNDLE` names, when it names one
+  of its own. Call logs and Redis are not included.
+- **Where**: `~/.local/share/omniroute-backups/`, the newest 14 kept, and a copy in the personal
+  OneDrive -- the folder Windows names in `%OneDriveConsumer%`, never `%OneDrive%`, which on a
+  machine also signed in to a work account is that one -- under
+  `Backup\omniroute\<deviceName>\`, where the newest 14 stay plus the newest of each of the last 12
+  months. `backup:` in `.chezmoidata/omniroute.yaml` sets those numbers and the mirror (an absolute
+  path instead, or `''` for none); `OMNIROUTE_BACKUP_DIR`, `OMNIROUTE_BACKUP_KEEP`,
+  `OMNIROUTE_BACKUP_MIRROR` and `OMNIROUTE_CONTAINER` override them in the environment. A mirror that
+  cannot be written fails the run after the archive is kept here, so `systemctl --user --failed`
+  shows it.
+- **An empty gateway**: a database with no provider and no API key -- a freshly started stack -- is
+  archived here, but rotates nothing out and is not copied, so it never pushes the real archives
+  out of either place.
 - **How**: the tar is encrypted with the age identity at `~/.ssh/omniroute-backup-key`, a key of
   its own -- never the chezmoi one -- so neither key's loss or rotation touches the other. Its copy
   off this machine is the `omniroute-backup.age` item in 1Password, which `chezmoi apply` writes
@@ -215,27 +231,40 @@ lost machine takes it with them. `omniroute-backup` writes a daily, age-encrypte
   (`omniroute-backup.timer`, enabled by `chezmoi apply` on WSL) runs it daily at 03:30, or at the
   next boot when 03:30 was missed; run `omniroute-backup` by hand after any doubt.
 
-To restore, pick the archive and unpack it; a restore rolls the database back to that snapshot,
-API keys, settings and usage included:
+### Restore
+
+`omniroute-restore` brings an archive back, rolling the database to that snapshot -- API keys,
+settings and usage included -- and is safe on a fresh machine that has nothing but the backup key:
 
 ```bash
-mkdir -p /tmp/omniroute-restore
-age -d -i ~/.ssh/omniroute-backup-key ~/.local/share/omniroute-backups/omniroute-<stamp>.tar.age \
-    | tar -x -C /tmp/omniroute-restore
-cd local-services/omniroute
-docker compose stop omniroute
-docker run --rm -v dotfiles_omniroute-data:/data -v /tmp/omniroute-restore:/restore alpine sh -c \
-    'rm -f /data/storage.sqlite /data/storage.sqlite-wal /data/storage.sqlite-shm &&
-     cp /restore/storage.sqlite /restore/server.env /data/ &&
-     chown 1000:1000 /data/storage.sqlite /data/server.env &&
-     chmod 600 /data/storage.sqlite /data/server.env'
-docker compose start omniroute
+omniroute-restore --list                       # this device's archives, here and in the mirror
+omniroute-restore                              # the newest of them
+omniroute-restore --device mxhero-z790         # the newest archive another device mirrored
+omniroute-restore ~/Downloads/omniroute-<stamp>.tar.age
 ```
 
-The helper container writes into the named volume while the stack is stopped: `docker cp` cannot
-remove the stale `-wal`/`-shm` files beside a replaced database, and a database that mounts next to
-a stale write-ahead log is not the one that was backed up. `make test-omniroute-backup` covers the
-script, its retention and the installer's gate.
+Before it changes anything, it checks that the archive holds only what `omniroute-backup` writes,
+that the database passes SQLite's integrity check, that the image `compose.yaml` pins knows the
+database's schema (migrations only go forward: pin a newer image first otherwise), and that the key
+the gateway will start with decrypts a stored credential. It shows what it found and asks; `--yes`
+answers for it. Then it snapshots a running stack with `omniroute-backup` and stops it, writes the
+database into the volume as the container's user, starts the stack, waits for it to be healthy and
+takes the first backup. It never runs `docker compose down -v`, and Redis keeps its volume: it holds
+only counters and caches.
+
+`.env` is never generated: the checkout's own stays, a missing one comes from the archive's
+`compose.env`, and an archive from before that member gets the copy in 1Password. The CA bundle
+`.env` names comes from the archive or 1Password the same way, written where `.env` says when that is
+under your home directory. `omniroute-restore --env-only` does only that, without touching Docker --
+what `chezmoi apply` suggests on a machine with no `.env`. When the checkout's `.env` does not open the
+archive's credentials, the restore stops: move that `.env` aside to use the archive's, or pass
+`--allow-key-mismatch` and enter the provider keys again in the dashboard afterwards.
+
+Restoring another device's archive makes that database this machine's: its next backups go to this
+device's folder. The Ollama provider addresses and API keys are the other device's, so check them in
+the dashboard, and that `cred:OMNIROUTE_API_KEY` on this device's 1Password note is a key the restored
+database knows. `make test-omniroute-backup`, `make test-omniroute-restore` and
+`make test-omniroute-stack` cover the archive and its mirror, the restore, and the start on apply.
 
 ## Privacy boundary
 

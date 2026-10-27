@@ -39,7 +39,9 @@ make test-atuin                     # Atuin: the pinned install, the client conf
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: with and without a login, no refresh without one, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
-make test-omniroute-backup          # the OmniRoute stack's encrypted backups: the snapshot flow, retention, the installer's gate
+make test-omniroute-backup          # the OmniRoute stack's encrypted backups: the self-contained archive, retention, the personal OneDrive mirror, the empty-gateway guard, the installer's gate
+make test-omniroute-restore         # omniroute-restore: the archive allowlist, integrity and schema checks, .env from the archive or 1Password, the key check, the volume
+make test-omniroute-stack           # the OmniRoute start on apply: every state it finds, never creating the database, the render gate
 make test-omniroute-image           # the custom OmniRoute image pin: the switch from upstream, --check, --tag, and failed lookups leaving the pin untouched
 make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the dependency install, the pinned bun (cache, verified download, fallbacks), the ~/.bun/bin fallback, the bun installer and its PATH block
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
@@ -230,7 +232,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -955,7 +957,7 @@ stack is run from the checkout, and the digest in `compose.yaml` is what decides
 5. **Migrations are one-way, so a backup comes first.** The fork is based on upstream `v3.8.52`, and
    its first start migrates the v3.8.51 database. `omniroute-backup` takes a `VACUUM INTO` snapshot
    encrypted with the backup key; rolling the image reference back restores neither the schema nor
-   the data, so the archive is the rollback.
+   the data, so the archive, put back with `omniroute-restore`, is the rollback.
 6. **The package is public; a private one needs a login.** The fork is public, so GHCR serves the
    image anonymously. If its visibility changes, `docker login ghcr.io` with `read:packages` must
    run before `docker compose pull`, or the pull fails while the previous image keeps running.
@@ -963,6 +965,74 @@ stack is run from the checkout, and the digest in `compose.yaml` is what decides
 `make test-omniroute-image` covers 1 and the failures -- the first switch away from the official
 image, `--check` in both directions, `--tag`, a file with no recognised digest, and every failed
 lookup leaving the pin untouched -- against stubbed `gh` and `docker`.
+
+## OmniRoute Backups, Mirror and Restore
+
+The stack's state is one SQLite database in the `dotfiles_omniroute-data` volume, whose provider
+credentials are encrypted with `.env`'s `STORAGE_ENCRYPTION_KEY`. `omniroute-backup` turns it into
+an archive that restores the gateway by itself and copies that off the machine; `omniroute-restore`
+brings it back on a machine that has nothing but the backup key. All of it runs on WSL alone, where
+the stack runs from this checkout.
+
+| Part | Where |
+|------|-------|
+| The daily archive and its copy off the machine | `dot_local/bin/executable_omniroute-backup.tmpl`, run by `omniroute-backup.timer` |
+| Retention, the mirror, and the 1Password copy of `.env` | `.chezmoidata/omniroute.yaml` (`backup:`, `env:`) |
+| The restore | `dot_local/bin/executable_omniroute-restore.tmpl` |
+| The stack, on every apply | `.chezmoiscripts/run_after_linux-015-start-omniroute.sh.tmpl` |
+| What the three agree on: the secrets' keys, the archive names, finding the personal OneDrive | `.chezmoitemplates/lib-omniroute.sh` |
+
+An archive, `omniroute-<UTC stamp>.tar.age`, is age-encrypted to the backup key and holds:
+
+| Member | What | Since |
+|--------|------|-------|
+| `storage.sqlite` | the `VACUUM INTO` snapshot, integrity-checked inside the container | format 1 |
+| `server.env` | the secrets OmniRoute's bootstrap generated and persisted in the volume | format 1 |
+| `compose.env` | `.env`'s secrets, read from the gateway's environment, the allowed keys only | format 2 |
+| `manifest` | `format`, `created`, `device`, `image`, `schema`, `providers`, `api_keys`; read with grep, never sourced | format 2 |
+| `ca-bundle.pem` | the CA bundle `OMNIROUTE_CA_BUNDLE` names, unless it is the host's own | format 2 |
+
+**Keep these:**
+
+1. **An archive restores by itself, and a restore never invents a secret.** `.env` holds the only
+   key that opens the provider credentials, so the archive carries it (`compose.env`) and 1Password
+   keeps one more copy (`env:` in `omniroute.yaml`, the `OmniRouter` item). The restore takes the
+   checkout's `.env` when there is one, then the archive's, then 1Password's -- never new values,
+   which start a gateway that looks healthy while every cloud provider fails. Keep the 1Password
+   copy in step when `.env` changes.
+2. **The mirror is the personal OneDrive -- `%OneDriveConsumer%`, never `%OneDrive%`.** On a machine
+   also signed in to a work account, `%OneDrive%` names that one, and the archives would land in the
+   employer's storage. Each device gets a folder under `Backup/omniroute`, named by its `deviceName`,
+   so no device rotates another's archives out. A mirror that cannot be written fails the unit, after
+   the archive is kept on the machine.
+3. **An empty gateway rotates nothing out and is never mirrored.** A freshly started stack holds no
+   provider and no API key, and its daily archives would otherwise push the real ones out of both
+   places within two weeks. Its archive is still written on the machine.
+4. **Nothing unattended creates the database.** The start script starts a stack whose data volume
+   exists, and otherwise only says what to run: an empty gateway started by an apply would pass for
+   the real one. It never recreates a running container either -- a container on another image than
+   the pin gets a warning, because recreating it runs the new image's one-way migrations -- and
+   starts with `--no-recreate`.
+5. **A restore checks everything before it changes anything.** The archive may hold only the five
+   members above, as regular files: the age recipient is public, so a planted archive is possible.
+   `server.env` and `compose.env` are cut to the allowed keys, because OmniRoute's bootstrap merges
+   `server.env` into the gateway's environment, where `NODE_OPTIONS` would run code. Then come
+   `PRAGMA integrity_check`, the schema against the pinned image's migrations (they only go forward),
+   and the key against one stored credential, with OmniRoute's two derivations, in a throwaway
+   container of that image -- the key reaches it in the environment, never on a command line. Only
+   then does it snapshot a running stack, stop it and fill the volume as the container's user. It
+   never runs `docker compose down -v`.
+6. **The start script is `run_after_`, not `run_onchange_`.** The first applies on a fresh machine
+   run before Docker Desktop is reachable, and a `run_onchange_` script that skipped then would be
+   recorded as done for good. When it finds Docker down it also reads Docker Desktop's `AutoStart`
+   (`%APPDATA%\Docker\settings-store.json`): while that is off, the gateway stays down after every
+   reboot until Docker Desktop is started by hand.
+
+Restoring another device's archive makes it this machine's database: `omniroute-restore --device
+<name>` reads that device's folder, and the first backup afterwards goes to this device's own.
+`make test-omniroute-backup` covers the members, the allowlist, the mirror and its retention, 2 and
+3, and the installer; `make test-omniroute-restore` covers 1 and 5 against real `age`, `tar` and
+`sqlite3`, with the key check run under the host's `node`; `make test-omniroute-stack` covers 4 and 6.
 
 ## OpenCode V2 Through OmniRoute
 

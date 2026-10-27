@@ -1,0 +1,136 @@
+{{- if and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
+#!/bin/bash
+
+# Keeps the local OmniRoute stack running across applies, on WSL, where it runs from this checkout,
+# and never creates its database: an empty gateway started by an apply would pass for the real one,
+# and its backups would rotate the real archives out.
+#
+# `run_after_`, not `run_onchange_`: the first applies on a fresh machine run before Docker Desktop
+# is installed or reachable, and a `run_onchange_` script that skipped then would be recorded as
+# done and never run again. With the stack up it costs a `docker info`, a `docker compose config`
+# and a `docker inspect`, and prints nothing.
+#
+# What it does, by what it finds:
+#   Docker unreachable        warns, and says so when Docker Desktop does not start at sign-in
+#   no .env, or its CA bundle missing
+#                             warns: `omniroute-restore --env-only` writes both from the newest
+#                             archive or 1Password, never from new values
+#   the gateway's container   leaves it alone. Running, it warns when compose.yaml pins another
+#                             image: recreating runs that image's migrations, which only go
+#                             forward, so it stays a deliberate `omniroute-backup` and
+#                             `docker compose up -d`. Stopped, it was stopped on purpose, or a
+#                             restore is under way
+#   no data volume            warns, naming the archives found: `omniroute-restore` brings the
+#                             database back; a first install is a deliberate `docker compose up -d`
+#   a volume, no containers   pulls and starts the stack (`docker compose down` keeps the volume)
+#                             with `--no-recreate`, and fails the apply if it does not become healthy
+# Every other outcome exits 0, so a stack that cannot start yet never stops an apply.
+#
+# See CLAUDE.md, "OmniRoute Backups, Mirror and Restore".
+
+set -euo pipefail
+
+prefix="omniroute-stack"
+default_compose_dir={{ joinPath .chezmoi.sourceDir "local-services/omniroute" | squote }}
+device={{ .deviceName | squote }}
+mirror={{ .omniroute.backup.mirror | squote }}
+
+compose_dir="${OMNIROUTE_COMPOSE_DIR:-$default_compose_dir}"
+container="${OMNIROUTE_CONTAINER:-dotfiles-omniroute-1}"
+volume="${OMNIROUTE_VOLUME:-dotfiles_omniroute-data}"
+backup_dir="${OMNIROUTE_BACKUP_DIR:-$HOME/.local/share/omniroute-backups}"
+
+{{ includeTemplate "lib-omniroute.sh" }}
+
+log() { echo "[$prefix] $*" >&2; }
+warn() { echo "[$prefix] WARN: $*" >&2; }
+
+# Docker Desktop's "Start Docker Desktop when you sign in to your computer" is AutoStart in its
+# settings-store.json, under %APPDATA%\Docker. Reading it costs a Windows process, so this runs
+# only when the stack is found down.
+autostart_hint() {
+    local settings="${OMNIROUTE_DOCKER_SETTINGS:-}" appdata
+    if [[ -z "$settings" ]]; then
+        appdata="$(omniroute_windows_path APPDATA)" || return 0
+        settings="$appdata/Docker/settings-store.json"
+    fi
+    if [[ "$(jq -r '.AutoStart' "$settings" 2>/dev/null)" == false ]]; then
+        warn "Docker Desktop does not start when you sign in to Windows, so after a reboot the gateway stays down until Docker Desktop is started; turn on 'Start Docker Desktop when you sign in to your computer' in its Settings > General"
+    fi
+}
+
+if ! command -v docker >/dev/null 2>&1 || ! timeout 20 docker info >/dev/null 2>&1; then
+    warn "Docker is not reachable, so the OmniRoute stack is left as it is; start Docker Desktop and apply again"
+    autostart_hint
+    exit 0
+fi
+
+if [[ ! -f "$compose_dir/compose.yaml" ]]; then
+    warn "$compose_dir holds no compose.yaml, so there is no stack to start (OMNIROUTE_COMPOSE_DIR names another checkout)"
+    exit 0
+fi
+cd "$compose_dir"
+if [[ ! -f .env ]]; then
+    warn "$compose_dir/.env is missing, so the stack cannot start; 'omniroute-restore --env-only' writes it from the newest archive or from 1Password -- never generate new values for an existing database"
+    exit 0
+fi
+ca_bundle="$(omniroute_env_value OMNIROUTE_CA_BUNDLE .env)"
+if [[ -n "$ca_bundle" && ! -e "$ca_bundle" ]]; then
+    warn ".env's OMNIROUTE_CA_BUNDLE names $ca_bundle, which does not exist, so the stack cannot start; 'omniroute-restore --env-only' writes it from the newest archive or from 1Password"
+    exit 0
+fi
+if ! docker compose config --quiet; then
+    echo "[$prefix] ERROR: the Compose project in $compose_dir does not load" >&2
+    exit 1
+fi
+
+state="$(docker inspect "$container" 2>/dev/null | jq -r '.[0] | "\(.State.Status) \(.Config.Image)"' 2>/dev/null)" || state=""
+if [[ -n "$state" ]]; then
+    status="${state%% *}"
+    running_image="${state#* }"
+    pinned="$(docker compose config --images 2>/dev/null | grep -m1 omniroute)" || pinned=""
+    case "$status" in
+        running)
+            if [[ -n "$pinned" && "$pinned" != "$running_image" ]]; then
+                warn "the gateway runs $running_image, but compose.yaml pins $pinned; recreating runs the new image's migrations, which only go forward, so that stays yours to do: 'omniroute-backup && docker compose up -d omniroute' in $compose_dir"
+            fi
+            ;;
+        restarting)
+            warn "the gateway keeps restarting; see 'docker compose logs omniroute' in $compose_dir"
+            ;;
+        *)
+            log "the gateway's container is $status, and stays so; 'docker compose start' in $compose_dir starts it"
+            ;;
+    esac
+    exit 0
+fi
+
+if ! docker volume inspect "$volume" >/dev/null 2>&1; then
+    folders=("$backup_dir")
+    others=""
+    if omniroute_mirror_resolve "$mirror"; then
+        folders+=("$OMNIROUTE_MIRROR_ROOT/$device")
+        others="$(find "$OMNIROUTE_MIRROR_ROOT" -mindepth 1 -maxdepth 1 -type d ! -name "$device" -printf '%f ' 2>/dev/null || true)"
+    fi
+    mapfile -t archives < <(omniroute_list_archives "${folders[@]}")
+    if [[ ${#archives[@]} -gt 0 ]]; then
+        warn "the OmniRoute stack has no database here; 'omniroute-restore' brings back the newest archive, ${archives[0]}"
+    elif [[ -n "$others" ]]; then
+        warn "the OmniRoute stack has no database here, and no archive of $device exists; the mirror holds other devices' (${others% }): 'omniroute-restore --device <name>' brings one back"
+    else
+        warn "the OmniRoute stack has no database here and no archive was found; a first install starts with 'docker compose up -d' in $compose_dir (see .docs/omniroute-local.md)"
+    fi
+    exit 0
+fi
+
+log "the data volume $volume exists without its containers; starting the stack"
+if ! docker compose pull --quiet; then
+    warn "could not pull the stack's images (offline?), so it is not started; the next apply tries again"
+    exit 0
+fi
+if ! docker compose up -d --no-recreate --wait --wait-timeout 300; then
+    echo "[$prefix] ERROR: the stack did not become healthy; see 'docker compose logs omniroute' in $compose_dir" >&2
+    exit 1
+fi
+log "the OmniRoute stack is up"
+{{ end -}}

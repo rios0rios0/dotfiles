@@ -38,5 +38,7 @@ build/reports/
 # SAST, lint, and test reports written by `make sast` / `make lint`
 build/
 
-# Local OmniRoute credentials; `.env.example` remains tracked.
+# Local OmniRoute credentials; `.env.example` remains tracked. omniroute-restore stages the file
+# it writes beside it and renames it into place, so an interrupted restore can leave one of those.
 .env
+.env.restore.*

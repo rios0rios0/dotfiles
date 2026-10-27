@@ -5,13 +5,14 @@ REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 IGNORE_FILE="$REPO_ROOT/.chezmoiignore"
 EXIT_CODE=0
 
-# The kernel string and OS name that the platform matrix below repeats, and the stack's three
+# The kernel string and OS name that the platform matrix below repeats, and the stack's four
 # files, each named once here so a rename lands in every row at the same time.
 WSL_KERNEL="6.18.33.2-microsoft-standard-WSL2"
 WINDOWS_OS="windows"
 BACKUP_SCRIPT=".local/bin/omniroute-backup"
 BACKUP_SERVICE=".config/systemd/user/omniroute-backup.service"
 BACKUP_TIMER=".config/systemd/user/omniroute-backup.timer"
+RESTORE_SCRIPT=".local/bin/omniroute-restore"
 
 echo "[test-chezmoiignore] testing platform file inclusion logic..." >&2
 
@@ -271,27 +272,31 @@ check_platform "android" \
     --ignore-line ".local/bin/tailscale-up" \
     --ignore-line ".local/bin/tailscale"
 
-# The OmniRoute backups serve the local stack, which runs from the dotfiles checkout on WSL alone;
-# the script and both units ship there and nowhere else.
+# The OmniRoute backups and their restore serve the local stack, which runs from the dotfiles
+# checkout on WSL alone; both scripts and both units ship there and nowhere else.
 check_platform "linux" --kernel "6.11.0-generic" \
     --ignore-line "$BACKUP_SCRIPT" \
     --ignore-line "$BACKUP_SERVICE" \
-    --ignore-line "$BACKUP_TIMER"
+    --ignore-line "$BACKUP_TIMER" \
+    --ignore-line "$RESTORE_SCRIPT"
 
 check_platform "linux" --kernel "$WSL_KERNEL" \
     --include-line "$BACKUP_SCRIPT" \
     --include-line "$BACKUP_SERVICE" \
-    --include-line "$BACKUP_TIMER"
+    --include-line "$BACKUP_TIMER" \
+    --include-line "$RESTORE_SCRIPT"
 
 check_platform "$WINDOWS_OS" \
     --ignore-line "$BACKUP_SCRIPT" \
     --ignore-line "$BACKUP_SERVICE" \
-    --ignore-line "$BACKUP_TIMER"
+    --ignore-line "$BACKUP_TIMER" \
+    --ignore-line "$RESTORE_SCRIPT"
 
 check_platform "android" \
     --ignore-line "$BACKUP_SCRIPT" \
     --ignore-line "$BACKUP_SERVICE" \
-    --ignore-line "$BACKUP_TIMER"
+    --ignore-line "$BACKUP_TIMER" \
+    --ignore-line "$RESTORE_SCRIPT"
 
 if [ "$EXIT_CODE" -eq 0 ]; then
     echo "[test-chezmoiignore] all platform logic tests passed" >&2

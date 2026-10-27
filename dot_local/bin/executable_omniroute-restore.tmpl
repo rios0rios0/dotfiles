@@ -1,0 +1,420 @@
+#!/bin/bash
+
+# Restores the local OmniRoute stack from an archive omniroute-backup wrote -- on this machine, or on
+# another one and found in the mirror (--device) -- including on a fresh machine that has nothing
+# but the backup key. It never generates a secret: the provider credentials in the database open
+# only with the STORAGE_ENCRYPTION_KEY they were encrypted with, so .env is the checkout's own, else
+# the archive's compose.env, else the copy 1Password keeps (.chezmoidata/omniroute.yaml).
+#
+# Nothing in the stack changes until every check has passed and the restore is confirmed:
+#   - the archive decrypts and holds only regular files omniroute-backup writes. age hides an
+#     archive's content but proves nothing about who wrote it -- the recipient is public, in
+#     .chezmoidata/age-keys.yaml -- so nothing else is extracted, and server.env and compose.env
+#     keep only the keys lib-omniroute.sh allows;
+#   - the database passes `PRAGMA integrity_check`;
+#   - its schema is not newer than the image the checkout pins: migrations only go forward;
+#   - the key the gateway will start with -- .env's, else server.env's, the order OmniRoute's
+#     bootstrap reads them in -- decrypts a stored credential, tried with OmniRoute's own two key
+#     derivations in a throwaway container of that image, so the key reaches it in its
+#     environment, never on a command line.
+# Then a running stack is snapshotted and stopped, the database goes into the data volume as the
+# container's user, and the stack is started and waited on. Nothing is removed with
+# `docker compose down -v`, and Redis keeps its volume: it holds only counters and caches.
+#
+# See CLAUDE.md, "OmniRoute Backups, Mirror and Restore", and .docs/omniroute-local.md.
+
+set -euo pipefail
+umask 077
+
+prefix="omniroute-restore"
+default_device={{ .deviceName | squote }}
+default_mirror={{ .omniroute.backup.mirror | squote }}
+default_compose_dir={{ joinPath .chezmoi.sourceDir "local-services/omniroute" | squote }}
+default_env_reference={{ .omniroute.env.file | squote }}
+default_ca_reference={{ .omniroute.env.caBundle | squote }}
+
+container="${OMNIROUTE_CONTAINER:-dotfiles-omniroute-1}"
+volume="${OMNIROUTE_VOLUME:-dotfiles_omniroute-data}"
+backup_dir="${OMNIROUTE_BACKUP_DIR:-$HOME/.local/share/omniroute-backups}"
+identity="${OMNIROUTE_BACKUP_IDENTITY:-$HOME/.ssh/omniroute-backup-key}"
+mirror="${OMNIROUTE_BACKUP_MIRROR-$default_mirror}"
+compose_dir="${OMNIROUTE_COMPOSE_DIR:-$default_compose_dir}"
+env_reference="${OMNIROUTE_ENV_REFERENCE:-$default_env_reference}"
+ca_reference="${OMNIROUTE_CA_REFERENCE:-$default_ca_reference}"
+backup_command="${OMNIROUTE_BACKUP_COMMAND:-omniroute-backup}"
+
+{{ includeTemplate "lib-omniroute.sh" }}
+
+log() { echo "[$prefix] $*" >&2; }
+warn() { echo "[$prefix] WARN: $*" >&2; }
+fail() { echo "[$prefix] ERROR: $*" >&2; exit 1; }
+
+usage() {
+    cat >&2 <<EOF
+Usage: omniroute-restore [options] [ARCHIVE]
+
+Restores the local OmniRoute stack from an omniroute-backup archive: ARCHIVE, or the newest
+archive of this device ($default_device) or of --device's, from $backup_dir and the mirror.
+
+  --list                 list the archives found, newest first, and exit
+  --device NAME          read NAME's folder in the mirror instead of this device's
+  --yes                  restore without asking; required without a terminal
+  --no-start             restore into the data volume, but leave the stack stopped
+  --env-only             only write a missing .env, and the CA bundle it names, from the
+                         archive or from 1Password; no container or volume is touched
+  --allow-key-mismatch   restore even when the key the gateway would start with does not
+                         decrypt the archive's provider credentials (they stay unreadable
+                         until re-entered in the dashboard)
+
+Environment overrides: OMNIROUTE_COMPOSE_DIR (default: $default_compose_dir),
+OMNIROUTE_BACKUP_DIR, OMNIROUTE_BACKUP_IDENTITY, OMNIROUTE_BACKUP_MIRROR, OMNIROUTE_CONTAINER,
+OMNIROUTE_VOLUME.
+EOF
+}
+
+list=false
+yes=false
+no_start=false
+env_only=false
+allow_mismatch=false
+device="$default_device"
+archive=""
+while [[ $# -gt 0 ]]; do
+    case "$1" in
+        -h|--help) usage; exit 0 ;;
+        --list) list=true ;;
+        --device)
+            [[ $# -ge 2 ]] || fail "--device needs a device name; see --help"
+            device="$2"
+            shift
+            ;;
+        --device=*) device="${1#*=}" ;;
+        --yes|-y) yes=true ;;
+        --no-start) no_start=true ;;
+        --env-only) env_only=true ;;
+        --allow-key-mismatch) allow_mismatch=true ;;
+        -*) fail "unexpected option '$1'; see --help" ;;
+        *)
+            [[ -z "$archive" ]] || fail "more than one archive given; see --help"
+            archive="$1"
+            ;;
+    esac
+    shift
+done
+[[ "$device" =~ ^[A-Za-z0-9._-]+$ ]] || fail "'$device' is not a device name"
+
+# Where the device's archives are: this machine's backup folder when the device is this one, then
+# the device's folder in the mirror, when the mirror can be reached.
+folders=()
+if [[ "$device" == "$default_device" ]]; then
+    folders+=("$backup_dir")
+fi
+mirror_problem=""
+if omniroute_mirror_resolve "$mirror"; then
+    folders+=("$OMNIROUTE_MIRROR_ROOT/$device")
+else
+    mirror_problem="$OMNIROUTE_MIRROR_ERROR"
+fi
+
+if $list; then
+    [[ -z "$mirror_problem" ]] || warn "the mirror is not read: $mirror_problem"
+    mapfile -t found < <(omniroute_list_archives "${folders[@]}")
+    [[ ${#found[@]} -gt 0 ]] || fail "no archive of $device in: ${folders[*]:-nowhere}"
+    for path in "${found[@]}"; do
+        printf '%s\t%s\n' "$(du -h -- "$path" | cut -f1)" "$path"
+    done
+    exit 0
+fi
+
+stage="$(mktemp -d)"
+trap 'rm -rf "$stage"' EXIT
+members=()
+
+# Picks ARCHIVE, or the newest archive in the folders above; leaves `archive` empty when none exists.
+pick_archive() {
+    local -a found
+    if [[ -n "$archive" ]]; then
+        [[ -f "$archive" ]] || fail "no archive at $archive"
+        return 0
+    fi
+    mapfile -t found < <(omniroute_list_archives "${folders[@]}")
+    archive="${found[0]:-}"
+}
+
+# Decrypts the archive into the private stage, refusing anything omniroute-backup never writes.
+unpack_archive() {
+    local listing mode name
+    age -d -i "$identity" -o "$stage/archive.tar" "$archive" ||
+        fail "$archive does not decrypt with $identity: another key wrote it, or the file is damaged"
+    listing="$(tar -tvf "$stage/archive.tar")" || fail "$archive holds no readable tar"
+    while read -r mode _ _ _ _ name; do
+        [[ "$mode" == -* && "$name" =~ ^(storage\.sqlite|server\.env|compose\.env|manifest|ca-bundle\.pem)$ ]] ||
+            fail "$archive holds '$name', which omniroute-backup never writes; refusing it"
+        [[ " ${members[*]} " != *" $name "* ]] || fail "$archive holds $name twice; refusing it"
+        members+=("$name")
+    done <<<"$listing"
+    tar -x -C "$stage" --no-same-owner --no-same-permissions -f "$stage/archive.tar" "${members[@]}"
+    rm -f "$stage/archive.tar"
+    # OmniRoute's bootstrap merges server.env into the gateway's environment, and compose.env
+    # becomes .env: both keep only the allowed keys.
+    [[ -f "$stage/server.env" ]] || : > "$stage/server.env"
+    omniroute_filter_env "$stage/server.env" "$stage/server.env"
+    if [[ -f "$stage/compose.env" ]]; then
+        omniroute_filter_env "$stage/compose.env" "$stage/compose.env"
+    fi
+}
+
+# Prints a manifest field, printable characters only; archives from before the manifest have none.
+manifest_value() {
+    [[ -f "$stage/manifest" ]] || return 0
+    sed -n "s/^$1=//p" "$stage/manifest" | tail -n 1 | tr -cd '[:print:]'
+}
+
+# Reads the 1Password reference $1 into the file $2 through stdout, which goes straight into the
+# file -- never through an argument or the terminal. $3 = text strips carriage returns.
+read_from_1password() {
+    local op_command
+    op_command="$(command -v op 2>/dev/null)" || op_command="$(command -v op.exe 2>/dev/null)" || return 1
+    if [[ "${3:-}" == text ]]; then
+        "$op_command" read "$1" --account my | tr -d '\r' > "$2" || return 1
+    else
+        "$op_command" read "$1" --account my > "$2" || return 1
+    fi
+    [[ -s "$2" ]]
+}
+
+# Writes the checkout's .env when it has none: the archive's compose.env, else 1Password's copy.
+env_source=""
+ensure_env() {
+    local target="$compose_dir/.env" staged="$compose_dir/.env.restore.$$"
+    if [[ -f "$target" ]]; then
+        env_source="the existing $target"
+        return 0
+    fi
+    [[ -d "$compose_dir" ]] || fail "$compose_dir does not exist; OMNIROUTE_COMPOSE_DIR names the checkout's local-services/omniroute"
+    if [[ -f "$stage/compose.env" ]]; then
+        cp "$stage/compose.env" "$staged"
+        env_source="the archive's compose.env"
+    elif read_from_1password "$env_reference" "$staged" text; then
+        env_source="1Password ($env_reference)"
+    else
+        rm -f "$staged"
+        fail "$target is missing, the archive carries no compose.env, and 1Password did not return $env_reference; restore the original .env by hand -- never new values, which would not decrypt the stored credentials"
+    fi
+    chmod 600 "$staged"
+    mv -f "$staged" "$target"
+    log "wrote $target from $env_source"
+}
+
+# Puts the CA bundle .env names where it says, when nothing is there: the archive's copy, else
+# 1Password's. Only under $HOME: anywhere else needs root, which a restore does not take.
+ensure_ca_bundle() {
+    local path resolved staged
+    path="$(omniroute_env_value OMNIROUTE_CA_BUNDLE "$compose_dir/.env")"
+    [[ -z "$path" || "$path" == /* ]] || path="$compose_dir/$path"   # Compose's base for a relative one
+    [[ -n "$path" && "$path" != "$OMNIROUTE_DEFAULT_CA_BUNDLE" && ! -e "$path" ]] || return 0
+    resolved="$(realpath -m -- "$path")"
+    [[ "$resolved" == "$HOME"/* ]] ||
+        fail ".env's OMNIROUTE_CA_BUNDLE names $path, which does not exist and is outside $HOME; put the bundle there (1Password keeps a copy: $ca_reference), or point OMNIROUTE_CA_BUNDLE at a file under $HOME"
+    install -d -m 755 "$(dirname "$resolved")"
+    staged="$resolved.restore.$$"
+    if [[ -f "$stage/ca-bundle.pem" ]]; then
+        cp "$stage/ca-bundle.pem" "$staged"
+        log "wrote $resolved from the archive"
+    elif read_from_1password "$ca_reference" "$staged"; then
+        log "wrote $resolved from 1Password ($ca_reference)"
+    else
+        rm -f "$staged"
+        fail "$path is missing and neither the archive nor 1Password ($ca_reference) supplied it"
+    fi
+    # Certificates, not secrets: the gateway's user reads them through the Compose file's mount.
+    chmod 644 "$staged"
+    mv -f "$staged" "$resolved"
+}
+
+if $env_only; then
+    # The archive is optional here: on a machine with neither an archive nor the key yet, .env
+    # still comes from 1Password.
+    pick_archive
+    if [[ -n "$archive" && -f "$identity" ]] && command -v age >/dev/null 2>&1; then
+        unpack_archive
+    elif [[ -n "$archive" ]]; then
+        warn "cannot open $archive here (no age, or no identity at $identity), so 1Password supplies .env"
+    fi
+    ensure_env
+    ensure_ca_bundle
+    log "done; .env comes from $env_source"
+    exit 0
+fi
+
+for tool in age tar sqlite3 jq docker; do
+    command -v "$tool" >/dev/null 2>&1 || fail "$tool is not on PATH"
+done
+[[ -f "$identity" ]] || fail "no age identity at $identity; 'chezmoi apply' fetches it from 1Password (op://Private/omniroute-backup.age/private key) -- never generate a new one, which opens none of the archives"
+timeout 20 docker info >/dev/null 2>&1 || fail "Docker is not reachable; start Docker Desktop"
+
+pick_archive
+if [[ -z "$archive" ]]; then
+    [[ -z "$mirror_problem" ]] || warn "the mirror is not read: $mirror_problem"
+    fail "no archive of $device in: ${folders[*]:-nowhere}; name one, or another device with --device"
+fi
+log "restoring $archive"
+unpack_archive
+[[ -f "$stage/storage.sqlite" ]] || fail "$archive holds no storage.sqlite"
+written_by="$(manifest_value image)"
+written_by="${written_by:-not recorded in this archive}"
+
+# The checks on the database itself, read-only (immutable=1) and printing only `ok` and numbers.
+db="file:$stage/storage.sqlite?immutable=1"
+[[ "$(sqlite3 "$db" 'PRAGMA integrity_check;' 2>/dev/null)" == ok ]] ||
+    fail "the database in $archive fails its integrity check; refusing it"
+query() { sqlite3 "$db" "$1" 2>/dev/null || true; }
+schema="$(query 'SELECT max(CAST(version AS INTEGER)) FROM _omniroute_migrations;')"
+providers="$(query 'SELECT count(*) FROM provider_connections;')"
+api_keys="$(query 'SELECT count(*) FROM api_keys;')"
+# One stored credential, still encrypted, for the key check below; OmniRoute's own bootstrap probes
+# the same columns.
+ciphertext="$(query "SELECT CASE WHEN api_key LIKE 'enc:v1:%' THEN api_key
+    WHEN access_token LIKE 'enc:v1:%' THEN access_token
+    WHEN refresh_token LIKE 'enc:v1:%' THEN refresh_token ELSE id_token END
+    FROM provider_connections WHERE api_key LIKE 'enc:v1:%' OR access_token LIKE 'enc:v1:%'
+    OR refresh_token LIKE 'enc:v1:%' OR id_token LIKE 'enc:v1:%' LIMIT 1;")"
+
+ensure_env
+ensure_ca_bundle
+
+cd "$compose_dir"
+docker compose config --quiet || fail "the Compose project in $compose_dir does not load"
+images="$(docker compose config --images)" || fail "the Compose project in $compose_dir names no images"
+image="$(grep -m1 omniroute <<<"$images")" || fail "the Compose project in $compose_dir runs no omniroute image"
+if ! docker compose pull --quiet; then
+    docker image inspect "$image" >/dev/null 2>&1 || fail "could not pull $image (offline?)"
+    warn "could not pull the stack's images (offline?); using the ones already here"
+fi
+
+# Migrations only go forward: a database the pinned image has never heard of stays unrestored.
+migrations_dir="$(docker image inspect "$image" 2>/dev/null |
+    jq -r '[.[0].Config.Env[]? | select(startswith("OMNIROUTE_MIGRATIONS_DIR=")) | sub("^[^=]*="; "")] | last // "/app/migrations"')" ||
+    migrations_dir="/app/migrations"
+newest="$(docker run --rm --network none --entrypoint ls "$image" "$migrations_dir" 2>/dev/null |
+    sed -nE 's/^([0-9]+)_.*\.sql$/\1/p' | sort -n | tail -n 1)" || newest=""
+if [[ "$schema" =~ ^[0-9]+$ && "$newest" =~ ^[0-9]+$ ]]; then
+    newest=$((10#$newest))
+    if (( 10#$schema > newest )); then
+        fail "the database is at migration $schema, and the image this checkout pins knows up to $newest; pin a newer image first, such as the one that wrote it ($written_by) -- see 'Update the pin' in .docs/omniroute-local.md"
+    fi
+else
+    warn "could not compare the database's schema (${schema:-unknown}) with the image's migrations (${newest:-unknown}); make sure the pinned image is no older than the one that wrote the archive ($written_by)"
+fi
+
+# The key check. OmniRoute's bootstrap prefers the environment Compose builds from .env over the
+# server.env it persisted, and so does this.
+read -r -d '' key_check <<'MJS' || true
+const { createDecipheriv, createHash, scryptSync } = require("node:crypto");
+let value = "";
+process.stdin.setEncoding("utf8");
+process.stdin.on("data", (chunk) => (value += chunk));
+process.stdin.on("end", () => {
+    const secret = process.env.OMNIROUTE_RESTORE_KEY || "";
+    const [ivHex, dataHex, tagHex] = value.trim().replace(/^enc:v1:/, "").split(":");
+    const opens = (salt) => {
+        try {
+            const key = scryptSync(secret, salt, 32);
+            const decipher = createDecipheriv("aes-256-gcm", key, Buffer.from(ivHex, "hex"), { authTagLength: 16 });
+            decipher.setAuthTag(Buffer.from(tagHex, "hex"));
+            decipher.update(dataHex, "hex");
+            decipher.final();
+            return true;
+        } catch {
+            return false;
+        }
+    };
+    // src/lib/db/encryption.ts in the fork: the static salt first, then the legacy one, the first 16
+    // bytes of the key's SHA-256. Only the verdict is printed, never what decrypts.
+    const salts = ["omniroute-field-encryption-v1", createHash("sha256").update(secret).digest().subarray(0, 16)];
+    console.log(salts.some(opens) ? "match" : "mismatch");
+});
+MJS
+key="$(omniroute_env_value STORAGE_ENCRYPTION_KEY .env)"
+[[ -n "$key" ]] || key="$(omniroute_env_value STORAGE_ENCRYPTION_KEY "$stage/server.env")"
+if [[ -z "$ciphertext" ]]; then
+    verdict="none encrypted"
+elif [[ -z "$key" ]]; then
+    verdict="no-key"
+else
+    verdict="$(printf '%s' "$ciphertext" | OMNIROUTE_RESTORE_KEY="$key" docker run --rm -i --network none \
+        --entrypoint node -e OMNIROUTE_RESTORE_KEY "$image" -e "$key_check" 2>/dev/null)" || verdict="error"
+fi
+unset key
+case "$verdict" in
+    match | "none encrypted") ;;
+    *)
+        if $allow_mismatch; then
+            warn "the key check says '$verdict': the stored provider credentials will not decrypt, and need entering again in the dashboard"
+        else
+            fail "the key check says '$verdict': $env_source does not decrypt the archive's provider credentials. Restore the .env that went with this database (move the current one aside and the archive's compose.env or 1Password supplies it), or pass --allow-key-mismatch to restore anyway and enter the credentials again"
+        fi
+        ;;
+esac
+
+running="$(docker inspect "$container" 2>/dev/null | jq -r '.[0].State.Running // false' 2>/dev/null)" || running="false"
+
+log "about to restore:"
+if [[ -n "$(manifest_value format)" ]]; then
+    log "  written on $(manifest_value device) at $(manifest_value created), by $written_by"
+else
+    log "  written before archives carried a manifest"
+fi
+log "  schema ${schema:-unknown} (the pinned image knows up to ${newest:-unknown}); ${providers:-?} provider(s), ${api_keys:-?} API key(s)"
+log "  .env from $env_source; stored credentials: $verdict"
+if [[ "$running" == true ]]; then
+    log "  the running stack is snapshotted with $backup_command and stopped first"
+fi
+if ! $yes; then
+    [[ -t 0 ]] || fail "no terminal to ask on; pass --yes to restore without asking"
+    read -r -p "[$prefix] replace the database in $volume with this one? [y/N] " answer
+    [[ "$answer" =~ ^[Yy]([Ee][Ss])?$ ]] || fail "not confirmed; nothing was changed"
+fi
+
+if [[ "$running" == true ]]; then
+    # A local snapshot is all this needs, so a mirror that cannot be reached does not block it.
+    OMNIROUTE_BACKUP_MIRROR="" "$backup_command" || fail "the snapshot of the running stack failed; nothing was changed"
+    docker compose stop omniroute
+fi
+
+# Compose creates the volume -- with its labels, which a plain `docker volume create` lacks -- and
+# the containers, without starting them. The database then goes in as root, beside a stale
+# write-ahead log removed first: a database that mounts next to one is not the one restored.
+docker compose create
+read -r -d '' populate <<'SH' || true
+set -e
+cd /app/data
+rm -f storage.sqlite storage.sqlite-wal storage.sqlite-shm storage.sqlite-journal server.env
+tar -xf - --no-same-owner
+chown node:node /app/data storage.sqlite server.env
+chmod 700 /app/data
+chmod 600 storage.sqlite server.env
+SH
+tar -C "$stage" -cf - storage.sqlite server.env |
+    docker run --rm -i --network none --user 0:0 --entrypoint sh -v "$volume:/app/data" "$image" -c "$populate" ||
+    fail "could not write the database into $volume"
+log "restored the database into $volume"
+
+if $no_start; then
+    log "done; the stack stays stopped: 'docker compose up -d' in $compose_dir starts it"
+    exit 0
+fi
+docker compose up -d --wait --wait-timeout 300 ||
+    fail "the stack did not become healthy; see 'docker compose logs omniroute' in $compose_dir"
+# OmniRoute's own word on the key, from its start-up log; only whether the lines appear is used.
+logs="$(docker compose logs --no-color omniroute 2>&1 || true)"
+if grep -qE 'does not match the key used to encrypt|Refusing to auto-generate STORAGE_ENCRYPTION_KEY' <<<"$logs"; then
+    if $allow_mismatch; then
+        warn "the gateway reports that its key does not open the stored credentials"
+    else
+        docker compose stop omniroute
+        fail "the gateway reports that its key does not open the stored credentials, so it was stopped; see 'docker compose logs omniroute' in $compose_dir"
+    fi
+fi
+"$backup_command" || warn "the first backup after the restore failed; run omniroute-backup by hand"
+log "done; the gateway answers at http://127.0.0.1:20128"

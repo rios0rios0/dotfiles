@@ -244,7 +244,7 @@ On Linux with an NVIDIA driver, `chezmoi apply` installs Ollama as a user servic
 
 The [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway with providers such as both GPUs' Ollama, NVIDIA NIM and OpenRouter; its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes. The gateway is a digest-pinned build of the [`rios0rios0/OmniRoute`](https://github.com/rios0rios0/OmniRoute) fork, published to GHCR, and its client here is OpenCode, as `ocode` (next section).
 
-The stack's SQLite state gets a daily encrypted backup: a systemd user timer on WSL takes a `VACUUM INTO` snapshot of the gateway's database inside its container, packs it with the bootstrap's `server.env`, and encrypts the tar with an age key generated for the backups alone, rotated under `~/.local/share/omniroute-backups`. The [OmniRoute guide](.docs/omniroute-local.md) documents restoring and the copy of that key you must keep.
+The stack's SQLite state gets a daily encrypted backup: a systemd user timer on WSL takes a `VACUUM INTO` snapshot of the gateway's database inside its container, packs it with the secrets that decrypt its provider credentials and a manifest, encrypts the tar with an age key generated for the backups alone, rotates it under `~/.local/share/omniroute-backups`, and copies it to a per-device folder in the personal OneDrive. `omniroute-restore` brings an archive back -- on a fresh machine too, after checking it -- and every `chezmoi apply` keeps an existing stack running without ever creating an empty one. The [OmniRoute guide](.docs/omniroute-local.md) documents restoring and the copy of that key you must keep.
 
 ## OpenCode Through OmniRoute
 

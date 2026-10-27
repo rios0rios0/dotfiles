@@ -169,9 +169,12 @@ Remove it with `tailscale serve --tcp=41320 off`.
 
 ## When models are missing
 
-- **The gateway is down.** While OmniRoute does not answer, the provider serves no models;
-  start it with `docker compose up -d` from `local-services/omniroute/`. Nothing else in
-  OpenCode is affected.
+- **The gateway is down.** While OmniRoute does not answer, the provider serves no models.
+  Nothing else in OpenCode is affected. `chezmoi apply` starts an existing stack and otherwise
+  says why it cannot: Docker Desktop not running (after a reboot, unless it starts when you sign
+  in), no `.env` (`omniroute-restore --env-only`), or no database on this machine yet
+  (`omniroute-restore`, or a first `docker compose up -d` from `local-services/omniroute/`); see
+  the [OmniRoute guide](omniroute-local.md).
 - **The key is missing.** In an environment without the credential loader (a cron job, an
   IDE), `{env:OMNIROUTE_API_KEY}` substitutes empty, the gateway answers 401 and the models
   disappear. Run OpenCode from an interactive shell, or export the key first.
