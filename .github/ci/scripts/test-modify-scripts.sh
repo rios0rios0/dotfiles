@@ -80,15 +80,15 @@ apply_modify_template() {
 }
 
 # The MCP servers and ~/.claude/settings.json both differ by platform, so every case names the
-# platform it stands for rather than inheriting the host's.
+# platform it stands for rather than inheriting the host's. Windows is not among them: Claude
+# Code is not installed there, and .chezmoiignore keeps ~/.claude.json and ~/.claude off it.
 ANDROID=(--override-data '{"chezmoi": {"os": "android"}}')
 LINUX=(--override-data '{"chezmoi": {"os": "linux"}}')
-WINDOWS=(--override-data '{"chezmoi": {"os": "windows"}}')
 
-# Prints ~/.claude.json created from nothing on each platform, one JSON document after another.
+# Prints ~/.claude.json created from nothing on each platform that gets it, one JSON document
+# after another.
 render_mcp_on_every_platform() {
     apply_modify_template modify_dot_claude.json .claude.json "" "${LINUX[@]}" &&
-        apply_modify_template modify_dot_claude.json .claude.json "" "${WINDOWS[@]}" &&
         apply_modify_template modify_dot_claude.json .claude.json "" "${ANDROID[@]}"
 }
 
@@ -173,11 +173,12 @@ mcp_retires_only_what_the_platform_had() {
 }
 
 mcp_keeps_the_browser_on_linux() {
-    # given no ~/.claude.json on Windows, which has no Chrome for the DevTools server to drive
+    # given no ~/.claude.json on Android, which has no supported Chrome for the DevTools server
+    # to drive
 
     # when
     local out
-    out=$(apply_modify_template modify_dot_claude.json .claude.json "" "${WINDOWS[@]}") || return 1
+    out=$(apply_modify_template modify_dot_claude.json .claude.json "" "${ANDROID[@]}") || return 1
 
     # then
     [ "$(jq -c '.mcpServers | keys' <<<"$out")" = '["context7"]' ]
@@ -272,8 +273,8 @@ trust_passes_a_trusted_file_through() {
     cmp -s "$SANDBOX/trusted.json" "$SANDBOX/trusted.out"
 }
 
-# ~/.claude/settings.json carries the permission rules on Windows and Android and the look on
-# Linux, which is why these cases pass the platform arrays defined above the MCP cases.
+# ~/.claude/settings.json carries the permission rules on Android and the look on Linux, which
+# is why these cases pass the platform arrays defined above the MCP cases.
 
 settings_fills_a_missing_file() {
     # given no ~/.claude/settings.json on Android
@@ -368,58 +369,6 @@ settings_passes_a_linux_file_with_the_look_through() {
 
     # then
     cmp -s "$SANDBOX/look.json" "$SANDBOX/look.out"
-}
-
-# --- claude-omni's profile -----------------------------------------------------
-# claude-omni runs in ~/.claude-omni, which reads nothing from ~/.claude/settings.json,
-# so the look has to reach it on its own -- and has to be the same.
-
-local_profile_gets_the_regular_look() {
-    # given no ~/.claude-omni/settings.json, and the regular profile's look on the same machine
-    local home="$SANDBOX/local-home"
-    mkdir -p "$home"
-    local regular
-    regular=$(CASE_HOME="$home" apply_modify_template dot_claude/modify_settings.json .claude/settings.json "" \
-        "${LINUX[@]}") || return 1
-
-    # when
-    local out
-    out=$(CASE_HOME="$home" apply_modify_template dot_claude-omni/modify_settings.json .claude-omni/settings.json "") ||
-        return 1
-
-    # then: the same three keys, and nothing else
-    [ "$(jq -c 'keys' <<<"$out")" = '["statusLine","theme","tui"]' ] &&
-        [ "$(jq -S -c . <<<"$out")" = "$(jq -S -c '{statusLine, theme, tui}' <<<"$regular")" ]
-}
-
-local_profile_keeps_its_own_keys() {
-    # given the theme onboarding picked and a model chosen with /model
-    local input='{"model": "ollama-desktop/qwen3.8:27b", "theme": "dark"}'
-
-    # when
-    local out
-    out=$(apply_modify_template dot_claude-omni/modify_settings.json .claude-omni/settings.json "$input") || return 1
-
-    # then
-    [ "$(jq -r '.theme' <<<"$out")" = "dark-ansi" ] &&
-        [ "$(jq -r '.statusLine.type' <<<"$out")" = "command" ] &&
-        [ "$(jq -r '.model' <<<"$out")" = "ollama-desktop/qwen3.8:27b" ]
-}
-
-local_profile_passes_a_matching_file_through() {
-    # given the profile with the look already written in by hand, in its own key order
-    local home="$SANDBOX/matching-local-home"
-    mkdir -p "$home"
-    jq -n --indent 2 --arg command "bash $home/.claude/statusline-command.sh" \
-        '{theme: "dark-ansi", tui: "fullscreen", statusLine: {type: "command", command: $command, padding: 0}}' \
-        > "$SANDBOX/local.json"
-
-    # when
-    CASE_HOME="$home" apply_modify_template dot_claude-omni/modify_settings.json .claude-omni/settings.json \
-        "$(cat "$SANDBOX/local.json")"$'\n' > "$SANDBOX/local.out" || return 1
-
-    # then
-    cmp -s "$SANDBOX/local.json" "$SANDBOX/local.out"
 }
 
 # --- Codex's config.toml -------------------------------------------------------
@@ -595,11 +544,6 @@ else
     run_case "settings.json: gives Linux the look and none of the rules" settings_gives_linux_the_look_only
     run_case "settings.json: passes a Linux file that has the look through byte for byte" \
         settings_passes_a_linux_file_with_the_look_through
-    run_case "claude-omni settings.json: gets the regular profile's look and nothing else" \
-        local_profile_gets_the_regular_look
-    run_case "claude-omni settings.json: sets the look back and keeps the profile's keys" local_profile_keeps_its_own_keys
-    run_case "claude-omni settings.json: passes a matching file through byte for byte" \
-        local_profile_passes_a_matching_file_through
     run_case "codex config.toml: creates only the look when the file is missing" codex_creates_only_the_look
     run_case "codex config.toml: passes a matching file through byte for byte" codex_passes_a_matching_file_through
     run_case "codex config.toml: sets the look and keeps every other setting" codex_sets_the_look_and_keeps_every_setting

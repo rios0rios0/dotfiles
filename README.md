@@ -45,9 +45,8 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 
 ### Development Tools
 
-- **Claude Code**, **Codex CLI** and **GitHub Copilot CLI** (AI coding assistants)
-- **`claude-omni`**: Claude Code through **OmniRoute**, on a GPU's Ollama model or a cloud provider such as NVIDIA NIM or OpenRouter, with each model's window in the picker and the status line; the gateway runs a digest-pinned build of the [`rios0rios0/OmniRoute`](https://github.com/rios0rios0/OmniRoute) fork, published to GHCR; see the [OmniRoute guide](.docs/omniroute-local.md)
-- **OpenCode**: the same **OmniRoute** gateway as its primary provider, discovering the models the API key allows from the gateway itself, with the Claude Code permission set, the context7 and Chrome DevTools (Linux) MCP servers and the terminal look; see the [OpenCode guide](.docs/opencode-local.md)
+- AI coding assistants: **Claude Code** (Linux/WSL and Android), **Codex CLI** and **GitHub Copilot CLI** (Android)
+- **OpenCode**, as `ocode` on Linux: a build of the [`rios0rios0/opencode`](https://github.com/rios0rios0/opencode) fork that `chezmoi apply` makes from a local checkout, with a local **OmniRoute** gateway as its primary provider -- a digest-pinned build of the [`rios0rios0/OmniRoute`](https://github.com/rios0rios0/OmniRoute) fork, published to GHCR, in front of a GPU's Ollama model and cloud providers such as NVIDIA NIM and OpenRouter -- discovering the models the API key allows from the gateway itself, with the Claude Code permission set, the context7 and Chrome DevTools (Linux) MCP servers and the terminal look; see the [OpenCode guide](.docs/opencode-local.md) and the [OmniRoute guide](.docs/omniroute-local.md)
 - **Tailscale**: Windows' client on Windows and its WSL, which reaches it through a `tailscale` wrapper; `tailscaled` on bare-metal Linux, installed and logged in by `chezmoi apply` and rejoined by every interactive zsh; OmniRoute reaches another machine's GPU across it
 - **Sentry CLI** (`sentry`, from [getsentry/cli](https://github.com/getsentry/cli); Linux/WSL and Android, installed from npm); `sentry-ds` runs it on the work account, from a login store of its own (log in once with `sentry-ds auth login`), which needs CLI `0.47.0` or newer: `chezmoi apply` upgrades an older one
 - **Neon CLI** (`neon`, the [Neon Serverless Postgres](https://neon.com) CLI; Linux/WSL and Android, installed from npm — fresh installs take the `neon` package, not the legacy `neonctl` compatibility shim)
@@ -70,8 +69,8 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 | Scripts | `.sh` (bash) | `.ps1` (PowerShell) | `.sh` (bash) |
 | 1Password | `op` wrapper (calls `op.exe` from WSL) | Native `op.exe` | `op` wrapper (proot Alpine) |
 | Docker | Native | Docker Desktop | N/A (proot wrappers) |
-| MCP Config | `~/.claude.json` (Context7, Chrome DevTools) | `~/.claude.json` (Context7) | `~/.claude.json` and `~/.config/mcphub/servers.json` (Context7) |
-| Editor | Any | JetBrains Toolbox, Visual Studio | Neovim (AstroVim) |
+| MCP Config | `~/.claude.json` (Context7, Chrome DevTools) | N/A (no Claude Code) | `~/.claude.json` and `~/.config/mcphub/servers.json` (Context7) |
+| Editor | Any | Notepad++ | Neovim (AstroVim) |
 
 ## Installation
 
@@ -104,7 +103,7 @@ Set-ExecutionPolicy RemoteSigned -Scope Process
 chezmoi init --apply rios0rios0
 ```
 
-Windows Terminal forwards **Ctrl+V** to the running application as `\u0016`, so Codex CLI in WSL can attach an image from the Windows clipboard. Use **Ctrl+Shift+V** for normal terminal paste. These bindings apply to all Windows Terminal profiles and are deployed by the Windows chezmoi configuration; run `chezmoi update` from PowerShell to sync them on an existing computer.
+Windows Terminal forwards **Ctrl+V** to the running application as `\u0016` instead of pasting, so an application that reads the clipboard itself (to attach an image, for instance) receives the key. Use **Ctrl+Shift+V** for normal terminal paste. These bindings apply to all Windows Terminal profiles and are deployed by the Windows chezmoi configuration; run `chezmoi update` from PowerShell to sync them on an existing computer.
 
 ### Termux on Android
 
@@ -120,12 +119,11 @@ chezmoi init --apply rios0rios0
 ## Repository Structure
 
 ```
-.chezmoiscripts/         # 37 platform-specific setup scripts (run_once_before_*, run_after_*, run_onchange_after_*)
+.chezmoiscripts/         # 45 platform-specific setup scripts (run_once_before_*, run_after_*, run_onchange_after_*)
 .chezmoiremove           # Target paths deleted from $HOME on every apply (see Dependency Lifecycle)
 .chezmoitemplates/       # Shared template fragments (shared install functions, font installer, dependency removal, Sentry CLI version floor, MCP server logic, Claude Code look, username)
-dot_claude/              # Claude Code config (settings, permissions, trust; the status line on Linux) -> ~/.claude/
-dot_claude-omni/         # Claude Code look for claude-omni's profile (Linux) -> ~/.claude-omni/
-dot_codex/               # Codex CLI status line, merged into its config -> ~/.codex/
+dot_claude/              # Claude Code config (the look and status line on Linux; permissions and trust on Android) -> ~/.claude/
+dot_codex/               # Codex CLI status line, merged into its config (Android) -> ~/.codex/
 dot_config/              # XDG config (mcphub MCP servers for Android; systemd user units for the WSL SSH agent bridge) -> ~/.config/
 dot_docker/              # Docker daemon config -> ~/.docker/
 dot_local/bin/           # Executable user commands -> ~/.local/bin/ (platform-filtered)
@@ -135,7 +133,7 @@ dot_aws/                 # Encrypted AWS credentials -> ~/.aws/
 dot_azure/               # Encrypted Azure profile -> ~/.azure/
 private_dot_kube/        # Encrypted Kubernetes configs -> ~/.kube/ (owner-only)
 AppData/                 # Windows Terminal settings (Windows only)
-modify_dot_claude.json   # MCP server config for Claude Code -> ~/.claude.json
+modify_dot_claude.json   # MCP server config for Claude Code (Linux, Android) -> ~/.claude.json
 ```
 
 Chezmoi translates `dot_` prefixes to `.` in the target path (e.g., `dot_zshrc.tmpl` becomes `~/.zshrc`), and `private_` strips group and world permissions from the target (e.g., `private_dot_kube/` becomes `~/.kube` with mode `0700`).
@@ -185,8 +183,8 @@ the bridge up.
 
 ## Codex CLI Shortcut
 
-On Linux/WSL and Android, `codexx` starts Codex with command approvals and sandboxing
-disabled, matching the permission behavior of `claudex`. Commands run with your user
+On Android, the one platform where Codex is installed, `codexx` starts Codex with command
+approvals and sandboxing disabled, matching the permission behavior of `claudex`. Commands run with your user
 account's access. Arguments are forwarded unchanged, for example `codexx resume --last`.
 Reasoning effort follows your Codex configuration.
 
@@ -203,42 +201,40 @@ and update handling. Plain `codex` continues to use its configured permissions.
 
 ## Claude Code Configuration
 
-This repository manages six Claude Code configuration files. Each targets a different file on disk because Claude Code separates instructions, settings, and MCP servers into distinct subsystems that cannot be consolidated into a single file.
+This repository manages four Claude Code configuration files. Each targets a different file on disk because Claude Code separates instructions, settings, and MCP servers into distinct subsystems that cannot be consolidated into a single file.
 
 | Repository Path | Deployed To | Purpose |
 |-----------------|-------------|---------|
-| `dot_claude/CLAUDE.md` | `~/.claude/CLAUDE.md` | Global instructions loaded into every Claude Code session (WSL preferences) |
-| `dot_claude/modify_settings.json` | `~/.claude/settings.json` | Linux: the look (theme, renderer, status line). Windows and Android: default permission rules (`allow` list) and effort level |
-| `dot_claude/executable_statusline-command.sh` | `~/.claude/statusline-command.sh` | The status line both Claude Code profiles run (Linux) |
+| `dot_claude/modify_settings.json` | `~/.claude/settings.json` | Linux: the look (theme, renderer, status line). Android: default permission rules (`allow` list) and effort level |
+| `dot_claude/executable_statusline-command.sh` | `~/.claude/statusline-command.sh` | The status line Claude Code runs (Linux) |
 | `dot_claude/modify_dot_claude.json` | `~/.claude/.claude.json` | Auto-trusts project directories to skip the trust dialog |
-| `dot_claude-omni/modify_settings.json` | `~/.claude-omni/settings.json` | The same look for `claude-omni` |
 | `modify_dot_claude.json` (root) | `~/.claude.json` | User-scoped MCP servers (see [MCP Servers](#mcp-servers)) |
 
-The `modify_*` files are chezmoi [modify-templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file): chezmoi evaluates them itself, with the file's current content in `.chezmoi.stdin`, and writes back the merged result, so they need neither bash nor Python and run on Windows too. This preserves any user-added configuration while ensuring defaults are always present, and a file that already holds every default is left byte for byte untouched.
+The `modify_*` files are chezmoi [modify-templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file): chezmoi evaluates them itself, with the file's current content in `.chezmoi.stdin`, and writes back the merged result, so they need neither bash nor Python. This preserves any user-added configuration while ensuring defaults are always present, and a file that already holds every default is left byte for byte untouched.
 
-> **Note**: Linux gets only `settings.json` and the status line script from `dot_claude/`. The rest of it is deployed only on **Windows** and **Android**, which get no status line (see `.chezmoiignore`).
+> **Note**: Linux gets only `settings.json` and the status line script from `dot_claude/`. The rest of it is deployed only on **Android**, which gets no status line, and Windows, where Claude Code is not installed, gets neither `~/.claude` nor `~/.claude.json` (see `.chezmoiignore`). The global instructions (`~/.claude/CLAUDE.md`) and the rest of the AI content in `~/.claude` are synced by [aisync](https://github.com/rios0rios0/aisync), not by chezmoi.
 
 ### Claude Code and Codex Look
 
-Both CLIs keep their look across machines and profiles: Claude Code in the `dark-ansi` theme (the terminal's own ANSI palette) with the fullscreen renderer and a two-line status line styled after the p10k prompt, and Codex with its built-in status line, coloured from its syntax theme. Codex shows the directory, branch, model with reasoning effort and context left from the start; tokens used, the window size and both rate limits join after the first reply.
+Both CLIs keep their look across machines: Claude Code in the `dark-ansi` theme (the terminal's own ANSI palette) with the fullscreen renderer and a two-line status line styled after the p10k prompt, and Codex with its built-in status line, coloured from its syntax theme. Codex shows the directory, branch, model with reasoning effort and context left from the start; tokens used, the window size and both rate limits join after the first reply.
 
 | Tool | Declared in | Applied to | Platforms |
 |------|-------------|------------|-----------|
-| Claude Code | `.chezmoitemplates/lib-claude-look.tmpl`, and the script in `dot_claude/` | `~/.claude/settings.json`, and `~/.claude-omni/settings.json` for `claude-omni` | Linux |
-| Codex | `dot_codex/modify_private_config.toml` | `~/.codex/config.toml` | Linux, Windows, Android |
+| Claude Code | `.chezmoitemplates/lib-claude-look.tmpl`, and the script in `dot_claude/` | `~/.claude/settings.json` | Linux |
+| Codex | `dot_codex/modify_private_config.toml` | `~/.codex/config.toml` | Android |
 
 Only those keys are managed; everything else in the files stays as each tool wrote it. To change the look, edit it there and run `chezmoi apply`: a change made with `/theme` or `/statusline` lasts until the next apply, which sets the managed keys back and prints which. Rewriting `config.toml` keeps every Codex setting but drops its comments, and happens only when a managed key differs. See "Claude Code and Codex Look" in `CLAUDE.md` for why Claude Code's look stays on Linux.
 
 ### MCP Servers
 
-Every machine gets the same user-scope MCP servers in `~/.claude.json`, less what its platform cannot run:
+Linux and Android get the same user-scope MCP servers in `~/.claude.json`, less what the platform cannot run; Windows, where Claude Code is not installed, gets none:
 
-| Server | Linux | Windows | Android | Needs |
-|--------|-------|---------|---------|-------|
-| Context7 (current library docs) | HTTP | HTTP | HTTP | `CONTEXT7_API_KEY` |
-| Chrome DevTools (drives a browser, reads console and network errors) | npx | | | Google Chrome, which `chezmoi apply` installs on Linux |
+| Server | Linux | Android | Needs |
+|--------|-------|---------|-------|
+| Context7 (current library docs) | HTTP | HTTP | `CONTEXT7_API_KEY` |
+| Chrome DevTools (drives a browser, reads console and network errors) | npx | | Google Chrome, which `chezmoi apply` installs on Linux |
 
-`CONTEXT7_API_KEY` comes from a `cred:CONTEXT7_API_KEY` field on the device note in 1Password (see [MCP credentials](.docs/mcp-1password-setup.md)), and Claude Code fills it in from the environment, so no secret is written to `~/.claude.json`. Windows has no loader for those fields; set it there as a user environment variable. Chrome DevTools runs Chrome headless with a throwaway profile per session, redacts request credentials, and sends nothing to Google. GitHub, Azure DevOps, SonarQube and Kubernetes are used through their CLIs; the next apply deletes the MCP servers this repository used to configure for them. "MCP Servers" in `CLAUDE.md` explains each of those choices, how to watch the browser in one project, and why DBHub and Serena were evaluated and left out.
+`CONTEXT7_API_KEY` comes from a `cred:CONTEXT7_API_KEY` field on the device note in 1Password (see [MCP credentials](.docs/mcp-1password-setup.md)), and Claude Code fills it in from the environment, so no secret is written to `~/.claude.json`. Chrome DevTools runs Chrome headless with a throwaway profile per session, redacts request credentials, and sends nothing to Google. GitHub, Azure DevOps, SonarQube and Kubernetes are used through their CLIs; the next apply deletes the MCP servers this repository used to configure for them. "MCP Servers" in `CLAUDE.md` explains each of those choices, how to watch the browser in one project, and why DBHub and Serena were evaluated and left out.
 
 ### Code Intelligence (LSP)
 
@@ -254,26 +250,17 @@ It also ignores `.cache_ggshield`, which ggshield's global pre-commit hook write
 
 On Linux with an NVIDIA driver, `chezmoi apply` installs Ollama as a user service -- pinned, checksum-verified, no root -- pulls the model named in `.chezmoidata/local-llm.yaml`, and checks that it runs on the GPU. Each GPU machine also shares its server on the tailnet with `tailscale serve`. The [local model guide](.docs/local-coding-model.md) covers settings, measurements on this hardware and troubleshooting.
 
-## Claude Code Through OmniRoute
+## OmniRoute Gateway
 
-The [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway with providers such as both GPUs' Ollama, NVIDIA NIM and OpenRouter; its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes. `claude-omni` starts Claude Code through it, on a model picked from the gateway's own catalog or named with `-m`, in a profile of its own, without touching the regular `claude`, its login or ccswitch's rotation:
-
-```bash
-claude-omni                      # pick a model; each line shows its context window
-claude-omni -m nvidia/z-ai/glm-5.3 -p "explain this repository"
-claude-omni -c -m openrouter/moonshotai/kimi-k2.7-code   # switch model, keep the conversation
-claude-omni --list               # what the gateway serves, each model's window and where it runs
-```
-
-It gives Claude Code each model's real context window -- for a GPU model the one the Ollama server allocates, which OmniRoute cannot see -- and `/model` in the session offers every model the gateway serves that holds at least that window. The status line shows the model and its window. When ccswitch reports that no account has capacity left, `claude` points at `claude-omni` before launching.
-
-`claude-omni-task` runs one unattended task on the first free GPU, or on a model named with `-m`, and hands back an audit of the run -- every action with its result, the change it made measured against a snapshot of the working tree, and one command that undoes it -- which is what the `omniroute-general` agent uses.
+The [OmniRoute setup](.docs/omniroute-local.md) runs a local gateway with providers such as both GPUs' Ollama, NVIDIA NIM and OpenRouter; its dashboard and API bind to loopback, and its provider keys and database stay in local Docker volumes. The gateway is a digest-pinned build of the [`rios0rios0/OmniRoute`](https://github.com/rios0rios0/OmniRoute) fork, published to GHCR, and its client here is OpenCode, as `ocode` (next section).
 
 The stack's SQLite state gets a daily encrypted backup: a systemd user timer on WSL takes a `VACUUM INTO` snapshot of the gateway's database inside its container, packs it with the bootstrap's `server.env`, and encrypts the tar with an age key generated for the backups alone, rotated under `~/.local/share/omniroute-backups`. The [OmniRoute guide](.docs/omniroute-local.md) documents restoring and the copy of that key you must keep.
 
 ## OpenCode Through OmniRoute
 
 OpenCode runs on the same [OmniRoute](.docs/omniroute-local.md) gateway: the [global configuration](dot_config/opencode/opencode.json.tmpl) makes it the primary provider and defaults to `auto/coding`. Its model list is not written down -- OpenCode discovers it from the gateway's `/v1/models`, which serves exactly what the API key allows, so a model, or a whole provider, added in OmniRoute's dashboard appears here by itself.
+
+On Linux the CLI is `ocode`, a build of the [`rios0rios0/opencode`](https://github.com/rios0rios0/opencode) fork, which adds an OmniRoute provider plugin. `chezmoi apply` clones the fork to `~/Development/github.com/rios0rios0/opencode` when nothing is there yet, builds it into `~/.local/bin/ocode`, and builds again on every later apply that finds the checkout's HEAD moved; `rebuild-ocode` runs the same build without a whole apply.
 
 The same configuration wires the context7 and Chrome DevTools (Linux only) MCP servers, the Claude Code permission set, the `AGENTS.md` rules and a `dotfiles` reference to the chezmoi source, and reuses the `OMNIROUTE_API_KEY` the credential loader already exports. The [OpenCode guide](.docs/opencode-local.md) covers usage and troubleshooting.
 
@@ -369,7 +356,7 @@ See **[.docs/dependency-lifecycle.md](.docs/dependency-lifecycle.md)** for the f
 
 11. **`map has no entry for key "deviceName"`, or `[chezmoi-config] ERROR: the chezmoi config has no "deviceName"`**: the machine's `~/.config/chezmoi/chezmoi.yaml` was generated by `chezmoi init` from an older `.chezmoi.yaml.tmpl`. Only `chezmoi init` re-renders that file (`chezmoi apply` and `chezmoi update` never do), so a data key added to the template later does not exist there. Fix: run `chezmoi init` with no arguments, which regenerates the config and changes nothing else, then apply again. chezmoi's own hint, `config file template has changed, run chezmoi init to regenerate config file`, prints at the top of every apply and is easy to miss above a long installer run.
 
-12. **`Failed to connect to user scope bus via local transport: No such file or directory` (WSL)**, with `claude-omni` reporting that no Ollama server answers on this machine and `~/.ssh/agent.sock` missing: systemd is not running, because WSL boots a distribution with it only when `/etc/wsl.conf` has `systemd=true` under `[boot]`, and Kali's WSL image ships no such file. `chezmoi apply` sets it (through `sudo`) and prints `[wsl-systemd] WARN: systemd starts with the next WSL boot`. Fix: run `wsl.exe --shutdown`, which closes every WSL terminal, open a new one, and run `chezmoi apply` again. That apply finishes the SSH agent bridge and Ollama (including the model download), which had to wait for systemd. `ps -p 1 -o comm=` prints `systemd` once it runs. See "systemd on WSL" in `CLAUDE.md`.
+12. **`Failed to connect to user scope bus via local transport: No such file or directory` (WSL)**, with `~/.ssh/agent.sock` missing: systemd is not running, because WSL boots a distribution with it only when `/etc/wsl.conf` has `systemd=true` under `[boot]`, and Kali's WSL image ships no such file. `chezmoi apply` sets it (through `sudo`) and prints `[wsl-systemd] WARN: systemd starts with the next WSL boot`. Fix: run `wsl.exe --shutdown`, which closes every WSL terminal, open a new one, and run `chezmoi apply` again. That apply finishes the SSH agent bridge and Ollama (including the model download), which had to wait for systemd. `ps -p 1 -o comm=` prints `systemd` once it runs. See "systemd on WSL" in `CLAUDE.md`.
 
 ## References
 

@@ -123,24 +123,23 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 
 | Step | Script                                                                                       | Marker        | What it does                                                                                                                                                                        |
 |------|----------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1    | `run_once_before_windows-001-install-dependencies.ps1`                                       | `[automated]` | 51 packages (Spotify from the Microsoft Store, the rest from winget), skipping any that `winget list` finds under its exact ID, plus RustDesk from its GitHub release (section 3.3). |
-| 2    | `run_once_before_windows-002-configure-dependencies.ps1`                                     | `[partial]`   | Phase 2. It also runs `nvm install --lts`, which fails on the very first pass because NVM for Windows is not on `PATH` yet; run it again from a new terminal.                         |
+| 1    | `run_once_before_windows-001-install-dependencies.ps1`                                       | `[automated]` | 36 packages (Spotify from the Microsoft Store, the rest from winget), skipping any that `winget list` finds under its exact ID, plus RustDesk from its GitHub release (section 3.3). |
+| 2    | `run_once_before_windows-002-configure-dependencies.ps1`                                     | `[partial]`   | Phase 2: installs Kali and makes it the default distro, or runs `wsl --update` where Kali already exists. The reboot after the install is on you.                                   |
 | 3    | `run_once_before_windows-003-install-fonts.ps1`                                              | `[automated]` | MesloLGS NF, Meslo Nerd Font and FiraCode Nerd Font into `$env:WINDIR\Fonts` plus the `HKLM` font registry entries. Needs the elevated shell.                                       |
 | 4    | `run_once_before_windows-004-export-private-key.ps1`                                         | `[automated]` | Writes the age identity from `op://personal/Chezmoi Key/private key` to `~\.ssh\chezmoi`.                                                                                           |
-| 5    | Managed files                                                                                | `[automated]` | `.gitconfig`, `.ssh\config`, `.ssh\allowed_signers`, `.ssh\authorized_keys`, `.age_recipients`, `.oh-my-posh.json`, `.wakatime.cfg`, `.claude\*`, `.aws` and `.azure` (decrypted). |
+| 5    | Managed files                                                                                | `[automated]` | `.gitconfig`, `.ssh\config`, `.ssh\allowed_signers`, `.ssh\authorized_keys`, `.age_recipients`, `.oh-my-posh.json`, `.wakatime.cfg`, `.aws` and `.azure` (decrypted).               |
 | 6    | `run_once_after_windows-001-create-ssh-known-hosts.ps1`                                      | `[automated]` | Pre-populates `known_hosts` so git over SSH never hangs on a host-key prompt.                                                                                                       |
 | 7    | `run_after_windows-001-create-ssh-public-keys.ps1.tmpl`, `run_after_windows-002-create-ssh-pems.ps1.tmpl` | `[automated]` | SSH public keys and PEM certificates from the items the device note references.                                                                                          |
 | 8    | `run_after_windows-003-copy-app-data-files.ps1.tmpl`                                         | `[automated]` | Windows Terminal `settings.json` and the Kali icon from `AppData/`.                                                                                                                 |
-| 9    | `run_after_windows-004-install-jetbrains-themes.ps1`                                         | `[partial]`   | Fans the staged themes out to every JetBrains IDE under `%APPDATA%\JetBrains`. Nothing to do until the IDEs from Phase 6 exist; re-run `chezmoi apply` after installing them.        |
-| 10   | `run_onchange_after_windows-005-remove-dependencies.ps1`                                     | `[automated]` | Uninstalls tombstoned packages; silent on a fresh machine.                                                                                                                          |
+| 9    | `run_onchange_after_windows-005-remove-dependencies.ps1`                                     | `[automated]` | Uninstalls tombstoned packages; silent on a fresh machine.                                                                                                                          |
 
 ### 3.3 What the winget pass installs
 
-- `$requirements`: `AgileBits.1Password`, `AgileBits.1Password.CLI`, `FiloSottile.age`, `Git.Git`, `JanDeDobbeleer.OhMyPosh`, `Microsoft.PowerShell`, `Microsoft.WSL`, `Microsoft.WindowsTerminal`
+- `$requirements`: `AgileBits.1Password`, `AgileBits.1Password.CLI`, `FiloSottile.age`, `Git.Git`, `JanDeDobbeleer.OhMyPosh`, `Microsoft.PowerShell`, `Microsoft.WSL`, `Microsoft.WindowsTerminal`, `Tailscale.Tailscale`
 - `$hardware`: `CPUID.CPU-Z.ROG`, `FinalWire.AIDA64.Extreme`, `Logitech.GHUB`, `PassMark.PerformanceTest`
-- `$utilities`: `Adobe.Acrobat.Reader.64-bit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.CCleaner`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `msstore:9NCBCSZSJRSB` (Spotify, Microsoft Store edition), `Oracle.VirtualBox`
-- `$communication`: `SlackTechnologies.Slack`, `Discord.Discord`, `Zoom.Zoom.EXE`
-- `$development`: `Anthropic.ClaudeCode`, `CoreyButler.NVMforWindows`, `Docker.DockerDesktop`, `ExpressVPN.ExpressVPN`, `GitHub.cli`, `GitHub.Copilot`, `GoLang.Go`, `JetBrains.Toolbox`, `Microsoft.Azure.StorageExplorer`, `Microsoft.VisualStudio.2022.Community`, `Mirantis.Lens`, `OpenAI.Codex`, `OpenVPNTechnologies.OpenVPNConnect`, `Postman.Postman`, `BurntSushi.ripgrep.MSVC`, `jqlang.jq`, `MikeFarah.yq`, `sharkdp.bat`, `koalaman.shellcheck`
+- `$utilities`: `Adobe.Acrobat.Reader.64-bit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.CCleaner`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `msstore:9NCBCSZSJRSB` (Spotify, Microsoft Store edition)
+- `$communication`: `Zoom.Zoom.EXE`
+- `$development`: `Docker.DockerDesktop`, `ExpressVPN.ExpressVPN`, `Microsoft.Azure.StorageExplorer`, `Mirantis.Lens`, `OpenVPNTechnologies.OpenVPNConnect`, `BurntSushi.ripgrep.MSVC`
 - `$gaming`: `ElectronicArts.EADesktop`, `EpicGames.EpicGamesLauncher`, `GOG.Galaxy`, `Valve.Steam`
 
 An entry counts as installed when `winget list --id <id> --exact --source <source>` finds it;
@@ -199,7 +198,7 @@ Phase 3 is what authenticates every template here.
 | 9    | `run_once_after_linux-002-clone-pentesting-tools.sh`          | `[automated]` | Clones VHostScan, dirsearch, StegCracker and stegbrute into `~/Development/Tools`.                                                                                                                           |
 | 10   | `run_after_linux-002-import-gpg-keys.sh.tmpl`                 | `[automated]` | Imports the GPG keys the device note references.                                                                                                                                                             |
 | 11   | `run_after_linux-004-install-ggshield-hook.sh`                | `[automated]` | Generates the global GitGuardian pre-commit hook; `core.hooksPath` in `.gitconfig` points at it.                                                                                                             |
-| 12   | `run_after_linux-005-install-jetbrains-themes.sh`             | `[partial]`   | Same as Windows: needs the IDE config directories to exist first.                                                                                                                                            |
+| 12   | `run_after_linux-005-install-jetbrains-themes.sh`             | `[partial]`   | Fans the themes staged in `~/.local/share/jetbrains-themes` out to every JetBrains IDE under `~/.config/JetBrains`. Nothing to do until an IDE has a config directory there; re-run `chezmoi apply` after installing one. |
 | 13   | `run_onchange_after_linux-006-remove-dependencies.sh.tmpl`    | `[automated]` | Tombstones; silent on a fresh machine.                                                                                                                                                                       |
 | 14   | `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl`      | `[automated]` | Raises a CLI older than `0.47.0` (the floor `sentry-ds` needs) with `sentry cli upgrade`, failing until it holds; then `sentry cli setup --no-modify-path`: the zsh completion into `~/.local/share/zsh/site-functions`, and the Claude Code skill once `~/.claude` exists (the next `sentry cli upgrade` adds it otherwise). |
 | 15   | `run_onchange_after_linux-011-setup-chrome.sh`               | `[automated]` | Google Chrome from Google's apt repository, for the Chrome DevTools MCP server; asks for the sudo password. Its key is trusted for that repository only, and only once its fingerprint proves it Google's. |
@@ -208,8 +207,8 @@ Phase 3 is what authenticates every template here.
 ### What the dependency installer provides
 
 apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, `zip`, `unzip`, `xz-utils`,
-`age`, `gpg`, `gpg-agent`, `zsh`, `eza`, `sqlite3`, `bsdmainutils`, `binutils`, `bison`, `gcc`,
-`clang`, `make`, `htop`, `screenfetch`, `jq`, `yq`, `bat`, `ripgrep`, `silversearcher-ag`,
+`zstd`, `age`, `gpg`, `gpg-agent`, `zsh`, `eza`, `sqlite3`, `bsdmainutils`, `binutils`, `bison`, `gcc`,
+`clang`, `make`, `htop`, `screenfetch`, `jq`, `bat`, `ripgrep`, `silversearcher-ag`,
 `inotify-tools`, `dos2unix`, `expect`, `aria2`, `file`, `parallel`, `cloc`, `rename`, `whois`,
 `ffmpeg`, `sox`, `libsox-fmt-pulse`, `rsync`, `asciinema`, `shellcheck`, `postgresql-client`.
 
@@ -226,8 +225,6 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | bun (the `ocode` fork build's runtime)           | `install_bun`                        | `[automated]` | Upstream `bun.sh/install` into `~/.bun`, run with `SHELL` empty so its shell detection cannot append a PATH line to an rc file chezmoi owns; `dot_zshenv.tmpl` adds `~/.bun/bin` to PATH. The `ocode` build itself installs and builds with the bun the fork checkout pins, so when this one is another version the first apply also downloads the pinned one into `~/.cache/ocode-bun/<version>/`. |
 | Claude Code                                      | `install_claude_cli`                 | `[automated]` | npm package.                                                                                                                    |
 | ccswitch                                         | `install_ccswitch`                   | `[partial]`   | Installed here; every account still has to be enrolled once with `ccswitch enroll` after `claude` and `/login`.                 |
-| GitHub Copilot CLI                               | `install_copilot_cli`                | `[automated]` | Upstream installer into `~/.local/bin`.                                                                                          |
-| Codex CLI                                        | `install_codex_cli`                  | `[automated]` | npm package; its platform package bundles the bubblewrap the sandbox needs.                                                     |
 | Sentry CLI                                       | `install_sentry_cli`                 | `[automated]` | npm package (`sentry`, from getsentry/cli), shared with Android through `lib-install-deps.sh`; completions and the agent skill come from step 14.                                  |
 | Neon CLI                                         | `install_neon_cli`                   | `[automated]` | npm package (`neon`, from neondatabase/neon-pkgs), shared with Android through `lib-install-deps.sh`; fresh installs take the `neon` package, not the legacy `neonctl` compatibility shim. |
 | dev-toolkit                                      | `install_dev_toolkit`                | `[automated]` | Upstream install script.                                                                                                        |
@@ -238,6 +235,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | OCI CLI                                           | `install_oci_cli`                     | `[automated]`  | pip, inside the pyenv Python.                                                                                                    |
 | ggshield                                         | `install_ggshield`                   | `[automated]` | pipx; its auth config is rendered from 1Password by `dot_config/ggshield/private_auth_config.yaml.tmpl`.                         |
 | ruff                                             | `install_ruff`                       | `[automated]` | Astral install script.                                                                                                          |
+| yq                                               | `install_yq`                         | `[automated]` | mikefarah's release, pinned and SHA-256 checked, into `~/.local/bin`; Kali's apt `yq` is a different tool.                      |
 | aisync                                           | `install_aisync`                     | `[partial]`   | Installed here; the key, the `aifiles` clone and the first pull are done by hand (below).                                       |
 | Atlassian CLI                                    | `install_acli`                       | `[automated]` |                                                                                                                                 |
 | Speedtest CLI                                    | `install_speedtest_cli`              | `[automated]` | Ookla apt repository.                                                                                                           |
@@ -256,7 +254,6 @@ aisync --use-system-git init rios0rios0    # clones aifiles; a bare `init` makes
 aisync source add guide --source-repo rios0rios0/guide --branch generated
 aisync pull                                # personal files and the last 14 days of conversations
 claude                                     # /login, then: ccswitch enroll
-codex login                                # browser flow; `codex login --device-auth` prints a code instead
 sentry auth login                          # device code entered at a URL; `--token <API token>` skips OAuth
 neon login                                 # browser flow; `NEON_API_KEY` or `neon profile create <name> --api-key -` (stdin) skips it
 ```
@@ -274,7 +271,7 @@ gvm list && go version
 node --version && corepack --version
 pyenv version
 kubectl version --client && kubectl krew list
-command -v terra terraform terragrunt aws az gh copilot codex sentry neon acli ruff ggshield aisync ccswitch flyctl oci bun
+command -v terra terraform terragrunt aws az gh sentry neon acli ruff ggshield aisync ccswitch flyctl oci bun
 ls ~/.local/share/zsh/site-functions/_sentry
 fc-list | grep -i meslo
 git config --get core.hooksPath
@@ -355,8 +352,8 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 
 Same `aisync`, `claude` and `sentry auth login` steps as Phase 4, minus `ccswitch` (Linux only), with
 Neon authenticated by an API key rather than the browser flow (`neon profile create <name> --api-key -`
-reads it from stdin), and `codex login --device-auth` instead of `codex login`: it prints a code to enter
-in the phone's browser. Then the Android settings
+reads it from stdin). Codex, which only Android installs, logs in with `codex login --device-auth`: it
+prints a code to enter in the phone's browser. Then the Android settings
 from the README's known issue on the Phantom Process Killer: **Developer Options > Disable child
 process restrictions**, Termux's battery usage set to Unrestricted, and optionally Termux:Boot with a
 `termux-wake-lock` start script. rclone for OneDrive has its own guide:
@@ -389,7 +386,6 @@ Everything left is a download, a login or a license. The order does not matter w
 | Item                                                                         | Marker     | Notes                                                                                                                                                     |
 |------------------------------------------------------------------------------|------------|-----------------------------------------------------------------------------------------------------------------------------------------------------------|
 | Microsoft account, OneDrive, Edge, Steam and the other launchers             | `[manual]` | Logins. `Microsoft.OneDrive` and the launchers themselves came from Phase 3.                                                                              |
-| JetBrains IDEs (GoLand, IntelliJ IDEA Ultimate, WebStorm, Rider, PyCharm Professional, DataGrip) and ReSharper | `[manual]` | Installed through the JetBrains Toolbox from Phase 3. Run `chezmoi apply` again afterwards so `windows-004-install-jetbrains-themes.ps1` finds them. |
 | Docker Desktop first start                                                   | `[manual]` | Accept the terms, sign in, enable WSL integration for `kali-linux` if wanted.                                                                             |
 | Microsoft Store apps: WhatsApp, Telegram, CineBench, draw.io, JW Library     | `[manual]` | 1Password, Spotify, TranslucentTB and Oh My Posh from the same list already came from winget in Phase 3.                                                  |
 | Office 365, Notion                                                           | `[manual]` | account.microsoft.com and notion.so downloads.                                                                                                            |
@@ -400,8 +396,8 @@ Everything left is a download, a login or a license. The order does not matter w
 | AIDA64 OSD labels, Windows Terminal profiles beyond the managed `settings.json` | `[manual]` | UI configuration.                                                                                                                                       |
 | Restore backups                                                              | `[manual]` | After copying files in from Windows, strip the alternate data streams: `find . -name "*:Zone.Identifier" -type f -delete` from WSL.                        |
 
-**Verify:** `winget list` shows the Store and vendor apps you installed, every launcher opens signed in,
-and `chezmoi apply` reports the JetBrains themes fanned out.
+**Verify:** `winget list` shows the Store and vendor apps you installed, and every launcher opens
+signed in.
 
 ## Automation gaps
 
@@ -409,21 +405,21 @@ Candidates for future issues, in rough order of payoff:
 
 1. **Microsoft Store apps.** winget can install from the Store through its `msstore` source; the IDs for WhatsApp, Telegram, CineBench, draw.io and JW Library need to be looked up with `winget search --source msstore` and added to the Windows installer.
 2. **Fonts on a non-elevated apply.** `windows-003-install-fonts.ps1` exits 0 without administrator rights and chezmoi records it as done. Exiting non-zero, or self-elevating, would make the failure visible instead of silent.
-3. **`nvm install --lts` in `windows-002`** fails on the first pass because NVM for Windows is not on `PATH` yet.
-4. **Hardware profiles.** `$hardwareDesktop` and `$utilitiesDesktop` are commented out; a chezmoi data flag keyed on the hostname could enable them on the desktop only.
-5. **Broken winget manifests**: `Asus.ArmouryCrate`, `Blizzard.BattleNet`, `Ubisoft.Connect`. Re-test them periodically, or install from the vendor URL with a checksum.
-6. **Windows features up front.** A small elevated pre-step could enable Virtual Machine Platform and WSL and run `wsl --set-default-version 2` before winget, instead of relying on `wsl --install` inside `windows-002`.
-7. **Baremetal Linux 1Password.** `linux-001` and `linux-005` assume `op.exe`.
-8. **Post-install steps that need a token**: `aisync` first pull, `ccswitch enroll`, the Claude Code bootstrap on Android. The `cred:` fields on the device note could feed them.
-9. **`imagemagick`, `pdftk` on WSL, PDM**: decide where they belong and add them to the installers or drop them from the checklist.
-10. **Zone.Identifier cleanup** after a backup restore could live in a `dot_scripts` helper.
-11. **Flutter on Termux is unverified.** `install_flutter` in the Android installer was written from `dpkg-deb` inspection of the community package, not from a run on a device. Run one `chezmoi apply` on the phone and record whether `flutter --version`, `flutter precache --web` and `flutter test` work; if the package cannot be made to start, demote the row to `[manual]` and keep only the native `dart`.
+3. **Hardware profiles.** `$hardwareDesktop` and `$utilitiesDesktop` are commented out; a chezmoi data flag keyed on the hostname could enable them on the desktop only.
+4. **Broken winget manifests**: `Asus.ArmouryCrate`, `Blizzard.BattleNet`, `Ubisoft.Connect`. Re-test them periodically, or install from the vendor URL with a checksum.
+5. **Windows features up front.** A small elevated pre-step could enable Virtual Machine Platform and WSL and run `wsl --set-default-version 2` before winget, instead of relying on `wsl --install` inside `windows-002`.
+6. **Baremetal Linux 1Password.** `linux-001` and `linux-005` assume `op.exe`.
+7. **Post-install steps that need a token**: `aisync` first pull, `ccswitch enroll`, the Claude Code bootstrap on Android. The `cred:` fields on the device note could feed them.
+8. **`imagemagick`, `pdftk` on WSL, PDM**: decide where they belong and add them to the installers or drop them from the checklist.
+9. **Zone.Identifier cleanup** after a backup restore could live in a `dot_scripts` helper.
+10. **Flutter on Termux is unverified.** `install_flutter` in the Android installer was written from `dpkg-deb` inspection of the community package, not from a run on a device. Run one `chezmoi apply` on the phone and record whether `flutter --version`, `flutter precache --web` and `flutter test` work; if the package cannot be made to start, demote the row to `[manual]` and keep only the native `dart`.
 
 ## Appendix: the original checklist, item by item
 
 The checklist from issue [#30](https://github.com/rios0rios0/dotfiles/issues/30), mapped to what the
-repository does today. Script paths are under `.chezmoiscripts/`; winget IDs refer to
-`run_once_before_windows-001-install-dependencies.ps1`.
+repository does today. Items the Windows setup has since dropped are left out: the JetBrains Toolbox
+with the IDEs and ReSharper installed through it, Visual Studio, Postman, Go and jq. Script paths are
+under `.chezmoiscripts/`; winget IDs refer to `run_once_before_windows-001-install-dependencies.ps1`.
 
 ### Drivers
 
@@ -497,10 +493,6 @@ repository does today. Script paths are under `.chezmoiscripts/`; winget IDs ref
 
 | Item                                                        | Status                                                                                                   |
 |-------------------------------------------------------------|----------------------------------------------------------------------------------------------------------|
-| JetBrains Toolbox                                           | `[automated]` `JetBrains.Toolbox`                                                                        |
-| GoLand, IntelliJ IDEA Ultimate, WebStorm, Rider, PyCharm Professional, DataGrip | `[manual]`, through the Toolbox                                                     |
-| Visual Studio                                               | `[automated]` `Microsoft.VisualStudio.2022.Community`                                                   |
-| ReSharper                                                   | `[manual]`, through the Toolbox                                                                          |
 | Docker Desktop                                              | `[automated]` `Docker.DockerDesktop`                                                                     |
 | Git                                                         | `[automated]` `Git.Git`, with the ASLR caveat in the README                                              |
 | OpenVPN Connect                                             | `[automated]` `OpenVPNTechnologies.OpenVPNConnect`                                                       |
@@ -508,9 +500,8 @@ repository does today. Script paths are under `.chezmoiscripts/`; winget IDs ref
 | PowerShell 7                                                | `[partial]`, installed by hand as a prerequisite, kept by `Microsoft.PowerShell`                         |
 | `oh-my-posh font install meslo`                             | `[automated]` by `windows-003-install-fonts.ps1` instead                                                 |
 | 1Password CLI                                               | `[automated]` `AgileBits.1Password.CLI`, also a prerequisite                                              |
-| Go on Windows                                               | `[automated]` `GoLang.Go`                                                                                |
 | chezmoi on Windows                                          | `[manual]` prerequisite, `twpayne.chezmoi`                                                               |
-| jq, age on Windows                                          | `[automated]` `jqlang.jq`, `FiloSottile.age`                                                             |
+| age on Windows                                              | `[automated]` `FiloSottile.age`                                                                          |
 | WSL: Oh My Zsh                                              | `[automated]` `install_oh_my_zsh`                                                                        |
 | WSL: pyenv, build dependencies, `pyenv global`              | `[automated]` `install_pyenv` (Python `3.13.2`)                                                          |
 | WSL: `pip install pdm`                                      | `[manual]`                                                                                               |
@@ -525,7 +516,6 @@ repository does today. Script paths are under `.chezmoiscripts/`; winget IDs ref
 | WSL: sqlite3, jq, age, inotify-tools                        | `[automated]` apt arrays                                                                                 |
 | WSL: chezmoi                                                | `[automated]` by the `get.chezmoi.io` one-liner                                                          |
 | Microsoft Azure Storage Explorer                            | `[automated]` `Microsoft.Azure.StorageExplorer`                                                          |
-| Postman                                                     | `[automated]` `Postman.Postman`                                                                          |
 | Draw.io, NiceHash Miner                                     | `[manual]`, both still question marks on the checklist                                                   |
 
 ### Gaming

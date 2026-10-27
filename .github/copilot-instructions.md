@@ -9,18 +9,18 @@ The "build" is `chezmoi apply`; there is no compilation step. Repo *changes* (te
 
 ```bash
 make lint    # shellcheck, Go template syntax, Python (ruff), PowerShell, YAML/JSON
-make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution, local model server, claude-omni, Tailscale
+make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, the Windows installer, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution, zshrc functions, Sentry CLI setup, local model server, OpenCode config, Tailscale, systemd on WSL, status line, Claude Code language servers, OmniRoute backups and image pin, ocode build, terra update, yq install
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
-Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-local-llm`, `make test-claude-omni`, `make test-tailscale`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
+Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-local-llm`, `make test-tailscale`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
 
 ## Codex CLI Shortcut
 
-`dot_zshrc.tmpl` defines `codexx` for Linux/WSL and Android. It runs
-`command codex --dangerously-bypass-approvals-and-sandbox "$@"`, bypassing command
-approvals and sandboxing while preserving argument boundaries. Keep it a function
-with a preceding `unalias` so re-sourcing handles an existing alias. Keep PATH
+`dot_zshrc.tmpl` defines `codexx` for Android, the one platform that still installs
+Codex. It runs `command codex --dangerously-bypass-approvals-and-sandbox "$@"`,
+bypassing command approvals and sandboxing while preserving argument boundaries. Keep
+it a function with a preceding `unalias` so re-sourcing handles an existing alias. Keep PATH
 resolution so Android still launches its managed `~/.local/bin/codex` wrapper.
 Reasoning effort remains controlled by Codex configuration.
 
@@ -102,14 +102,13 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **Flutter** — the current stable SDK from the official tarball (resolved from Flutter's releases manifest, SHA-256 verified) under `~/.local/share/flutter`, with `flutter` and `dart` linked into `~/.local/bin`; `flutter upgrade` moves an installed SDK forward
   - **bun** — the runtime the `ocode` fork build uses, via `bun.sh/install` run with `SHELL` empty so its shell detection cannot append a PATH line to an rc file chezmoi owns; the `~/.bun/bin` block lives in `dot_zshenv.tmpl`. The build itself installs and builds with the bun the fork checkout pins (`packageManager`), downloading that version into `~/.cache/ocode-bun/<version>/` (verified against the release's `SHASUMS256.txt`) when this one differs
   - **Claude CLI** (`@anthropic-ai/claude-code` npm package)
-  - **GitHub Copilot CLI** (binary `copilot`, via upstream install script into `~/.local/bin`)
-  - **Codex CLI** (`@openai/codex` npm package; its platform package bundles the bubblewrap the sandbox needs, so nothing else is installed for it)
   - **Sentry CLI** (`sentry` npm package from `getsentry/cli`, through the shared `install_sentry_cli`; the official `cli.sentry.dev/install` script is not used because its Bun-compiled glibc binary cannot run on Termux, and npm gives both platforms the same JavaScript bundle; completions and the agent skill come from `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl`)
   - **Neon CLI** (`neon` npm package from `neondatabase/neon-pkgs`, through the shared `install_neon_cli`; fresh installs take `neon`, not the legacy `neonctl` compatibility shim, and the plain JavaScript bundle needs no wrapper on Termux — its `--keyring` native addon has no android-arm64 build and the CLI falls back to file-based credentials)
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** (via pip, installed into pyenv Python)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
   - **ruff** (Python linter, via Astral install script) — used by `make lint-python` to lint embedded Python in `modify_*` templates
+  - **yq** (mikefarah's, the one `make lint-syntax` and CI call as `yq eval`) — a pinned release binary, checked against its SHA-256, into `~/.local/bin`. Kali's apt `yq` is a different tool (kislyuk's Python wrapper around jq, with no `eval`) and is tombstoned; `install_yq` checks `~/.local/bin/yq`'s version rather than `command -v yq`, which would find the apt one and skip the install
   - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via upstream install script) — syncs AI assistant rules/agents/skills into `~/.claude/` and other AI assistant home directories; replaces the legacy `run_after_*-install-ai-rules.*` scripts
   - **ccswitch** ([`rios0rios0/ccswitch`](https://github.com/rios0rios0/ccswitch), Linux/WSL only) — monitors Claude Code usage and rotates between enrolled backup accounts when limits are exhausted; `dot_zshrc.tmpl` starts its monitor daemon and both `claude`/`claudex` run `ccswitch ensure` before launch
   - **Speedtest CLI** (Ookla, via packagecloud)
@@ -141,9 +140,9 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Uses winget with exact package IDs: `winget list --id <id> --exact` decides what is already installed, `msstore:<id>` entries come from the Microsoft Store source (Spotify), and a failed install is reported as a WARN and listed at the end
 - Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
 - Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, PassMark PerformanceTest
-- Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify (Microsoft Store edition), VirtualBox, Grammarly, etc.
+- Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify (Microsoft Store edition), Grammarly, etc.
 - Installs RustDesk outside winget (its publisher had it removed from winget): `Install-RustDesk` downloads the pinned MSI from the GitHub release, installs it only after its SHA-256 and its `PURSLANE` Authenticode signer check out, and skips machines where RustDesk is already installed
-- Installs development: Claude Code, GitHub Copilot CLI (`GitHub.Copilot`), Codex CLI (`OpenAI.Codex`), NVM for Windows, Docker Desktop, GitHub CLI, JetBrains Toolbox, Postman, ripgrep, jq, yq, bat, etc.
+- Installs development: Docker Desktop, ExpressVPN, Azure Storage Explorer, Lens, OpenVPN Connect, ripgrep
 - Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy
 
 #### Windows Configuration (`.chezmoiscripts/run_once_before_windows-002-configure-dependencies.ps1`)
@@ -175,7 +174,6 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `run_after_android-003-wrap-terra-clis.sh` — wraps terraform/terragrunt binaries with `termux-etc-seccomp` to avoid SIGSYS on Android
 - `run_after_android-005-prune-tmp-modcache.sh` — chmods and sweeps any Go module cache left under `$TMPDIR` (undeletable `0400`/`0500` entries there crash Termux with an `OutOfMemoryError` on exit; `dot_zshenv.tmpl` also pins `GOMODCACHE` to `$HOME/go/pkg/mod` to prevent it)
 - `run_after_android-007-build-claude-exec-shim.sh` — compiles `~/.local/bin/claude-exec-shim` with `clang`, the argv[0]-preserving launcher that `dot_zshenv.tmpl` points `$CLAUDE_CODE_EXECPATH` at so Claude Code's `grep`/`find` wrapper functions can run the musl binary without `LD_PRELOAD`. Skipped when the binary is already newer than its source; warns and exits 0 when no compiler is installed yet
-- `run_after_windows-004-install-jetbrains-themes.ps1` — fans staged JetBrains themes into detected IDE config directories (Windows)
 
 #### Manual Validation After Installation
 - Verify shell configuration: `zsh --version` (Linux/Android) or `pwsh --version` (Windows)
@@ -207,19 +205,18 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_p10k.zsh` → `~/.p10k.zsh`: Powerlevel10k theme configuration
 - `dot_oh-my-posh.json` → `~/.oh-my-posh.json`: Oh My Posh theme (Windows only)
 - `dot_age_recipients.tmpl` → `~/.age_recipients`: Age encryption recipients
-- `modify_dot_claude.json` → `~/.claude.json`: MCP servers for Claude Code (Context7 over HTTP everywhere, Chrome DevTools on Linux; servers it no longer manages are deleted from existing files through a per-platform retired list); a modify-template, see "MCP Servers" in CLAUDE.md
+- `modify_dot_claude.json` → `~/.claude.json`: MCP servers for Claude Code on Linux and Android (Context7 over HTTP on both, Chrome DevTools on Linux; servers it no longer manages are deleted from existing files through a per-platform retired list); a modify-template, see "MCP Servers" in CLAUDE.md. Windows gets no `~/.claude.json`: Claude Code is not installed there
 - `dot_config/mcphub/modify_servers.json` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android only; same list and merge as `~/.claude.json`, from `.chezmoitemplates/lib-modify-mcp-servers.tmpl`)
-- `dot_claude/modify_settings.json` → `~/.claude/settings.json`: on Linux, Claude Code's look (`dark-ansi` theme, fullscreen renderer, status line) from `.chezmoitemplates/lib-claude-look.tmpl`; on Windows and Android, permission rules and `effortLevel`. A modify-template; see "Claude Code and Codex Look" in CLAUDE.md
-- `dot_claude/executable_statusline-command.sh` → `~/.claude/statusline-command.sh`: the two-line status line styled after p10k, run by both Claude Code profiles (Linux only)
-- `dot_claude-omni/modify_settings.json` → `~/.claude-omni/settings.json`: the same look for `claude-omni`'s profile, from the same library; ships with `claude-omni`
-- `dot_codex/modify_private_config.toml` → `~/.codex/config.toml`: Codex's status line items and colours, on every platform; a TOML modify-template that leaves Codex's own settings alone and keeps the file `0600`
+- `dot_claude/modify_settings.json` → `~/.claude/settings.json`: on Linux, Claude Code's look (`dark-ansi` theme, fullscreen renderer, status line) from `.chezmoitemplates/lib-claude-look.tmpl`; on Android, permission rules and `effortLevel`. A modify-template; see "Claude Code and Codex Look" in CLAUDE.md
+- `dot_claude/executable_statusline-command.sh` → `~/.claude/statusline-command.sh`: the two-line status line styled after p10k, run by Claude Code (Linux only)
+- `dot_codex/modify_private_config.toml` → `~/.codex/config.toml`: Codex's status line items and colours, on Android, the one platform that installs Codex; a TOML modify-template that leaves Codex's own settings alone and keeps the file `0600`
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
 - `dot_config/systemd/user/ssh-agent-bridge.socket` + `ssh-agent-bridge@.service` → `~/.config/systemd/user/`: WSL-only SSH agent bridge (see below)
 - `.chezmoiscripts/run_before_linux-000-enable-wsl-systemd.sh.tmpl`: turns systemd on in `/etc/wsl.conf` on a WSL distribution that boots without it (Kali's image ships no such file), merging into the existing file through `sudo`; renders to nothing once systemd is PID 1
-- `dot_local/bin/executable_claude-omni.tmpl` → `~/.local/bin/claude-omni`: Claude Code through OmniRoute (`local-services/omniroute/`, run from the checkout), on a model picked from the gateway's own catalog or named with `-m`. It sets the one context window Claude Code holds per process to the smaller of OmniRoute's and the repository's -- for a GPU model `contextTokens` from `.chezmoidata/local-llm.yaml`, which the Ollama unit `dot_config/systemd/user/ollama.service.tmpl` also renders -- pins every tier to the model, turns the `[1m]` variants off, keeps the prompt cacheable, offers `/model` only the served models that hold the session's window, and keeps the old launchers' GPU guards (the user unit on demand; a tailnet GPU's window and placement checked). Both read their settings through `.chezmoitemplates/lib-omniroute.tmpl`; the key is the `cred:OMNIROUTE_API_KEY` field. See "Claude Code Through OmniRoute (claude-omni)" in CLAUDE.md
-- `dot_local/bin/executable_claude-omni-task.tmpl` → `~/.local/bin/claude-omni-task`: one unattended task through `claude-omni` -- on the first free, serving GPU in `taskGpus`, or on a model named with `-m` -- followed by an audit: every action with its result, the change measured between working-tree snapshots taken through a scratch index, an undo command and the transcript path; saved under `~/.claude-omni/audits`
+- `dot_config/systemd/user/ollama.service.tmpl` → `~/.config/systemd/user/ollama.service`: the local model server (Ollama), one of OmniRoute's providers, as a user unit on Linux with an NVIDIA driver; its model, context window (`contextTokens`, rendered as `OLLAMA_CONTEXT_LENGTH`), KV cache type and keep-alive come from `.chezmoidata/local-llm.yaml` through `.chezmoitemplates/lib-local-llm.tmpl`, and `run_onchange_after_linux-009-setup-ollama.sh.tmpl` installs the binary and restarts the unit when it changes. See "Local Model Server (Ollama)" in CLAUDE.md
+- `dot_config/opencode/opencode.json.tmpl` → `~/.config/opencode/opencode.json`: OpenCode's global config, with OmniRoute (`local-services/omniroute/`, run from the checkout) as the primary provider at `.chezmoidata/omniroute.yaml`'s `baseUrl` and `omniroute/auto/coding` as the default model; the key is read at load time as `{env:OMNIROUTE_API_KEY}`, which the credential loader exports from the `cred:OMNIROUTE_API_KEY` field. The CLI that reads it is `ocode`, the fork build `run_after_linux-006-build-ocode.sh` installs into `~/.local/bin/ocode` (Linux only). See "OpenCode V2 Through OmniRoute" in CLAUDE.md
 - `dot_local/bin/executable_tailscale-up.tmpl` → `~/.local/bin/tailscale-up`: renders per kind of machine. On bare metal it logs the machine in to the tailnet (waiting for the browser), sets `--operator=$USER` and `--accept-dns=false`, and shares the local model's server with `tailscale serve`; `tailscale-up --no-login` is the quiet pass every interactive zsh runs. On WSL the client is Windows', logged in through its app: it shares the server through Windows' `tailscale serve`, and `--no-login` is what the apply runs. `run_onchange_after_linux-010-setup-tailscale.sh.tmpl` installs `tailscaled` on bare metal and only runs that pass on WSL; see "Tailscale" in `CLAUDE.md`
-- `dot_local/bin/executable_tailscale` → `~/.local/bin/tailscale` (WSL only): a wrapper for Windows' `tailscale.exe`, so `tailscale-up` and `claude-omni` reach Windows' client under the usual name
+- `dot_local/bin/executable_tailscale` → `~/.local/bin/tailscale` (WSL only): a wrapper for Windows' `tailscale.exe`, so `tailscale status` and `tailscale-up` reach Windows' client under the usual name
 - `dot_scripts/` → `~/.scripts/`: User utility scripts
 
 ### Scripts and Automation
@@ -267,8 +264,8 @@ and refuses to install on a mismatch. Verify with `/usr/bin/ssh-add -l` — the 
 | Shell            | Zsh + Oh My Zsh + Powerlevel10k         | PowerShell + Oh My Posh             | Zsh + Oh My Zsh + Powerlevel10k         |
 | Prompt theme     | Powerlevel10k (`~/.p10k.zsh`)           | Oh My Posh (`~/.oh-my-posh.json`)   | Powerlevel10k (`~/.p10k.zsh`)           |
 | Script extension | `.sh`                                   | `.ps1`                              | `.sh`                                   |
-| Editor           | (any)                                   | JetBrains Toolbox / Visual Studio   | NeoVim (AstroVim, `~/.config/nvim/`)    |
-| MCP config       | `~/.claude.json` (Context7, Chrome DevTools) | `~/.claude.json` (Context7)    | `~/.claude.json`, `~/.config/mcphub/servers.json` (Context7) |
+| Editor           | (any)                                   | Notepad++                           | NeoVim (AstroVim, `~/.config/nvim/`)    |
+| MCP config       | `~/.claude.json` (Context7, Chrome DevTools) | N/A (no Claude Code)           | `~/.claude.json`, `~/.config/mcphub/servers.json` (Context7) |
 | Terraform        | `terra` (same as Android)               | N/A                                 | `termux-etc-seccomp` wrapper (`terra`)  |
 | 1Password CLI    | `~/.local/bin/op` wrapper → `op.exe`    | Native `op.exe`                     | `~/.local/bin/op` → `termux-etc-seccomp` binary |
 | Docker           | Native                                  | Docker Desktop                      | N/A                                     |
@@ -525,7 +522,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-omni`, `claude-omni-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `top-size`, `ocode`, `rebuild-ocode`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `top-size`, `ocode`, `rebuild-ocode`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
@@ -549,7 +546,7 @@ Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-key
    - `~/.zshrc` (Linux/Android) or PowerShell profile (Windows) with custom settings
    - `~/.zshenv` (Linux/Android) for IDE-compatible PATH setup
    - `~/.gitconfig` with per-device SSH signing via 1Password
-   - `~/.claude.json` (Linux/Windows) or `~/.config/mcphub/servers.json` (Android) with MCP servers
+   - `~/.claude.json` (Linux/Android), plus `~/.config/mcphub/servers.json` on Android, with MCP servers
 
 3. **Development Environment**:
    - kubectl, terraform, terragrunt available in PATH

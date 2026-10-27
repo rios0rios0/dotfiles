@@ -138,16 +138,6 @@ if [[ -d "$HOME/.fly/bin" ]]; then
     export PATH="$HOME/.fly/bin:$PATH"
 fi
 
-# OpenCode V2 CLI (`opencode`, plus the `opencode2` shim the installer writes beside it): the
-# upstream installer puts it under ~/.opencode and would otherwise append this export to the
-# rc files chezmoi owns (`install_opencode` runs it with `--no-modify-path` for that reason;
-# the apply that rewrote ~/.zshrc without the appended line is what took `opencode` off PATH
-# and prompted this block). Deliberately NOT on Android: the binary is a glibc build and
-# bionic cannot start it, so no Android machine installs it.
-if [[ -d "$HOME/.opencode/bin" ]]; then
-    export PATH="$HOME/.opencode/bin:$PATH"
-fi
-
 # Bun (`bun`), the runtime the ocode fork build runs on
 # (`run_after_linux-006-build-ocode.sh`): the upstream installer puts it under ~/.bun and,
 # when `$SHELL` names a shell it knows, would append this export to the rc files chezmoi
@@ -184,8 +174,8 @@ fi
 # installed a non-LTS Current release keeps it in `versions/node`, where a
 # version sort ranks it above the LTS the chain points at. That is not a
 # cosmetic difference: `npm install -g` writes into the *active* version's tree,
-# so the dependency installer (which runs the real `nvm`) puts `codex`, `sentry`
-# and Claude Code under the LTS, while a shell that picked the higher Current
+# so the dependency installer (which runs the real `nvm`) puts `sentry` and
+# Claude Code under the LTS, while a shell that picked the higher Current
 # release sees none of them and reports every one of those CLIs as missing.
 nvmRoot="$HOME/.nvm"
 if [[ -d "$nvmRoot" ]]; then

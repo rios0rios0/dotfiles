@@ -529,7 +529,7 @@ else
 fi
 
 # 17) The ZSHENV template carries the ~/.bun/bin PATH block on Linux and macOS (the same
-#     non-Android branch as flyctl and opencode) and none on Android.
+#     non-Android branch as flyctl) and none on Android.
 chmod +x "$CI_DIR/fixtures/mock-op.sh" 2>/dev/null || true
 cat >"$TMP/chezmoi.yaml" <<EOF
 sourceDir: "$REPO_ROOT"
@@ -562,6 +562,14 @@ else
         fail "Android must not carry the ~/.bun/bin PATH block"
     else
         pass "Android carries no ~/.bun/bin PATH block"
+    fi
+
+    # the flyctl block shares the branch and the template structure with the bun block;
+    # guard that an edit to one did not break the other
+    if render linux | grep -qF 'export PATH="$HOME/.fly/bin:$PATH"'; then
+        pass "the flyctl PATH block still renders on Linux"
+    else
+        fail "the flyctl PATH block disappeared from the Linux render"
     fi
 fi
 

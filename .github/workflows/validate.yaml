@@ -285,26 +285,6 @@ jobs:
       - name: Test the local model server
         run: make test-local-llm
 
-  test-claude-omni:
-    name: Test (Claude Code through OmniRoute)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install jq, zsh and column
-        run: sudo apt-get install -y jq zsh bsdextrautils
-      - name: Test claude-omni and claude-omni-task
-        run: make test-claude-omni
-
   test-opencode:
     name: Test (OpenCode V2 through OmniRoute)
     runs-on: ubuntu-latest
@@ -324,24 +304,6 @@ jobs:
         run: sudo apt-get install -y jq
       - name: Test the OpenCode configuration
         run: make test-opencode
-
-  test-opencode-cli:
-    name: Test (OpenCode CLI install and PATH)
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Test the OpenCode CLI installation and PATH wiring
-        run: make test-opencode-cli
 
   test-tailscale:
     name: Test (Tailscale)
@@ -388,7 +350,7 @@ jobs:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install jq'
         run: 'sudo apt-get install -y jq'
-      - name: 'Test the status line in both Claude Code profiles'
+      - name: 'Test the Claude Code status line with and without a login'
         run: 'make test-statusline'
 
   test-claude-lsp:
@@ -452,6 +414,14 @@ jobs:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Test the unattended terra update calls'
         run: 'make test-terra-update'
+
+  test-yq:
+    name: 'Test (yq install)'
+    runs-on: 'ubuntu-latest'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Test the pinned install of mikefarah''s yq'
+        run: 'make test-yq'
 
   sast:
     name: SAST

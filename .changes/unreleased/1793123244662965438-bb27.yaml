@@ -1,0 +1,4 @@
+kind: 'Removed'
+body: 'removed `claude-omni` and `claude-omni-task` with everything that served only them: the profile look in `dot_claude-omni/`, `.chezmoitemplates/lib-omniroute.tmpl`, the one-time `~/.claude-local` profile move, the status line''s per-model window table, the ccswitch capacity hint in `dot_zshrc.tmpl` and `make test-claude-omni`; `.chezmoidata/omniroute.yaml` keeps only the `baseUrl` the OpenCode configuration reads, the next apply deletes `~/.local/bin/claude-omni`, `~/.local/bin/claude-omni-task` and the `~/.claude-omni` profile, and the OmniRoute gateway, Ollama and the Tailscale share stay'
+breaking: true
+time: '2026-10-27T17:47:24.662965438Z'

@@ -1,12 +1,12 @@
-# OmniRoute for Claude Code
+# The OmniRoute Gateway
 
-OmniRoute is a local gateway that routes each Claude Code request to the provider behind its model id:
-this machine's or another machine's Ollama, NVIDIA NIM, OpenRouter, Baseten. `claude-omni` starts Claude
-Code through it. Its Compose stack and local environment files live in `local-services/omniroute/` and
-run from the dotfiles checkout; chezmoi deploys none of it. The dashboard and API run locally, with Redis
-available only on the internal Docker network. Compose keeps the existing `dotfiles` project name so
-moving the files does not switch to new named data volumes. OpenCode V2 is the gateway's second
-client: see [OpenCode V2 through OmniRoute](opencode-local.md).
+OmniRoute is a local gateway that routes each request to the provider behind its model id: this
+machine's or another machine's Ollama, NVIDIA NIM, OpenRouter, Baseten. OpenCode -- on Linux `ocode`,
+the fork build -- is its client: see [OpenCode V2 through OmniRoute](opencode-local.md). Its Compose
+stack and local environment files live in `local-services/omniroute/` and run from the dotfiles
+checkout; chezmoi deploys none of it. The dashboard and API run locally, with Redis available only on
+the internal Docker network. Compose keeps the existing `dotfiles` project name so moving the files
+does not switch to new named data volumes.
 
 ## Start OmniRoute
 
@@ -35,7 +35,7 @@ docker compose up -d
 docker compose logs -f omniroute
 ```
 
-Open `http://127.0.0.1:20128`. The initial dashboard setup may ask for a bootstrap token; find it in the `omniroute` service logs. Create a dashboard API key for Claude Code after signing in.
+Open `http://127.0.0.1:20128`. The initial dashboard setup may ask for a bootstrap token; find it in the `omniroute` service logs. Create an API key for OpenCode after signing in; see [Connect OpenCode](#connect-opencode).
 
 The Compose file pins a custom build of the fork (`ghcr.io/rios0rios0/omniroute`) by digest rather than the official image; see [The custom fork image](#the-custom-fork-image). Both services use `restart: always`, so Docker starts them automatically when its daemon starts. All published ports bind to `127.0.0.1`; Redis has no host-published port. `docker compose down` preserves the named data volumes. `docker compose down -v` deletes the database, Redis data, and configured provider credentials.
 
@@ -82,8 +82,7 @@ The fork repository is public, so the GHCR package is public and Compose pulls i
 
 OmniRoute runs in a Docker container while Ollama runs directly in WSL, on this machine and on any other
 GPU machine on the tailnet. Each GPU is an Ollama provider of its own in OmniRoute's **Providers** page,
-and its prefix must match a key of `gpus` in `.chezmoidata/omniroute.yaml`, which is how `claude-omni`
-knows a model runs on a GPU and which one:
+and its model ids carry that provider's prefix:
 
 | Prefix | Base URL | Where |
 |--------|----------|-------|
@@ -98,12 +97,9 @@ the server is up. Tailscale Serve forwards the tailnet's port to this same `loca
 extra proxy, `socat`, or systemd bridge is needed. The API has no authentication, and loopback
 keeps the network off it directly.
 
-The dotfiles checkout is shared by two machines, so the local/remote roles come from chezmoi's
-`deviceName`, not from a machine guess at runtime. On the laptop (`alien-a51`), `ollama-laptop` is
-local and `ollama-desktop` is the desktop. On the desktop (`mxhero-z790`), a per-device override
-swaps those roles: `ollama-desktop` is local and `ollama-laptop` is the laptop. Check the value on
-each machine with `chezmoi data | jq -r .deviceName`; `CHEZMOI_DEVICE` can override the hostname
-when set before `chezmoi init`.
+The table is the laptop's (`alien-a51`) view. On the desktop (`mxhero-z790`) the roles swap:
+`ollama-desktop` is local, at `host.docker.internal`, and `ollama-laptop` is the laptop's tailnet
+address. Each machine's providers live in its own OmniRoute database, not in this checkout.
 
 Do not add a `host-gateway` mapping: with Docker Desktop it points at the Docker VM's bridge rather
 than the Windows host. Container traffic to the remote GPU leaves through Windows and traverses its
@@ -114,7 +110,6 @@ model load, where a name gets thirty seconds.
 Give each Ollama model a manual context window of `contextTokens` from `.chezmoidata/local-llm.yaml`
 (65536). OmniRoute cannot see the window an Ollama server allocates and assumes its 128000 fallback;
 with the override, it rejects an oversized request instead of letting Ollama truncate it.
-`claude-omni` declares the same window itself, so the override is the second guard.
 
 **Known limitation: the tailnet GPU answers 403.** `tailscale-up` shares the server with
 `tailscale serve --tcp=11434`, a raw TCP forward, so a request from another machine keeps its own
@@ -175,10 +170,9 @@ Following that probe, OmniRoute hides 68 of its 81 NIM chat entries; the 13 that
 the latest probe remain visible. Three models that were visible after an older probe were hidden
 because they were not confirmed by this run: one was absent from the current catalog, one timed out,
 and one returned HTTP 500. This visibility is stored in OmniRoute's database, not in this checkout,
-and it is the whole of the curation: `claude-omni` lists what `/v1/models` serves, so a model hidden
-here is absent from its picker too. `claude-omni --probe nvidia/` repeats the probe; each request may
-incur provider charges. OmniRoute reports no authoritative NIM context window, so the picker shows `?`
-rather than presenting its generic 128000 fallback as fact.
+and it is the whole of the curation: OpenCode lists what `/v1/models` serves, so a model hidden
+there is absent from its picker too. OmniRoute reports no authoritative context window for NIM
+models; the 128000 it gives them is its generic fallback.
 
 **Why the first answer can take a minute.** NIM queues requests: `z-ai/glm-5.3-flash` started answering
 after 30-35 seconds. OmniRoute aborted that first attempt at its 30-second default and retried on a
@@ -186,123 +180,16 @@ fresh socket, which queued it again: 61-65 seconds in all. The Compose file rais
 `OMNIROUTE_DIRECT_HEADERS_TIMEOUT_MS` to two minutes, so a queued request is waited for once. OmniRoute
 lifts the bound to three minutes by itself only for requests that ask for high effort.
 
-## Claude Code through OmniRoute (`claude-omni`)
+## Connect OpenCode
 
-Create an API key for Claude Code in the dashboard, and put it in this device's 1Password note as a
+Create an API key for OpenCode in the dashboard, and put it in this device's 1Password note as a
 concealed field labelled `cred:OMNIROUTE_API_KEY`. `reload-credentials` (or a new shell) exports it as
-`OMNIROUTE_API_KEY`. `claude-omni` hands it to Claude Code for that one process only, so the regular
-`claude`, its claude.ai login and ccswitch's rotation are untouched.
-
-```bash
-claude-omni                                    # pick a model; each line shows its context window
-claude-omni -m nvidia/z-ai/glm-5.3             # straight in
-claude-omni -m ollama-desktop/qwen3.8:27b -p "add a test for Subtract"   # print mode, like `claude -p`
-claude-omni -c -m openrouter/z-ai/glm-5.3      # switch model, keeping the conversation
-claude-omni --list                             # the models OmniRoute serves, their windows and where they run
-claude-omni --list --all                       # every chat model OmniRoute serves, with its window
-claude-omni --probe nvidia/                    # which models under a prefix answer with a tool call
-```
-
-The picker is the gateway's own catalog: every launch reads OmniRoute's `/v1/models` and lists the
-chat models that can call tools, the GPUs' own model leading and each line showing its context
-window. No model list lives in this repository, so a model is added, hidden or restricted in
-OmniRoute's dashboard and the picker follows -- `efforts` in `.chezmoidata/omniroute.yaml` is the
-one per-model setting kept here (a Claude Code effort level, low to xhigh). Enter takes the model
-the profile saved last; if that one is no longer served, the first served one starts. Without a
-terminal -- in print mode, or from a script -- it takes that model without asking. The first launch
-shows Claude Code's onboarding once, because the session runs in its own profile (`~/.claude-omni`),
-and its trust prompt once per project. `chezmoi apply` keeps the regular profile's theme, renderer
-and status line there; see "Claude Code and Codex Look" in
-[CLAUDE.md](../CLAUDE.md).
-
-### The window a session gets
-
-Claude Code reads no context window from a gateway: it assumes 200K for a model id it does not
-recognise, and takes one `CLAUDE_CODE_MAX_CONTEXT_TOKENS` for the whole process. `claude-omni` sets it to
-the smaller of OmniRoute's window, which OmniRoute enforces, and this repository's:
-
-| Model | Window | `--list` shows |
-|-------|--------|----------------|
-| On a GPU | `contextTokens` from `local-llm.yaml`, what the server allocates | `64K` |
-| One OmniRoute knows (its catalog has `max_input_tokens`) | OmniRoute's | `256K` |
-| One OmniRoute does not know (no `max_input_tokens`) | OmniRoute's 128000 fallback, with a warning | `128K?` |
-| An `auto/*` combo | `autoWindow` (200000); OmniRoute advertises the largest window in the pool | `200K` |
-
-The reply reservation follows the window: an eighth of it, between 8,192 and 32,000 tokens.
-
-Every Claude Code tier -- Opus, Sonnet, Haiku, Fable and subagents -- is pinned to the one model, and
-`CLAUDE_CODE_DISABLE_1M_CONTEXT=1` keeps `/model`'s Default row from turning the model id into
-`<id>[1m]`, which Claude Code would size at 1,000,000 tokens.
-
-### Switching models
-
-In the session, `/model` lists the models OmniRoute serves whose window is at least the session's,
-each with its window and provider. The window stays the session's after a switch, so a model with a
-smaller one would overflow before the session compacts, and OmniRoute's answer to an over-window
-request is not one Claude Code compacts on. `claude-omni -c -m ID` reaches any model, and keeps the
-conversation.
-
-The status line shows the model and the session's window, `ctx 80% left (13k/64k)`. After a switch it adds
-the new model's own window, `(13k/64k · model 256k)`, and turns red when that one is smaller, which can
-only happen with a model id typed into `/model` by hand.
-
-### The profile
-
-`~/.claude-omni` is a profile of its own: `/model` choices are saved to its settings, and in the regular
-profile they would be sent to Anthropic. It also leaves out the regular profile's plugins, skills, agents
-and MCP servers. Two files the launcher writes sit there as well: `omniroute-settings.json`, named on
-Claude Code's command line because the `/model` lineup outgrows a command-line argument, and
-`omniroute-windows.tsv`, every served model's window for the status line.
-
-On a window of 128K or less the session is also lean, because what loads before the first prompt has to
-fit. Measured with `/context` on 2026-10-12 (Claude Code `2.1.296`):
-
-| Profile | dotfiles repository | ccswitch repository |
-|---------|--------------------|---------------------|
-| Regular profile | 72.8K tokens | 50.7K tokens |
-| Lean profile, at a 64K window | 37.2K tokens, 7.1K free | 18.5K tokens, **25.9K free** |
-
-- **Tool schemas.** For a model it does not recognise, Claude Code sends every tool schema with every
-  request instead of deferring the rarely used ones: 27K tokens. `--tools` limits a lean session to six
-  (5.8K).
-- **Global rules.** A separate `CLAUDE_CONFIG_DIR` does not drop `~/.claude/rules`: for any project under
-  `$HOME`, Claude Code reads that directory as the rules of the ancestor directory `~`.
-  `claudeMdExcludes` keeps only the rules `lean.rules` lists.
-- **The reply reservation.** Claude Code reserves room for a reply plus about 13K before it
-  auto-compacts; an eighth of a 64K window leaves 21.2K of it for that.
-
-A repository whose own `CLAUDE.md` is as large as this one's (26.9K tokens) leaves too little room for a
-64K window and is better served by a larger model.
-
-### Delegating a task (`claude-omni-task`)
-
-An agent that hands a task to another model -- `omniroute-general` in the
-[aifiles](https://github.com/rios0rios0/aifiles) agents -- runs it through `claude-omni-task`:
-
-```bash
-claude-omni-task brief.md                              # the first free GPU in taskGpus
-claude-omni-task -m nvidia/z-ai/glm-5.3 brief.md       # a model named by the caller
-```
-
-Without `-m` it tries `taskGpus` in order and takes the first GPU that no other run holds (a lock per
-GPU, since a GPU serves one request at a time) and that passes the launch checks. A cloud model runs only
-when named, and then every file the model reads goes to that provider; the audit says so. The model runs
-unattended with every permission check off, as the caller's own session does. Nobody watches it, so
-instead of restricting it, `claude-omni-task` returns all of it to the caller:
-
-- **every action**, in order, with its result: each command and its output, each file read or
-  written, a write outside the repository flagged as one;
-- **the change**, measured between snapshots of the working tree taken before and after the run,
-  untracked files included. The snapshots go through a scratch copy of the index, so the
-  caller's own index is never touched, and edits that were already in the tree are never
-  attributed to the run;
-- **one command that undoes exactly that change** (`git diff --binary <before> <after> | git
-  apply -R`), and one that shows it;
-- **the transcript**, which Claude Code keeps under `~/.claude-omni/projects`.
-
-It prints the audit in short and saves it in full under `~/.claude-omni/audits`. What an audit cannot
-take back is whatever left the working tree -- a commit, a push, a request to a server, a write
-somewhere else. Those show up in the action list and as a moved HEAD, and nowhere else.
+`OMNIROUTE_API_KEY`, which OpenCode reads when it loads its configuration; the key never enters this
+repository. That configuration points OpenCode's provider at `baseUrl` in
+`.chezmoidata/omniroute.yaml` (`http://127.0.0.1:20128`), the one OmniRoute setting kept here, and
+the models it offers are whatever the key's policy lets `/v1/models` serve: a model is added, hidden
+or restricted in OmniRoute's dashboard, and OpenCode follows. Setup and usage are in
+[OpenCode V2 through OmniRoute](opencode-local.md).
 
 ## Encrypted backups
 
@@ -344,12 +231,9 @@ script, its retention and the installer's gate.
 
 ## Privacy boundary
 
-The dashboard, routing API, provider credentials and database remain on this machine. Prompts sent to NVIDIA, OpenRouter or Baseten still leave the machine and are handled under that provider's own retention and usage policies; in a Claude Code session, the prompt includes every file the model reads. Use only providers and models whose data terms fit the work you send. The GPU models never leave your own machines.
+The dashboard, routing API, provider credentials and database remain on this machine. Prompts sent to NVIDIA, OpenRouter or Baseten still leave the machine and are handled under that provider's own retention and usage policies; in an OpenCode session, the prompt includes every file the model reads. Use only providers and models whose data terms fit the work you send. The GPU models never leave your own machines.
 
 ## References
 
-- [Claude Code: gateway compatibility guide](https://code.claude.com/docs/en/llm-gateway-protocol)
-- [Claude Code: correct the window for a gateway or custom model ID](https://code.claude.com/docs/en/model-config#correct-the-window-for-a-gateway-or-custom-model-id)
-- [Claude Code: environment variables](https://code.claude.com/docs/en/env-vars)
-- [Claude Code: `modelPicker`](https://code.claude.com/docs/en/settings-reference#modelpicker)
 - [OmniRoute](https://github.com/diegosouzapw/OmniRoute)
+- [OpenCode V2 through OmniRoute](opencode-local.md)

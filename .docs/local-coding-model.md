@@ -1,9 +1,9 @@
 # Local Model Server (Ollama)
 
-Ollama serves a coding model from this machine's NVIDIA GPU. It is one of OmniRoute's providers:
-Claude Code reaches it through `claude-omni`, which also reaches another machine's GPU and the cloud
-providers. See [OmniRoute for Claude Code](omniroute-local.md) for the launcher; this page covers
-the server.
+Ollama serves a coding model from this machine's NVIDIA GPU. It is one of OmniRoute's providers,
+beside another machine's GPU and the cloud providers, and OpenCode reaches it through the gateway.
+See [The OmniRoute Gateway](omniroute-local.md) for the gateway's side and
+[OpenCode V2 through OmniRoute](opencode-local.md) for the client's; this page covers the server.
 
 ## When it is installed
 
@@ -13,7 +13,8 @@ unless `.chezmoidata/local-llm.yaml` sets `enabled: false`, globally or for one 
 
 1. downloads the pinned Ollama release, checks it against the digest upstream publishes, and
    unpacks it into `~/.local/share/ollama/<version>` (no root, no system user);
-2. starts `ollama.service` as a **user** unit, rendered from the same data file;
+2. enables `ollama.service`, a **user** unit rendered from the same data file, so that it starts
+   with the user's systemd manager, and restarts it;
 3. reads the server's start-up log -- one `inference compute` line per backend, `library=cpu`
    alone meaning no accelerator answered -- and fails the apply when no other backend is there:
    see [Troubleshooting](#troubleshooting) for why that check exists. Loading a model to see
@@ -44,17 +45,16 @@ Everything lives in `.chezmoidata/local-llm.yaml`, which chezmoi reads on every 
 
 | Key | Default | What it controls |
 |-----|---------|------------------|
-| `model` | `qwen3.8:27b` | The model the server pulls, and the one `claude-omni` runs on each GPU |
-| `contextTokens` | `65536` | Both `OLLAMA_CONTEXT_LENGTH` and the window `claude-omni` declares for every GPU model, from one value |
+| `model` | `qwen3.8:27b` | The model the server pulls |
+| `contextTokens` | `65536` | `OLLAMA_CONTEXT_LENGTH`: the window the server allocates |
 | `kvCacheType` | `q8_0` | KV cache precision; half the memory of the `f16` default |
 | `keepAlive` | `15m` | How long an idle model stays in VRAM before the GPU is given back |
 | `shareOnTailnet` | `true` | Whether this machine's server is shared on the tailnet, for OmniRoute on another machine |
 | `devices` | none | Per-device overrides of any key above, by chezmoi `deviceName` |
 
-The window has to be one value because nothing else can learn it: Ollama allocates it per server,
-Claude Code reads no window from a gateway, and OmniRoute advertises its 128000-token fallback for
-every Ollama model. A session declaring more than the server allocates would grow past the point
-where Ollama truncates the prompt -- silently -- before Claude Code compacts it.
+OmniRoute cannot read the window from Ollama and advertises its 128000-token fallback for the
+model instead; [Connect the GPUs' Ollama](omniroute-local.md#connect-the-gpus-ollama) sets the
+window by hand on OmniRoute's side.
 
 ## Performance on this machine
 
@@ -72,8 +72,7 @@ Measured on 2026-10-12: RTX 5090 Laptop GPU (24 GB, also driving the display), O
 | On the CPU instead | 55 s for a one-word reply |
 
 An apply no longer loads the model, so the GPU stays free after one: the load happens on the first
-request that needs it (a `claude-omni` session on this GPU starts its server on demand and lets
-Ollama load the model), and `keepAlive` gives the VRAM back 15 minutes after the last request.
+request that needs it, and `keepAlive` gives the VRAM back 15 minutes after the last request.
 
 Through OmniRoute the cache is reused the same way: on 2026-10-15 an 11K-token prefix took 5.53 s
 the first time and 1.15 s the second, against 5.50 s and 1.03 s sent to Ollama directly.
@@ -85,9 +84,9 @@ shows the split.
 ## Another machine's GPU
 
 Every machine with the model shares its server on the tailnet's port 11434, unless
-`shareOnTailnet` says otherwise, and OmniRoute reaches it there as a provider of its own. Claude
-Code itself still runs on the machine you work on: every file it reads or edits and every command
-it runs stays there, and only inference happens on the other one.
+`shareOnTailnet` says otherwise, and OmniRoute reaches it there as a provider of its own. OpenCode
+itself still runs on the machine you work on: every file it reads or edits and every command it
+runs stays there, and only inference happens on the other one.
 
 1. Both machines are on the tailnet (see "Tailscale" in [CLAUDE.md](../CLAUDE.md)). A WSL machine
    is on it through Windows' Tailscale client, logged in once with its app; WSL reaches that
@@ -98,16 +97,12 @@ it runs stays there, and only inference happens on the other one.
    Docker Desktop uses `host.docker.internal` to reach Ollama directly, without Tailscale.
 3. OmniRoute's provider for that machine points at its tailnet address -- the `100.x` one, which
    OmniRoute counts as private and gives five minutes to start answering; a MagicDNS name gets
-   thirty seconds, too little for a cold model load. See [OmniRoute for Claude Code](omniroute-local.md).
+   thirty seconds, too little for a cold model load. See
+   [Connect the GPUs' Ollama](omniroute-local.md#connect-the-gpus-ollama).
 
-Before a session on the other machine's GPU, `claude-omni` loads the model there and reads back
-how the server holds it:
-
-- **A different context window stops the launch.** The other machine renders its window from its
-  own checkout, which may be older or carry a per-device override, and would truncate the prompt
-  where Claude Code expects to compact it. Run `chezmoi update` there.
-- **A model partly on the CPU only warns.** A GPU busy with a game leaves part of the model on
-  that machine's CPU, where every request still succeeds, many times slower.
+That machine's server allocates the window its own checkout renders, which may be older than this
+one or carry a per-device override, and nothing compares the two: after changing `contextTokens`,
+run `chezmoi update` there too.
 
 **A WSL machine serves only while its WSL runs**, and Windows stops WSL a few seconds after the
 last WSL terminal closes. To use a desktop's GPU from the laptop, open a WSL terminal on the
@@ -130,15 +125,15 @@ one: it is a second worker, useful while this GPU is busy, on battery, or alread
   and reinstalls when one no longer matches. It also makes this same check itself, against the log
   lines of the run it just restarted: only `library=cpu` there fails the apply. To run it now:
   `chezmoi execute-template < "$(chezmoi source-path)/.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.sh.tmpl" | bash`
-- **The server is not running.** `claude-omni` starts the user unit on demand when a session picks
-  this machine's GPU; otherwise `systemctl --user status ollama`. When systemd itself is not
-  running, `claude-omni` says so, and `systemctl` fails with `Failed to connect to user scope bus via
-  local transport`: on WSL, `chezmoi apply` turns systemd on in `/etc/wsl.conf`, then
-  `wsl.exe --shutdown` and a second apply start it and finish the setup, model download included.
+- **The server is not running.** The installer enables the user unit, so it starts with the user's
+  systemd manager; `systemctl --user status ollama` shows why it is down, and
+  `systemctl --user start ollama` starts it. When systemd itself is not running, `systemctl` fails
+  with `Failed to connect to user scope bus via local transport`: on WSL, `chezmoi apply` turns
+  systemd on in `/etc/wsl.conf`, then `wsl.exe --shutdown` and a second apply start it and finish
+  the setup, model download included.
 
 ## References
 
-- [Ollama: Anthropic API compatibility](https://docs.ollama.com/api/anthropic-compatibility)
 - [Ollama: context length](https://docs.ollama.com/context-length)
 - [Tailscale: `tailscale serve`](https://tailscale.com/docs/reference/tailscale-cli/serve)
 - [Tailscale: Windows with WSL 2](https://tailscale.com/kb/1295/install-windows-wsl2)

@@ -1,19 +1,20 @@
 # OpenCode V2 Through OmniRoute
 
-OpenCode is the second client of the local [OmniRoute](omniroute-local.md) gateway:
+OpenCode is the client of the local [OmniRoute](omniroute-local.md) gateway, and on Linux it runs
+as `ocode`, the personal fork's build (see [Where the CLI comes from](#where-the-cli-comes-from)).
 `chezmoi apply` renders `dot_config/opencode/opencode.json.tmpl` to
 `~/.config/opencode/opencode.json`, making OmniRoute the primary provider and
 `omniroute/auto/coding` the default model. No model list lives in this repository for OpenCode:
 it discovers the catalog from the gateway's own `/v1/models`, which serves exactly what the API
-key's policy allows. `claude-omni` resolves its lineup from the same endpoint, so a model, or a
-whole new provider, added in OmniRoute's dashboard appears in both without a change here.
+key's policy allows, so a model, or a whole new provider, added in OmniRoute's dashboard appears
+without a change here.
 
 ## What is configured
 
 | Part | Where it comes from |
 |------|---------------------|
 | Provider | `providers.omniroute`: `baseURL` is `.chezmoidata/omniroute.yaml`'s `baseUrl` with `/v1`, and the key is the `{env:OMNIROUTE_API_KEY}` reference |
-| Model list | live from the gateway; the `omniroute/*` entries in the model picker and `opencode models` |
+| Model list | live from the gateway; the `omniroute/*` entries in the model picker and `ocode models` |
 | Default model | `omniroute/auto/coding`: the gateway picks the upstream |
 | MCP servers | context7 (remote, every platform) and Chrome DevTools (local, Linux only, pinned like Claude Code's) |
 | Permissions | the same shell, read and edit allowances as the Claude Code side, as V2 ordered entries |
@@ -21,9 +22,9 @@ whole new provider, added in OmniRoute's dashboard appears in both without a cha
 | Reference | `dotfiles` points at the chezmoi source, so a session can read the dotfiles that rendered the configuration |
 | Terminal look | `~/.config/opencode/cli.json` |
 
-The key is the same `cred:OMNIROUTE_API_KEY` field of the device note `claude-omni` uses: the
-credential loader exports `OMNIROUTE_API_KEY` in every shell, and OpenCode substitutes it when
-it loads the file. The repository itself never holds it.
+The key is the `cred:OMNIROUTE_API_KEY` field of the device note: the credential loader exports
+`OMNIROUTE_API_KEY` in every shell, and OpenCode substitutes it when it loads the file. The
+repository itself never holds it.
 
 AI content is not part of this configuration. `~/.config/opencode/AGENTS.md`, `rules/`,
 `agents/`, `commands/` and `skills/` are synced by aisync (the `opencode` tool in the aifiles
@@ -37,42 +38,35 @@ config), like the equivalent `~/.claude` and `~/.codex` trees; chezmoi renders o
 Upstream's restore of those variables (sst/opencode#51888) was closed unmerged; the gate now
 lives on the personal fork `rios0rios0/opencode`, branch `reworked` (commit
 "feat(core): restore OPENCODE_DISABLE_CLAUDE_CODE for compatibility roots"), which gates the
-`~/.claude` compatibility roots at discovery. Until a build from that branch runs on this
-machine, the plugin is the stopgap; afterwards, delete the plugin and export
-`OPENCODE_DISABLE_CLAUDE_CODE=1` from `dot_zshenv.tmpl`.
+`~/.claude` compatibility roots at discovery. `ocode` is built from that branch, but nothing
+exports the variable yet, so the plugin is still the stopgap; to switch, export
+`OPENCODE_DISABLE_CLAUDE_CODE=1` from `dot_zshenv.tmpl` and delete the plugin.
 
 ## Where the CLI comes from
 
-`opencode` itself is provisioned by the Linux dependency script: `install_opencode()` runs
-upstream's V2 installer with `--no-modify-path`, which drops the binary and its `opencode2`
-shim under `~/.opencode/bin` and leaves every shell rc file alone. `dot_zshenv.tmpl` is what
-puts `~/.opencode/bin` on PATH, and only off Android -- the released binary is a glibc build,
-which Termux's bionic cannot start. The block lives there because the installer's default is
-to append `export PATH=$HOME/.opencode/bin:$PATH` to the first rc file it finds, `~/.zshrc`
-under zsh: a `chezmoi apply` rewrote that file without the appended line and took `opencode`
-off PATH once, which is exactly what this arrangement prevents. Updates after the first
-install are the CLI's own (`opencode upgrade`), not an apply. `make test-opencode-cli` guards
-the skip, the flag and the PATH block on each platform.
+On Linux the CLI is `ocode`: OpenCode built from the personal fork `rios0rios0/opencode` (branch
+`reworked`), which adds the OmniRoute provider plugin and the `OPENCODE_DISABLE_CLAUDE_CODE`
+gate. `run_after_linux-006-build-ocode.sh` builds it into `~/.local/bin/ocode`. It reads the same
+`~/.config/opencode/opencode.json` and `cli.json` that upstream's `opencode` would; that binary is
+not installed. The build script is Linux only, so Windows and Android get the configuration
+without a CLI. How the build works is in [The fork build (`ocode`)](#the-fork-build-ocode).
 
 ## Using it
 
 ```bash
-opencode                       # in a project; the picker lists every model the key allows
-opencode models                # the full catalog, with the omniroute/* entries among them
+ocode                          # in a project; the picker lists every model the key allows
+ocode models                   # the full catalog, with the omniroute/* entries among them
 ```
 
-Model ids are the ones OmniRoute uses, so any id from the picker (`omniroute/auto/coding`,
-`omniroute/codex/...`, `omniroute/nvidia/...`) can also be passed verbatim to
-`claude-omni -m` or `claude-omni-task -m`.
+Model ids are OmniRoute's own behind the provider's `omniroute/` prefix: `omniroute/auto/coding`,
+`omniroute/codex/...`, `omniroute/nvidia/...`.
 
 ## The fork build (`ocode`)
 
-`ocode` is the same CLI, built from the personal fork `rios0rios0/opencode` (branch
-`reworked`) instead of the official binary: it adds the OmniRoute provider plugin
-and the `OPENCODE_DISABLE_CLAUDE_CODE` gate. `run_after_linux-006-build-ocode.sh` rebuilds it
-from the checkout at `~/Development/github.com/rios0rios0/opencode` whenever that checkout's HEAD
-moved, and installs it as `~/.local/bin/ocode`; see the "Fork Build (`ocode`)" part of the main
-`CLAUDE.md` for the mechanics. The build pins the client identity the Console reads from the
+`run_after_linux-006-build-ocode.sh` rebuilds `ocode` from the checkout at
+`~/Development/github.com/rios0rios0/opencode` whenever that checkout's HEAD moved, and installs
+it as `~/.local/bin/ocode`; see the "Fork Build (`ocode`)" part of the main `CLAUDE.md` for the
+mechanics. The build pins the client identity the Console reads from the
 User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a build-stamped
 `OPENCODE_VERSION=<release>-reworked.<%y%m%d%H%M>`, e.g. `2.1.4-reworked.2610241230`, where
 `<release>` is the upstream release the checkout is built on (its `packages/cli/package.json`
@@ -120,9 +114,9 @@ apply found nothing to build -- without a whole apply. `make test-zshrc-function
 - **Nothing at all is loaded.** V1 habits fail silently: the MCP field is `environment`, not
   `env`, and a key written as `${OMNIROUTE_API_KEY}` stays literal and fails authentication.
   `make test-opencode` guards both by rendering the template on each platform and checking
-  every field, and `opencode debug config` shows what was actually loaded.
+  every field, and `ocode debug config` shows what was actually loaded.
 
 ## References
 
-- [The gateway, its keys and `claude-omni`](omniroute-local.md)
+- [The gateway and its keys](omniroute-local.md)
 - [OpenCode configuration](https://opencode.ai/docs/config)

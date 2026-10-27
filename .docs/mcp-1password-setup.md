@@ -12,9 +12,9 @@ servers each platform gets, and why each has the shape it has, is in "MCP Server
 On the `Device: <deviceName>` Secure Note in the `personal` vault, add one concealed (password)
 field per variable a server on that machine needs, labelled `cred:` followed by the variable name:
 
-| Field label             | Server   | Platforms               |
-|-------------------------|----------|-------------------------|
-| `cred:CONTEXT7_API_KEY` | Context7 | Linux, Windows, Android |
+| Field label             | Server   | Platforms      |
+|-------------------------|----------|----------------|
+| `cred:CONTEXT7_API_KEY` | Context7 | Linux, Android |
 
 Chrome DevTools needs no credential, so it has no field.
 
@@ -29,8 +29,5 @@ read `cred:GITHUB_PERSONAL_ACCESS_TOKEN`, `cred:ADO_ORGANIZATION_NAME`,
 were retired in favour of their CLIs, so keep those fields only where a CLI or script still reads
 them.
 
-## Windows
-
-Windows has no runtime loader for `cred:` fields. Set the variables a server needs as user
-environment variables in System Properties, Environment Variables, which keeps the values out of
-shell history, and restart Claude Code.
+Windows gets no MCP servers: Claude Code is not installed there, so `~/.claude.json` is not
+deployed to it.

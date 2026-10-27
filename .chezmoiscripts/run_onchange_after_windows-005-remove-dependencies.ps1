@@ -150,6 +150,32 @@ function Invoke-TombstoneList {
 # can be retired once every machine has converged (a commit hash from the feature
 # branch changes when the branch is rebased before merge).
 $tombstones = @(
+    # Apps and CLIs no longer used on Windows -- removed in #260 (2026-10-27). jq, bat and
+    # shellcheck still come from apt inside WSL, and yq from its GitHub release (`install_yq`);
+    # Codex and Copilot stay on Android. NVM for Windows served only `nvm install --lts` in
+    # run_once_before_windows-002; nothing on Windows runs Node any more. The tools' own
+    # directories (~\.claude, ~\.claude.json, ~\.codex, ~\.copilot, ~\go, the VirtualBox VMs)
+    # are left in place: they hold logins, history and data, not installs.
+    "winget:Anthropic.ClaudeCode",
+    "winget:CoreyButler.NVMforWindows",
+    "winget:GitHub.Copilot",
+    "winget:OpenAI.Codex",
+    "winget:GitHub.cli",
+    "winget:GoLang.Go",
+    "winget:JetBrains.Toolbox",
+    "winget:Microsoft.VisualStudio.2022.Community",
+    "winget:Postman.Postman",
+    "winget:koalaman.shellcheck",
+    "winget:MikeFarah.yq",
+    "winget:jqlang.jq",
+    "winget:sharkdp.bat",
+    "winget:SlackTechnologies.Slack",
+    "winget:Discord.Discord",
+    "winget:Oracle.VirtualBox",
+    # The JetBrains themes staged for run_after_windows-004-install-jetbrains-themes.ps1,
+    # which went with the Toolbox
+    "path:$HOME\.local\share\jetbrains-themes",
+
     # Chrome Remote Desktop Host -- removed in #209 (2026-09-29)
     "winget:Google.ChromeRemoteDesktopHost",
 

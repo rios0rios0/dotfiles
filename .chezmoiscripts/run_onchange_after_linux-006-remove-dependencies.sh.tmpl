@@ -18,7 +18,22 @@ set -euo pipefail
 # converged (a commit hash from the feature branch changes when the branch is
 # rebased before merge).
 TOMBSTONES=(
-{{- if $wsl }}
+    # Kali's apt `yq`, kislyuk's Python wrapper around jq (with its `xq` and `tomlq`) -- replaced
+    # in #260 (2026-10-27) by mikefarah's yq, which `install_yq` puts in ~/.local/bin. The apt
+    # one has no `eval`, so `make lint-syntax` failed on every YAML file. Nothing depends on it.
+    "apt:yq"
+
+    # The GitHub Copilot, Codex and official OpenCode CLIs, and claude-omni -- removed in #260
+    # (2026-10-27). ocode, the fork build, replaces `opencode`, and ~/.opencode held nothing
+    # but its binary and the `opencode2` shim. The Copilot installer extracted one binary into
+    # ~/.local/bin. ~/.claude-omni was claude-omni's profile: its transcripts, task audits,
+    # GPU locks and saved /model choice. ~/.codex and ~/.copilot are deliberately NOT listed:
+    # they hold logins and history, and aisync may still sync rules into them.
+    "npm_global:@openai/codex"
+    "path:$HOME/.local/bin/copilot"
+    "path:$HOME/.opencode"
+    "path:$HOME/.claude-omni"
+{{ if $wsl }}
     # Tailscale's Linux client, on WSL only: Windows' client replaced it in #229, and
     # Tailscale's WSL guide says a client inside WSL breaks WSL's traffic through the
     # Windows one. Bare metal keeps tailscaled. Root owns what this leaves behind --

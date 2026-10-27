@@ -1,0 +1,4 @@
+kind: 'Removed'
+body: 'removed the GitHub Copilot and Codex CLIs from Linux/WSL and Windows, which keeps them on Android alone: `install_copilot_cli` and `install_codex_cli` left the Linux installer and `GitHub.Copilot` and `OpenAI.Codex` the winget list, `~/.codex/config.toml`''s look and the `codexx` shortcut now ship to Android only, and the next apply uninstalls `@openai/codex`, deletes `~/.local/bin/copilot` and runs `winget uninstall` for both, leaving `~/.codex` and `~/.copilot` in place'
+breaking: true
+time: '2026-10-27T17:47:24.673195346Z'

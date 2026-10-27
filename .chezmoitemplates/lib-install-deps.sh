@@ -134,7 +134,7 @@ install_nvm() {
     else
         # Globally installed npm packages live inside the active version's tree, so a
         # new LTS major starts empty and every `npm install -g` CLI this installer
-        # placed (`codex`, `sentry`, Claude Code) silently disappears from PATH -- the
+        # placed (`sentry`, Claude Code) silently disappears from PATH -- the
         # old tree still holds them, which is why nothing downstream reports an error.
         # `--reinstall-packages-from` rebuilds them in the new tree. It is only passed
         # when there is a version to copy from: on a first install `nvm current` prints
@@ -172,32 +172,12 @@ install_fly_cli() {
 }
 
 # =========================================================================================================
-# https://opencode.ai
-# OpenCode V2 CLI (binary `opencode`, plus the `opencode2` shim the installer writes beside it,
-# under ~/.opencode/bin). The upstream installer would otherwise append `export
-# PATH=$HOME/.opencode/bin:$PATH` to the first shell rc it finds -- zsh's ~/.zshrc here, a file
-# chezmoi owns -- and the next apply strips it: one apply did exactly that and took `opencode`
-# off PATH. `--no-modify-path` keeps the installer out of the rc files and `dot_zshenv.tmpl`
-# carries the PATH block, as it does for flyctl. Updates after the first install are the CLI's
-# own (`opencode upgrade`), not an apply's. Called only by the Linux installer: the released
-# binary is a glibc build, which bionic cannot start (the Sentry CLI's reason), so an Android
-# machine installs nothing.
-install_opencode() {
-    if [[ -x "$HOME/.opencode/bin/opencode" ]]; then
-        echo "[install-deps] opencode is already installed, skipping" >&2
-        return
-    fi
-
-    run_remote_installer "opencode" "https://opencode.ai/v2/install" --no-modify-path || return 1
-}
-
-# =========================================================================================================
 # https://bun.sh
 # Bun (`bun`), the runtime `run_after_linux-006-build-ocode.sh` builds the ocode fork with.
 # The upstream installer puts the binary under ~/.bun and, when `$SHELL` names a shell it
 # knows, appends `export PATH="$HOME/.bun/bin:$PATH"` to that shell's rc file -- ~/.zshrc
 # here, which chezmoi owns and rewrites, so the line would survive exactly until the next
-# apply (the flyctl/opencode story). It is run with SHELL empty for that reason: its shell
+# apply (the flyctl story). It is run with SHELL empty for that reason: its shell
 # detection then falls through to printing the manual instruction instead of editing a file,
 # and `dot_zshenv.tmpl` carries the PATH block. Bun updates itself (`bun upgrade`), not an
 # apply. Called only by the Linux installer: the build it feeds is Linux-only, and bun

@@ -11,7 +11,7 @@ requirements=(
     "zip"           # required for SDKMan
     "unzip"         # required for SDKMan
     "xz-utils"      # required to extract the Flutter SDK archive (.tar.xz)
-    "zstd"          # required to extract the Ollama release archive (.tar.zst) for claude-local
+    "zstd"          # required to extract the Ollama release archive (.tar.zst) for the local model server
     "age"           # required for Chezmoi (decrypt files with SSH)
     "gpg"           # required for import and export GPGs
     "gpg-agent"     # required for import and export GPGs
@@ -38,7 +38,6 @@ sudo apt install --no-install-recommends --yes "${hardware[@]}"
 utilities=(
     #"imagemagick"       # it's for image manipulation (convert, identify, etc.) TODO: better to use on Windows?
     "jq"                # it's for parsing JSON
-    "yq"                # it's for parsing YAML
     "bat"               # it's for cat with syntax highlighting (https://github.com/sharkdp/bat)
     "ripgrep"           # it's for recursively searching files with regex (https://github.com/BurntSushi/ripgrep)
     "silversearcher-ag" # it's for searching files (https://github.com/ggreer/the_silver_searcher)
@@ -245,7 +244,7 @@ install_pyenv() {
 # the matching entry carries the archive path and its SHA-256, so the download is pinned to
 # what Google published rather than to a version this file would have to be bumped for.
 #
-# It lands in ~/.local/share/flutter -- beside `zinit`, `codex` and the hand-installed
+# It lands in ~/.local/share/flutter -- beside `zinit` and the hand-installed
 # `dart-sdk` it replaces -- and is reached through two symlinks in ~/.local/bin rather than a
 # PATH entry. A PATH entry would have to win against ~/.local/bin in BOTH `.zshenv` and
 # `.zshrc`, which prepend it independently, and a `dart` there that is not the Flutter one
@@ -390,75 +389,6 @@ install_claude_cli() {
         return
     fi
     npm install -g @anthropic-ai/claude-code
-}
-
-# https://github.com/github/copilot-cli
-# The agentic GitHub Copilot CLI (binary `copilot`). This supersedes the deprecated
-# `github/gh-copilot` `gh` extension, which only provided `gh copilot suggest`/`explain`.
-#
-# Installed from the upstream install script (same shape as `install_ccswitch` and
-# `install_aisync`) rather than `npm install -g @github/copilot`. The npm package
-# relies on a postinstall lifecycle script to fetch its platform-specific binary, so
-# it breaks under `ignore-scripts=true` and cannot be installed with
-# `--ignore-scripts`. The upstream installer verifies checksums and honours PREFIX,
-# defaulting to `$HOME/.local/bin` for non-root — already on PATH via `dot_zshenv`.
-install_copilot_cli() {
-    if command -v copilot &>/dev/null; then
-        echo "[configure-deps] GitHub Copilot CLI is already installed, skipping" >&2
-        return
-    fi
-
-    local installer
-    local status
-
-    installer="$(mktemp)"
-    if ! curl --proto '=https' -fsSL https://gh.io/copilot-install -o "$installer"; then
-        echo "[configure-deps] ERROR: failed to download GitHub Copilot CLI installer" >&2
-        rm -f "$installer"
-        return 1
-    fi
-
-    PREFIX="$HOME/.local" bash "$installer"
-    status=$?
-    rm -f "$installer"
-
-    return "$status"
-}
-
-# https://github.com/openai/codex
-# Codex CLI (binary `codex`), installed like Claude Code. The npm package is a Node
-# launcher whose platform binary comes from an optional dependency
-# (`@openai/codex-linux-<arch>`), and neither ships a lifecycle script, so it installs
-# under `ignore-scripts=true` without a postinstall workaround. The platform package
-# also bundles `codex-resources/bwrap`, which gives the sandbox its bubblewrap backend
-# on WSL2 without an apt package. Android cannot take this route at all -- see
-# `install_codex_cli` in the Android installer and the `codex` wrapper it relies on.
-#
-# The install is verified rather than assumed. `npm install -g` writes into the
-# *active* Node version's tree, so this call is only as good as the version
-# `install_nvm` left current -- and a missing `npm`, a registry failure, or a
-# package that lands somewhere PATH does not reach all produce the same silent
-# outcome: no `codex`, no error, and an installer that reports success.
-install_codex_cli() {
-    if command -v codex &>/dev/null; then
-        echo "[configure-deps] Codex CLI is already installed, skipping" >&2
-        return
-    fi
-
-    if ! command -v npm &>/dev/null; then
-        echo "[codex] ERROR: npm is not available; install_nvm must run before install_codex_cli" >&2
-        return 1
-    fi
-
-    if ! npm install -g @openai/codex; then
-        echo "[codex] ERROR: npm install -g @openai/codex failed" >&2
-        return 1
-    fi
-
-    if ! command -v codex &>/dev/null; then
-        echo "[codex] ERROR: codex is still not on PATH after a successful npm install" >&2
-        return 1
-    fi
 }
 
 # https://github.com/rios0rios0/dev-toolkit
@@ -776,6 +706,63 @@ install_ruff() {
     fi
 }
 
+# https://github.com/mikefarah/yq
+# mikefarah's yq, the Go one that `make lint-syntax` and CI call as `yq eval`. Kali's apt package
+# of the same name is a different tool -- kislyuk's Python wrapper around jq, `yq 3.x` -- which
+# has no `eval`, so on a machine that took it from apt every YAML file failed the lint whatever
+# its content. That package is tombstoned in run_onchange_after_linux-006-remove-dependencies,
+# and this binary lands in ~/.local/bin, ahead of /usr/bin on PATH in any case.
+#
+# Pinned like npiperelay. To bump it, take both builds' SHA-256 from the new release's `checksums`
+# file -- its columns are the algorithms `checksums_hashes_order` lists, SHA-256 among them -- and
+# change the three values together; the version check below then replaces the installed binary.
+install_yq() {
+    local version="4.54.1"
+    local arch sha256
+    case "$(uname -m)" in
+        x86_64) arch="amd64" sha256="8e34fc298390875de416e6a4afcb8cabeceb25d9aa8506c1a2f9353cf702ea5f" ;;
+        aarch64) arch="arm64" sha256="189088da0c6429ec5178dfaab1a114805f6cab0b61b165ab236efedf1d57a71b" ;;
+        *)
+            echo "[configure-deps] ERROR: no yq build is pinned for $(uname -m)" >&2
+            return 1
+            ;;
+    esac
+
+    # Not `command -v yq`: that finds the Python yq this replaces and would skip the install.
+    local target="$HOME/.local/bin/yq"
+    if [[ -x "$target" ]] && "$target" --version 2>/dev/null | grep -qF "version v$version"; then
+        echo "[configure-deps] yq $version is already installed, skipping" >&2
+        return
+    fi
+
+    local download
+    download="$(mktemp)"
+    if ! curl --proto '=https' --proto-redir '=https' -fsSL -o "$download" \
+        "https://github.com/mikefarah/yq/releases/download/v$version/yq_linux_$arch"; then
+        echo "[configure-deps] ERROR: failed to download yq $version" >&2
+        rm -f "$download"
+        return 1
+    fi
+    if ! echo "$sha256  $download" | sha256sum --check --status; then
+        echo "[configure-deps] ERROR: the yq $version download does not match its pinned SHA-256" >&2
+        rm -f "$download"
+        return 1
+    fi
+
+    mkdir -p "$HOME/.local/bin"
+    if ! install -m 0755 "$download" "$target"; then
+        echo "[configure-deps] ERROR: could not install yq into $target" >&2
+        rm -f "$download"
+        return 1
+    fi
+    rm -f "$download"
+
+    if ! "$target" --version 2>/dev/null | grep -qF "version v$version"; then
+        echo "[configure-deps] ERROR: $target does not report yq $version after the install" >&2
+        return 1
+    fi
+}
+
 # https://github.com/rios0rios0/aisync
 # `aisync` syncs AI assistant rules/agents/skills across AI assistant home
 # directories such as `~/.claude/`.
@@ -923,8 +910,6 @@ verify install_flutter
 
 install_claude_cli
 install_ccswitch
-install_copilot_cli
-verify install_codex_cli
 install_sentry_cli
 install_neon_cli
 install_dev_toolkit
@@ -936,13 +921,14 @@ install_github_cli
 install_aws_cli
 verify install_azure_cli
 install_fly_cli
-verify install_opencode
 # The ocode fork build (`run_after_linux-006-build-ocode.sh`) runs on bun.
 verify install_bun
 verify install_oci_cli
 
 install_ggshield
 install_ruff
+# mikefarah's yq; Kali's apt `yq` is a different tool (see the function).
+verify install_yq
 install_aisync
 
 install_acli

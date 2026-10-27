@@ -1,9 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Tests the local model server: the settings every consumer reads, the Ollama unit and claude-omni,
-# which must agree on one context window, and the installer's render gate plus a stubbed end-to-end
-# run of it. claude-omni itself, its GPU guards and claude-omni-task are covered by test-claude-omni.sh.
+# Tests the local model server: the settings it reads, the Ollama unit, which allocates the context
+# window they name, and the installer's render gate plus a stubbed end-to-end run of it.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -52,14 +51,6 @@ settings() {
     local override="${2:-}"
     PATH="$TMP/bin-$1" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
         ${override:+--override-data "$override"} '{{ includeTemplate "lib-local-llm.tmpl" . }}'
-}
-
-# omni_gpu_windows [override JSON]: the window claude-omni declares for GPU models
-omni_gpu_windows() {
-    local override="${1:-}"
-    PATH="$TMP/bin-gpu" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
-        ${override:+--override-data "$override"} \
-        '{{ $omni := includeTemplate "lib-omniroute.tmpl" . | fromJson }}{{ $omni.gpuWindow }}'
 }
 
 UNIT="$REPO_ROOT/dot_config/systemd/user/ollama.service.tmpl"
@@ -112,27 +103,7 @@ else
     fail "settings without deviceName: $json"
 fi
 
-# --- one window, two consumers ---------------------------------------------------------------
-
-# The machines share this checkout but not their local/remote topology. The persistent deviceName
-# selects the right provider map; otherwise the desktop would try to reach its own GPU via tailnet.
-# The gpus map has to name exactly OmniRoute's provider prefixes: claude-omni resolves its lineup
-# from the gateway's /v1/models, so a key that drifts from the dashboard drops that GPU silently.
-for device in alien-a51 mxhero-z790; do
-    config="$(PATH="$TMP/bin-gpu" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
-        --override-data "{\"deviceName\":\"$device\"}" \
-        '{{ includeTemplate "lib-omniroute.tmpl" . }}')"
-    if [[ "$device" == alien-a51 ]]; then local_gpu=ollama-laptop; remote_gpu=ollama-desktop; local_label='laptop GPU'; remote_label='desktop GPU'
-    else local_gpu=ollama-desktop; remote_gpu=ollama-laptop; local_label='desktop GPU'; remote_label='laptop GPU'; fi
-    if [[ "$(jq -r --arg gpu "$local_gpu" '.gpus[$gpu].machine + " " + .gpus[$gpu].label' <<<"$config")" == "local $local_label" &&
-        "$(jq -r --arg gpu "$remote_gpu" '.gpus[$gpu].machine + " " + .gpus[$gpu].label' <<<"$config")" == "tailnet $remote_label" &&
-        "$(jq -r '.gpus | keys | join(" ")' <<<"$config")" == "ollama-desktop ollama-laptop" &&
-        "$(jq -r '.taskGpus | join(" ")' <<<"$config")" == "$local_gpu $remote_gpu" ]]; then
-        pass "$device maps its local GPU directly and the other device through the tailnet"
-    else
-        fail "$device GPU routing is wrong: $(jq -c '{gpus, taskGpus}' <<<"$config")"
-    fi
-done
+# --- the unit ----------------------------------------------------------------------------------
 
 # Ollama listens on IPv4 loopback: Docker Desktop dials host.docker.internal over Windows' IPv4
 # loopback, which WSL's relay answers only for an IPv4 listener (0.0.0.0 becomes a dual-stack [::]
@@ -147,14 +118,14 @@ fi
 
 for override in "" '{"localLLM":{"devices":{"testdevice":{"contextTokens":32768}}}}'; do
     # given the same settings
-    # when: the window the server allocates, and the one claude-omni declares for every GPU model
+    # when: the window the server allocates, and the one the settings name
     server="$(render gpu "$UNIT" "$override" | sed -n 's/^Environment=OLLAMA_CONTEXT_LENGTH=//p')"
-    client="$(omni_gpu_windows "$override")"
+    window="$(settings gpu "$override" | jq -r '.contextTokens')"
     # then
-    if [[ -n "$server" && "$(tr ' ' '\n' <<<"$client" | grep . | sort -u)" == "$server" ]]; then
-        pass "the unit and claude-omni agree on a ${server}-token window"
+    if [[ -n "$server" && "$server" == "$window" ]]; then
+        pass "the unit allocates the ${window}-token window the settings name"
     else
-        fail "the unit serves '$server' tokens but claude-omni declares '$client'"
+        fail "the unit serves '$server' tokens but the settings name '$window'"
     fi
 done
 

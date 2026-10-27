@@ -133,6 +133,16 @@ for platform in linux android; do
     awk '/^###### Codex CLI / { capture=1; next }
          capture && /^###### / { exit }
          capture { print }' "$rendered" > "$TMPDIR/codex-shortcut.zsh"
+    # Codex is installed on Android alone, so Linux must not carry a shortcut to nothing.
+    if [ "$platform" = "linux" ]; then
+        if grep -q 'codexx' "$rendered"; then
+            echo "[test-template-render] FAIL: linux zshrc still defines codexx" >&2
+            EXIT_CODE=1
+        else
+            echo "[test-template-render] PASS: linux zshrc syntax, and no codexx" >&2
+        fi
+        continue
+    fi
     # An inherited alias must be replaced; repeated sourcing must be harmless.
     # A shell function named codex must not intercept the executable on PATH.
     if ! PATH="$TMPDIR/codex-bin:$PATH" zsh -f -c '
