@@ -4,8 +4,8 @@
 #
 # On WSL the machine's tailnet client is Windows', so nothing inside WSL runs one: Tailscale's WSL
 # guide says a second client there breaks WSL's traffic through the Windows one. This puts that
-# client's CLI under the usual name, so `tailscale status`, tailscale-up and claude-omni work in
-# WSL as they do elsewhere. Shipped to WSL only (.chezmoiignore): on bare metal it would shadow
+# client's CLI under the usual name, so `tailscale status` and tailscale-up work in WSL as they
+# do elsewhere. Shipped to WSL only (.chezmoiignore): on bare metal it would shadow
 # the real CLI.
 #
 # TAILSCALE_EXE names another tailscale.exe, for an install outside the default directory.

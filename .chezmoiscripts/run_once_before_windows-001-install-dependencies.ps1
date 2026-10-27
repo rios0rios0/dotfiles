@@ -165,8 +165,7 @@ $utilities = @(
     "Piriform.CCleaner",
     "Piriform.Recuva",
     "RevoUninstaller.RevoUninstallerPro",
-    "msstore:9NCBCSZSJRSB",             # Spotify, the Microsoft Store edition: the Spotify.Spotify installer refuses to run beside it (exit code 29)
-    "Oracle.VirtualBox"
+    "msstore:9NCBCSZSJRSB"              # Spotify, the Microsoft Store edition: the Spotify.Spotify installer refuses to run beside it (exit code 29)
 )
 Install-PackageList $utilities
 Install-RustDesk                    # not in winget, see the function
@@ -178,33 +177,18 @@ Install-RustDesk                    # not in winget, see the function
 # =========================================================================================================
 # Communication
 $communication = @(
-    "SlackTechnologies.Slack",
-    "Discord.Discord",
     "Zoom.Zoom.EXE"
 )
 Install-PackageList $communication
 # =========================================================================================================
 # Development
 $development = @(
-    "Anthropic.ClaudeCode",
-    "CoreyButler.NVMforWindows",
     "Docker.DockerDesktop",
     "ExpressVPN.ExpressVPN",
-    "GitHub.cli",
-    "GitHub.Copilot",                   # agentic GitHub Copilot CLI (binary `copilot`)
-    "GoLang.Go",
-    "JetBrains.Toolbox",
     "Microsoft.Azure.StorageExplorer",
-    "Microsoft.VisualStudio.2022.Community",
     "Mirantis.Lens",
-    "OpenAI.Codex",                     # Codex CLI (binary `codex`); winget unpacks the portable release zip
     "OpenVPNTechnologies.OpenVPNConnect",
-    "Postman.Postman",
-    "BurntSushi.ripgrep.MSVC",
-    "jqlang.jq",
-    "MikeFarah.yq",
-    "sharkdp.bat",
-    "koalaman.shellcheck"               # static analysis for shell scripts (used by `make lint`)
+    "BurntSushi.ripgrep.MSVC"
 )
 Install-PackageList $development
 # =========================================================================================================

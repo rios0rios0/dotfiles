@@ -3,15 +3,16 @@
   Keeps one of two sets of keys in ~/.claude/settings.json, by platform:
 
   - Linux gets Claude Code's look -- theme, renderer and status line -- from
-    lib-claude-look.tmpl, the same keys claude-omni's profile gets. A key whose value
-    differs is set back, so change the look in that library, not with /theme.
-  - Windows and Android get this repository's permission rules, and effortLevel when it
-    is missing. Rules already present, including ones added by hand, keep their place;
-    missing ones are appended in the order below, and retired ones are taken out.
+    lib-claude-look.tmpl. A key whose value differs is set back, so change the look in
+    that library, not with /theme.
+  - Android gets this repository's permission rules, and effortLevel when it is missing.
+    Rules already present, including ones added by hand, keep their place; missing ones
+    are appended in the order below, and retired ones are taken out.
 
   Neither crosses over: Linux never had the rules, and the look's status line forks bash
-  and jq on every redraw, which on Termux counts against Android's phantom-process budget
-  and on Windows would need a shell and paths of its own.
+  and jq on every redraw, which on Termux counts against Android's phantom-process budget.
+  Windows gets neither: Claude Code is no longer installed there, and .chezmoiignore keeps
+  ~/.claude off it.
 
   A modify-template for the reasons given in modify_dot_claude.json at the source
   root, which also explain why it has no .tmpl suffix. When nothing differs, the

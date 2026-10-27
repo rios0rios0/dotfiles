@@ -17,6 +17,18 @@ set -euo pipefail
 # converged (a commit hash from the feature branch changes when the branch is
 # rebased before merge).
 TOMBSTONES=(
+    # The GitHub Copilot and Codex CLIs -- removed in #260 (2026-10-27), as on Linux and
+    # Windows. Codex was the wrapper run_once_before_android-001f wrote into ~/.local/bin,
+    # the release builds it kept under ~/.local/share/codex, and its update-check stamp and
+    # log; the npm package is listed too, for a device that still holds the install the
+    # wrapper replaced. ~/.codex and ~/.copilot are deliberately NOT listed: they hold
+    # logins and history.
+    "npm_global:@github/copilot"
+    "npm_global:@openai/codex"
+    "path:$HOME/.local/bin/codex"
+    "path:$HOME/.local/share/codex"
+    "path:${XDG_CACHE_HOME:-$HOME/.cache}/codex-wrapper"
+
     # `keychain` -- removed in bec4050 (2026-07-23). It cannot pin the agent
     # socket path on Termux (it records whichever random path ssh-agent picked,
     # and ignores a pre-bound SSH_AUTH_SOCK), so `dot_zshrc.tmpl` now binds the

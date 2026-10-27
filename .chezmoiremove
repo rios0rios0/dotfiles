@@ -22,9 +22,14 @@
 # Gemini CLI -- removed in 601cbeb (2026-07-21)
 .gemini
 
+# `claude-omni` and `claude-omni-task` -- removed in #260 (2026-10-27). Its profile,
+# ~/.claude-omni, is a one-time `path:` tombstone in the Linux removal script.
+.local/bin/claude-omni
+.local/bin/claude-omni-task
+
 # `claude-local` and `claude-remote` -- removed in #233 (2026-10-15), replaced by
-# `claude-omni`, which reaches both GPUs and the cloud providers through OmniRoute.
-# `claude-local-task` became `claude-omni-task` in the same change.
+# `claude-omni` (itself removed in #260). `claude-local-task` became `claude-omni-task`
+# in the same change.
 .local/bin/claude-local
 .local/bin/claude-remote
 .local/bin/claude-local-task

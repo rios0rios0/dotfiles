@@ -23,14 +23,18 @@ AppData
 {{- end }}
 
 {{- /* Claude Code's ~/.claude. Linux gets only the look: settings.json, which carries it there,
-     and the status line script it runs. The trust dialog in .claude.json serves Windows and
-     Android, which get no status line: it is a bash script that forks jq on every redraw. The
-     AI content in ~/.claude -- CLAUDE.md, rules, agents, commands and skills -- is aisync's, not
+     and the status line script it runs. The trust dialog in .claude.json serves Android, which
+     gets no status line: it is a bash script that forks jq on every redraw. Windows gets neither
+     ~/.claude nor ~/.claude.json, because Claude Code is no longer installed there. The AI
+     content in ~/.claude -- CLAUDE.md, rules, agents, commands and skills -- is aisync's, not
      chezmoi's: see "AI Rules Sync" in CLAUDE.md. dot_claude/modify_settings.json holds the look. */ -}}
 {{- if eq .chezmoi.os "linux" }}
 .claude/.claude.json
-{{- else }}
+{{- else if eq .chezmoi.os "android" }}
 .claude/statusline-command.sh
+{{- else }}
+.claude
+.claude.json
 {{- end }}
 
 {{- /* Files shared between Windows and Android.
@@ -72,8 +76,7 @@ AppData
      .chezmoidata/local-llm.yaml switches it off. Gated on the GPU rather than on WSL, because
      nothing in it depends on Windows and a bare-metal machine with a GPU runs it the same way.
      The OS check lives here, not in lib-local-llm.tmpl, because lookPath finds nvidia-smi.exe on
-     a Windows machine with an NVIDIA card too. claude-omni, which reaches it through OmniRoute,
-     ships on every Linux machine below: a GPU on the tailnet or a cloud provider needs none here. */ -}}
+     a Windows machine with an NVIDIA card too. */ -}}
 {{- if not $localLLM }}
 .config/systemd/user/ollama.service
 {{- end }}
@@ -86,9 +89,7 @@ AppData
 {{- if ne .chezmoi.os "linux" }}
 .chezmoiscripts/linux-*.sh
 .local/bin/tailscale-up
-.claude-omni
-.local/bin/claude-omni
-.local/bin/claude-omni-task
+.local/share/jetbrains-themes
 .config/ggshield
 .docker
 .histdb

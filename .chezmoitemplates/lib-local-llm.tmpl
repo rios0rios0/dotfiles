@@ -5,8 +5,8 @@
 
   Every consumer reads it the same way,
       includeTemplate "lib-local-llm.tmpl" . | fromJson
-  so the Ollama unit, its installer and claude-omni agree on one model and one context window
-  by construction rather than by keeping copies in step.
+  so the Ollama unit, its installer and tailscale-up agree on one model, one context window and
+  one tailnet share by construction rather than by keeping copies in step.
 
   The platform is not decided here. .chezmoiignore pairs `enabled` with its own OS check,
   because lookPath finds nvidia-smi.exe on a Windows machine with an NVIDIA card as well, and

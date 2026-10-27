@@ -477,13 +477,6 @@ source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
 ###### Workspace Aliases ###########################################################
 source "$HOME/.scripts/linux-engineering-workspace-aliases.sh"
 
-###### Codex CLI ###################################################################
-# Match claudex's permission bypass; keep PATH resolution for the Termux wrapper.
-# Remove any old alias so re-sourcing can safely define the function.
-unalias codexx 2>/dev/null
-codexx() {
-    command codex --dangerously-bypass-approvals-and-sandbox "$@"
-}
 {{- if eq .chezmoi.os "linux" }}
 
 ###### OpenCode (ocode) ############################################################
@@ -515,21 +508,9 @@ rebuild-ocode() {
 # that puts the current (healthy) account's credentials on disk, so account
 # rotation applies no matter which entrypoint is used. It is a no-op when ccswitch
 # is absent, which keeps the entrypoints working on platforms that never install it.
-#
-# When no enrolled account has capacity left, `ccswitch capacity` (also no network)
-# says when one recovers and exits 3, and claude-omni is pointed out for the
-# meantime. Only pointed out: switching from the account's model to another one
-# without a word would surprise anyone in the middle of a task. Any other status --
-# capacity, an error, a ccswitch too old to know the command -- launches silently.
 _claude_ensure_account() {
     if command -v ccswitch >/dev/null 2>&1; then
         ccswitch ensure --quiet 2>/dev/null
-        if command -v claude-omni >/dev/null 2>&1; then
-            ccswitch capacity 2>/dev/null
-            if (( $? == 3 )); then
-                print -u2 "[claude-omni] \`claude-omni\` runs Claude Code through OmniRoute meanwhile, on a GPU or another provider"
-            fi
-        fi
     fi
     return 0
 }

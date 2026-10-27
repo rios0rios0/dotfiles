@@ -1,0 +1,4 @@
+kind: 'Changed'
+body: 'changed `yq` on Linux/WSL from Kali''s apt package, kislyuk''s Python wrapper around jq, to mikefarah''s yq, the one `make lint-syntax` and CI call as `yq eval`, which the apt one rejects, so every YAML file failed the lint locally whatever its content: `install_yq` downloads the release pinned to `v4.54.1` into `~/.local/bin/yq`, checked against a SHA-256 per architecture, `yq` left the apt list, and the next apply removes the apt package (its `xq` and `tomlq` with it) where passwordless sudo allows; `make test-yq` covers the install'
+breaking: true
+time: '2026-10-27T17:53:49.317940768Z'

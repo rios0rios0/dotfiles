@@ -1,7 +1,7 @@
 {{- /*
   Shared MCP server merge for modify_dot_claude.json (~/.claude.json) and
   dot_config/mcphub/modify_servers.json. Both are chezmoi modify-templates, so this
-  runs inside chezmoi on every platform, Windows included -- no bash, no python3.
+  runs inside chezmoi itself -- no bash, no python3.
 
   Called through includeTemplate with a dict: "stdin" is the target's current
   content, "os" is .chezmoi.os, and "file" names the target in the log line.
@@ -56,10 +56,10 @@
     }
   }
 }`) -}}
-{{- /* Any other platform gets what Windows gets. */ -}}
+{{- /* Any other platform gets the remote servers alone. Windows gets neither file: Claude
+       Code is not installed there (see .chezmoiignore). */ -}}
 {{- $groupsByOs := dict
       "linux" (list "remote" "browser")
-      "windows" (list "remote")
       "android" (list "remote") -}}
 {{- $servers := dict -}}
 {{- range (get $groupsByOs .os | default (list "remote")) -}}
@@ -76,7 +76,6 @@
 {{- $desktopRetired := list "github" "azure-devops" "sonarqube" "kubernetes" -}}
 {{- $retiredByOs := dict
       "linux" $desktopRetired
-      "windows" $desktopRetired
       "android" (list "github") -}}
 {{- $retired := get $retiredByOs .os | default $desktopRetired -}}
 {{- $config := dict -}}

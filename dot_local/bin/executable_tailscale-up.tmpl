@@ -193,9 +193,8 @@ tailscale set "${prefs[@]}" 2>/dev/null || sudo tailscale set "${prefs[@]}"
 {{- if and $llm.enabled $llm.shareOnTailnet }}
 
 # This machine's Ollama, on the tailnet's port 11434: where OmniRoute on another machine reaches
-# this GPU, and claude-omni checks the window it serves. Serve keeps the forward in the client's
-# state, so it comes back with the service; it is set here when it is missing or forwards anywhere
-# else, as the one an older revision set does.
+# this GPU. Serve keeps the forward in the client's state, so it comes back with the service; it
+# is set here when it is missing or forwards anywhere else, as the one an older revision set does.
 {{- if $wsl }}
 #
 # Windows' client forwards to Windows' loopback, where WSL's localhost relay hands each connection

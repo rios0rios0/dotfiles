@@ -1,10 +1,8 @@
 #!/bin/bash
 set -euo pipefail
 
-# Exercises dot_claude/executable_statusline-command.sh, the status line both Claude Code
-# profiles run: the regular one and claude-omni's, which differ in what the script finds
-# through CLAUDE_CONFIG_DIR -- a claude.ai login, or none -- and in claude-omni's case in the
-# table of windows it writes, which ctx reads after /model switches models.
+# Exercises dot_claude/executable_statusline-command.sh with two profiles, which differ in
+# what the script finds through CLAUDE_CONFIG_DIR: a claude.ai login, or none.
 #
 # The script reads the JSON Claude Code pipes to a status line, with CLAUDE_CONFIG_DIR at a
 # scratch profile, so nothing here touches the developer's real credentials or usage cache.
@@ -44,12 +42,10 @@ printf '#!/bin/bash\nprintf "%%s\\n" "$*" >> "$STATUSLINE_TEST_LOG/mkdir.calls"\
     > "$STUBS/mkdir"
 chmod +x "$STUBS/curl" "$STUBS/mkdir"
 
-# claude-omni's profile: no .credentials.json, since OmniRoute's key never lands there, and the
-# windows table claude-omni writes at launch.
-OMNI_PROFILE="$SANDBOX/claude-omni"
-mkdir -p "$OMNI_PROFILE"
-printf '{"numStartups": 1}\n' > "$OMNI_PROFILE/.claude.json"
-printf 'ollama-desktop/qwen3.8:27b\t65536\nopenrouter/moonshotai/kimi-k2.7-code\t262144\n' > "$OMNI_PROFILE/omniroute-windows.tsv"
+# A profile without a claude.ai login: no .credentials.json, as on an API key.
+NO_LOGIN_PROFILE="$SANDBOX/no-login"
+mkdir -p "$NO_LOGIN_PROFILE"
+printf '{"numStartups": 1}\n' > "$NO_LOGIN_PROFILE/.claude.json"
 
 # The regular profile, logged in with a token that has an hour left.
 REGULAR_PROFILE="$SANDBOX/claude"
@@ -85,21 +81,6 @@ render() {
         sed 's/\x1b\[[0-9;]*m//g'
 }
 
-# omni_payload <model id> <label> <window>: what Claude Code pipes in a claude-omni session, after
-# /model chose <model id>; the window is the session's, which /model does not change
-omni_payload() {
-    jq -nc --arg id "$1" --arg label "$2" --argjson window "$3" '
-        {workspace: {current_dir: "/tmp"}, model: {id: $id, display_name: $label},
-         context_window: {remaining_percentage: 80, total_input_tokens: 13000, context_window_size: $window}}'
-}
-
-# omni_render <launch model> <payload>: the second line of a claude-omni session, colours kept
-omni_render() {
-    printf '%s' "$2" |
-        CLAUDE_CONFIG_DIR="$OMNI_PROFILE" CLAUDE_OMNI_MODEL="$1" COLUMNS=200 PATH="$STUBS:$PATH" \
-            STATUSLINE_TEST_LOG="$LOG" bash "$SCRIPT" | sed -n 2p
-}
-
 run_case() {
     local description="$1"
     shift
@@ -111,28 +92,28 @@ run_case() {
     fi
 }
 
-omni_session_shows_the_model_and_no_limits() {
-    # given claude-omni's profile, in a subdirectory of a repository
+no_login_session_shows_the_model_and_no_limits() {
+    # given a profile without a login, in a subdirectory of a repository
     reset_log
 
     # when
     local out line1 line2
-    out=$(render "$OMNI_PROFILE" "$(payload "$PROJECT/src" "qwen3.8:27b")") || return 1
+    out=$(render "$NO_LOGIN_PROFILE" "$(payload "$PROJECT/src" "Sonnet 5")") || return 1
     line1=$(sed -n 1p <<<"$out")
     line2=$(sed -n 2p <<<"$out")
 
     # then: the directory, the branch, the model and its window -- and no plan limits
     [[ "$line1" == *"project/src"* && "$line1" == *"feat/look"* ]] &&
-        [[ "$line2" == *"qwen3.8:27b"* && "$line2" == *"ctx 83% left (21k/131k)"* ]] &&
+        [[ "$line2" == *"Sonnet 5"* && "$line2" == *"ctx 83% left (21k/131k)"* ]] &&
         [[ "$out" != *"5h "* && "$out" != *"7d "* ]]
 }
 
-omni_session_starts_no_refresh() {
-    # given claude-omni's profile, whose usage cache never exists, so it is always stale
+no_login_session_starts_no_refresh() {
+    # given a profile without a login, whose usage cache never exists, so it is always stale
     reset_log
 
     # when
-    render "$OMNI_PROFILE" "$(payload "$PROJECT" "qwen3.8:27b")" >/dev/null || return 1
+    render "$NO_LOGIN_PROFILE" "$(payload "$PROJECT" "Sonnet 5")" >/dev/null || return 1
 
     # then: no lock was taken, so no refresh forked, and curl never ran
     [ ! -s "$LOG/mkdir.calls" ] && [ ! -e "$LOG/curl.argv" ]
@@ -187,52 +168,12 @@ draws_no_private_use_area_glyph() {
     reset_log
     fresh_cache
     local out
-    out=$(render "$OMNI_PROFILE" "$(payload "$PROJECT/src" "qwen3.8:27b")") || return 1
+    out=$(render "$NO_LOGIN_PROFILE" "$(payload "$PROJECT/src" "Sonnet 5")") || return 1
     out+=$(render "$REGULAR_PROFILE" "$(payload "$PROJECT" "Opus 5")") || return 1
 
     # when / then: Claude Code strips U+E000-U+F8FF, every Nerd Font glyph, so none may be
     # drawn (matched as UTF-8 bytes, so the check needs no locale)
     ! LC_ALL=C grep -qP '\xEE[\x80-\xBF][\x80-\xBF]|\xEF[\x80-\xA3][\x80-\xBF]' <<<"$out"
-}
-
-omni_session_names_a_larger_models_window() {
-    # given a session started on the GPU model's 64K window, switched with /model to a 256K model
-    reset_log
-
-    # when
-    local line
-    line=$(omni_render "ollama-desktop/qwen3.8:27b" \
-        "$(omni_payload "openrouter/moonshotai/kimi-k2.7-code" "Kimi K2.7 Code · OpenRouter" 65536)") || return 1
-
-    # then: the label, the session's window, which still decides when it compacts, and the model's own
-    line=$(sed 's/\x1b\[[0-9;]*m//g' <<<"$line")
-    [[ "$line" == *"Kimi K2.7 Code · OpenRouter ❯ ctx 80% left (13k/65k · model 262k)"* ]]
-}
-
-omni_session_warns_when_the_model_is_smaller() {
-    # given a session started on a 256K window, switched by hand to the GPU model's 64K one
-    reset_log
-
-    # when
-    local line
-    line=$(omni_render "openrouter/moonshotai/kimi-k2.7-code" \
-        "$(omni_payload "ollama-desktop/qwen3.8:27b" "qwen3.8:27b · desktop GPU" 262144)") || return 1
-
-    # then: in the error colour, since the session would compact only after the model overflows
-    [[ "$line" == *$'\033[38;5;160m'"ctx 80% left · model holds 65k"* ]]
-}
-
-omni_session_on_its_launch_model_adds_nothing() {
-    # given a session still on the model it started on
-    reset_log
-
-    # when
-    local line
-    line=$(omni_render "ollama-desktop/qwen3.8:27b" "$(omni_payload "ollama-desktop/qwen3.8:27b" "qwen3.8:27b · desktop GPU" 65536)") || return 1
-
-    # then: the window as Claude Code reports it, and nothing more
-    line=$(sed 's/\x1b\[[0-9;]*m//g' <<<"$line")
-    [[ "$line" == *"ctx 80% left (13k/65k)"* && "$line" != *"model "* ]]
 }
 
 fits_a_narrow_terminal() {
@@ -248,16 +189,10 @@ fits_a_narrow_terminal() {
     done <<<"$out"
 }
 
-run_case "a claude-omni session shows the model and its window, and no plan limits" \
-    omni_session_shows_the_model_and_no_limits
-run_case "a claude-omni session, which has no login, takes no refresh lock and forks nothing" \
-    omni_session_starts_no_refresh
-run_case "after /model, ctx names the new model's own window when it is larger" \
-    omni_session_names_a_larger_models_window
-run_case "after /model to a smaller window, ctx turns red and names it" \
-    omni_session_warns_when_the_model_is_smaller
-run_case "on the model it started on, a claude-omni session's ctx adds nothing" \
-    omni_session_on_its_launch_model_adds_nothing
+run_case "a session without a login shows the model and its window, and no plan limits" \
+    no_login_session_shows_the_model_and_no_limits
+run_case "a session without a login takes no refresh lock and forks nothing" \
+    no_login_session_starts_no_refresh
 run_case "a refresh hands the OAuth token to curl on stdin, never in its arguments" \
     refresh_sends_the_token_on_stdin_only
 run_case "a logged-in session shows its account, both windows and the model cap" \

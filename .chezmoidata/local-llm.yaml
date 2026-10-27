@@ -1,21 +1,16 @@
-# The local model server: Ollama on this machine's NVIDIA GPU, one of OmniRoute's providers, which
-# Claude Code reaches through `claude-omni`. See .docs/local-coding-model.md and CLAUDE.md, "Local
-# Model Server (Ollama)".
+# The local model server: Ollama on this machine's NVIDIA GPU, one of OmniRoute's providers. See
+# .docs/local-coding-model.md and CLAUDE.md, "Local Model Server (Ollama)".
 #
 # chezmoi reads this file on every apply -- unlike `data:` in .chezmoi.yaml.tmpl, which only
-# `chezmoi init` regenerates -- so an edit reaches the Ollama unit, its installer and claude-omni
-# together on the next apply. All three read it through .chezmoitemplates/lib-local-llm.tmpl;
-# claude-omni through .chezmoitemplates/lib-omniroute.tmpl, which includes it.
+# `chezmoi init` regenerates -- so an edit reaches the Ollama unit, its installer and tailscale-up
+# together on the next apply. All three read it through .chezmoitemplates/lib-local-llm.tmpl.
 localLLM:
   # Installed and served on every Linux machine with an NVIDIA driver unless this is false,
   # here or for one device below.
   enabled: true
   model: 'qwen3.8:27b'
-  # Rendered into both OLLAMA_CONTEXT_LENGTH, which is what the server allocates, and the window
-  # claude-omni declares for this model on every GPU (CLAUDE_CODE_MAX_CONTEXT_TOKENS), which is what
-  # Claude Code budgets against. Neither Claude Code nor OmniRoute can read it from Ollama --
-  # OmniRoute advertises a 128000 fallback -- so the two must agree, and one value is what makes
-  # them agree.
+  # Rendered into OLLAMA_CONTEXT_LENGTH, which is what the server allocates. OmniRoute cannot read
+  # it from Ollama and advertises a 128000 fallback for the model instead.
   #
   # Sized for a 24 GB GPU that also drives a display: qwen3.8:27b is ~18 GB with its vision
   # projector, and only 16 of its 64 layers keep a KV cache, so 64K of q8_0 cache costs ~2 GiB.
@@ -27,11 +22,11 @@ localLLM:
   # so it is given back after a while rather than held for good.
   keepAlive: '15m'
   # Share this machine's server with the other machines on the tailnet, so that OmniRoute on them
-  # can use this GPU and claude-omni can check its window: tailscale-up forwards the tailnet's port
-  # 11434 to it (`tailscale serve`, never Funnel; on WSL, Windows' client forwards to Windows'
-  # `localhost`, which WSL hands on to Ollama's loopback socket). Local Docker Desktop reaches the
-  # same socket through host.docker.internal, never the tailnet. The API has no authentication, and
-  # loopback keeps the network off it directly.
+  # can use this GPU: tailscale-up forwards the tailnet's port 11434 to it (`tailscale serve`,
+  # never Funnel; on WSL, Windows' client forwards to Windows' `localhost`, which WSL hands on to
+  # Ollama's loopback socket). Local Docker Desktop reaches the same socket through
+  # host.docker.internal, never the tailnet. The API has no authentication, and loopback keeps the
+  # network off it directly.
   shareOnTailnet: true
   # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
   #   devices:

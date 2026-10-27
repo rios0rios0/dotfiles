@@ -140,27 +140,32 @@ check_platform "android" \
     --include ".config/mcphub"
 
 # Claude Code's look: Linux gets settings.json and the status line script from ~/.claude and
-# nothing else there; Windows and Android keep the trust dialog and get no status line. The
-# AI content of ~/.claude (CLAUDE.md, rules, agents, commands, skills) is aisync's, not chezmoi's.
-# Codex's look is built into Codex, so ~/.codex/config.toml ships everywhere.
+# nothing else there; Android keeps the trust dialog and gets no status line. Windows, where
+# Claude Code is no longer installed, gets neither ~/.claude nor ~/.claude.json. The AI content
+# of ~/.claude (CLAUDE.md, rules, agents, commands, skills) is aisync's, not chezmoi's.
 check_platform "linux" \
     --include-line ".claude" \
+    --include-line ".claude.json" \
     --include ".claude/settings.json" \
     --include ".claude/statusline-command.sh" \
-    --ignore-line ".claude/.claude.json" \
-    --include ".codex"
+    --ignore-line ".claude/.claude.json"
 
 check_platform "$WINDOWS_OS" \
-    --include ".claude/settings.json" \
-    --include ".claude/.claude.json" \
-    --ignore-line ".claude/statusline-command.sh" \
-    --include ".codex"
+    --ignore-line ".claude" \
+    --ignore-line ".claude.json"
 
 check_platform "android" \
+    --include-line ".claude" \
+    --include-line ".claude.json" \
     --include ".claude/settings.json" \
     --include ".claude/.claude.json" \
-    --ignore-line ".claude/statusline-command.sh" \
-    --include ".codex"
+    --ignore-line ".claude/statusline-command.sh"
+
+# The JetBrains themes are staged for the one script that fans them out, on Linux; Windows lost
+# its counterpart with the Toolbox, and Android never had one.
+check_platform "linux" --include ".local/share/jetbrains-themes"
+check_platform "$WINDOWS_OS" --ignore-line ".local/share/jetbrains-themes"
+check_platform "android" --ignore-line ".local/share/jetbrains-themes"
 
 # ggshield's pre-commit hook is wired on Linux alone, and so is the ~/.config/git/ignore that
 # answers its `git check-ignore` (ggshield runs git without the global config, so
@@ -202,29 +207,11 @@ check_platform "linux" --kernel "$WSL_KERNEL" --gpu \
 check_platform "linux" --kernel "$WSL_KERNEL" \
     --ignore "ollama.service"
 
-# claude-omni, its task runner and the look of its profile ship on every Linux machine, GPU or
-# not: OmniRoute reaches a GPU on the tailnet or a cloud provider without one here.
-check_platform "linux" --kernel "6.11.0-generic" \
-    --include "claude-omni" \
-    --include-line ".claude-omni"
-
-check_platform "linux" --kernel "$WSL_KERNEL" --gpu \
-    --include "claude-omni" \
-    --include-line ".claude-omni"
-
 # A Windows machine with an NVIDIA card has nvidia-smi on PATH as well, so the OS check, not the
-# driver, has to keep the Linux unit and launcher off it.
+# driver, has to keep the Linux unit off it.
 check_platform "$WINDOWS_OS" --gpu \
     --ignore "ollama.service" \
-    --ignore-line ".local/bin/claude-omni" \
-    --ignore-line ".local/bin/claude-omni-task" \
-    --ignore-line ".claude-omni" \
     --ignore-line ".config/systemd"
-
-check_platform "android" \
-    --ignore-line ".local/bin/claude-omni" \
-    --ignore-line ".local/bin/claude-omni-task" \
-    --ignore-line ".claude-omni"
 
 # The OmniRoute stack runs from the dotfiles checkout, where its .env lives; chezmoi deploys none
 # of it, on any platform.

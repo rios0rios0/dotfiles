@@ -18,6 +18,3 @@ if ($kaliFound) {
     Write-Host "Setting Kali Linux as the default distro..."
     wsl.exe --setdefault kali-linux
 }
-# =========================================================================================================
-nvm install --lts # TODO: in the first execution it's giving error because nvm is not recognized as cmdlet
-# =========================================================================================================

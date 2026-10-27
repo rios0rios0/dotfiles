@@ -29,18 +29,17 @@ make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image p
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
 make test-zshrc-functions           # top-size, sentry-ds and rebuild-ocode in dot_zshrc: arguments, sudo, the work store, completion, the resolved build script
 make test-sentry-setup              # the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds
-make test-local-llm                 # the local model server: its settings, one context window with claude-omni, the installer's gate
-make test-claude-omni               # claude-omni and claude-omni-task: windows, the environment, the /model lineup, GPU guards, the audit, the capacity hint
+make test-local-llm                 # the local model server: its settings, the window its unit allocates, the installer's gate
 make test-opencode                  # OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference
-make test-opencode-cli              # the OpenCode CLI install: the skip, `--no-modify-path`, the failures, the PATH block per platform
 make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
-make test-statusline                # Claude Code status line: both profiles, no refresh without a login, the token off argv
+make test-statusline                # Claude Code status line: with and without a login, no refresh without one, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
 make test-omniroute-backup          # the OmniRoute stack's encrypted backups: the snapshot flow, retention, the installer's gate
 make test-omniroute-image           # the custom OmniRoute image pin: the switch from upstream, --check, --tag, and failed lookups leaving the pin untouched
 make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the dependency install, the pinned bun (cache, verified download, fallbacks), the ~/.bun/bin fallback, the bun installer and its PATH block
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
+make test-yq                        # mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring
 ```
 
 ## Essential Commands
@@ -89,7 +88,7 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 | Shell      | Zsh + Oh My Zsh + p10k       | PowerShell + Oh My Posh | Zsh + Oh My Zsh + p10k           |
 | Scripts    | `.sh`                        | `.ps1`                  | `.sh`                            |
 | Docker     | Native                       | N/A                     | `termux-etc-seccomp` wrapper     |
-| MCP config | `modify_dot_claude.json` (Context7 over HTTP, Chrome DevTools through npx) | `modify_dot_claude.json` (Context7 over HTTP) | `modify_dot_claude.json` and `dot_config/mcphub/` (Context7 over HTTP) |
+| MCP config | `modify_dot_claude.json` (Context7 over HTTP, Chrome DevTools through npx) | N/A (no Claude Code) | `modify_dot_claude.json` and `dot_config/mcphub/` (Context7 over HTTP) |
 | 1Password  | Native `op` CLI              | Native `op` CLI         | `termux-etc-seccomp` wrapper at `.local/bin/op` |
 
 ## Key Files
@@ -221,7 +220,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `codex-wrapper`, `copilot`, `codex`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `claude-omni`, `claude-omni-task`, `tailscale`, `codex-config`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -248,9 +247,8 @@ See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-ma
 
 ## JSON Patching (Modify-Templates, Not Scripts)
 
-`~/.claude.json`, `~/.claude/.claude.json`, `~/.claude/settings.json`,
-`~/.claude-omni/settings.json` and mcphub's `servers.json` (and, in TOML,
-`~/.codex/config.toml`) are merged into, never overwritten, by `modify_` files that are chezmoi
+`~/.claude.json`, `~/.claude/.claude.json`, `~/.claude/settings.json` and mcphub's
+`servers.json` are merged into, never overwritten, by `modify_` files that are chezmoi
 **modify-templates**: chezmoi evaluates them itself, with the file's current content in
 `.chezmoi.stdin`, and writes back what they output. They used to be bash scripts that
 ran embedded Python, and on Windows they could never start: chezmoi picks an interpreter
@@ -265,10 +263,6 @@ from the file extension (`.json` has none), Windows has no `#!`, and the apply a
 | Compare with `toJson`, never `eq` on decoded values | A missing key decodes to `""`, and `eq` between a string and a bool is an error rather than `false` |
 | Invalid JSON fails the template | The old scripts started from `{}` and replaced the file; failing leaves it for a person to repair |
 
-`~/.codex/config.toml` follows the same rules through `fromToml` and `toToml`, with one cost
-JSON does not have: a TOML re-serialisation also drops the file's comments (see "Claude Code
-and Codex Look").
-
 `make test-modify-scripts` runs each one through `chezmoi cat` in a sandbox, and fails when
 any `modify_` file that chezmoi resolves for Windows is not a modify-template.
 
@@ -278,10 +272,12 @@ any `modify_` file that chezmoi resolves for Windows is not a modify-template.
 `modify_dot_claude.json` and mcp-hub's `dot_config/mcphub/modify_servers.json` merge them in.
 They come in groups, and `$groupsByOs` names the groups each platform gets:
 
-| Group | Servers | Linux | Windows | Android |
-|-------|---------|-------|---------|---------|
-| `remote` | `context7` (HTTP) | yes | yes | yes |
-| `browser` | `chrome-devtools` (npx) | yes | | |
+| Group | Servers | Linux | Android |
+|-------|---------|-------|---------|
+| `remote` | `context7` (HTTP) | yes | yes |
+| `browser` | `chrome-devtools` (npx) | yes | |
+
+Windows gets no `~/.claude.json` at all: Claude Code is no longer installed there.
 
 **Keep these:**
 
@@ -315,7 +311,7 @@ They come in groups, and `$groupsByOs` names the groups each platform gets:
    | `--redact-network-headers` | Every header outside DevTools' allowlist reads `<redacted>` -- `Authorization` and cookies, but custom `X-` headers too -- so the app's credentials stay out of the transcript. Response bodies are not redacted |
    | `--no-usage-statistics`, `--no-performance-crux`, `CHROME_DEVTOOLS_MCP_NO_UPDATE_CHECKS` | Its three calls home: usage statistics to Google (on by default), page URLs to the CrUX API, and a daily npm check that a pin turns into noise |
 
-   It is Linux only: native Windows has no Chrome here, and Termux has no supported one. It drives
+   It is Linux only: Termux has no supported Chrome, and Windows gets no MCP servers. It drives
    Google's package rather than Kali's `chromium`, which trailed the stable channel by five
    releases when this was written -- this is the browser Claude points at pages nobody vetted.
 6. **Removing a server is explicit.** The merge never touches a server it does not manage, so a
@@ -325,7 +321,7 @@ They come in groups, and `$groupsByOs` names the groups each platform gets:
    every apply, so it is the repository's to delete; the same name elsewhere belongs to the user
    and stays. `github`, `azure-devops`, `sonarqube` and `kubernetes` were retired this way on
    2026-10-14 in favour of their CLIs, and `dot_claude/modify_settings.json` retires the
-   `mcp__github__*` rule that pre-approved the first one's tools on Windows and Android.
+   `mcp__github__*` rule that pre-approved the first one's tools on Android.
 
 To watch the browser or read the redacted headers in one project, add a server of the same name
 at local scope there, keeping the rest of the flags:
@@ -383,7 +379,7 @@ installs both halves:
 5. **No `-y` and no terminal.** None of these plugins runs a command to install; one that started
    to fails here instead of running unattended.
 6. **The regular profile only.** The script unsets `CLAUDE_CONFIG_DIR`, so an apply run from inside
-   a `claude-omni` session cannot put plugins into that deliberately separate profile.
+   a session on another profile cannot put plugins into that profile.
 7. **A failure fails the apply.** A server that does not install keeps its plugin out, and the run
    exits non-zero so the next apply retries it; a machine without `claude` fails the same way.
 8. **aifiles mirrors the result.** Where aisync runs, `aisync pull` rewrites `settings.json` from
@@ -426,6 +422,25 @@ Both dependency installers carry an `install_flutter`, and the two bodies are di
 **The package cannot unpack until `$PREFIX/share/flutter` exists.** Its data archive names `usr/share/flutter/manifest.json` but carries no directory entry for that parent, and dpkg creates no implicit parents — it extracts in archive order — so the unpack aborts with `unable to create '…/manifest.json.dpkg-new' …: No such file or directory`, which apt then reports as nothing but `dpkg returned an error code (1)` with the real line scrolled off above a wall of `Unpacking …`. `install_flutter` therefore `mkdir -p`s it before handing the file to apt. The archive orphans three further parents (`$PREFIX/bin`, `$PREFIX/etc/profile.d`, `/data`), all of which a Termux install already has; the set is a property of the pinned bytes rather than of the version, so re-derive it when bumping the pin with the one-liner in the comment at that `mkdir`.
 
 **Android is verified on a device (2026-09-20), up to `flutter --version`.** It reports framework `6a19cca564`, engine `af7e796e16` and Dart 3.13.4 — the same triple the pin was corroborated against — after a first run that builds the flutter tool from source and resolves its dependencies (~2 min, network). That run is also what writes `bin/cache/flutter.version.json`, so the version marker does not exist between the `apt install` and the first successful launch — which is why the cached `.deb` is deleted only once that launch answers, and not on the line after `apt install` where the `rm` first sat. An apply interrupted in that window, or one where `flutter --version` fails outright, re-installs from the file instead of re-fetching 615 MB. `precache --web` and the `~/.local/bin` wrappers remain unexercised. The function was written from `dpkg-deb -I`/`-c` of the package (no maintainer scripts; 21,475 files; a bionic Dart VM, so no termux-etc wrapper; the `linux-arm64` engine including `flutter_tester`, and no web SDK, which `precache --web` fetches). `flutter --version` is the hard check; `precache --web` is reported and not fatal, because an artifact the custom engine cannot fetch would fail every apply forever. Termux's own `dart` package sits in `languages` as the baseline for `dart format` whether or not the SDK starts. Flutter's bundled `dart` shadows it through `~/.local/bin` only after the SDK answered.
+
+## yq Is mikefarah's, Not Kali's
+
+`make lint-syntax` and CI validate YAML with `yq eval`, the syntax of
+[mikefarah's yq](https://github.com/mikefarah/yq). Kali's apt package named `yq` is a different
+tool -- kislyuk's Python wrapper around jq (`yq 3.x`, shipping `xq` and `tomlq` too) -- which has
+no `eval`, so on a machine that took `yq` from apt every YAML file failed the lint whatever its
+content.
+
+| Half | Mechanism |
+|------|-----------|
+| Install the right one | `install_yq` in the Linux installer downloads the pinned release into `~/.local/bin/yq`, checks it against a SHA-256 pinned per architecture, and skips only when that file already reports the pinned version -- `command -v yq` would find the Python one and skip |
+| Drop the wrong one | `"yq"` is out of the apt list, and an `apt:yq` tombstone removes the package where it is installed (it needs passwordless sudo, as every `apt:` entry does) |
+
+**Do not put `yq` back into the Linux apt list.** Termux's `yq` package is mikefarah's, so Android
+keeps it from apt, and Windows installs no yq at all. CI pins its own copy in
+`.github/workflows/validate.yaml`. To bump the installer's pin, take both builds' SHA-256 from the
+release's `checksums` file, whose columns `checksums_hashes_order` names. `make test-yq` covers the
+install against a stubbed `curl`, with the Python yq on PATH.
 
 ## One Interpreter Per Python CLI (pipx, Not pip)
 
@@ -504,8 +519,8 @@ sort ranks it above the LTS the chain points at.
 
 The consequence is invisible, which is what makes it worth a test. Global npm
 packages live inside the active version's tree, so the dependency installer (which
-runs the real `nvm`) puts `codex`, `sentry` and Claude Code under the LTS, while a
-shell that picked the higher Current release sees none of them. Every one of those
+runs the real `nvm`) puts `sentry` and Claude Code under the LTS, while a shell that
+picked the higher Current release sees none of them. Every one of those
 CLIs is installed correctly and missing from PATH, and nothing anywhere reports an
 error — `install_codex_cli` had been running `npm install -g @openai/codex`
 successfully into a tree the user's shell never looked at.
@@ -531,12 +546,11 @@ On Android, tool wrappers (`op`, `gh`) **must be `run_once_before` scripts**, NO
 The wrapper scripts follow a strict execution order:
 1. `android-001-create-wrapper.sh` — generic `termux-etc-seccomp` wrapper (all tool wrappers depend on this)
 2. `android-001a-create-op-wrapper.sh` — `op` wrapper (needed by chezmoi templates)
-3. `android-001b-create-gh-wrapper.sh` — `gh` wrapper (backs the `gh_linux_arm64` binary installed in step 8)
-4. `android-001c-create-golangci-lint-wrapper.sh` — `golangci-lint` wrapper (backs the `golangci-lint_linux_arm64` binary installed in step 8)
-5. `android-001d-create-acli-wrapper.sh` — `acli` wrapper (backs the `acli_linux_arm64` binary installed in step 8)
+3. `android-001b-create-gh-wrapper.sh` — `gh` wrapper (backs the `gh_linux_arm64` binary installed in step 7)
+4. `android-001c-create-golangci-lint-wrapper.sh` — `golangci-lint` wrapper (backs the `golangci-lint_linux_arm64` binary installed in step 7)
+5. `android-001d-create-acli-wrapper.sh` — `acli` wrapper (backs the `acli_linux_arm64` binary installed in step 7)
 6. `android-001e-create-claude-wrapper.sh` — `claude` wrapper for Claude Code's `linux-arm64-musl` build (handles the background `patchelf`-aware auto-updater; first-time bootstrap is still manual via `examples/claude-code.md` in `rios0rios0/termux-etc-redirect`) It parks `LD_PRELOAD` in `TERMUX_ETC_LD_PRELOAD` instead of dropping it (see below) and takes `termux-wake-lock` before the `exec`. It also writes `~/.local/bin/claude-zsh`, the `CLAUDE_CODE_SHELL` launcher that restores the parked value before each tool-call zsh starts (see below).
-7. `android-001f-create-codex-wrapper.sh` — `codex` wrapper for the Codex CLI's static `aarch64-unknown-linux-musl` release (see "Codex CLI on Termux" below). It parks `LD_PRELOAD` the same way and hands the parked value to Codex's own tool-call shells with `-c 'shell_environment_policy.set.LD_PRELOAD=…'` (see below), takes `termux-wake-lock`, and downloads the release itself — the `codex` binary and its `codex-code-mode-host` sidecar together — in the foreground on the first launch, which is how step 8 bootstraps it, and through a background check afterwards, because `codex update` refuses a manual install
-8. `android-002-install-dependencies.sh.tmpl` — installs binaries and extensions
+7. `android-002-install-dependencies.sh.tmpl` — installs binaries and extensions
 
 The generic `termux-etc-seccomp` wrapper is the only exception — it exists as BOTH a bootstrap script (for timing) AND a chezmoi-managed file (`dot_local/bin/executable_wrapper`) to keep it updated on subsequent applies.
 
@@ -553,13 +567,12 @@ Android 12+ includes a **Phantom Process Killer** that enforces a system-wide li
 - `MALLOC_ARENA_MAX=2` — reduces glibc memory arena fragmentation on mobile
 - `DBUS_SESSION_BUS_ADDRESS=disabled:` — blocks D-Bus session autolaunch. Without it, tools run through `termux-etc-seccomp` (`op`, `gh`, `acli`, `claude`) leak a `dbus-daemon --session --fork` that reparents to PID 1 and is never reaped, silently consuming the ~32-process phantom budget until any new subprocess trips the killer. `op` is the likeliest source (leaked daemons appeared in the same second as its `op-daemon.pid`), but the guard covers every wrapped tool
 
-**`LD_PRELOAD` contract with `termux-etc-mount`:** the musl Claude binary cannot load Termux's bionic preload shims, so the wrapper and `termux-etc-mount` both move `LD_PRELOAD` to `TERMUX_ETC_LD_PRELOAD` before the `exec`. Three things hand it back, and each covers a case the others cannot, because an export from inside a running shell reaches only that shell's children, never the shell itself:
+**`LD_PRELOAD` contract with `termux-etc-mount`:** the musl Claude binary cannot load Termux's bionic preload shims, so the wrapper and `termux-etc-mount` both move `LD_PRELOAD` to `TERMUX_ETC_LD_PRELOAD` before the `exec`. Two things hand it back, and each covers a case the other cannot, because an export from inside a running shell reaches only that shell's children, never the shell itself:
 
 | Where the shims come back | Mechanism |
 |---------------------------|-----------|
-| In the tool-call shell itself | The wrapper exports `CLAUDE_CODE_SHELL=~/.local/bin/claude-zsh` (both files come from `001e`). Claude Code accepts the override because the path contains `zsh` and is executable, and derives the shell type and rc file from that string; the launcher restores the variable and `exec`s the real zsh, so `termux-exec` is mapped before the shell's first `execve`. This is what lets a tool call exec `sentry` or any other npm bin directly: those keep their `#!/usr/bin/env node` shebang, and the kernel resolves it only through the caller's preload (`copilot`'s launcher now starts too; that CLI then fails on its own, its `pty.node` native module has no `android-arm64` build, which is unrelated). The launcher also drops the `NODE_EXTRA_CA_CERTS` the wrapper sets for Claude's own musl Node, which bionic Node never needs and the Sentry CLI warns about on every run |
+| In the tool-call shell itself | The wrapper exports `CLAUDE_CODE_SHELL=~/.local/bin/claude-zsh` (both files come from `001e`). Claude Code accepts the override because the path contains `zsh` and is executable, and derives the shell type and rc file from that string; the launcher restores the variable and `exec`s the real zsh, so `termux-exec` is mapped before the shell's first `execve`. This is what lets a tool call exec `sentry` or any other npm bin directly: those keep their `#!/usr/bin/env node` shebang, and the kernel resolves it only through the caller's preload. The launcher also drops the `NODE_EXTRA_CA_CERTS` the wrapper sets for Claude's own musl Node, which bionic Node never needs and the Sentry CLI warns about on every run |
 | In everything a shell spawns | The Android block of `dot_zshenv.tmpl` re-exports the parked value (falling back to `termux-exec` alone when nothing was parked). On its own this half fixed `make` targets and pipelines scripts — children of the shell — but not a script exec'd straight from the tool call, which failed with `bad interpreter: /usr/bin/env` while `zsh -c 'sentry --version'` worked. It stays for a `termux-etc-mount` run by hand, an SSH login and an older wrapper |
-| In Codex's tool-call shells | The `codex` wrapper (`001f`) appends `-c 'shell_environment_policy.set.LD_PRELOAD=…'` with the parked value (same `termux-exec` fallback as the other two). Codex applies that policy to the environment it spawns tool commands with, so the shims are mapped at `execve` time. Neither of the halves above can reach those shells: Codex ignores `$SHELL` and resolves the shell from the password database (`getpwuid_r`), whose Termux entry is `$PREFIX/bin/login` — a name it does not recognise — so it falls back to `which bash` and runs `$PREFIX/bin/bash -lc "<cmd>"`, which never sources `~/.zshenv`. `CODEX_WRAPPER_KEEP_LD_PRELOAD=1` opts out |
 
 Keep the variable name in step with `rios0rios0/termux-etc-redirect`; a `CLAUDE_CODE_SHELL` already in the environment wins over the launcher.
 
@@ -595,23 +608,6 @@ They get there because Go derives `GOMODCACHE` from `GOPATH`, and the pipelines 
 Both are needed: the pin cannot retroactively remove caches left by older revisions, nor reach a tool that exports its own `GOMODCACHE`. When deleting one by hand, always `chmod -R u+w` first.
 
 **Diagnosing it:** `find "$TMPDIR" ! -writable | wc -l`. Anything in the thousands will crash Termux on exit. A telltale sign in the crash report is an *identical* allocation size across separate crashes — the file set is unchanged, so the string is deterministic.
-
-## Codex CLI on Termux
-
-`npm install -g @openai/codex` cannot work on Termux, so do not retry it there: the package is a Node launcher plus one optional dependency per platform, and `@openai/codex-linux-arm64` declares `os: linux` in its `package.json` while Termux's Node reports `android`. npm skips it silently and the launcher throws `Missing optional dependency`. The Android installer (`install_codex_cli`) removes such an install, and `run_once_before_android-001f-create-codex-wrapper.sh` provides `~/.local/bin/codex` instead, which runs the GitHub release's `codex-aarch64-unknown-linux-musl` binary — a **static** executable, so unlike Claude Code it needs no musl loader and no `patchelf`.
-
-The wrapper encodes six Termux facts, each verified on a device:
-
-| Fact | Consequence in the wrapper |
-|------|----------------------------|
-| musl resolves DNS by reading `/etc/resolv.conf` through direct syscalls, and Android has no such file | The binary runs through `termux-etc-mount` (Tier 3), like `claude`. Tier 2 (`termux-etc-seccomp`) is wrong here: its `SIGSYS -> ENOSYS` rewrite reaches every descendant, and Codex spawns Node for tool calls |
-| Codex (rustls) probes the usual CA bundle paths with `stat()`, which Tier 3 does not redirect (`openat` only), so every handshake fails with `invalid peer certificate: UnknownIssuer` | `SSL_CERT_FILE` defaults to `$PREFIX/etc/tls/cert.pem` |
-| The Linux sandbox is bubblewrap, which needs unprivileged user namespaces; Android's SELinux policy denies them (`unshare(CLONE_NEWUSER)` returns `EINVAL`), so `read-only` and `workspace-write` panic before running any command | `-c 'sandbox_mode="danger-full-access"'` is prepended to every launch unless `CODEX_WRAPPER_KEEP_SANDBOX=1`. A `--sandbox` on the command line still wins; a `-c` of your own has to come *before* the subcommand (`codex -c key=value exec …`), because Codex's `-c` is per parse level and one given after the subcommand replaces the wrapper's whole override list instead of merging with it. Approval prompts are unaffected |
-| `termux-etc-mount` drops `LD_PRELOAD` before the `exec`, and Codex starts its tool-call shells itself — `$PREFIX/bin/bash -lc "<cmd>"`, because it resolves the shell from the password database (`getpwuid_r` → `$PREFIX/bin/login`, which names no shell it knows) and never from `$SHELL` — so `~/.zshenv` is not even sourced and every `#!/usr/bin/env` script a tool call runs dies with `bad interpreter` | `-c 'shell_environment_policy.set.LD_PRELOAD=…'` is prepended with the parked value (falling back to `termux-exec` alone). Codex applies that policy to the environment tool commands are spawned with, so `termux-exec` is mapped before the shell's first `execve` whichever shell Codex picks. `CODEX_WRAPPER_KEEP_LD_PRELOAD=1` opts out |
-| `codex update` refuses a manual install (`Could not detect the Codex installation method`) | The wrapper resolves the latest release from the `releases/latest` redirect, keeps builds under `~/.local/share/codex/versions/<X.Y.Z>/codex`, checks once per 24h in the background, retains three builds, and silences Codex's own startup update nag while its updater is active. `CODEX_WRAPPER_NO_AUTO_UPDATE=1` and `CODEX_WRAPPER_FORCE_VERSION=X.Y.Z` override this |
-| Code Mode's host is a **separate release asset** (`codex-code-mode-host-<target>.tar.gz`) that Codex resolves as a sibling of its own executable | `install_version` unpacks both assets into one staging directory, so they appear together in a single rename. A version directory holding only `codex` makes Code Mode fail closed with `host executable was not found`, and nothing says so until a model actually asks for Code Mode — so `ensure_code_mode_host` backfills the selected version in the background when the sidecar is missing, which is what repairs builds an older wrapper revision downloaded |
-
-Log in with `codex login --device-auth` on the phone: it prints a code to enter at the URL it shows, in any browser, while the default `codex login` expects to open a browser and receive a callback on `localhost:1455`. The `LD_PRELOAD` contract above applies with a third leg of its own: `termux-etc-mount` parks the value and the wrapper hands it to the tool-call shells through Codex's shell environment policy, because those shells are `bash -lc` spawned by Codex and never source `dot_zshenv.tmpl`.
 
 ## Clipboard Images on Termux (Ctrl+V)
 
@@ -672,8 +668,8 @@ binary, the verification commands, and why termux-x11 and Termux:API were both r
 | The official install script (`cli.sentry.dev/install`) downloads a Bun-compiled `sentry-linux-<arch>` executable linked against glibc; the `-musl` variants stopped shipping after `0.34.0` | On Termux the kernel cannot start it at all (`/lib/ld-linux-aarch64.so.1` does not exist under bionic), so the script dies with `No such file or directory` before `sentry cli setup` runs. Do not retry it there, and do not reach for `glibc-runner` or a musl loader: the npm route removes the need |
 | The npm package `sentry` is the same CLI as a plain JavaScript bundle: no platform package, no lifecycle script, `engines.node >= 20` | It runs under Termux's native `nodejs` (bionic) and under NVM on Linux/WSL with one shared function body. Node 22.15+ uses the built-in `node:sqlite` for `cli.db`, kept in `$XDG_CONFIG_HOME/sentry/` (`~/.config/sentry/` by default; a legacy `~/.sentry/` that already holds one stays in use); older Node falls back to a bundled WASM driver |
 | Node resolves DNS through bionic and reads Termux's CA bundle | No `termux-etc-seccomp`/`termux-etc-mount`, no `SSL_CERT_FILE`, no `LD_PRELOAD` parking. Verified on a device: `sentry cli upgrade --check` reaches the network and reports `Method: npm` |
-| `sentry cli upgrade` detects the npm layout from its own path | Updates go through npm; nothing in the versions-directory style of the `claude` and `codex` wrappers is needed |
-| npm links `$PREFIX/bin/sentry` to the package's `dist/bin.cjs` and keeps its `#!/usr/bin/env node` shebang | The kernel resolves that path only through `termux-exec` in the calling process. Plain Termux tabs have it; Claude Code tool calls get it from the `claude-zsh` launcher and Codex tool calls from Codex's shell environment policy (see the `LD_PRELOAD` contract above). Before that launcher every `sentry` call made directly from a tool call died with `bad interpreter: /usr/bin/env: no such file or directory` while `zsh -c 'sentry ...'` worked. Do not `termux-fix-shebang` the file as a workaround: `sentry cli upgrade` reinstalls it through npm and undoes that |
+| `sentry cli upgrade` detects the npm layout from its own path | Updates go through npm; nothing in the versions-directory style of the `claude` wrapper is needed |
+| npm links `$PREFIX/bin/sentry` to the package's `dist/bin.cjs` and keeps its `#!/usr/bin/env node` shebang | The kernel resolves that path only through `termux-exec` in the calling process. Plain Termux tabs have it; Claude Code tool calls get it from the `claude-zsh` launcher (see the `LD_PRELOAD` contract above). Before that launcher every `sentry` call made directly from a tool call died with `bad interpreter: /usr/bin/env: no such file or directory` while `zsh -c 'sentry ...'` worked. Do not `termux-fix-shebang` the file as a workaround: `sentry cli upgrade` reinstalls it through npm and undoes that |
 
 Log in with `sentry auth login`: the OAuth flow is a device code entered at a URL, so it works on the phone as-is, and `--token` accepts an API token instead.
 
@@ -705,7 +701,7 @@ npm installs ship neither shell completions nor the agent skill, so `run_onchang
 | Fact | Consequence |
 |------|-------------|
 | Fresh installs take the `neon` package, never `neonctl`: since the two-package split, `neon` holds the CLI and the `neon` executable, while `neonctl` is a compatibility shim whose only executable imports `neon/cli` in-process | One package to install; a machine that installs `neonctl` for the legacy command name is running the same CLI, so the repository never carries both. Since the rename, `neon --version` is what reports the CLI's version |
-| The package is the whole CLI as a plain JavaScript ESM bundle (`bin` links `neon` to `dist/cli.js`, `#!/usr/bin/env node`), `engines.node >= 20.19.0` | It runs under Termux's native Node and under NVM on Linux/WSL with one function body. npm treats a mismatched engine as a warning, so `install_neon_cli` skips with a warning below 20.19.0 instead of installing a launcher the CLI's docs say cannot run or upgrade. The shebang needs termux-exec in the calling process — the Sentry CLI's story, with plain Termux tabs and the tool-call shells covered by `claude-zsh` and Codex's shell environment policy |
+| The package is the whole CLI as a plain JavaScript ESM bundle (`bin` links `neon` to `dist/cli.js`, `#!/usr/bin/env node`), `engines.node >= 20.19.0` | It runs under Termux's native Node and under NVM on Linux/WSL with one function body. npm treats a mismatched engine as a warning, so `install_neon_cli` skips with a warning below 20.19.0 instead of installing a launcher the CLI's docs say cannot run or upgrade. The shebang needs termux-exec in the calling process — the Sentry CLI's story, with plain Termux tabs and the tool-call shells covered by `claude-zsh` |
 | `@napi-rs/keyring`, the opt-in `--keyring` OS-keyring storage, publishes no android-arm64 target, and the CLI's `tryLoadKeyring` returns null when the addon cannot load | On the phone, credentials stay in the CLI's config file — which is the default anyway — and `--keyring` reports that the OS keyring is unavailable instead of crashing. Nothing here needs a wrapper |
 | `esbuild` is an optional dependency serving only the bundling commands, resolved lazily at call time, with the platform binary arriving through `@esbuild/<platform>` packages | `--ignore-scripts` skips only esbuild's fallback postinstall, which exists for installers that disable optional dependencies; verified with that postinstall skipped, the JS API still bundles. If the import ever fails, the CLI names `NEON_ESBUILD_PATH` |
 
@@ -715,56 +711,41 @@ Verified on Linux (the `--ignore-scripts` install, `neon --version`, and esbuild
 
 ## AI Rules Sync
 
-AI assistant rules (Claude Code, GitHub Copilot CLI, Codex, OpenCode, etc.) are **not** managed by chezmoi. Everything the harnesses load as AI content lives in their own directories and is synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply): `~/.claude/CLAUDE.md`, `~/.codex/AGENTS.md` and `~/.config/opencode/AGENTS.md` carry the per-machine environment reality (WSL facts, the interactive `cp`/`rm`/`mv` guards, quoting rules), and `rules/`, `agents/`, `commands/` and `skills/` under each directory carry the portable content. chezmoi touches only the individual files there that "JSON Patching" and "Claude Code and Codex Look" name, plus OpenCode's `opencode.json` and `cli.json`.
+AI assistant rules (Claude Code, OpenCode, etc.) are **not** managed by chezmoi. Everything the harnesses load as AI content lives in their own directories and is synced separately by [`aisync`](https://github.com/rios0rios0/aisync), a Go CLI installed by `install_aisync()` in the Linux/WSL and Android dependency scripts (replaces the legacy `run_after_*-install-ai-rules.*` scripts that used to curl `install-rules.sh` from `rios0rios0/guide` on every apply): `~/.claude/CLAUDE.md` and `~/.config/opencode/AGENTS.md` carry the per-machine environment reality (WSL facts, the interactive `cp`/`rm`/`mv` guards, quoting rules), and `rules/`, `agents/`, `commands/` and `skills/` under each directory carry the portable content. chezmoi touches only the individual files there that "JSON Patching" and "Claude Code Look" name, plus OpenCode's `opencode.json` and `cli.json`.
 
 After the dependency installer finishes, run `aisync init`, `aisync source add guide --source-repo rios0rios0/guide --branch generated`, and `aisync pull` to populate the rules. Subsequent `aisync pull` calls refresh them on demand.
 
-## Claude Code and Codex Look
+## Claude Code Look
 
-The look of both CLIs is declared here and merged into each tool's own settings file by
-modify-templates, which set a managed key whose value differs and leave every other key alone:
+Claude Code's look is declared here and merged into its settings file by a modify-template, which
+sets a managed key whose value differs and leaves every other key alone:
 
 | Look | Declared in | Merged into |
 |------|-------------|-------------|
-| Claude Code: `theme` `dark-ansi`, `tui` `fullscreen`, `statusLine` | `.chezmoitemplates/lib-claude-look.tmpl` | `~/.claude/settings.json` and `~/.claude-omni/settings.json`, Linux only |
+| Claude Code: `theme` `dark-ansi`, `tui` `fullscreen`, `statusLine` | `.chezmoitemplates/lib-claude-look.tmpl` | `~/.claude/settings.json`, Linux only |
 | Claude Code's status line | `dot_claude/executable_statusline-command.sh` | `~/.claude/statusline-command.sh`, Linux only |
-| Codex: `tui.status_line`, `tui.status_line_use_colors` | `dot_codex/modify_private_config.toml` | `~/.codex/config.toml`, every platform |
 
 **Change the look here, never with `/theme` or `/statusline`.** Those write the same keys, so
-the next apply sets them back, with a `[claude-settings]`, `[claude-omni]` or `[codex-config]`
-line naming each one.
+the next apply sets them back, with a `[claude-settings]` line naming each one.
 
-1. **One declaration for both Claude Code profiles.** `claude-omni` runs under
-   `CLAUDE_CONFIG_DIR=~/.claude-omni`, which reads nothing from `~/.claude/settings.json`:
-   a session there would keep the theme its onboarding picked, with no status line. Both
-   modify-templates read `lib-claude-look.tmpl`, so the profiles cannot drift apart, and one
-   script serves both -- it finds its credentials, usage cache and account through
-   `CLAUDE_CONFIG_DIR`, so a session through OmniRoute shows no plan limits. Without a login it also
-   starts no usage refresh: one that cannot succeed never writes the cache, and would fork on
-   every redraw.
+1. **The status line follows `CLAUDE_CONFIG_DIR`.** It finds its credentials, usage cache and
+   account through it, so a profile without a claude.ai login shows no plan limits. Without a
+   login it also starts no usage refresh: one that cannot succeed never writes the cache, and
+   would fork on every redraw.
 2. **The OAuth token never reaches an argument list.** The refresh hands it to `curl` on
    stdin (`-H @-`), because any local user can read a process's arguments in
    `/proc/<pid>/cmdline`.
 3. **Claude Code's look stays on Linux.** The status line forks bash and jq on every redraw,
-   which on Termux counts against Android's phantom-process budget and on Windows would need a
-   shell and paths of its own. `.chezmoiignore` therefore ships only `settings.json` and the
-   script from `dot_claude/` to Linux, and keeps the script off the other platforms.
-   `dot_claude/modify_settings.json` branches on the platform: the look on Linux, the
-   permission rules and `effortLevel` on Windows and Android as before -- Linux never had them.
-4. **Codex's look ships everywhere.** Its status line is built in, and Codex ignores a `[tui]`
-   key it does not know rather than rejecting the file. `status_line_use_colors` defaults to
-   `true` and is written anyway, so neither the toggle in `/statusline` nor a changed default
-   turns the colours off for good. Codex hides an item until it has a value: a new session shows
-   the directory, branch, model and context left; tokens used, the window size and both rate
-   limits join after the first reply.
-5. **TOML is re-serialised only on a real change.** When both keys match, `config.toml` passes
-   through byte for byte. Otherwise `toToml` rewrites it, which keeps every setting -- trusted
-   projects, hook hashes, the model -- but drops comments and indents nested tables. `private_`
-   keeps the file `0600`: MCP server entries in it can carry tokens.
+   which on Termux counts against Android's phantom-process budget. `.chezmoiignore` therefore
+   ships only `settings.json` and the script from `dot_claude/` to Linux and keeps the script off
+   Android; Windows, where Claude Code is no longer installed, gets neither `~/.claude` nor
+   `~/.claude.json`. `dot_claude/modify_settings.json` branches on the platform: the look on
+   Linux, the permission rules and `effortLevel` on Android as before -- Linux never had them.
 
-`make test-modify-scripts` covers every merge, the byte-for-byte passthroughs and the `0600`
-mode; `make test-chezmoiignore` covers which platform gets which file; `make test-statusline`
-covers the script in both profiles, including 1 and 2, against stubbed `curl` and `mkdir`.
+`make test-modify-scripts` covers every merge and the byte-for-byte passthroughs;
+`make test-chezmoiignore` covers which platform gets which file; `make test-statusline`
+covers the script with and without a login, including 1 and 2, against stubbed `curl` and
+`mkdir`.
 
 ## Non-Interactive Shell Guards
 
@@ -772,15 +753,6 @@ These ship to every platform, not only Android: both blocks sit outside the chez
 
 - `dot_zshenv.tmpl` relaxes `nomatch` for non-interactive shells (`[[ -o interactive ]] || setopt NO_NOMATCH`), so a glob that matches nothing is passed through to the command instead of aborting the whole line. Interactive shells keep the prompt-time error.
 - `dot_zshrc.tmpl` replaces the `common-aliases` `rm`/`cp`/`mv -i` aliases with functions, defined right after oh-my-zsh loads, that keep `-i` only when stdin is a terminal. Against a closed stdin `-i` reads EOF and skips the operation with exit 0 — a `cp` that never happened, reported as success.
-
-## Codex CLI Shortcut
-
-`dot_zshrc.tmpl` defines `codexx` for Linux/WSL and Android. It runs
-`command codex --dangerously-bypass-approvals-and-sandbox "$@"`, bypassing command
-approvals and sandboxing while preserving argument boundaries. Keep it a function
-with a preceding `unalias` so re-sourcing handles an existing alias. Keep PATH
-resolution so Android still launches its managed `~/.local/bin/codex` wrapper.
-Reasoning effort remains controlled by Codex configuration.
 
 ## Claude Account Rotation (ccswitch)
 
@@ -794,11 +766,9 @@ Keep `claudex` a **function**, not an alias: zsh refuses to define a function wh
 
 **Note:** if `ANTHROPIC_API_KEY` or `ANTHROPIC_AUTH_TOKEN` is set, Claude Code ignores the rotated OAuth credentials; `ccswitch` warns when it detects this.
 
-The same guard asks `ccswitch capacity` (no network) whether any enrolled account has capacity left, and when it exits `3` -- none -- points at `claude-omni` before launching. Only exit `3` counts: `1` is any failure, including a ccswitch too old to know the command, so a stale binary stays silent rather than misleading.
-
 ## Local Model Server (Ollama)
 
-Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NVIDIA GPU. It is one of OmniRoute's providers, and Claude Code reaches it through `claude-omni` (next section). Setup, measurements and troubleshooting are in `.docs/local-coding-model.md`; these are the invariants:
+Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NVIDIA GPU. It is one of OmniRoute's providers. Setup, measurements and troubleshooting are in `.docs/local-coding-model.md`; these are the invariants:
 
 | Part | Where |
 |------|-------|
@@ -810,46 +780,14 @@ Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NV
 
 **Keep these, each prevents a failure that was observed or measured:**
 
-1. **One window, rendered twice.** `contextTokens` becomes both `OLLAMA_CONTEXT_LENGTH` (what the server allocates) and the window `claude-omni` declares for every GPU model (`CLAUDE_CODE_MAX_CONTEXT_TOKENS`, what Claude Code budgets against). Neither Claude Code nor OmniRoute can read it from Ollama -- OmniRoute advertises a 128000 fallback -- so a mismatch means nothing compacts before the server truncates. Never hard-code either side.
+1. **One window, from one value.** `contextTokens` becomes `OLLAMA_CONTEXT_LENGTH`, what the server allocates. OmniRoute cannot read it from Ollama and advertises its 128000 fallback instead. Never hard-code the window anywhere else.
 2. **The marker is a commit record.** The installer writes the release marker only after `sync`, and re-verifies every unpacked file against a digest manifest each time it runs. A WSL VM that went down after an install once left both `libcublasLt` libraries truncated under a valid marker; CUDA discovery then died with `SIGBUS` on every start, and Ollama served from the CPU without a visible error.
 3. **The installer proves GPU *discovery*, and loads nothing.** It reads the server's own start-up log, filtered to the invocation it just restarted -- one `inference compute` line per backend, `library=cpu` alone meaning no accelerator answered -- and fails the apply when no other backend is there. Loading the model to inspect where Ollama placed it, which this used to do, put ~17 GB of weights in VRAM at every apply and paid a ~17 s cold start that the first real request would otherwise have re-used; the model now stays out of VRAM until something asks for it, and `keepAlive` gives the VRAM back afterwards. The failure it catches is unchanged: a damaged CUDA install (a WSL VM once went down mid-install, leaving the two `libcublasLt` libraries truncated) makes discovery crash, `cpu` becomes the only backend, and Ollama then serves every request from the CPU -- an order of magnitude slower -- with no error. What used to be an observed partial placement is now a forecast: the free VRAM the log's GPU line reports, against the model's size, warns when even the weights cannot fit.
 4. **Gate on the driver and the OS, not on WSL.** Nothing here depends on Windows, so bare-metal Linux with a GPU qualifies; but `lookPath` finds `nvidia-smi.exe` on Windows too, so `.chezmoiignore` pairs the driver check with `eq .chezmoi.os "linux"`.
 5. **Device overrides are laid over key by key.** sprig's `merge` and `mergeOverwrite` both count `false` as empty, so a device's `enabled: false` would lose to the default `true`; `lib-local-llm.tmpl` uses `set` per key instead.
-6. **Ollama binds IPv4 loopback, and the specific address is load-bearing on WSL.** The family of the listening socket decides the family WSL's localhost forwarding publishes on the Windows side: a dual-stack `0.0.0.0` bind appears there on `::1` alone, and Docker Desktop -- which reaches this machine as `host.docker.internal`, dialing Windows' IPv4 loopback -- gets connection refused, surfacing as a 502 on every local GPU request through OmniRoute. `127.0.0.1` publishes Windows' `127.0.0.1`, so the container connects. Tailscale needs no change either way: Windows' client forwards to `localhost:11434`, which names both families. The API has no authentication, so on WSL every Windows-side process can run inference and pull or delete models; keep the tailnet share to devices you trust. `.chezmoidata/omniroute.yaml` uses `deviceName` to map the laptop (`alien-a51`) and desktop (`mxhero-z790`) local/remote GPU roles separately, and its `gpus` keys are the gateway's provider prefixes (`ollama-laptop`, `ollama-desktop`) -- a renamed key silently drops that GPU from the lineup.
+6. **Ollama binds IPv4 loopback, and the specific address is load-bearing on WSL.** The family of the listening socket decides the family WSL's localhost forwarding publishes on the Windows side: a dual-stack `0.0.0.0` bind appears there on `::1` alone, and Docker Desktop -- which reaches this machine as `host.docker.internal`, dialing Windows' IPv4 loopback -- gets connection refused, surfacing as a 502 on every local GPU request through OmniRoute. `127.0.0.1` publishes Windows' `127.0.0.1`, so the container connects. Tailscale needs no change either way: Windows' client forwards to `localhost:11434`, which names both families. The API has no authentication, so on WSL every Windows-side process can run inference and pull or delete models; keep the tailnet share to devices you trust.
 
 `make test-local-llm` covers 1, 3, 5, the installer's render gate and a stubbed end-to-end run of it (nothing loaded, the invocation filter, the busy-GPU warning, and both failure logs); `make test-chezmoiignore` covers the gate per platform. Ollama and its models live under `$HOME`, so removing the server means `path:` tombstones for `.local/share/ollama` and `.ollama`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service` and `~/.local/bin/ollama`.
-
-## Claude Code Through OmniRoute (claude-omni)
-
-`claude-omni` runs Claude Code through OmniRoute -- the gateway in `local-services/omniroute/` -- on the provider and model it is given: a GPU's Ollama, NVIDIA NIM, OpenRouter, or an `auto/*` combo. It replaced `claude-local` and `claude-remote`. Setup and usage are in `.docs/omniroute-local.md`.
-
-| Part | Where |
-|------|-------|
-| Settings (base URL, GPUs, choice efforts, `auto/*` window, task GPUs, lean profile, per-device overrides) | `.chezmoidata/omniroute.yaml`, read through `.chezmoitemplates/lib-omniroute.tmpl`, which includes `lib-local-llm.tmpl` for the GPU model and window |
-| Model lineup | fetched from the gateway's `/v1/models` at every launch, so it is whatever the key's policy allows |
-| Launcher | `dot_local/bin/executable_claude-omni.tmpl` |
-| Delegated, audited runs | `dot_local/bin/executable_claude-omni-task.tmpl` |
-| Status line | `dot_claude/executable_statusline-command.sh`; see "Claude Code and Codex Look" |
-| Look of its profile | `dot_claude-omni/modify_settings.json`, from `.chezmoitemplates/lib-claude-look.tmpl` |
-| The old profile, carried over | `.chezmoiscripts/run_once_before_linux-006-move-claude-local-profile.sh` |
-| Gateway | `local-services/omniroute/compose.yaml`, run from the checkout, where its `.env` lives; chezmoi deploys none of it |
-| Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported as `OMNIROUTE_API_KEY` |
-| Gate | `.chezmoiignore`: Linux, GPU or not |
-
-**Keep these, each prevents a failure that was observed or measured:**
-
-1. **One window per process: the smaller of OmniRoute's and the repository's.** Claude Code reads no window from a gateway -- gateway discovery reads only `id`, `display_name` and `description` -- and takes one `CLAUDE_CODE_MAX_CONTEXT_TOKENS` for the whole process, `/model` switches included. OmniRoute enforces the window it resolves (a 400 past it), so declaring more trades compaction for an error. For Ollama it advertises its 128000 fallback, which is why a GPU's window comes from `local-llm.yaml`; a window with no `max_input_tokens` behind it is that fallback, and the launch warns.
-2. **Every tier is pinned, and the 1M variants are off.** `ANTHROPIC_MODEL`, the Opus, Sonnet, Haiku and **Fable** defaults and `CLAUDE_CODE_SUBAGENT_MODEL` all name the one model. Without `CLAUDE_CODE_DISABLE_1M_CONTEXT=1`, `/model`'s Default row turns the id into `<id>[1m]`, which Claude Code sizes at 1,000,000 tokens (measured; `claude-local` had the same hole).
-3. **`/model` offers only models whose window is at least the session's, and the lineup is fetched, never written down.** The launcher reads `/v1/models` on every launch and keeps every chat row (`type` null) whose `capabilities.tool_calling` is not false -- 63 openrouter specialty models fail that test -- leading with `gpuModel` on each GPU, then the catalog's own order. Curation therefore happens in OmniRoute (hide a model, scope the key's policy, override a window) and the next launch follows; `--list` prints the result and `--list --all` what the gateway holds. A `modelPicker` with `replaceBuiltInOptions`, passed in `--settings`, offers those rows that hold the session's window, each labelled with its window; the label also becomes `display_name` in the status line. A smaller model would overflow before the session compacts, and OmniRoute's over-window 400 is OpenAI-shaped, which Claude Code does not compact on (filed upstream). `claude-omni -c -m ID` reaches any catalog row and keeps the conversation. Claude Code's own gateway discovery stays off: it reads only `id`, `display_name` and `description` (no window) and keeps only ids containing `claude`, so the picker is built from the same catalog here instead. The server-side `q`/`kind`/`capability`/`min_context` filters of v3.8.51 are ignored by the running gateway, so the filtering is client-side in jq.
-4. **The prompt stays as Claude Code wrote it.** The list `ollama launch` sets for a non-Anthropic model (`CLAUDE_CODE_ATTRIBUTION_HEADER=0`, `CLAUDE_CODE_TOTAL_TOKENS_REMINDER=off`, `CLAUDE_CODE_AUTO_MODE_SERVER=0`, `DISABLE_ERROR_REPORTING`, `DISABLE_FEEDBACK_COMMAND`, `CLAUDE_CODE_DISABLE_FEEDBACK_SURVEY`) is now this script's to keep current, and `ANTHROPIC_CUSTOM_HEADERS` adds `x-omniroute-compression: off` and `x-omniroute-no-memory: true`, so OmniRoute neither compresses the prompt (one engine is lossy) nor injects memory. Measured: an 11K-token prefix read back from Ollama's cache through OmniRoute in 1.15 s against 5.53 s cold, as direct.
-5. **Nothing is exported beyond the launched process, and the key never reaches an argument list.** An `ANTHROPIC_AUTH_TOKEN` in the shell outranks the claude.ai login and would silently disable ccswitch's rotation; the key reaches curl on stdin (`-H @-`), because `/proc/<pid>/cmdline` is readable by any local user.
-6. **The GPU guards of the old launchers stay.** This machine's server is started on demand, and a machine without systemd is told so. A tailnet GPU is found the way OmniRoute reaches it, the model is loaded there, a `context_length` other than this machine's is refused, and partial GPU placement warns -- the other machine renders its window from *its* checkout, and nothing on the wire says so. A tailnet GPU that answers 403 to the forwarded Host header is a separate, known limit (`tailscale serve --tcp` passes it through and Ollama refuses it), documented in `.docs/omniroute-local.md`.
-7. **A separate profile, lean only on a small window.** `CLAUDE_CONFIG_DIR=~/.claude-omni` keeps `/model` choices, which Claude Code saves to the profile's settings, out of the regular profile, which would send them to Anthropic. Up to `lean.maxWindow` the session also gets `claudeMdExcludes` -- a separate config directory alone does **not** drop `~/.claude/rules`, which Claude Code reads as the rules of the ancestor `~` -- and `--tools`, which cuts the schemas sent to an unrecognised model from 27K tokens to 5.8K. `--tools` is variadic, so `--settings` follows it before the caller's arguments.
-8. **A delegated run is returned, not restricted.** `claude-omni-task` runs the model with permissions off and hands back every action with its result, the change measured between two working-tree snapshots taken through a **scratch copy of the index** (`GIT_INDEX_FILE`, never the caller's), an undo command and the transcript. Without `-m` it takes the first free, serving GPU in `taskGpus`, under a `flock` per GPU, since a GPU serves one request at a time; a cloud model runs only when named, and the audit says which provider received the files the model read. What an audit cannot reach -- commits, pushes, requests, writes outside the repository -- is listed, not prevented.
-9. **The status line keeps the session's window.** After `/model` it appends the new model's own, from the `omniroute-windows.tsv` the launch writes into the profile, and turns red when that window is smaller than the session's.
-10. **Nothing that grows with the catalog rides on a command line.** The resolved lineup and the settings JSON carry every served model -- 273 KB and 159 KB against the 1352-model catalog of 2026-10-17 -- and Linux refuses to exec a single argument past `MAX_ARG_STRLEN` (32 pages) with `Argument list too long`, before the program runs. The lineup therefore reaches `jq` on stdin (its catalog through `--slurpfile`), and the settings go into `omniroute-settings.json` in the profile, whose path is what `--settings` names. However many models the gateway adds, a launch cannot fail on their size.
-
-`make test-claude-omni` covers 1 to 8, 10 and the capacity hint against stubbed `curl`, `claude`, `systemctl` and `tailscale`; `make test-statusline` covers 9; `make test-chezmoiignore` covers the gate. Removing the feature means `.chezmoiremove` entries for `~/.local/bin/claude-omni` and `~/.local/bin/claude-omni-task` and a `path:` tombstone for `.claude-omni`.
 
 ## The OmniRoute Fork Image
 
@@ -903,12 +841,12 @@ lookup leaving the pin untouched -- against stubbed `gh` and `docker`.
 
 ## OpenCode V2 Through OmniRoute
 
-OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencode.json.tmpl` renders to `~/.config/opencode/opencode.json`, with OmniRoute as the primary provider and `omniroute/auto/coding` as the default model. Both discover the catalog from the gateway's own `/v1/models`, which serves exactly what the API key allows, so neither carries a model list here. Setup and usage are in `.docs/opencode-local.md`.
+OpenCode runs on the OmniRoute gateway: `dot_config/opencode/opencode.json.tmpl` renders to `~/.config/opencode/opencode.json`, with OmniRoute as the primary provider and `omniroute/auto/coding` as the default model. It discovers the catalog from the gateway's own `/v1/models`, which serves exactly what the API key allows, so no model list is carried here. The CLI that reads it on Linux is `ocode`, the fork build below; the official `opencode` binary is no longer installed. Setup and usage are in `.docs/opencode-local.md`.
 
 | Part | Where |
 |------|-------|
 | Global config | `dot_config/opencode/opencode.json.tmpl`, applied on every platform that gets a shell |
-| CLI | `install_opencode()` in the Linux dependency script runs the V2 installer with `--no-modify-path`; `dot_zshenv.tmpl` puts `~/.opencode/bin` on PATH, off Android only |
+| CLI | `ocode`, built into `~/.local/bin/ocode` by `run_after_linux-006-build-ocode.sh` (see "The Fork Build" below), Linux only |
 | Look | `dot_config/opencode/cli.json` |
 | Rules | `~/.config/opencode/AGENTS.md` and `rules/`, synced by aisync, not chezmoi; each project's `CLAUDE.md` arrives through `instructions` |
 | Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported by the credential loader and read at config load as `{env:OMNIROUTE_API_KEY}` |
@@ -920,9 +858,8 @@ OpenCode runs on the same gateway as `claude-omni`: `dot_config/opencode/opencod
 3. **The MCP field is `environment`.** V2 reads `environment` on a local MCP server; an `env` key is ignored with no diagnostic, and the variable silently never reaches the server. `make test-opencode` asserts `environment` and the absence of `env` on every server.
 4. **The `dotfiles` reference is absolute on purpose.** A local reference path resolves against the config document's directory unless absolute; the template renders `{{ .chezmoi.sourceDir }}`, so a session reads the actual dotfiles checkout (usually `~/.local/share/chezmoi`).
 5. **Permissions are V2 ordered entries** (`{action, resource, effect}`), the same allowances as the Claude Code side; what the list does not allow, the TUI still asks for.
-6. **The CLI's PATH line is chezmoi's, never the installer's.** The V2 installer appends `export PATH=$HOME/.opencode/bin:$PATH` to the first shell rc it finds -- `~/.zshrc` here, a file chezmoi owns and rewrites -- so that line survives exactly until the next apply: one apply stripped it and took `opencode` off PATH. `install_opencode` therefore runs the installer with `--no-modify-path` (the `install_fly_cli` reasoning) and the block in `dot_zshenv.tmpl` owns the PATH entry. Android gets neither: the released binary is a glibc build, which bionic cannot start.
 
-`make test-opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. `make test-opencode-cli` covers the CLI half the same way: the skip when the binary exists, the installer call carrying `--no-modify-path`, the failed download and the failed installer, and the PATH block rendering on Linux and macOS but not Android. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json` and `cli.json` -- not for the directory itself, where OpenCode keeps files of its own, including the aisync-synced rules, agents, commands and skills.
+`make test-opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json` and `cli.json` -- not for the directory itself, where OpenCode keeps files of its own, including the aisync-synced rules, agents, commands and skills.
 
 ### The Fork Build (`ocode`)
 
@@ -1070,9 +1007,9 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
    node logged in some other way without touching the rest.
 7. **Bare metal: MagicDNS stays off (`--accept-dns=false`).** Without a DNS manager, tailscaled
    replaces `/etc/resolv.conf`, and every lookup fails while it is down. Peers are reached by
-   address: `tailscale ip -4 <name>`, or `tailscale status --json`, as `claude-omni` does. WSL
-   can leave MagicDNS on: it resolves through Windows (DNS tunneling, `nameserver
-   10.255.255.254`), whose client answers tailnet names without touching `/etc/resolv.conf`.
+   address: `tailscale ip -4 <name>`, or `tailscale status --json`. WSL can leave MagicDNS on:
+   it resolves through Windows (DNS tunneling, `nameserver 10.255.255.254`), whose client
+   answers tailnet names without touching `/etc/resolv.conf`.
 8. **Bare metal: the repository key is checked before apt trusts it:** exactly one key, with
    Tailscale's fingerprint. A keyring carrying a second key would make apt trust that one too.
    Upstream's `install.sh` maps every Kali release since 2021 to the Debian bullseye suite; the
@@ -1101,8 +1038,8 @@ The SSH agent bridge, Ollama and the OmniRoute backups run as systemd user units
 distribution with systemd only when `/etc/wsl.conf` has `systemd=true` under `[boot]`. Kali's WSL image ships no
 `/etc/wsl.conf`, so PID 1 is WSL's own `init`. `systemctl --user` then fails with `Failed to connect
 to user scope bus via local transport: No such file or directory` -- the socket it looks for in
-`$XDG_RUNTIME_DIR`, WSLg's `/mnt/wslg/runtime-dir`, does not exist -- and `claude-omni` finds no
-server for this machine's GPU.
+`$XDG_RUNTIME_DIR`, WSLg's `/mnt/wslg/runtime-dir`, does not exist -- and none of those units can
+start.
 
 Two halves make the fix automatic, and both are needed:
 
@@ -1136,8 +1073,6 @@ and Ollama, pulling the model. Tailscale does not wait: on WSL its client is Win
 
 `make test-wsl-systemd` covers the render gate, the merge, both restart messages, and the systemd
 line in every installer that calls `systemctl`, which also catches a new one that lacks it.
-`make test-claude-omni` covers `claude-omni` naming the missing systemd instead of pointing at
-`systemctl --user status ollama`.
 
 ## Claude Code Voice Input (WSL)
 

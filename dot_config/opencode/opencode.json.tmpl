@@ -18,7 +18,7 @@
         "baseURL": "{{ .omniroute.baseUrl }}/v1",
         /* {env:...} is OpenCode's own substitution, resolved when it loads this file; a
            literal key here would land in the repository. The shell exports the name from
-           the same credential loader as claude-omni. */
+           the credential loader, out of the device note's `cred:OMNIROUTE_API_KEY`. */
         "apiKey": "{env:OMNIROUTE_API_KEY}"
       },
       "env": ["OMNIROUTE_API_KEY"]

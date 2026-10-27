@@ -7,7 +7,7 @@ set -euo pipefail
 # The property under test is agreement with NVM itself. The dependency installer
 # runs the real `nvm`, and `npm install -g` writes into whichever version that
 # leaves active -- so when this block picks a different one, every npm-installed
-# CLI (`codex`, `sentry`, Claude Code) is installed correctly and still missing
+# CLI (`sentry`, Claude Code) is installed correctly and still missing
 # from PATH, with nothing anywhere reporting an error. The case that produced
 # that in practice is first below: a machine holding both an LTS and a newer
 # Current release, where "newest installed" and "what `default` points at" differ.
