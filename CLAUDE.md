@@ -43,7 +43,7 @@ make test-yq                        # mikefarah's yq: the pin, the Python yq it 
 make test-export-keys               # the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key
 make test-export-key-windows        # the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh)
 make test-install-fonts-windows     # the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh)
-make test-powershell-profile-windows # the Oh My Posh block in PowerShell 7's profile: created, kept, already set up, replaced (needs pwsh)
+make test-powershell-profile-windows # PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh)
 ```
 
 ## Essential Commands
@@ -224,7 +224,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `powershell-profile`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -1207,19 +1207,28 @@ later load without administrator rights.
 
 ## PowerShell Profile (Oh My Posh)
 
-`run_after_windows-006-setup-powershell-profile.ps1` makes PowerShell 7 start with Oh My Posh and
-the `~/.oh-my-posh.json` theme: a block between `# >>> rios0rios0/dotfiles: oh-my-posh >>>` markers
-in its all-hosts profile, `Documents\PowerShell\profile.ps1`. Without it nothing ever ran
-`oh-my-posh init`, and the theme chezmoi deployed was never loaded.
+PowerShell 7 starts with Oh My Posh and the `~/.oh-my-posh.json` theme through
+`dot_config/powershell/profile.ps1`, a profile chezmoi keeps in the user folder
+(`~\.config\powershell\profile.ps1`, Windows only). PowerShell does not read it by itself: the
+PowerShell profile in Windows Terminal's
+`AppData/Local/Packages/Microsoft.WindowsTerminal_+/LocalState/settings.json`, which
+`run_after_windows-003-copy-app-data-files.ps1.tmpl` copies on every apply, starts it with
+`pwsh.exe -NoExit -Command ". $HOME/.config/powershell/profile.ps1"`.
 
 | Rule | Why |
 |------|-----|
-| Documents comes from Windows' known folder, never a path under `$HOME` | OneDrive moves it -- on alien-a51 to `OneDrive - ARANCIA\Documents` -- so `$HOME\Documents` would write a profile PowerShell never reads |
-| Only the block between the markers is the repository's | Everything else in the profile stays; a block that differs is replaced in place, one that matches is reported as already set up |
+| The profile lives in the user folder, never in Documents | PowerShell reads its own profile only from the Documents folder Windows reports, which OneDrive moves -- on alien-a51 to `OneDrive - <organization>\Documents`, with no `C:\Users\<user>\Documents` left at all -- and which Controlled Folder Access guards. Defender blocked the script that used to write the profile there (event 1123), and because `Set-Content` failed without stopping, that script reported success |
+| Dot-sourced with `.`, after `-NoExit` | `-Command` runs at the session's global scope, so the prompt Oh My Posh sets up, and anything else the profile defines, stays in the session; `-File` would run it in a script scope whose definitions are gone when the prompt appears |
+| `pwsh.exe`, by name | Setting `commandline` replaces the one Windows Terminal generates for the profile, so it has to name PowerShell itself; `pwsh.exe` resolves through `PATH` -- for the Store build, its app execution alias in `%LOCALAPPDATA%\Microsoft\WindowsApps` -- whichever version is installed |
 | PowerShell 7 only | Windows PowerShell 5.1 runs no profile under its default execution policy (`Restricted`) -- `oh-my-posh init` failed there with `UnauthorizedAccess` -- and loosening that policy is the user's decision, not an apply's |
-| `run_after_`, warning on a failure | It runs once the theme is written, and the next apply retries a profile it could not write |
 
-`make test-powershell-profile-windows` covers it under pwsh, against a scratch Documents folder.
+A PowerShell 7 started outside Windows Terminal -- VS Code's terminal, `pwsh` typed in another
+shell -- reads only the Documents profile and starts without Oh My Posh; give that launcher the
+same arguments.
+
+`make test-powershell-profile-windows` runs the command line from `settings.json` in a child pwsh
+against a scratch home: Oh My Posh's init gets the theme's path and its output lands in the session,
+and a machine without Oh My Posh starts with no error.
 
 ## WSL Settings (.wslconfig)
 

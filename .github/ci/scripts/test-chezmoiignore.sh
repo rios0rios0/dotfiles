@@ -166,6 +166,12 @@ check_platform "$WINDOWS_OS" --include-line ".wslconfig"
 check_platform "linux" --ignore-line ".wslconfig"
 check_platform "android" --ignore-line ".wslconfig"
 
+# PowerShell 7's profile, which Windows Terminal dot-sources; on Linux the same path is pwsh's own
+# profile, and nothing here installs pwsh there.
+check_platform "$WINDOWS_OS" --include-line ".config/powershell"
+check_platform "linux" --ignore-line ".config/powershell"
+check_platform "android" --ignore-line ".config/powershell"
+
 # The JetBrains themes are staged for the one script that fans them out, on Linux; Windows lost
 # its counterpart with the Toolbox, and Android never had one.
 check_platform "linux" --include ".local/share/jetbrains-themes"

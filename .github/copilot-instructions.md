@@ -194,7 +194,8 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_zshenv.tmpl` → `~/.zshenv`: PATH setup for all Zsh invocations (critical for IDE integration)
 - `dot_gitconfig.tmpl` → `~/.gitconfig`: Git config with 1Password SSH/GPG signing, per-device keys
 - `dot_p10k.zsh` → `~/.p10k.zsh`: Powerlevel10k theme configuration
-- `dot_oh-my-posh.json` → `~/.oh-my-posh.json`: Oh My Posh theme (Windows only), loaded by the block `run_after_windows-006-setup-powershell-profile.ps1` puts into PowerShell 7's profile
+- `dot_oh-my-posh.json` → `~/.oh-my-posh.json`: Oh My Posh theme (Windows only), loaded by `~/.config/powershell/profile.ps1`
+- `dot_config/powershell/profile.ps1` → `~/.config/powershell/profile.ps1`: PowerShell 7's profile (Windows only), kept in the user folder because PowerShell's own profile path is in Documents, which OneDrive moves; Windows Terminal's PowerShell profile dot-sources it (`pwsh.exe -NoExit -Command`)
 - `modify_dot_wslconfig` → `~/.wslconfig` (Windows only): merges `.chezmoidata/wsl.yaml`'s WSL settings (gradual memory reclaim, sparse VHDs, keep WSL running) into the file the WSL Settings app writes, keeping every other line
 - `dot_age_recipients.tmpl` → `~/.age_recipients`: Age encryption recipients
 - `modify_dot_claude.json` → `~/.claude.json`: MCP servers for Claude Code on Linux and Android (Context7 over HTTP on both, Chrome DevTools on Linux; servers it no longer manages are deleted from existing files through a per-platform retired list); a modify-template, see "MCP Servers" in CLAUDE.md. Windows gets no `~/.claude.json`: Claude Code is not installed there

@@ -69,6 +69,7 @@
                 "startingDirectory": "~"
             },
             {
+                "commandline": "pwsh.exe -NoExit -Command \". $HOME/.config/powershell/profile.ps1\"",
                 "font":
                 {
                     "face": "MesloLGS NF"

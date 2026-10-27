@@ -16,6 +16,7 @@ local-services
 {{- if ne .chezmoi.os "windows" }}
 .chezmoiscripts/windows-*.ps1
 .wslconfig
+.config/powershell
 .aws
 .azure
 AppData
