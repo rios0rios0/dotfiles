@@ -158,8 +158,8 @@ sync_repo_to_default() {
 # they run unwrapped just like `aisync` always has. Same reasoning is encoded
 # in `install_gvm`'s comment block above.
 #
-# All three of our Go tools (`terra`, `dev-toolkit`, `aisync`) ship a `make
-# install` target, so a single helper covers them.
+# All four of our Go tools (`terra`, `dev-toolkit`, `aisync`, `autobump`) ship a
+# `make install` target, so a single helper covers them.
 #
 # Args:
 #   $1 — repository HTTPS URL (e.g. https://github.com/rios0rios0/terra.git)
@@ -673,6 +673,14 @@ install_aisync() {
     install_go_tool_from_source https://github.com/rios0rios0/aisync.git aisync
 }
 
+# https://github.com/rios0rios0/autobump
+# `autobump` bumps a repository's version and releases its changelog. Built from source like
+# `aisync`: it pushes through go-git and calls the GitHub API, and only a GOOS=android build
+# resolves names through bionic rather than the /etc/resolv.conf Android does not have.
+install_autobump() {
+    install_go_tool_from_source https://github.com/rios0rios0/autobump.git autobump
+}
+
 # change the login shell to zsh once Oh My Zsh is in place: the shared installer
 # runs Oh My Zsh's script with `--unattended`, which skips its `chsh` prompt, and
 # returns non-zero when the download failed, so a machine without ~/.oh-my-zsh
@@ -730,6 +738,7 @@ install_azure_cli
 install_fly_cli
 install_oci_cli
 install_aisync
+install_autobump
 # chlog writes the changelog fragments AutoBump releases; built with Termux's `golang`, shared
 # with Linux/WSL (lib-install-deps.sh).
 verify install_chlog
