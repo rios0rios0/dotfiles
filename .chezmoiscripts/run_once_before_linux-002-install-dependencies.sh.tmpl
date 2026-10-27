@@ -17,7 +17,7 @@ requirements=(
     "gpg-agent"     # required for import and export GPGs
     "zsh"           # required as the target shell (must be installed before oh-my-zsh and shell change)
     "eza"           # it's for "ls" highlighting (https://github.com/eza-community/eza)
-    "sqlite3"       # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
+    "sqlite3"       # it's for querying SQLite databases, such as the zsh-histdb history Atuin imports once
     "bsdmainutils"  # hexdump is a utility for displaying file contents in hexadecimal required by GVM (Go Version Manager)
     "binutils"      # required by GVM (Go Version Manager)
     "bison"         # required by GVM (Go Version Manager)
@@ -788,6 +788,67 @@ install_yq() {
     fi
 }
 
+# https://github.com/atuinsh/atuin
+# Atuin, which records every interactive zsh's commands and syncs them, end-to-end encrypted, with
+# the server .chezmoidata/atuin.yaml names; see CLAUDE.md, "Shell History (Atuin)". The release
+# tarball, not upstream's installer: that one is a script piped into sh that also edits the
+# shell's rc files, which chezmoi owns. Termux takes the same release from its `atuin` package.
+#
+# Pinned like yq. To bump it, take both builds' SHA-256 from the new release's `.sha256` files --
+# they match the digests GitHub lists for the assets -- and move the server image in
+# local-services/atuin/compose.yaml to the same release.
+install_atuin() {
+    local version="18.24.2"
+    local triple sha256
+    case "$(uname -m)" in
+        x86_64) triple="x86_64-unknown-linux-gnu" sha256="005a4953f2fe96d4506fee7d926de73ec8cf64c89b2a07acd39bfa4fd88c0449" ;;
+        aarch64) triple="aarch64-unknown-linux-gnu" sha256="5ec6cc8bd3889b616970cc1fa1ede46b5608da693a0bb81c04fbb48ed63967ab" ;;
+        *)
+            echo "[configure-deps] ERROR: no Atuin build is pinned for $(uname -m)" >&2
+            return 1
+            ;;
+    esac
+
+    # `-V` prints "atuin <version>" alone; `--version` adds the commit.
+    local target="$HOME/.local/bin/atuin"
+    if [[ -x "$target" && "$("$target" -V 2>/dev/null)" == "atuin $version" ]]; then
+        echo "[configure-deps] Atuin $version is already installed, skipping" >&2
+        return
+    fi
+
+    local workdir
+    workdir="$(mktemp -d)"
+    if ! curl --proto '=https' --proto-redir '=https' -fsSL -o "$workdir/atuin.tar.gz" \
+        "https://github.com/atuinsh/atuin/releases/download/v$version/atuin-$triple.tar.gz"; then
+        echo "[configure-deps] ERROR: failed to download Atuin $version" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    if ! echo "$sha256  $workdir/atuin.tar.gz" | sha256sum --check --status; then
+        echo "[configure-deps] ERROR: the Atuin $version download does not match its pinned SHA-256" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    if ! tar -xzf "$workdir/atuin.tar.gz" -C "$workdir" "atuin-$triple/atuin"; then
+        echo "[configure-deps] ERROR: the Atuin $version archive holds no atuin-$triple/atuin" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+
+    mkdir -p "$HOME/.local/bin"
+    if ! install -m 0755 "$workdir/atuin-$triple/atuin" "$target"; then
+        echo "[configure-deps] ERROR: could not install Atuin into $target" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    rm -rf "$workdir"
+
+    if [[ "$("$target" -V 2>/dev/null)" != "atuin $version" ]]; then
+        echo "[configure-deps] ERROR: $target does not report Atuin $version after the install" >&2
+        return 1
+    fi
+}
+
 # https://github.com/rios0rios0/aisync
 # `aisync` syncs AI assistant rules/agents/skills across AI assistant home
 # directories such as `~/.claude/`.
@@ -970,6 +1031,8 @@ install_ggshield
 install_ruff
 # mikefarah's yq; Kali's apt `yq` is a different tool (see the function).
 verify install_yq
+# Atuin keeps the shell history; without it zsh records none (see the function).
+verify install_atuin
 install_aisync
 install_autobump
 # chlog writes the changelog fragments AutoBump releases; built with the Go install_gvm set up

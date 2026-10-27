@@ -102,12 +102,22 @@ check "stops the running watcher so the next shell watches the restored folder" 
 
 # --- the watcher's own archive: plain tar ------------------------------------------------------
 new_case
+mkdir -p "$CASE_HOME/.john"
+echo "pot" > "$CASE_HOME/.john/john.pot"
+archive_folder "$CASE_HOME/.john"
+run_script
+check "restores from an uncompressed archive" \
+      "$([ "$RC" -eq 0 ] && [ "$(cat "$CASE_HOME/.john/john.pot" 2>/dev/null)" = "pot" ] && echo true || echo false)"
+
+# ~/.histdb is no longer one of the watched folders: Atuin keeps the shell history. An archive an
+# older watcher left behind is not unpacked.
+new_case
 mkdir -p "$CASE_HOME/.histdb"
 echo "history" > "$CASE_HOME/.histdb/zsh-history.db"
 archive_folder "$CASE_HOME/.histdb"
 run_script
-check "restores from an uncompressed archive" \
-      "$([ "$RC" -eq 0 ] && [ "$(cat "$CASE_HOME/.histdb/zsh-history.db" 2>/dev/null)" = "history" ] && echo true || echo false)"
+check "leaves an old ~/.histdb.tar alone" \
+      "$([ "$RC" -eq 0 ] && [ ! -e "$CASE_HOME/.histdb" ] && [ -z "$OUTPUT" ] && echo true || echo false)"
 
 # --- a folder that already exists is left as it is ---------------------------------------------
 new_case

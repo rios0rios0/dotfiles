@@ -4,7 +4,7 @@
 # backs up as archives. The watcher writes "<folder>.tar" beside each folder and adds it to chezmoi
 # encrypted, so a new machine gets the archive from `chezmoi apply` -- ~/.kube/config-files.tar is
 # the one in the repository -- and this unpacks it beside itself. A folder chezmoi deploys file by
-# file (.histdb, .john and .sqlmap) has no archive, which is nothing to report.
+# file (.john and .sqlmap) has no archive, which is nothing to report.
 #
 # Until 2026-10 this looked for "-home-<user>-<folder>.tar.gz" in its working directory, the name
 # the watcher wrote in 2025, so it never found an archive: every first apply warned four times and
@@ -17,7 +17,7 @@
 set -euo pipefail
 
 # The folders the watcher archives (its WATCH_DIRS).
-WATCH_DIRS=("$HOME/.histdb" "$HOME/.john" "$HOME/.kube/config-files" "$HOME/.sqlmap")
+WATCH_DIRS=("$HOME/.john" "$HOME/.kube/config-files" "$HOME/.sqlmap")
 
 restored=0
 failed=0

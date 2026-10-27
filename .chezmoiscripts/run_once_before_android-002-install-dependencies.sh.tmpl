@@ -19,7 +19,7 @@ requirements=(
     "unzip"             # required for SDKMan
     "age"               # required for Chezmoi (decrypt files with SSH)
     "eza"               # it's for "ls" highlighting (https://github.com/eza-community/eza)
-    "sqlite"            # it's for managing ZSH history (https://github.com/larkery/zsh-histdb)
+    "sqlite"            # it's for querying SQLite databases, such as the zsh-histdb history Atuin imports once
     "vim"               # needed for some operations
     "neovim"            # preferred editor
     # NOTE: no `binutils` package on Termux. `clang` already pulls in `lld` (provides `ld.lld`)
@@ -68,6 +68,7 @@ utilities=(
     "rclone"            # it's for syncing files with cloud storage (OneDrive, Google Drive, S3, etc.)
     "dnsutils"          # provides "nslookup" function
     "tmux"              # terminal multiplexer for managing multiple sessions under one process tree
+    "atuin"             # it's for the shell history, synced through the tailnet server in .chezmoidata/atuin.yaml (https://github.com/atuinsh/atuin)
     "shellcheck"        # it's for static analysis of shell scripts (used by `make lint`)
     "postgresql"        # provides the `psql` client (Termux ships server + client in one package)
     "ruff"              # https://docs.astral.sh/ruff/ — Termux ships the upstream Rust binary as a native `aarch64` apt package, so we use it directly instead of going through `pipx` (no Python venv, no pipx-metadata fragility, faster, Termux-maintained)

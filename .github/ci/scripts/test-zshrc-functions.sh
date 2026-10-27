@@ -30,7 +30,8 @@ for tool in chezmoi zsh; do
 done
 ZSH_BIN="$(type -P zsh)"
 
-# dot_zshrc.tmpl reads nothing but .chezmoi, so a config of its own keeps the host's out of the render
+# dot_zshrc.tmpl reads nothing but .chezmoi and, on Termux, deviceName, so a config of its own keeps
+# the host's out of the render
 cat > "$TMP/chezmoi.yaml" <<EOF
 sourceDir: "$REPO_ROOT"
 data:

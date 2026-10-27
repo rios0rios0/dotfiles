@@ -4,7 +4,8 @@ set -euo pipefail
 # Tests tailscale-up in both of its renders. On bare metal, against a stubbed tailscale, systemctl
 # and sudo: the pass every interactive zsh runs, which must never wait or ask for a password, and
 # the direct call, which logs in, sets the two preferences and shares what .chezmoidata says this
-# machine shares -- the local model's server and the ocode web UI. On WSL, against a stub of
+# machine shares -- the local model's server, the ocode web UI and, on the one device that runs it,
+# the Atuin sync server. On WSL, against a stub of
 # Windows' client: nothing waits, nothing runs as root, and both are shared through Windows to
 # `localhost`, moving a share an older revision left on a literal address. Also checks that the web
 # UI's port is the one the fork's service derives from the channel the build stamps, the wrapper
@@ -60,6 +61,18 @@ render() {
 
 # The ocode web UI's port, as .chezmoidata/opencode.yaml declares it for this device.
 PORT="$(chezmoi execute-template --config "$TMP/chezmoi.yaml" '{{ (includeTemplate "lib-opencode.tmpl" . | fromJson).webPort }}')"
+# The Atuin sync server's port, as .chezmoidata/atuin.yaml declares it.
+ATUIN_PORT="$(chezmoi execute-template --config "$TMP/chezmoi.yaml" '{{ (includeTemplate "lib-atuin.tmpl" . | fromJson).port }}')"
+
+# render_atuin_server <metal|wsl>: tailscale-up on the device .chezmoidata/atuin.yaml names as the
+# Atuin server, with no GPU and the web UI share off, so the Atuin share is all it shares.
+render_atuin_server() {
+    local osrelease="6.11.0-generic"
+    [[ "$1" != wsl ]] || osrelease="6.18.33.2-microsoft-standard-WSL2"
+    PATH="$TMP/bin-nogpu" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
+        --override-data "{\"atuin\":{\"serverDevice\":\"testdevice\"},\"opencode\":{\"shareOnTailnet\":false},\"chezmoi\":{\"os\":\"linux\",\"kernel\":{\"osrelease\":\"$osrelease\",\"ostype\":\"Linux\",\"version\":\"#1 SMP\"}}}" \
+        < "$HELPER"
+}
 
 HELPER="$REPO_ROOT/dot_local/bin/executable_tailscale-up.tmpl"
 INSTALLER="$REPO_ROOT/.chezmoiscripts/run_onchange_after_linux-010-setup-tailscale.sh.tmpl"
@@ -71,6 +84,10 @@ for gpu in gpu nogpu; do
         render "$gpu" "$kind" "$HELPER" noshare > "$TMP/tailscale-up-$kind-$gpu-noshare"
         chmod +x "$TMP/tailscale-up-$kind-$gpu" "$TMP/tailscale-up-$kind-$gpu-noshare"
     done
+done
+for kind in metal wsl; do
+    render_atuin_server "$kind" > "$TMP/tailscale-up-$kind-atuin"
+    chmod +x "$TMP/tailscale-up-$kind-atuin"
 done
 
 # A tool directory without any tailscale, for the runs that must not find one: a developer's
@@ -149,7 +166,7 @@ EOF
 chmod +x "$WSL_STUBS"/*
 
 # reset <state> [down] [enabled] [failed] [operator] [shared=<forward target>]
-#       [ocode=<forward target>] [win-down] [win-missing] [linux-tailscaled]
+#       [ocode=<forward target>] [atuin=<forward target>] [win-down] [win-missing] [linux-tailscaled]
 reset() {
     rm -f "$TMP/calls" "$TMP/ts-down" "$TMP/ts-enabled" "$TMP/ts-failed" "$TMP/ts-operator" "$TMP/ts-serve.json" \
         "$TMP/win-down" "$TMP/win-missing" "$TMP/linux-tailscaled"
@@ -165,6 +182,7 @@ reset() {
             operator) touch "$TMP/ts-operator" ;;
             shared=*) serve="$(jq -c --arg t "${flag#shared=}" '.TCP["11434"].TCPForward = $t' <<<"$serve")" ;;
             ocode=*) serve="$(jq -c --arg t "${flag#ocode=}" --arg p "$PORT" '.TCP[$p].TCPForward = $t' <<<"$serve")" ;;
+            atuin=*) serve="$(jq -c --arg t "${flag#atuin=}" --arg p "$ATUIN_PORT" '.TCP[$p].TCPForward = $t' <<<"$serve")" ;;
             win-down) touch "$TMP/win-down" ;;
             win-missing) touch "$TMP/win-missing" ;;
             linux-tailscaled) touch "$TMP/linux-tailscaled" ;;
@@ -467,6 +485,48 @@ output="$(wsl nogpu-noshare --no-login)" && status=0 || status=$?
 [[ "$status" -eq 0 ]] && ! grep -q 'serve' "$TMP/calls" &&
     pass "on WSL a machine that shares neither runs no tailscale serve at all" ||
     fail "WSL nothing to share: status=$status calls=$(calls)"
+
+# --- the Atuin sync server, on the one device that runs it ----------------------------------------
+
+# given the Atuin server's device on the tailnet, sharing nothing yet
+reset Running
+# when: the pass the apply runs
+output="$(wsl atuin --no-login)" && status=0 || status=$?
+# then: its port is shared through Windows' client, to Windows' localhost, where Docker Desktop
+# publishes it
+[[ "$status" -eq 0 && "$output" == *"sharing the Atuin sync server"* ]] &&
+    grep -qx -- "tailscale serve --bg --tcp=$ATUIN_PORT tcp://localhost:$ATUIN_PORT" "$TMP/calls" &&
+    ! grep -q -- '--tcp=11434\|--tcp='"$PORT"' ' "$TMP/calls" &&
+    pass "on WSL the Atuin server's device shares port $ATUIN_PORT through Windows' client" ||
+    fail "WSL Atuin share: status=$status output=$output calls=$(calls)"
+
+# given the same device already sharing it
+reset Running "atuin=localhost:$ATUIN_PORT"
+# when
+output="$(wsl atuin)" && status=0 || status=$?
+# then
+[[ "$status" -eq 0 ]] && ! grep -q 'serve --bg' "$TMP/calls" &&
+    pass "on WSL an Atuin share that is in place is left as it is" ||
+    fail "WSL Atuin already shared: status=$status calls=$(calls)"
+
+# given any other device, which syncs with that server rather than running one
+reset Running
+# when
+output="$(wsl nogpu --no-login)" && status=0 || status=$?
+# then
+[[ "$status" -eq 0 ]] && ! grep -q -- "--tcp=$ATUIN_PORT" "$TMP/calls" &&
+    pass "a device that does not run the Atuin server does not share its port" ||
+    fail "Atuin shared by another device: status=$status calls=$(calls)"
+
+# given the Atuin server's device on bare metal, with this user as the operator
+reset Running operator
+# when
+output="$(helper atuin)" && status=0 || status=$?
+# then: forwarded to the host's loopback, where Docker publishes it
+[[ "$status" -eq 0 && "$output" == *"sharing the Atuin sync server"* ]] &&
+    grep -qx -- "tailscale serve --bg --tcp=$ATUIN_PORT tcp://127.0.0.1:$ATUIN_PORT" "$TMP/calls" &&
+    pass "on bare metal the Atuin server's device shares port $ATUIN_PORT to its loopback" ||
+    fail "bare-metal Atuin share: status=$status output=$output calls=$(calls)"
 
 # then, across every WSL case: nothing ran as root
 if grep -q '^sudo\|tailscale set' "$TMP/wsl-all-calls"; then

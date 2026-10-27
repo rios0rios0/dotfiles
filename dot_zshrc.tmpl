@@ -57,31 +57,6 @@ zinit light romkatv/powerlevel10k
 [[ ! -L $HOME/.oh-my-zsh/custom/themes/powerlevel10k ]] && ln -sf $HOME/.local/share/zinit/plugins/romkatv---powerlevel10k $HOME/.oh-my-zsh/custom/themes/powerlevel10k 2>/dev/null
 ######################################################
 ######################################################
-zinit light larkery/zsh-histdb
-[[ ! -L $HOME/.oh-my-zsh/custom/plugins/zsh-histdb ]] && ln -sf $HOME/.local/share/zinit/plugins/larkery---zsh-histdb $HOME/.oh-my-zsh/custom/plugins/zsh-histdb
-source $HOME/.oh-my-zsh/custom/plugins/zsh-histdb/sqlite-history.zsh
-autoload -Uz add-zsh-hook
-source $HOME/.oh-my-zsh/custom/plugins/zsh-histdb/histdb-interactive.zsh
-bindkey '^r' _histdb-isearch
-#bindkey '^[[A' _histdb-isearch # TODO: it didn't work
-#bindkey '^[[B' _histdb-isearch # TODO: it didn't work
-
-_zsh_autosuggest_strategy_histdb_top() {
-    local query="
-        SELECT commands.argv FROM history
-        LEFT JOIN commands ON history.command_id = commands.rowid
-        LEFT JOIN places ON history.place_id = places.rowid
-        WHERE commands.argv LIKE '$(sql_escape $1)%'
-        GROUP BY commands.argv, places.dir
-        ORDER BY places.dir != '$(sql_escape $PWD)', COUNT(*) DESC
-        LIMIT 1
-    "
-    suggestion=$(_histdb_query "$query")
-}
-
-ZSH_AUTOSUGGEST_STRATEGY=histdb_top
-######################################################
-######################################################
 zinit light zsh-users/zsh-completions
 ######################################################
 ######################################################
@@ -175,7 +150,7 @@ ZSH_THEME="powerlevel10k/powerlevel10k"
 DISABLE_MAGIC_FUNCTIONS="true"
 
 plugins=(
-  common-aliases zsh-histdb
+  common-aliases
   colorize colored-man-pages
   1password
   nmap ssh
@@ -225,6 +200,20 @@ for _guarded in rm cp mv; do
   eval "$_guarded() { if [[ -t 0 ]]; then command $_guarded -i \"\$@\"; else command $_guarded \"\$@\"; fi; }"
 done
 unset _guarded
+
+###### Shell History (Atuin) ############################################################################################
+# Atuin records every command and syncs it, end-to-end encrypted, with the server
+# .chezmoidata/atuin.yaml names. Its init binds Ctrl-R and the up arrow to its search and puts itself
+# first among zsh-autosuggestions' strategies. It runs after Oh My Zsh on purpose: Oh My Zsh binds
+# both keys to its own history search, and the last binding wins. `--disable-ai` keeps `?` an
+# ordinary key, since Atuin's AI is not set up. See CLAUDE.md, "Shell History (Atuin)".
+if command -v atuin >/dev/null 2>&1; then
+{{- if eq .chezmoi.os "android" }}
+    # Termux reports `localhost` as the hostname, which every phone shares; record this one instead.
+    export ATUIN_HOST_NAME="{{ get . "deviceName" }}"
+{{- end }}
+    eval "$(atuin init zsh --disable-ai)"
+fi
 
 ###### Toolbox ##########################################################################################################
 ###### General #####################################################################

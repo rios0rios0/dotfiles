@@ -1,0 +1,31 @@
+{{- /*
+  The Atuin settings for this device, as JSON: .atuin from .chezmoidata/atuin.yaml with
+  .atuin.devices.<deviceName> laid over it, plus two values derived from them:
+    isServer     this device runs the sync server
+    syncAddress  where its client syncs: loopback on the server device itself, whose own name
+                 resolves to 127.0.1.1 under WSL rather than to its tailnet address, and
+                 serverHost everywhere else
+
+  dot_config/atuin/config.toml.tmpl and tailscale-up read it, so where the server runs and how
+  every client reaches it are one declaration rather than one per consumer:
+      includeTemplate "lib-atuin.tmpl" . | fromJson
+*/ -}}
+{{- /* deviceName is read with `get`, as lib-opencode.tmpl does and for the same reason: a config
+       that predates it must render with the defaults, so run_before_000-verify-chezmoi-config can
+       report the stale config instead of the apply dying on a template error. */ -}}
+{{- $atuin := .atuin -}}
+{{- $deviceName := get . "deviceName" -}}
+{{- $device := dict -}}
+{{- if hasKey $atuin.devices $deviceName -}}
+{{-   $device = get $atuin.devices $deviceName -}}
+{{- end -}}
+{{- /* Laid over key by key with `set`, never with sprig's merge, which drops false and 0. */ -}}
+{{- $settings := deepCopy (omit $atuin "devices") -}}
+{{- range $key, $value := $device -}}
+{{-   $_ := set $settings $key $value -}}
+{{- end -}}
+{{- $isServer := eq $deviceName $settings.serverDevice -}}
+{{- $host := ternary "127.0.0.1" $settings.serverHost $isServer -}}
+{{- $_ := set $settings "isServer" $isServer -}}
+{{- $_ := set $settings "syncAddress" (printf "http://%s:%v" $host $settings.port) -}}
+{{- toJson $settings -}}

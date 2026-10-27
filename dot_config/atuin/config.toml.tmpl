@@ -1,0 +1,21 @@
+{{- $atuin := includeTemplate "lib-atuin.tmpl" . | fromJson -}}
+# Atuin's client settings, rendered by chezmoi from .chezmoidata/atuin.yaml: an edit made here is
+# reverted by the next apply. See .docs/atuin-sync.md and CLAUDE.md, "Shell History (Atuin)".
+
+# The sync server, in {{ $atuin.serverDevice }}'s Docker and shared on the tailnet. History is encrypted on this
+# machine, with the key in ~/.local/share/atuin/key, before anything is sent; the server sees only
+# ciphertext and what each record carries in the clear: when the command ran, roughly how long its
+# text is, and a random ID for the device.
+sync_address = "{{ $atuin.syncAddress }}"
+auto_sync = true
+sync_frequency = "5m"
+
+# The update check asks api.atuin.sh for the latest release once an hour. Updates come from the
+# dependency installers instead -- a pinned release on Linux, Termux's package on the phone -- so
+# with it off the client talks to nothing but the server above.
+update_check = false
+
+# Refuses to record a command carrying a recognisable credential -- tokens for GitHub, AWS,
+# Anthropic, npm, Tailscale, 1Password service accounts, age secret keys and more. The default,
+# spelled out so that no edit turns it off unnoticed.
+secrets_filter = true

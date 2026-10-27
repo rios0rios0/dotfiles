@@ -18,6 +18,13 @@ set -euo pipefail
 # converged (a commit hash from the feature branch changes when the branch is
 # rebased before merge).
 TOMBSTONES=(
+    # zsh-histdb -- replaced (2026-10-27) by Atuin, which syncs the shell history through the
+    # tailnet server in .chezmoidata/atuin.yaml. zinit's checkout of the plugin, and the link into
+    # Oh My Zsh's custom plugins that .zshrc made. ~/.histdb is deliberately NOT listed: it is the
+    # history itself, which Atuin imported (.docs/atuin-sync.md) and which stays as a fallback.
+    "path:$HOME/.local/share/zinit/plugins/larkery---zsh-histdb"
+    "path:$HOME/.oh-my-zsh/custom/plugins/zsh-histdb"
+
     # Claude Code's npm package -- replaced in #269 (2026-10-27) by Anthropic's native build,
     # which `install_claude_cli` puts behind ~/.local/bin/claude and which updates itself. npm 12
     # blocks the postinstall that copies the native binary over the package's placeholder, so the

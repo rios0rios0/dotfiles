@@ -34,7 +34,8 @@ make test-zshrc-functions           # top-size, sentry-ds and rebuild-ocode in d
 make test-sentry-setup              # the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds
 make test-local-llm                 # the local model server: its settings, the window its unit allocates, the installer's gate
 make test-opencode                  # OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference
-make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server and the ocode web UI
+make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server, the ocode web UI and the Atuin server
+make test-atuin                     # Atuin: the pinned install, the client config per device, zsh after Oh My Zsh, the server's pin and port, zsh-histdb's removal
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: with and without a login, no refresh without one, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
@@ -1095,6 +1096,57 @@ take its name.
 
 `make test-tailscale` covers 1 to 7, 9 and 11 against stubs of both clients, `systemctl` and `sudo`,
 and the removal on WSL alone; `make test-chezmoiignore` covers the gates.
+
+## Shell History (Atuin)
+
+Every interactive zsh, on Linux and Termux, records its history with Atuin, which syncs it,
+end-to-end encrypted, through one server of our own on the tailnet. It replaced zsh-histdb, whose
+database the repository carried as encrypted files that nothing ever committed again after March
+2025. Setup, the one-time import and moving the server are in `.docs/atuin-sync.md`.
+
+| Part | Where |
+|------|-------|
+| Settings: the server's device, how clients reach it, the port, per-device overrides | `.chezmoidata/atuin.yaml`, read through `.chezmoitemplates/lib-atuin.tmpl` |
+| Client | `install_atuin` in the Linux installer (pinned release, SHA-256 per architecture); Termux's `atuin` package |
+| Client settings | `dot_config/atuin/config.toml.tmpl`, Linux and Android only (`.chezmoiignore`) |
+| Shell | `dot_zshrc.tmpl`, after Oh My Zsh |
+| Server | `local-services/atuin/compose.yaml`, run by hand on the server's device, as OmniRoute is |
+| Tailnet share | `tailscale-up`, on the server's device alone |
+
+**Keep these:**
+
+1. **One server.** Atuin servers never sync with each other, so `serverDevice` names exactly one; a
+   container on a second device would hold a second, separate history. It is the laptop until a
+   machine that is always on exists (#272). Moving it leaves the old device's `tailscale serve`
+   entry behind (Tailscale's item 11): `tailscale serve --tcp=8888 off` there.
+2. **The server's own client syncs on loopback.** Under WSL the machine's own name resolves to
+   `127.0.1.1` from `/etc/hosts`, not to its tailnet address, so `lib-atuin.tmpl` renders
+   `127.0.0.1` for the server's device and `serverHost` for every other one.
+3. **Clients find the server by its MagicDNS name, through the system resolver.** Atuin's HTTP client
+   resolves names with getaddrinfo, so WSL asks Windows' Tailscale client and Termux the Tailscale
+   app. Bare metal runs with `--accept-dns=false` (Tailscale's item 7), so a bare-metal device sets
+   `serverHost` to the server's tailnet IP as its own override.
+4. **Atuin starts after Oh My Zsh.** Oh My Zsh binds Ctrl-R and the up arrow to its own history
+   search, and the last binding wins. `--disable-ai` keeps `?` an ordinary key.
+5. **`update_check = false`.** It asks `api.atuin.sh` once an hour; the version is pinned here
+   instead, so the client talks to nothing but our server.
+6. **One release in three places:** `install_atuin`'s version, the server image's tag and digest, and
+   Termux's package, which follows upstream. Bump the first two together.
+7. **Registration stays closed.** `ATUIN_OPEN_REGISTRATION` defaults to `false`; it is opened only to
+   register the account.
+8. **Termux names itself.** It reports `localhost`, which every phone shares, so `.zshrc` exports
+   `ATUIN_HOST_NAME` as the chezmoi `deviceName` there.
+9. **`atuin import` is not synced by itself.** It fills the local database alone; the explicit
+   `atuin sync` after it adds the imported commands to the record store and uploads them, which the
+   background sync does not. The laptop imports only its own `alien-a51` rows: its database also
+   held the desktop's March 2025 snapshot, which the desktop imports.
+10. **zsh-histdb is gone; its data is not.** Its zinit checkout and its link into Oh My Zsh are
+    tombstoned on Linux and Android. `~/.histdb` stays as a fallback, and the folder watcher no
+    longer archives it into the chezmoi source after every command.
+
+`make test-atuin` covers 2, 4 to 8 and 10, and the pinned install against a stubbed `curl`;
+`make test-tailscale` covers the share on the server's device alone; `make test-chezmoiignore` the
+platforms.
 
 ## systemd on WSL (Turned On by chezmoi)
 

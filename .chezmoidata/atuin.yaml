@@ -1,0 +1,26 @@
+# Shell history: Atuin records every command and syncs it, end-to-end encrypted, through a server of
+# our own on the tailnet. See .docs/atuin-sync.md and CLAUDE.md, "Shell History (Atuin)".
+#
+# chezmoi reads this file on every apply -- unlike `data:` in .chezmoi.yaml.tmpl, which only
+# `chezmoi init` regenerates -- so an edit reaches every consumer on the next apply. It is read
+# through .chezmoitemplates/lib-atuin.tmpl.
+atuin:
+  # The device whose Docker runs the server (local-services/atuin/compose.yaml), and whose
+  # tailscale-up shares it on the tailnet. Its own client reaches the server on loopback. Atuin
+  # servers never sync with each other, so there is exactly one; the history is complete wherever
+  # a device has synced with it since the last command elsewhere. The laptop hosts it until a
+  # machine that is always on exists: #272.
+  serverDevice: 'alien-a51'
+  # How every other device reaches the server: the server device's MagicDNS name, which WSL
+  # resolves through Windows' Tailscale client and Termux through the Tailscale app (Atuin uses the
+  # system resolver). A device whose resolver does not know tailnet names -- bare metal, where
+  # tailscale-up turns MagicDNS off -- sets the server's tailnet IP (`tailscale ip -4 alien-a51`)
+  # as its own override.
+  serverHost: 'alien-a51'
+  # The port the server listens on, and the tailnet port tailscale-up shares it on.
+  port: 8888
+  # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
+  #   devices:
+  #     some-bare-metal-box:
+  #       serverHost: '100.64.0.1'
+  devices: {}
