@@ -573,7 +573,7 @@ jobs:
           rm packages-microsoft-prod.deb
           sudo apt-get update
           sudo apt-get install -y powershell
-      - name: 'Test the Oh My Posh block in the PowerShell profile'
+      - name: 'Test PowerShell 7''s profile from Windows Terminal'
         run: 'make test-powershell-profile-windows'
 
   sast:
