@@ -304,3 +304,43 @@ install_neon_cli() {
         echo "[install-deps] WARN: the Neon CLI was installed but 'neon' is not on PATH; check 'npm prefix -g'" >&2
     fi
 }
+
+# =========================================================================================================
+# https://github.com/luizjhonata/chlog
+# chlog writes the changelog fragments the owner's repositories keep under `.changes/` (`chlog new`)
+# and checks that a change carries one (`chlog check`); AutoBump turns them into CHANGELOG.md entries
+# at release time without needing chlog itself. Same body on both platforms: `go install` at a pinned
+# tag fetches the module through the Go proxy, verifies it against the Go checksum database and builds
+# it with the local Go -- on Termux a GOOS=android binary, which needs no termux-etc wrapper, like the
+# Go CLIs the Android installer builds from source. The ldflags stamp the version upstream's release
+# builds carry, so `chlog --version` tells the pinned build from an older one and a bumped pin
+# replaces it. GOBIN is ~/.local/bin because GVM keeps only the newest Go's pkgset on PATH, so a plain
+# `go install` would vanish at the next Go upgrade. The module is upstream's: rios0rios0/chlog is a
+# fork that only adds a .gitignore change, and its go.mod still names luizjhonata, so it cannot be
+# installed under its own name.
+install_chlog() {
+    local version="0.4.1"
+    local target="$HOME/.local/bin/chlog"
+
+    if [[ "$("$target" --version 2>/dev/null)" == "chlog version: $version" ]]; then
+        echo "[install-deps] chlog $version is already installed, skipping" >&2
+        return 0
+    fi
+
+    if ! command_exists go; then
+        echo "[install-deps] ERROR: go is not available; it must be installed before install_chlog" >&2
+        return 1
+    fi
+
+    mkdir -p "$HOME/.local/bin"
+    if ! GOBIN="$HOME/.local/bin" go install -ldflags "-X main.version=$version" \
+        "github.com/luizjhonata/chlog@v$version"; then
+        echo "[install-deps] ERROR: go install github.com/luizjhonata/chlog@v$version failed" >&2
+        return 1
+    fi
+
+    if [[ "$("$target" --version 2>/dev/null)" != "chlog version: $version" ]]; then
+        echo "[install-deps] ERROR: $target does not report chlog $version after the install" >&2
+        return 1
+    fi
+}
