@@ -1,0 +1,19 @@
+# The age keys `chezmoi apply` puts on a machine, one per purpose. Each private key is the
+# `private key` field of a Secure Note in 1Password's `Private` vault, holding the whole identity
+# file `age-keygen -o` writes; only the public halves live here. See CLAUDE.md, "Age Keys".
+#
+# The export scripts (run_before_linux-005 and run_before_windows-004) compare the key on disk
+# against `recipient` on every apply and fetch `privateKey` when it differs, so rotating a key is
+# a new item, its references and public key here, and re-encrypting what the old key protected.
+ageKeys:
+  # Decrypts every encrypted_*.age file in this repository, at ~/.ssh/chezmoi on Linux/WSL and
+  # Windows; ~/.age_recipients holds `recipient` for `chezmoi add --encrypt`. Not the SSH key that
+  # signs commits, which it replaced on 2026-10-27.
+  chezmoi:
+    recipient: 'age1a39h6wr0uq69rxn9lsj5qgwhpgs2hkmpyhfgwufwd8tc6f292vqs8jmq8z'
+    privateKey: 'op://Private/chezmoi.age/private key'
+  # Encrypts the OmniRoute stack's daily backups (omniroute-backup), at ~/.ssh/omniroute-backup-key
+  # on WSL alone, where they run. Never the chezmoi key.
+  omnirouteBackup:
+    recipient: 'age142st2urc08ttscnrl3qsryd0gn6364kyftmm8uwrnz4jduxx3ccq5n865l'
+    privateKey: 'op://Private/omniroute-backup.age/private key'

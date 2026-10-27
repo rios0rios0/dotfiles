@@ -1,4 +1,4 @@
-{{- if ne .chezmoi.os "android" }}
-{{- warnf "[age-recipients] fetching Chezmoi encryption public key..." }}
-{{ onepasswordRead "op://personal/Chezmoi Key/public key" "my" }}
-{{- end }}
+{{- /* The public half of the chezmoi age key (.chezmoidata/age-keys.yaml), which
+       `chezmoi add --encrypt` encrypts to through `age.recipientsFile` in .chezmoi.yaml.tmpl.
+       Android is excluded in .chezmoiignore: nothing encrypted is applied there. */ -}}
+{{ .ageKeys.chezmoi.recipient }}

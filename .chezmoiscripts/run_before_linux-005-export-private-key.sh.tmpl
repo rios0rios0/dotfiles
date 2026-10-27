@@ -1,0 +1,92 @@
+#!/bin/bash
+
+# Puts the age keys this machine needs in ~/.ssh, from 1Password, before any file is applied:
+#   ~/.ssh/chezmoi                decrypts every encrypted_*.age file (.kube, .histdb, .npmrc...)
+#   ~/.ssh/omniroute-backup-key   encrypts the OmniRoute backups; WSL only, where they run
+# .chezmoidata/age-keys.yaml names each item and each key's public half; see CLAUDE.md, "Age Keys".
+#
+# A `run_before_` script, not `run_once_`: it runs on every apply and returns before touching
+# 1Password while each file holds its key, so a key that is missing, was deleted, or is an older
+# one -- the SSH key this repository encrypted to until 2026-10-27 -- is fetched on the next apply.
+# A chezmoi key that cannot be fetched fails the apply, which could decrypt nothing without it; a
+# backup key only warns, because the apply needs none.
+#
+# Nothing here deletes ~/.ssh, which on WSL also holds the SSH agent bridge's socket.
+
+set -euo pipefail
+
+prefix="export-key"
+ssh_dir="$HOME/.ssh"
+
+chezmoi_key="$ssh_dir/chezmoi"
+chezmoi_recipient={{ .ageKeys.chezmoi.recipient | squote }}
+chezmoi_reference={{ .ageKeys.chezmoi.privateKey | squote }}
+backup_key="$ssh_dir/omniroute-backup-key"
+backup_recipient={{ .ageKeys.omnirouteBackup.recipient | squote }}
+backup_reference={{ .ageKeys.omnirouteBackup.privateKey | squote }}
+
+# TODO: workaround since "op" isn't installed on WSL
+op() {
+  op.exe "$@"
+}
+
+# key_matches <file> <recipient>: an identity written by age-keygen names its public key in a
+# comment, so the check needs neither an age binary nor 1Password.
+key_matches() {
+    [[ -f "$1" ]] && grep -qxF "# public key: $2" "$1"
+}
+
+# fetch_key <file> <recipient> <reference>: stages the identity beside the target and renames it
+# over the target only once it is the key the recipient names, so a failed or wrong read never
+# leaves a partial key behind, nor replaces a working one.
+fetch_key() {
+    local target="$1" recipient="$2" reference="$3" staged
+    staged="$(mktemp "$target.XXXXXX")"
+    if op read --no-newline "$reference" --account my >"$staged" &&
+        grep -q '^AGE-SECRET-KEY-1' "$staged" && key_matches "$staged" "$recipient"; then
+        chmod 600 "$staged"
+        mv -f "$staged" "$target"
+        echo "[$prefix] wrote $target from 1Password" >&2
+        return 0
+    fi
+    rm -f "$staged"
+    return 1
+}
+
+need_chezmoi=false
+need_backup=false
+key_matches "$chezmoi_key" "$chezmoi_recipient" || need_chezmoi=true
+if grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null; then
+    key_matches "$backup_key" "$backup_recipient" || need_backup=true
+fi
+if ! $need_chezmoi && ! $need_backup; then
+    exit 0
+fi
+
+mkdir -p "$ssh_dir"
+chmod 700 "$ssh_dir"
+
+# sign into the personal 1Password account ('my' shorthand refers to my.1password.com)
+# when multiple accounts are configured, --account my ensures the personal account is used
+# if 'my' shorthand is missing, add the personal account first with:
+#   op account add --address my.1password.com --shorthand my
+if signin_output=$(op signin --account my); then
+    eval "$signin_output"
+else
+    echo "[$prefix] ERROR: could not sign into 1Password personal account (shorthand 'my')" >&2
+    echo "[$prefix] if you have multiple accounts, ensure the personal account uses the 'my' shorthand:" >&2
+    echo "[$prefix]   op account add --address my.1password.com --shorthand my" >&2
+    if $need_chezmoi; then
+        exit 1
+    fi
+    echo "[$prefix] WARN: $backup_key was not fetched; the next apply tries again" >&2
+    exit 0
+fi
+
+if $need_chezmoi && ! fetch_key "$chezmoi_key" "$chezmoi_recipient" "$chezmoi_reference"; then
+    echo "[$prefix] ERROR: 1Password did not return the chezmoi age key; check that 'op read \"$chezmoi_reference\" --account my' prints it" >&2
+    exit 1
+fi
+if $need_backup && ! fetch_key "$backup_key" "$backup_recipient" "$backup_reference"; then
+    echo "[$prefix] WARN: 1Password did not return the OmniRoute backup key, so backups fail until it arrives; the next apply tries again ('op read \"$backup_reference\" --account my')" >&2
+fi

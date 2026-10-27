@@ -10,11 +10,14 @@ echo "[test-template-render] testing template rendering with mock 1Password..." 
 
 chmod +x "$MOCK_OP"
 
-# Create a temporary chezmoi config that uses the mock op
+# Create a temporary chezmoi config that uses the mock op. It names this checkout as the source,
+# so templates read its .chezmoidata and .chezmoitemplates rather than whatever the default source
+# directory holds, or nothing at all on CI.
 TMPDIR=$(mktemp -d)
 trap 'rm -rf "$TMPDIR"' EXIT
 
 cat > "$TMPDIR/chezmoi.yaml" <<EOF
+sourceDir: "$REPO_ROOT"
 onePassword:
   command: "$MOCK_OP"
 data:
@@ -29,7 +32,7 @@ declare -A TEMPLATE_CHECKS=(
     ["dot_ssh/config.tmpl"]="Host"
     ["dot_ssh/allowed_signers.tmpl"]=""
     ["dot_ssh/authorized_keys.tmpl"]=""
-    ["dot_age_recipients.tmpl"]=""
+    ["dot_age_recipients.tmpl"]="^age1"
     ["dot_wakatime.cfg.tmpl"]="api_key"
 )
 

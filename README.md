@@ -142,7 +142,7 @@ Chezmoi translates `dot_` prefixes to `.` in the target path (e.g., `dot_zshrc.t
 This repository uses a layered approach to secrets management:
 
 - **1Password CLI** fetches SSH keys, GPG keys, and credentials at template render time via `onepasswordRead` / `onepassword` template functions
-- **Age encryption** protects sensitive files at rest (AWS, Azure, Kubernetes configs, npmrc). Private key stored at `~/.ssh/chezmoi`, recipients at `~/.age_recipients`
+- **Age encryption** protects sensitive files at rest (AWS, Azure, Kubernetes configs, npmrc). Private key stored at `~/.ssh/chezmoi`, recipients at `~/.age_recipients`. The key is the `chezmoi.age` item in 1Password, a key of its own rather than the SSH key that signs commits, and `chezmoi apply` fetches it before any file whenever it is missing or out of date
 - **Per-device SSH/GPG signing** matches keys by hostname against 1Password device notes ("Device: \<hostname\>")
 - **Machine-local Git config** stays out of this public repository: `~/.gitconfig` ends with an `[include]` of `~/.gitconfig.local`, an unmanaged file for settings such as a work identity selected by `includeIf` (Git skips the include when the file does not exist)
 
