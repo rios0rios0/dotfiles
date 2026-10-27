@@ -1240,15 +1240,20 @@ in its all-hosts profile, `Documents\PowerShell\profile.ps1`. Without it nothing
    stays; when nothing differs the file passes through byte for byte.
 2. **Keys and values compare case-insensitively**, as WSL reads them: the app writes `Gradual`,
    the documentation `gradual`, and neither should rewrite the other.
-3. **The file's own line endings stay.** The app writes CRLF with no final newline; a rewrite keeps
-   whichever the file had, and a new file gets CRLF.
+3. **The file's own line endings and encoding stay.** The app writes CRLF with no final newline; a
+   rewrite keeps whichever the file had, and a new file gets CRLF. A UTF-8 BOM, which Windows
+   PowerShell 5.1's `Set-Content -Encoding UTF8` writes, stays in front and is read past: left in,
+   it would hide the first section, and the merge would add a second one. A UTF-16 file, which its
+   `>` and `Out-File` write, is passed through with a warning, because no line of it can be read
+   and ASCII lines written into it would corrupt it.
 4. **Nothing restarts WSL.** WSL reads the file only when its VM starts, and `wsl.exe --shutdown`
    would end every WSL process, the apply's own among them; the apply's line says so instead.
    `sparseVhd` applies to distributions created afterwards; an existing one is made sparse with
    `wsl.exe --manage <distro> --set-sparse true` while WSL is stopped.
 
 `make test-modify-scripts` covers the merge (a new file, the app's file passing through, a value
-set back with every other line kept); `make test-chezmoiignore` covers that only Windows gets it.
+set back with every other line kept, a BOM kept, a UTF-16 file left alone); `make test-chezmoiignore`
+covers that only Windows gets it.
 
 ## RustDesk on Windows (GitHub Release, Not winget)
 

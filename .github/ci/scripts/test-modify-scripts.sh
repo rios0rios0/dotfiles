@@ -70,7 +70,10 @@ apply_modify_template() {
     cp -r "$REPO_ROOT/.chezmoitemplates" "$case_dir/src/"
     cp -r "$REPO_ROOT/.chezmoidata" "$case_dir/src/"
     cp "$REPO_ROOT/$source_file" "$case_dir/src/$source_file"
-    if [ -n "$content" ]; then
+    if [ -n "${CASE_CONTENT_FILE:-}" ]; then
+        # for content a shell string cannot hold, such as UTF-16's NUL bytes
+        cp "$CASE_CONTENT_FILE" "$case_dir/dest/$target"
+    elif [ -n "$content" ]; then
         printf '%s' "$content" > "$case_dir/dest/$target"
     fi
     : > "$case_dir/chezmoi.yaml"
@@ -413,6 +416,32 @@ wslconfig_keeps_everything_else() {
     [ "$out" = $'# mine\n[wsl2]\nmemory=16GB\n\n[experimental]\nautoMemoryReclaim=Gradual\nnetworkingMode=mirrored\nsparseVhd=true\n\n[general]\ninstanceIdleTimeout=-1' ]
 }
 
+wslconfig_keeps_a_utf8_bom() {
+    # given the file as Windows PowerShell 5.1's `Set-Content -Encoding UTF8` writes it: a BOM
+    # before the first section, which must not hide that section
+    local input=$'\xef\xbb\xbf[experimental]\r\nautoMemoryReclaim=dropcache\r\nsparseVhd=true\r\n[general]\r\ninstanceIdleTimeout=-1\r\n'
+
+    # when
+    local out
+    out=$(apply_modify_template modify_dot_wslconfig .wslconfig "$input") || return 1
+
+    # then: the value is set back under the BOM, with no second [experimental] section
+    [ "$out" = $'\xef\xbb\xbf[experimental]\r\nautoMemoryReclaim=Gradual\r\nsparseVhd=true\r\n[general]\r\ninstanceIdleTimeout=-1\r' ]
+}
+
+wslconfig_leaves_utf16_alone() {
+    # given the file as Windows PowerShell 5.1's `>` writes it: UTF-16 LE, BOM first, and a value
+    # that differs
+    printf '[experimental]\r\nautoMemoryReclaim=dropcache\r\n' | iconv -f UTF-8 -t UTF-16 > "$SANDBOX/wslconfig.utf16"
+
+    # when
+    CASE_CONTENT_FILE="$SANDBOX/wslconfig.utf16" apply_modify_template modify_dot_wslconfig .wslconfig "" \
+        > "$SANDBOX/wslconfig.utf16.out" || return 1
+
+    # then: passed through untouched, since no line of it could be read
+    cmp -s "$SANDBOX/wslconfig.utf16" "$SANDBOX/wslconfig.utf16.out"
+}
+
 windows_deploys_only_modify_templates() {
     # given the source state as chezmoi resolves it for Windows, which cannot start
     # a #! script: every modify_ file there must be a modify-template
@@ -479,6 +508,8 @@ else
     run_case "wslconfig: creates both sections when the file is missing" wslconfig_creates_the_settings
     run_case "wslconfig: passes the WSL Settings app's file through byte for byte" wslconfig_passes_the_apps_file_through
     run_case "wslconfig: sets a value back and keeps every other line" wslconfig_keeps_everything_else
+    run_case "wslconfig: keeps a UTF-8 BOM and reads the section behind it" wslconfig_keeps_a_utf8_bom
+    run_case "wslconfig: leaves a UTF-16 file as it is" wslconfig_leaves_utf16_alone
     run_case "every modify_ file that deploys on Windows is a modify-template" windows_deploys_only_modify_templates
 fi
 
