@@ -12,7 +12,7 @@ CASE_INDEX=0
 
 echo "[test-remove-dependencies] testing dependency removal library..." >&2
 
-if [ ! -f "$LIB" ]; then
+if [[ ! -f "$LIB" ]]; then
     echo "[test-remove-dependencies] FAIL: library not found at $LIB" >&2
     exit 1
 fi
@@ -42,7 +42,7 @@ run_case() {
         echo "[test-remove-dependencies] PASS: $description" >&2
     else
         echo "[test-remove-dependencies] FAIL: $description" >&2
-        [ -n "$output" ] && echo "$output" >&2
+        [[ -n "$output" ]] && echo "$output" >&2
         EXIT_CODE=1
     fi
 }
@@ -166,7 +166,7 @@ output=$(apply_tombstones "npm_global:@example/absent" "pipx:absent" 2>&1)
 CASE
 )"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-remove-dependencies] all dependency removal tests passed" >&2
 fi
 

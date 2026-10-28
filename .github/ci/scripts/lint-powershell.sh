@@ -8,10 +8,11 @@ echo "[lint-powershell] linting PowerShell scripts..." >&2
 
 # Preprocess .ps1.tmpl by stripping Go template directives
 preprocess_tmpl() {
+    local template="$1"
     sed \
         -e '/^{{-\? .*-\?}}$/d' \
         -e 's|{{-\? .*-\?}}|"placeholder"|g' \
-        "$1"
+        "$template"
 }
 
 # Check if pwsh is available
@@ -24,7 +25,7 @@ fi
 while IFS= read -r -d '' file; do
     rel=$(realpath --relative-to="$REPO_ROOT" "$file")
     result=$(pwsh -Command "Invoke-ScriptAnalyzer -Path '$file' -Severity Warning,Error -ExcludeRule PSAvoidUsingWriteHost,PSUseApprovedVerbs" 2>&1) || true
-    if [ -n "$result" ]; then
+    if [[ -n "$result" ]]; then
         echo "[lint-powershell] FAIL: $rel" >&2
         echo "$result" >&2
         EXIT_CODE=1
@@ -38,7 +39,7 @@ while IFS= read -r -d '' file; do
     preprocess_tmpl "$file" > "$tmpfile"
 
     result=$(pwsh -Command "Invoke-ScriptAnalyzer -Path '$tmpfile' -Severity Warning,Error -ExcludeRule PSAvoidUsingWriteHost,PSUseApprovedVerbs" 2>&1) || true
-    if [ -n "$result" ]; then
+    if [[ -n "$result" ]]; then
         echo "[lint-powershell] FAIL: $rel" >&2
         echo "$result" >&2
         EXIT_CODE=1
@@ -47,7 +48,7 @@ while IFS= read -r -d '' file; do
     rm -f "$tmpfile"
 done < <(find "$REPO_ROOT" -name '*.ps1.tmpl' -not -path '*/.git/*' -print0)
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[lint-powershell] all PowerShell scripts passed" >&2
 fi
 

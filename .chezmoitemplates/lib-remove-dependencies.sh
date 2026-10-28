@@ -60,6 +60,7 @@ remove_path() {
             echo "[$prefix] WARN: refusing to remove '$target' (contains a '..' component)" >&2
             return 0
             ;;
+        *) ;;
     esac
 
     echo "[$prefix] removing path: $target" >&2

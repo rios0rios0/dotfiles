@@ -8,6 +8,7 @@ echo "[lint-shellcheck] linting shell scripts..." >&2
 
 # Preprocess a .tmpl file by stripping Go template directives
 preprocess_tmpl() {
+    local template="$1"
     sed \
         -e 's|{{ lookPath "bash" }}|/bin/bash|g' \
         -e 's|{{- lookPath "bash" -}}|/bin/bash|g' \
@@ -15,7 +16,7 @@ preprocess_tmpl() {
         -e 's|{{- \.chezmoi\.[a-zA-Z]*[^}]* -}}|"placeholder"|g' \
         -e '/^{{-\? .*-\?}}$/d' \
         -e 's|{{-\? .*-\?}}||g' \
-        "$1"
+        "$template"
 }
 
 # Lint pure .sh files (not templates)
@@ -24,6 +25,7 @@ while IFS= read -r -d '' file; do
     # skip files inside .github/ci (our own CI scripts are linted by the CI runner)
     case "$file" in
         */.github/ci/*) continue ;;
+        *) ;;
     esac
 
     if ! shellcheck -S warning "$file"; then
@@ -57,17 +59,15 @@ while IFS= read -r -d '' file; do
         preprocess_tmpl "$file" > "$target"
     fi
 
-    if head -1 "$target" | grep -qE '^#!(/usr)?/bin/(env )?(ba)?sh'; then
-        if ! shellcheck -S warning "$target"; then
-            echo "[lint-shellcheck] FAIL: $file" >&2
-            EXIT_CODE=1
-        fi
+    if head -1 "$target" | grep -qE '^#!(/usr)?/bin/(env )?(ba)?sh' && ! shellcheck -S warning "$target"; then
+        echo "[lint-shellcheck] FAIL: $file" >&2
+        EXIT_CODE=1
     fi
 
     [[ "$target" != "$file" ]] && rm -f "$target"
 done < <(find "$REPO_ROOT/dot_local/bin" -type f -name 'executable_*' -print0)
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[lint-shellcheck] all scripts passed" >&2
 fi
 

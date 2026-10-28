@@ -29,6 +29,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 | Shell | Zsh | PowerShell 7 | Zsh |
 | Framework | Oh My Zsh + ZINIT | Oh My Posh | Oh My Zsh + ZINIT |
 | Theme | Powerlevel10k | Oh My Posh (custom) | Powerlevel10k |
+| History | Atuin, synced through our own server | PowerShell's own | Atuin, synced through our own server |
 
 ### Version Managers
 
@@ -258,6 +259,10 @@ The same configuration wires the context7 and Chrome DevTools (Linux only) MCP s
 Each machine runs one Tailscale client. On Windows, and so for its WSL, that is Windows' own: the Windows dependency installer installs it, you log in with its app, and WSL reaches its CLI through the `tailscale` wrapper in `~/.local/bin`. No client runs inside WSL -- Tailscale's WSL guide warns that one there breaks WSL's traffic through the Windows one -- and an apply removes the one older revisions installed (with `sudo apt-get purge -y tailscale` by hand when sudo asks for a password). Windows' client puts the whole machine on the tailnet: Windows' own services, and Docker Desktop's containers, whose traffic leaves through Windows. Once Windows is logged in, run `tailscale-up` in WSL to share the local model's server through it.
 
 On bare-metal Linux, `chezmoi apply` installs Tailscale from its signed apt repository -- the key checked by fingerprint -- and enables `tailscaled`. Run from a terminal, it then prints the login URL and waits until you have used it; otherwise run `tailscale-up` later, which every new shell points at until the machine is logged in. After that the machine rejoins by itself, and every interactive zsh brings it back up after a `tailscale down`, never waiting or asking for a password. MagicDNS stays off (`--accept-dns=false`), because without a DNS manager tailscaled would replace `/etc/resolv.conf`.
+
+## Shell History
+
+Every zsh, on Linux and Termux, records its commands with [Atuin](https://atuin.sh), and Ctrl-R and the up arrow search them. Atuin syncs them through a server of our own: a Docker container on the laptop (`alien-a51`), which its `tailscale-up` shares on the tailnet. Each device encrypts its history before sending it, with a key that never leaves the devices, and the client never contacts Atuin's own servers. A device that is offline keeps recording and catches up the next time it reaches the server. Moving the server to an always-on machine is [#272](https://github.com/rios0rios0/dotfiles/issues/272). The [Atuin guide](.docs/atuin-sync.md) covers starting the server, the account, and the one-time import of the old zsh-histdb history.
 
 ## Chezmoi Conventions
 

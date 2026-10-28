@@ -12,6 +12,8 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 LIBRARY="$REPO_ROOT/.chezmoitemplates/lib-install-deps.sh"
 EXIT_CODE=0
+# The LTS a machine already runs in these cases.
+CURRENT_LTS="v24.22.1"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -29,7 +31,10 @@ fi
 # shellcheck source=/dev/null
 source <(printf '%s\n' "$FUNCTION")
 
-command_exists() { command -v "$1" >/dev/null 2>&1; }
+command_exists() {
+    local name="$1"
+    command -v "$name" >/dev/null 2>&1
+}
 run_remote_installer() { echo "run_remote_installer $*" >>"$CALLS"; }
 
 # `nvm version-remote --lts` answers $LTS and `nvm current` answers $CURRENT; everything else is
@@ -57,7 +62,8 @@ run_case() {
 
 # The line number of the first call matching $1, or nothing.
 line_of() {
-    grep -n -m 1 -F -- "$1" "$CALLS" | cut -d: -f1
+    local call="$1"
+    grep -n -m 1 -F -- "$call" "$CALLS" | cut -d: -f1
 }
 
 upgraded_before_globals() {
@@ -68,7 +74,7 @@ upgraded_before_globals() {
 }
 
 # --- the LTS already installed ------------------------------------------------------------------
-run_case "v24.22.1" "v24.22.1" installed
+run_case "$CURRENT_LTS" "$CURRENT_LTS" installed
 if [[ "$STATUS" -eq 0 ]] && ! grep -q "^nvm install --lts" "$CALLS"; then
     pass "installs no Node.js when the LTS is already current"
 else
@@ -81,8 +87,8 @@ else
 fi
 
 # --- a new LTS, carrying the global CLIs over --------------------------------------------------
-run_case "v26.1.0" "v24.22.1" bump
-if grep -q -x "nvm install --lts --reinstall-packages-from=v24.22.1" "$CALLS"; then
+run_case "v26.1.0" "$CURRENT_LTS" bump
+if grep -q -x "nvm install --lts --reinstall-packages-from=$CURRENT_LTS" "$CALLS"; then
     pass "installs a new LTS with the global CLIs of the current version"
 else
     fail "installs a new LTS with the global CLIs of the current version ($(tr '\n' ';' <"$CALLS"))"
@@ -94,7 +100,7 @@ else
 fi
 
 # --- a first install: nothing to copy from ------------------------------------------------------
-run_case "v24.22.1" "none" first
+run_case "$CURRENT_LTS" "none" first
 if grep -q -x "nvm install --lts" "$CALLS"; then
     pass "passes no --reinstall-packages-from on a first install"
 else
@@ -106,7 +112,7 @@ else
     fail "upgrades npm after a first install ($(tr '\n' ';' <"$CALLS"))"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-install-nvm] all Node.js and npm install tests passed" >&2
 fi
 

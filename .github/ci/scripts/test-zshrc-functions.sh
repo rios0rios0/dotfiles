@@ -30,7 +30,8 @@ for tool in chezmoi zsh; do
 done
 ZSH_BIN="$(type -P zsh)"
 
-# dot_zshrc.tmpl reads nothing but .chezmoi, so a config of its own keeps the host's out of the render
+# dot_zshrc.tmpl reads nothing but .chezmoi and, on Termux, deviceName, so a config of its own keeps
+# the host's out of the render
 cat > "$TMP/chezmoi.yaml" <<EOF
 sourceDir: "$REPO_ROOT"
 data:
@@ -286,9 +287,10 @@ EOF
         # Runs rebuild-ocode from a directory under the given PATH, leaving stdout in $TMP/out,
         # stderr in $TMP/err and the status in $STATUS, and starting with an empty chezmoi log.
         run_rebuild_ocode() {
+            local dir="$1" path_value="$2"
             : > "$TMP/chezmoi.log"
             STATUS=0
-            (cd "$1" && LC_ALL=C PATH="$2" "$ZSH_BIN" -f -c 'source "$1"; rebuild-ocode' _ "$rebuild_ocode") \
+            (cd "$dir" && LC_ALL=C PATH="$path_value" "$ZSH_BIN" -f -c 'source "$1"; rebuild-ocode' _ "$rebuild_ocode") \
                 > "$TMP/out" 2> "$TMP/err" || STATUS=$?
         }
 

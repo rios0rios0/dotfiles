@@ -14,6 +14,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPT="$REPO_ROOT/dot_claude/executable_statusline-command.sh"
 EXIT_CODE=0
+MODEL="Sonnet 5"
 
 echo "[test-statusline] testing the Claude Code status line..." >&2
 
@@ -68,7 +69,8 @@ fresh_cache() {
 
 # payload <cwd> <model display name> [rate_limits object]
 payload() {
-    jq -nc --arg cwd "$1" --arg model "$2" --argjson limits "${3:-null}" '
+    local cwd="$1" model="$2" limits="${3:-null}"
+    jq -nc --arg cwd "$cwd" --arg model "$model" --argjson limits "$limits" '
         {workspace: {current_dir: $cwd}, model: {display_name: $model},
          context_window: {remaining_percentage: 83, total_input_tokens: 21800, context_window_size: 131072}}
         + (if $limits == null then {} else {rate_limits: $limits} end)'
@@ -76,8 +78,9 @@ payload() {
 
 # render <profile> <payload> [COLUMNS]: the two lines, colours stripped
 render() {
-    printf '%s' "$2" |
-        CLAUDE_CONFIG_DIR="$1" COLUMNS="${3:-200}" PATH="$STUBS:$PATH" STATUSLINE_TEST_LOG="$LOG" bash "$SCRIPT" |
+    local config_dir="$1" input="$2" columns="${3:-200}"
+    printf '%s' "$input" |
+        CLAUDE_CONFIG_DIR="$config_dir" COLUMNS="$columns" PATH="$STUBS:$PATH" STATUSLINE_TEST_LOG="$LOG" bash "$SCRIPT" |
         sed 's/\x1b\[[0-9;]*m//g'
 }
 
@@ -98,13 +101,13 @@ no_login_session_shows_the_model_and_no_limits() {
 
     # when
     local out line1 line2
-    out=$(render "$NO_LOGIN_PROFILE" "$(payload "$PROJECT/src" "Sonnet 5")") || return 1
+    out=$(render "$NO_LOGIN_PROFILE" "$(payload "$PROJECT/src" "$MODEL")") || return 1
     line1=$(sed -n 1p <<<"$out")
     line2=$(sed -n 2p <<<"$out")
 
     # then: the directory, the branch, the model and its window -- and no plan limits
     [[ "$line1" == *"project/src"* && "$line1" == *"feat/look"* ]] &&
-        [[ "$line2" == *"Sonnet 5"* && "$line2" == *"ctx 83% left (21k/131k)"* ]] &&
+        [[ "$line2" == *"$MODEL"* && "$line2" == *"ctx 83% left (21k/131k)"* ]] &&
         [[ "$out" != *"5h "* && "$out" != *"7d "* ]]
 }
 
@@ -113,10 +116,10 @@ no_login_session_starts_no_refresh() {
     reset_log
 
     # when
-    render "$NO_LOGIN_PROFILE" "$(payload "$PROJECT" "Sonnet 5")" >/dev/null || return 1
+    render "$NO_LOGIN_PROFILE" "$(payload "$PROJECT" "$MODEL")" >/dev/null || return 1
 
     # then: no lock was taken, so no refresh forked, and curl never ran
-    [ ! -s "$LOG/mkdir.calls" ] && [ ! -e "$LOG/curl.argv" ]
+    [[ ! -s "$LOG/mkdir.calls" ]] && [[ ! -e "$LOG/curl.argv" ]]
 }
 
 refresh_sends_the_token_on_stdin_only() {
@@ -160,7 +163,7 @@ logged_in_session_shows_its_limits() {
     [[ "$line1" == *"someone@example.com"* ]] &&
         [[ "$line2" == *"Opus 5 ❯"* && "$line2" == *"5h 20%"* && "$line2" == *"7d 83%"* ]] &&
         [[ "$line2" == *"Fable 43%"* ]] &&
-        [ ! -s "$LOG/mkdir.calls" ]
+        [[ ! -s "$LOG/mkdir.calls" ]]
 }
 
 draws_no_private_use_area_glyph() {
@@ -168,7 +171,7 @@ draws_no_private_use_area_glyph() {
     reset_log
     fresh_cache
     local out
-    out=$(render "$NO_LOGIN_PROFILE" "$(payload "$PROJECT/src" "Sonnet 5")") || return 1
+    out=$(render "$NO_LOGIN_PROFILE" "$(payload "$PROJECT/src" "$MODEL")") || return 1
     out+=$(render "$REGULAR_PROFILE" "$(payload "$PROJECT" "Opus 5")") || return 1
 
     # when / then: Claude Code strips U+E000-U+F8FF, every Nerd Font glyph, so none may be
@@ -185,7 +188,7 @@ fits_a_narrow_terminal() {
 
     # when / then: each line sheds detail until it fits
     while IFS= read -r line; do
-        [ "${#line}" -le 40 ] || return 1
+        [[ "${#line}" -le 40 ]] || return 1
     done <<<"$out"
 }
 
@@ -200,7 +203,7 @@ run_case "a logged-in session shows its account, both windows and the model cap"
 run_case "no line draws a private-use-area glyph" draws_no_private_use_area_glyph
 run_case "every line fits a 40-column terminal" fits_a_narrow_terminal
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-statusline] all status line tests passed" >&2
 fi
 exit "$EXIT_CODE"

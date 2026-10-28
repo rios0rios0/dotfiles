@@ -7,6 +7,11 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
 EXIT_CODE=0
+# Whether the device settings, as JSON, switch the local model on.
+enabled_of() {
+    local json="$1"
+    jq -r '.enabled' <<<"$json"
+}
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -42,9 +47,9 @@ chmod +x "$TMP/bin-gpu/nvidia-smi"
 
 # render <gpu|nogpu> <source file> [override JSON]
 render() {
-    local override="${3:-}"
-    PATH="$TMP/bin-$1" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
-        ${override:+--override-data "$override"} < "$2"
+    local gpu="$1" template="$2" override="${3:-}"
+    PATH="$TMP/bin-$gpu" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
+        ${override:+--override-data "$override"} < "$template"
 }
 
 settings() {
@@ -62,7 +67,7 @@ INSTALLER="$REPO_ROOT/.chezmoiscripts/run_onchange_after_linux-009-setup-ollama.
 # when
 json="$(settings gpu)"
 # then
-if [[ "$(jq -r '.enabled' <<<"$json")" == "true" && "$(jq -r '.model' <<<"$json")" != "" &&
+if [[ "$(enabled_of "$json")" == "true" && "$(jq -r '.model' <<<"$json")" != "" &&
     "$(jq -r '.contextTokens' <<<"$json")" =~ ^[0-9]+$ ]]; then
     pass "settings are enabled with a model and a numeric window when a GPU is present"
 else
@@ -73,7 +78,7 @@ fi
 # when
 json="$(settings nogpu)"
 # then
-[[ "$(jq -r '.enabled' <<<"$json")" == "false" ]] && pass "settings are disabled without a GPU" ||
+[[ "$(enabled_of "$json")" == "false" ]] && pass "settings are disabled without a GPU" ||
     fail "settings without a GPU: $json"
 
 # given a GPU, but this device switched off. sprig's merge drops false as empty, which once let
@@ -81,7 +86,7 @@ json="$(settings nogpu)"
 # when
 json="$(settings gpu '{"localLLM":{"devices":{"testdevice":{"enabled":false}}}}')"
 # then
-[[ "$(jq -r '.enabled' <<<"$json")" == "false" ]] && pass "a device can switch the local model off" ||
+[[ "$(enabled_of "$json")" == "false" ]] && pass "a device can switch the local model off" ||
     fail "device opt-out ignored: $json"
 
 # given an override for this device and one for another
@@ -97,7 +102,7 @@ json="$(settings gpu '{"localLLM":{"devices":{"testdevice":{"contextTokens":3276
 printf 'sourceDir: "%s"\n' "$REPO_ROOT" > "$TMP/stale.yaml"
 # when
 if json="$(PATH="$TMP/bin-gpu" chezmoi execute-template --config "$TMP/stale.yaml" \
-    '{{ includeTemplate "lib-local-llm.tmpl" . }}' 2>&1)" && [[ "$(jq -r '.enabled' <<<"$json")" == "true" ]]; then
+    '{{ includeTemplate "lib-local-llm.tmpl" . }}' 2>&1)" && [[ "$(enabled_of "$json")" == "true" ]]; then
     pass "settings render with the defaults when the config has no deviceName"
 else
     fail "settings without deviceName: $json"
@@ -294,7 +299,7 @@ else
     fail "the installer without a discovery line: $(cat "$TMP/installer.rc") | $(tail -3 "$TMP/installer.out" | tr '\n' ' ')"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-local-llm] all local model tests passed" >&2
 fi
 

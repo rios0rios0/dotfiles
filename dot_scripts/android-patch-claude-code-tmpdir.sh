@@ -50,7 +50,7 @@ _patch_claude_code_tmpdir() {
 
         local patched=0
         # Shorthand used in sed replacements:
-        local T='(process.env.TMPDIR||"/tmp")'
+        local tmp_expr='(process.env.TMPDIR||"/tmp")'
 
         # -----------------------------------------------------------------
         # Cleanup: Undo old patches that used require("os").tmpdir()
@@ -74,7 +74,7 @@ _patch_claude_code_tmpdir() {
         #   TO: ||(process.env.TMPDIR||"/tmp")+"/claude"
         # -----------------------------------------------------------------
         if grep -q '||"/tmp/claude"' "$cli_js"; then
-            sed -i "s#||\"/tmp/claude\"#||${T}+\"/claude\"#g" "$cli_js"
+            sed -i "s#||\"/tmp/claude\"#||${tmp_expr}+\"/claude\"#g" "$cli_js"
             patched=$((patched + 1))
         fi
 
@@ -85,7 +85,7 @@ _patch_claude_code_tmpdir() {
         #   TO: ||(process.env.TMPDIR||"/tmp")
         # -----------------------------------------------------------------
         if grep -q '||"/tmp"' "$cli_js"; then
-            sed -i "s#||\"/tmp\"#||${T}#g" "$cli_js"
+            sed -i "s#||\"/tmp\"#||${tmp_expr}#g" "$cli_js"
             patched=$((patched + 1))
         fi
 
@@ -95,7 +95,7 @@ _patch_claude_code_tmpdir() {
         #   TO: :(process.env.TMPDIR||"/tmp"))
         # -----------------------------------------------------------------
         if grep -q ':"/tmp")' "$cli_js"; then
-            sed -i "s#:\"/tmp\")#:${T})#g" "$cli_js"
+            sed -i "s#:\"/tmp\")#:${tmp_expr})#g" "$cli_js"
             patched=$((patched + 1))
         fi
 
@@ -104,7 +104,7 @@ _patch_claude_code_tmpdir() {
         # the existing static "/tmp/claude","/private/tmp/claude" entries.
         # -----------------------------------------------------------------
         if grep -q '"/tmp/claude","/private/tmp/claude"' "$cli_js"; then
-            sed -i "s#\"/tmp/claude\",\"/private/tmp/claude\"#\"/tmp/claude\",\"/private/tmp/claude\",${T}+\"/claude\"#g" "$cli_js"
+            sed -i "s#\"/tmp/claude\",\"/private/tmp/claude\"#\"/tmp/claude\",\"/private/tmp/claude\",${tmp_expr}+\"/claude\"#g" "$cli_js"
             patched=$((patched + 1))
         fi
 

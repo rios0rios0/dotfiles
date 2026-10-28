@@ -22,8 +22,9 @@ fail() { echo "[test-claude-lsp] FAIL: $1" >&2; EXIT_CODE=1; }
 # Writes the stubs into $1. Each records its call in $CALLS; npm fails when its arguments contain
 # $FAIL_NPM, and claude records the CLAUDE_CONFIG_DIR it was started with.
 write_stubs() {
-    mkdir -p "$1"
-    cat > "$1/go" <<'EOF'
+    local dir="$1"
+    mkdir -p "$dir"
+    cat > "$dir/go" <<'EOF'
 #!/bin/bash
 echo "go $* GOBIN=${GOBIN:-}" >> "$CALLS"
 if [[ -n "${FAIL_GO:-}" ]]; then
@@ -35,7 +36,7 @@ if [[ "${SKIP_GOPLS_BINARY:-}" != 1 ]]; then
     chmod +x "$GOBIN/gopls"
 fi
 EOF
-    cat > "$1/npm" <<'EOF'
+    cat > "$dir/npm" <<'EOF'
 #!/bin/bash
 echo "${NPM_LOG_PREFIX:-npm} $*" >> "$CALLS"
 if [[ -n "${FAIL_NPM:-}" && "$*" == *"$FAIL_NPM"* ]]; then
@@ -54,11 +55,11 @@ if [[ "$*" == *pyright@* ]]; then
     chmod +x "$NPM_GLOBAL_BIN/pyright-langserver"
 fi
 EOF
-    cat > "$1/claude" <<'EOF'
+    cat > "$dir/claude" <<'EOF'
 #!/bin/bash
 echo "claude $* CLAUDE_CONFIG_DIR=${CLAUDE_CONFIG_DIR:-}" >> "$CALLS"
 EOF
-    chmod +x "$1/go" "$1/npm" "$1/claude"
+    chmod +x "$dir/go" "$dir/npm" "$dir/claude"
 }
 
 # The only programs on PATH besides the stubs: a runner's own go or npm in /usr/bin would

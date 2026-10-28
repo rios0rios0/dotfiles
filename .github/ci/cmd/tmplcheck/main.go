@@ -13,10 +13,23 @@ import (
 func main() {
 	repoRoot := findRepoRoot()
 
-	// Build function map: sprig functions + chezmoi-specific stubs
+	tmplFiles, err := collectTemplates(repoRoot)
+	if err != nil {
+		fmt.Fprintf(os.Stderr, "[tmplcheck] ERROR: walking repo: %v\n", err)
+		os.Exit(1)
+	}
+
+	passed, exitCode := parseTemplates(repoRoot, tmplFiles, buildFuncMap())
+	fmt.Fprintf(os.Stderr, "[tmplcheck] %d/%d templates parsed successfully\n", passed, len(tmplFiles))
+
+	os.Exit(exitCode)
+}
+
+// buildFuncMap returns sprig's functions plus chezmoi's own, as no-op stubs that return safe
+// zero values.
+func buildFuncMap() template.FuncMap {
 	funcMap := sprig.TxtFuncMap()
 
-	// Chezmoi-specific template functions (no-op stubs that return safe zero values)
 	chezmoiFuncs := template.FuncMap{
 		"onepassword":         func(args ...interface{}) interface{} { return map[string]interface{}{"fields": []interface{}{}} },
 		"onepasswordRead":     func(args ...interface{}) string { return "stub-value" },
@@ -37,53 +50,77 @@ func main() {
 	for k, v := range chezmoiFuncs {
 		funcMap[k] = v
 	}
+	return funcMap
+}
 
-	// Collect all .tmpl files
+// collectTemplates returns every template in the repository, followed by the shared fragments in
+// .chezmoitemplates/.
+func collectTemplates(repoRoot string) ([]string, error) {
 	var tmplFiles []string
 
-	// Walk from repo root for all .tmpl files
 	err := filepath.Walk(repoRoot, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
 		}
-		// Skip .git directory
-		if info.IsDir() && info.Name() == ".git" {
-			return filepath.SkipDir
+		if info.IsDir() {
+			return skipDir(repoRoot, path, info)
 		}
-		// Skip .github/ci directory (our own CI files)
-		rel, _ := filepath.Rel(repoRoot, path)
-		if info.IsDir() && rel == filepath.Join(".github", "ci") {
-			return filepath.SkipDir
-		}
-		if !info.IsDir() && filepath.Ext(path) == ".tmpl" {
+		if isTemplate(path, info) {
 			tmplFiles = append(tmplFiles, path)
-		}
-		// Modify-templates are templates without a .tmpl suffix: chezmoi recognises
-		// them by the chezmoi:modify-template marker in a modify_ file.
-		if !info.IsDir() && strings.HasPrefix(info.Name(), "modify_") && filepath.Ext(path) != ".tmpl" {
-			if content, err := os.ReadFile(path); err == nil && strings.Contains(string(content), "chezmoi:modify-template") {
-				tmplFiles = append(tmplFiles, path)
-			}
 		}
 		return nil
 	})
 	if err != nil {
-		fmt.Fprintf(os.Stderr, "[tmplcheck] ERROR: walking repo: %v\n", err)
-		os.Exit(1)
+		return nil, err
 	}
 
-	// Also collect .chezmoitemplates/ (shared template fragments without .tmpl extension)
-	templatesDir := filepath.Join(repoRoot, ".chezmoitemplates")
-	if info, err := os.Stat(templatesDir); err == nil && info.IsDir() {
-		filepath.Walk(templatesDir, func(path string, info os.FileInfo, err error) error {
-			if err != nil || info.IsDir() {
-				return err
-			}
-			tmplFiles = append(tmplFiles, path)
-			return nil
-		})
+	return append(tmplFiles, collectFragments(filepath.Join(repoRoot, ".chezmoitemplates"))...), nil
+}
+
+// skipDir skips the .git directory and .github/ci (our own CI files).
+func skipDir(repoRoot, path string, info os.FileInfo) error {
+	rel, _ := filepath.Rel(repoRoot, path)
+	if info.Name() == ".git" || rel == filepath.Join(".github", "ci") {
+		return filepath.SkipDir
+	}
+	return nil
+}
+
+// isTemplate reports whether chezmoi renders a file as a template: a .tmpl file, or a
+// modify-template, which has no .tmpl suffix: chezmoi recognises it by the
+// chezmoi:modify-template marker in a modify_ file.
+func isTemplate(path string, info os.FileInfo) bool {
+	if filepath.Ext(path) == ".tmpl" {
+		return true
+	}
+	if !strings.HasPrefix(info.Name(), "modify_") {
+		return false
+	}
+	content, err := os.ReadFile(path)
+	return err == nil && strings.Contains(string(content), "chezmoi:modify-template")
+}
+
+// collectFragments returns the shared template fragments in .chezmoitemplates/, which carry no
+// .tmpl extension.
+func collectFragments(templatesDir string) []string {
+	if info, err := os.Stat(templatesDir); err != nil || !info.IsDir() {
+		return nil
 	}
 
+	var fragments []string
+	filepath.Walk(templatesDir, func(path string, info os.FileInfo, err error) error {
+		if err != nil || info.IsDir() {
+			return err
+		}
+		fragments = append(fragments, path)
+		return nil
+	})
+	return fragments
+}
+
+// parseTemplates parses each file with funcMap, reporting every failure, and returns how many
+// parsed and the exit code.
+func parseTemplates(repoRoot string, tmplFiles []string, funcMap template.FuncMap) (int, int) {
 	exitCode := 0
 	passed := 0
 
@@ -107,9 +144,7 @@ func main() {
 		}
 	}
 
-	fmt.Fprintf(os.Stderr, "[tmplcheck] %d/%d templates parsed successfully\n", passed, len(tmplFiles))
-
-	os.Exit(exitCode)
+	return passed, exitCode
 }
 
 func findRepoRoot() string {

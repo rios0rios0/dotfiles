@@ -20,6 +20,14 @@ $terminalProfile = (Get-Content -LiteralPath $settingsPath -Raw | ConvertFrom-Js
     Where-Object { $_.source -eq "Windows.Terminal.PowershellCore" }
 $commandLine = [string]$terminalProfile.commandline
 
+# Prints a case's outcome under the suite's prefix. Write-Host belongs in a Show- function, as
+# PSScriptAnalyzer's PSAvoidUsingWriteHost puts it, so Invoke-TestCase leaves the printing here.
+function Show-TestResult {
+    param([string]$Message)
+
+    Write-Host "[test-powershell-profile-windows] $Message"
+}
+
 function Invoke-TestCase {
     param([string]$Description, [scriptblock]$Body)
 
@@ -28,10 +36,10 @@ function Invoke-TestCase {
     Copy-Item -LiteralPath $profileSource -Destination (Join-Path $root ".config/powershell/profile.ps1")
     try {
         & $Body
-        Write-Host "[test-powershell-profile-windows] PASS: $Description"
+        Show-TestResult "PASS: $Description"
     }
     catch {
-        Write-Host "[test-powershell-profile-windows] FAIL: $Description -- $_"
+        Show-TestResult "FAIL: $Description -- $_"
         $script:failures++
     }
 }

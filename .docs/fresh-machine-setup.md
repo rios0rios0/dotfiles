@@ -45,7 +45,7 @@ name needs a `cred:` field on the device note. Nothing about it blocks the first
 [mcp-1password-setup.md](mcp-1password-setup.md) describes the field.
 
 The age identity is only needed where an encrypted file is applied: `.aws` and `.azure` on
-Windows; `.kube`, `.histdb`, `.john`, `.sqlmap` and `.npmrc` on Linux. Nothing encrypted is applied
+Windows; `.kube`, `.john`, `.sqlmap` and `.npmrc` on Linux. Nothing encrypted is applied
 on Android, so Termux never needs `~/.ssh/chezmoi`.
 
 ## Phase 1: Firmware and hardware drivers (Windows)
@@ -209,8 +209,8 @@ Phase 3 is what authenticates every template here.
 | 4    | `run_once_before_linux-003-configure-dependencies.sh`         | `[automated]` | Symlinks Debian's `batcat` to `~/.local/bin/bat`.                                                                                                                                                            |
 | 5    | `run_once_before_linux-004-install-fonts.sh.tmpl`             | `[automated]` | The same three font families into `~/.fonts`, then `fc-cache`.                                                                                                                                              |
 | 6    | `run_before_linux-005-export-private-key.sh.tmpl`             | `[automated]` | On every apply where a key is missing or differs: signs in with `op signin --account my` and writes the chezmoi age key to `~/.ssh/chezmoi`, on WSL the OmniRoute backup key, and the aisync key to `~/.config/aisync/key.txt` (only when it is missing). |
-| 7    | Managed files                                                 | `[automated]` | `.zshrc`, `.zshenv`, `.p10k.zsh`, `.tmux.conf`, `.gitconfig`, `.age_recipients`, `.docker/config.json`, `.config/ggshield`, the `ssh` and `ssh-add` wrappers in `~/.local/bin`, `.scripts/*`, `~/.claude.json` (MCP servers), and the decrypted `.kube`, `.histdb`, `.john`, `.sqlmap` and `.npmrc`. `.ssh/config` is Windows and Android only. |
-| 8    | `run_once_after_linux-001-extract-compressed-folders.sh`      | `[automated]` | Restores `~/.kube/config-files` from the `~/.kube/config-files.tar` the apply decrypts, and any other folder the folder watcher backs up as `<folder>.tar` (`.histdb`, `.john` and `.sqlmap` are deployed file by file, so they have none). A folder that already exists is left alone; one that fails to unpack fails the apply, which retries it. |
+| 7    | Managed files                                                 | `[automated]` | `.zshrc`, `.zshenv`, `.p10k.zsh`, `.tmux.conf`, `.gitconfig`, `.age_recipients`, `.docker/config.json`, `.config/ggshield`, the `ssh` and `ssh-add` wrappers in `~/.local/bin`, `.scripts/*`, `~/.claude.json` (MCP servers), Atuin's `.config/atuin/config.toml`, and the decrypted `.kube`, `.john`, `.sqlmap` and `.npmrc`. `.ssh/config` is Windows and Android only. |
+| 8    | `run_once_after_linux-001-extract-compressed-folders.sh`      | `[automated]` | Restores `~/.kube/config-files` from the `~/.kube/config-files.tar` the apply decrypts, and any other folder the folder watcher backs up as `<folder>.tar` (`.john` and `.sqlmap` are deployed file by file, so they have none). A folder that already exists is left alone; one that fails to unpack fails the apply, which retries it. |
 | 9    | `run_once_after_linux-002-clone-pentesting-tools.sh`          | `[automated]` | Clones VHostScan, dirsearch, StegCracker and stegbrute into `~/Development/Tools`.                                                                                                                           |
 | 10   | `run_after_linux-002-import-gpg-keys.sh.tmpl`                 | `[automated]` | Imports the GPG keys the device note references.                                                                                                                                                             |
 | 11   | `run_after_linux-004-install-ggshield-hook.sh`                | `[automated]` | Generates the global GitGuardian pre-commit hook; `core.hooksPath` in `.gitconfig` points at it.                                                                                                             |
@@ -254,6 +254,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | ggshield                                         | `install_ggshield`                   | `[automated]` | pipx; its auth config is rendered from 1Password by `dot_config/ggshield/private_auth_config.yaml.tmpl`.                         |
 | ruff                                             | `install_ruff`                       | `[automated]` | Astral install script.                                                                                                          |
 | yq                                               | `install_yq`                         | `[automated]` | mikefarah's release, pinned and SHA-256 checked, into `~/.local/bin`; Kali's apt `yq` is a different tool.                      |
+| Atuin (shell history)                            | `install_atuin`                      | `[partial]`   | The release tarball, pinned and SHA-256 checked, into `~/.local/bin`; `.zshrc` starts it. The account login and the one-time import of the zsh-histdb history are by hand (below). |
 | aisync                                           | `install_aisync`                     | `[automated]` | Installed here; `run_after_linux-014` clones aifiles and pulls it after every apply.                                            |
 | Atlassian CLI                                    | `install_acli`                       | `[automated]` |                                                                                                                                 |
 | Speedtest CLI                                    | `install_speedtest_cli`              | `[automated]` | Ookla apt repository.                                                                                                           |
@@ -270,7 +271,12 @@ exec zsh                                   # first zsh: ZINIT clones Powerlevel1
 claude                                     # /login, then: ccswitch enroll
 sentry auth login                          # device code entered at a URL; `--token <API token>` skips OAuth
 neon login                                 # browser flow; `NEON_API_KEY` or `neon profile create <name> --api-key -` (stdin) skips it
+atuin login -u <username>                  # the password and key from the `Atuin` item in 1Password
 ```
+
+Then import the zsh-histdb history once and run `atuin sync`. On `alien-a51`, which runs the Atuin
+server, that means starting the server and registering the account first, and importing only the
+laptop's own commands. [atuin-sync.md](atuin-sync.md) has the commands for each device.
 
 aisync needs nothing here: the apply fetched its key, cloned aifiles into `~/.config/aisync/repo`
 and pulled it, letting aifiles' copy win over what was there, which it backed up to an
@@ -291,7 +297,8 @@ gvm list && go version
 node --version && corepack --version
 pyenv version
 kubectl version --client && kubectl krew list
-command -v terra terraform terragrunt aws az gh sentry neon acli ruff ggshield aisync ccswitch flyctl oci bun
+command -v terra terraform terragrunt aws az gh sentry neon acli ruff ggshield aisync ccswitch flyctl oci bun atuin
+atuin status                               # logged in, and the last sync
 ls ~/.local/share/zsh/site-functions/_sentry
 fc-list | grep -i meslo
 git config --get core.hooksPath
@@ -344,7 +351,7 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 `make`, `wget`, `zsh`, `ncurses-utils`, `proot`, `proot-distro`, `clang`, `cmake`, `file`,
 `patchelf`, `htop`, `screenfetch`, `jq`, `yq`, `bat`, `ripgrep`, `silversearcher-ag`,
 `inotify-tools`, `dos2unix`, `expect`, `which`, `mlocate`, `openssh`, `netcat-openbsd`, `parallel`,
-`rsync`, `rclone`, `dnsutils`, `tmux`, `shellcheck`, `postgresql`, `ruff`, `golang`, `rust`,
+`rsync`, `rclone`, `dnsutils`, `tmux`, `atuin`, `shellcheck`, `postgresql`, `ruff`, `golang`, `rust`,
 `nodejs`, `python`, `python-pip`, `dart`.
 
 | Tool                                                              | Function                                                                          | Marker        | Notes                                                                                                                                                                                              |
@@ -369,9 +376,11 @@ Termux packages: `git`, `curl`, `zip`, `unzip`, `age`, `eza`, `sqlite`, `vim`, `
 
 ### After the apply `[manual]`
 
-Same `claude` and `sentry auth login` steps as Phase 4, minus `ccswitch` (Linux only), with
-Neon authenticated by an API key rather than the browser flow (`neon profile create <name> --api-key -`
-reads it from stdin). Then the Android settings
+Same `claude`, `sentry auth login` and `atuin login` steps as Phase 4, minus `ccswitch` (Linux
+only), with Neon authenticated by an API key rather than the browser flow
+(`neon profile create <name> --api-key -` reads it from stdin). Then import the phone's zsh-histdb
+history into Atuin under its device name, as [atuin-sync.md](atuin-sync.md) shows for Termux. Then
+the Android settings
 from the README's known issue on the Phantom Process Killer: **Developer Options > Disable child
 process restrictions**, Termux's battery usage set to Unrestricted, and optionally Termux:Boot with a
 `termux-wake-lock` start script. rclone for OneDrive has its own guide:

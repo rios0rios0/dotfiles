@@ -20,7 +20,7 @@ CLAUDE_CLIPBOARD_CONSUMED_FILE="$CLAUDE_CLIPBOARD_CACHE_DIR/consumed"
 # stdout so neither consumer pays for a command substitution: these run on
 # Termux, where the phantom-process budget makes avoidable forks expensive.
 clipboard_set_watch_dirs() {
-    if [ -n "${CLAUDE_CLIPBOARD_DIRS:-}" ]; then
+    if [[ -n "${CLAUDE_CLIPBOARD_DIRS:-}" ]]; then
         IFS=: read -r -a CLAUDE_CLIPBOARD_WATCH_DIRS <<<"$CLAUDE_CLIPBOARD_DIRS"
         return 0
     fi
@@ -39,11 +39,11 @@ clipboard_newest_image() {
     local dir cands=() line
     clipboard_set_watch_dirs
     for dir in "${CLAUDE_CLIPBOARD_WATCH_DIRS[@]}"; do
-        [ -d "$dir" ] || continue
+        [[ -d "$dir" ]] || continue
         cands+=("$dir"/*.png "$dir"/*.jpg "$dir"/*.jpeg "$dir"/*.webp "$dir"/*.gif)
     done
-    [ ${#cands[@]} -eq 0 ] && return 1
+    [[ ${#cands[@]} -eq 0 ]] && return 1
     line=$(stat -c '%Y %n' -- "${cands[@]}" 2>/dev/null | sort -rn | head -1)
-    [ -z "$line" ] && return 1
+    [[ -z "$line" ]] && return 1
     printf '%s\n' "$line"
 }

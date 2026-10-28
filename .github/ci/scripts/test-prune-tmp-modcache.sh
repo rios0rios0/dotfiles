@@ -16,7 +16,7 @@ CASE_INDEX=0
 
 echo "[test-prune-tmp-modcache] testing \$TMPDIR module cache pruning..." >&2
 
-if [ ! -f "$SCRIPT" ]; then
+if [[ ! -f "$SCRIPT" ]]; then
     echo "[test-prune-tmp-modcache] FAIL: script not found at $SCRIPT" >&2
     exit 1
 fi
@@ -33,7 +33,7 @@ check() {
     local description="$1"
     local condition="$2"
 
-    if [ "$condition" = "true" ]; then
+    if [[ "$condition" = "true" ]]; then
         pass "$description"
     else
         fail "$description"
@@ -62,7 +62,7 @@ new_case() {
 # --- the fixture must actually reproduce the failure it guards against --------
 new_case
 make_cache "$CASE_TMP/proj/.go"
-if rm -rf "$CASE_TMP/proj/.go/pkg/mod" 2>/dev/null && [ ! -d "$CASE_TMP/proj/.go/pkg/mod" ]; then
+if rm -rf "$CASE_TMP/proj/.go/pkg/mod" 2>/dev/null && [[ ! -d "$CASE_TMP/proj/.go/pkg/mod" ]]; then
     fail "fixture reproduces an undeletable cache (plain rm -rf should fail)"
 else
     pass "fixture reproduces an undeletable cache (plain rm -rf fails)"
@@ -80,9 +80,9 @@ else
     fail "exits 0 after pruning a cache"
 fi
 check "removes a read-only module cache under \$TMPDIR" \
-      "$([ ! -d "$CASE_TMP/proj/.go/pkg/mod" ] && echo true || echo false)"
+      "$([[ ! -d "$CASE_TMP/proj/.go/pkg/mod" ]] && echo true || echo false)"
 check "leaves a sibling bin/ untouched" \
-      "$([ -f "$CASE_TMP/proj/.go/bin/gotestsum" ] && echo true || echo false)"
+      "$([[ -f "$CASE_TMP/proj/.go/bin/gotestsum" ]] && echo true || echo false)"
 
 # --- refuses to delete the live cache ----------------------------------------
 new_case
@@ -90,7 +90,7 @@ make_cache "$CASE_TMP/live"
 
 if GOMODCACHE="$CASE_TMP/live/pkg/mod" TMPDIR="$CASE_TMP" bash "$SCRIPT" >/dev/null 2>&1; then
     check "refuses to remove the active \$GOMODCACHE" \
-          "$([ -d "$CASE_TMP/live/pkg/mod" ] && echo true || echo false)"
+          "$([[ -d "$CASE_TMP/live/pkg/mod" ]] && echo true || echo false)"
 else
     fail "refuses to remove the active \$GOMODCACHE (script errored)"
 fi
@@ -102,20 +102,20 @@ new_case
 make_cache "$CASE_TMP/live"
 GOMODCACHE="$CASE_TMP/live/pkg/mod/" TMPDIR="$CASE_TMP" bash "$SCRIPT" >/dev/null 2>&1 || true
 check "refuses when \$GOMODCACHE carries a trailing slash" \
-      "$([ -d "$CASE_TMP/live/pkg/mod" ] && echo true || echo false)"
+      "$([[ -d "$CASE_TMP/live/pkg/mod" ]] && echo true || echo false)"
 
 new_case
 make_cache "$CASE_TMP/live"
 ln -sfn "$CASE_TMP/live" "$CASE_TMP/live-link"
 GOMODCACHE="$CASE_TMP/live-link/pkg/mod" TMPDIR="$CASE_TMP" bash "$SCRIPT" >/dev/null 2>&1 || true
 check "refuses when \$GOMODCACHE reaches the cache through a symlink" \
-      "$([ -d "$CASE_TMP/live/pkg/mod" ] && echo true || echo false)"
+      "$([[ -d "$CASE_TMP/live/pkg/mod" ]] && echo true || echo false)"
 
 new_case
 make_cache "$CASE_TMP/live"
 GOMODCACHE="$CASE_TMP/live/pkg/mod/../mod" TMPDIR="$CASE_TMP" bash "$SCRIPT" >/dev/null 2>&1 || true
 check "refuses when \$GOMODCACHE contains a '..' component" \
-      "$([ -d "$CASE_TMP/live/pkg/mod" ] && echo true || echo false)"
+      "$([[ -d "$CASE_TMP/live/pkg/mod" ]] && echo true || echo false)"
 
 # --- does not escape $TMPDIR through a symlink -------------------------------
 new_case
@@ -125,13 +125,13 @@ ln -sfn "$CASE_DIR/outside" "$CASE_TMP/escape"
 
 TMPDIR="$CASE_TMP" bash "$SCRIPT" >/dev/null 2>&1 || true
 check "does not follow a symlink out of \$TMPDIR" \
-      "$([ -f "$CASE_DIR/outside/pkg/mod/precious.txt" ] && echo true || echo false)"
+      "$([[ -f "$CASE_DIR/outside/pkg/mod/precious.txt" ]] && echo true || echo false)"
 
 # --- quiet no-ops -------------------------------------------------------------
 new_case
 output=$(TMPDIR="$CASE_TMP" bash "$SCRIPT" 2>&1) && rc=0 || rc=$?
-check "exits 0 when there is nothing to prune" "$([ "$rc" -eq 0 ] && echo true || echo false)"
-check "stays silent when there is nothing to prune" "$([ -z "$output" ] && echo true || echo false)"
+check "exits 0 when there is nothing to prune" "$([[ "$rc" -eq 0 ]] && echo true || echo false)"
+check "stays silent when there is nothing to prune" "$([[ -z "$output" ]] && echo true || echo false)"
 
 new_case
 if TMPDIR="$CASE_DIR/does-not-exist" bash "$SCRIPT" >/dev/null 2>&1; then
@@ -140,7 +140,7 @@ else
     fail "exits 0 when \$TMPDIR does not exist"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-prune-tmp-modcache] all module cache pruning tests passed" >&2
 fi
 

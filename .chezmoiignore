@@ -98,7 +98,6 @@ AppData
 .local/share/jetbrains-themes
 .config/ggshield
 .docker
-.histdb
 .john
 .kube
 .local/bin/ssh
@@ -114,6 +113,7 @@ pyvenv.cfg
 {{- /* Files shared between Linux and Android.
      They are only needed on these systems, so ignore them on all others (i.e. on Windows). */ -}}
 {{- if not (or (eq .chezmoi.os "linux") (eq .chezmoi.os "android")) }}
+.config/atuin
 .local/bin/op
 .scripts
 .p10k.zsh

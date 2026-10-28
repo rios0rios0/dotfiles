@@ -40,7 +40,8 @@ BASH_BIN="$(type -P bash)"
 # --- the version comparison ----------------------------------------------------------------------
 
 at_least() {
-    bash -c 'source "$1"; sentry_cli_version_at_least "$2" "$3" && echo yes || echo no' _ "$LIB" "$1" "$2"
+    local have="$1" want="$2"
+    bash -c 'source "$1"; sentry_cli_version_at_least "$2" "$3" && echo yes || echo no' _ "$LIB" "$have" "$want"
 }
 check "the floor itself is enough" "yes" "$(at_least 0.47.0 0.47.0)"
 check "a newer patch is enough" "yes" "$(at_least 0.47.1 0.47.0)"
@@ -79,12 +80,13 @@ EOF
 # through the globals $CASE_STUB and $CASE_HOME rather than stdout, since a command substitution
 # would run the counter in a subshell and hand every case the same directory.
 new_case() {
+    local version="$1"
     CASE_INDEX=$((CASE_INDEX + 1))
     CASE_STUB="$TMP/case-$CASE_INDEX"
     CASE_HOME="$CASE_STUB/home"
     mkdir -p "$CASE_HOME"
     : > "$CASE_STUB/calls"
-    [[ -z "$1" ]] || echo "$1" > "$CASE_STUB/version"
+    [[ -z "$version" ]] || echo "$version" > "$CASE_STUB/version"
 }
 
 # Runs a rendered setup script in the current case: `run_case <script> <path-dir> [VAR=value...]`.
@@ -101,8 +103,10 @@ run_case() {
 # Both at once, for the cases that need nothing in between: `run_setup <script> <path-dir> <version>
 # [VAR=value...]`
 run_setup() {
-    new_case "$3"
-    run_case "$1" "$2" "${@:4}"
+    local script="$1" path_dir="$2" version="$3"
+    shift 3
+    new_case "$version"
+    run_case "$script" "$path_dir" "$@"
 }
 
 for platform in linux-007 android-006; do

@@ -90,7 +90,10 @@ export OMNIROUTE_COMPOSE="$COMPOSE"
 touch "$FAKE_DOCKER_LOG"
 touch "$FAKE_GH_LOG"
 
-image_line_of() { grep -E '^[[:space:]]*image:' "$1"; }
+image_line_of() {
+    local compose="$1"
+    grep -E '^[[:space:]]*image:' "$compose"
+}
 image_line() { image_line_of "$COMPOSE"; }
 checksum() { cksum "$COMPOSE"; }
 

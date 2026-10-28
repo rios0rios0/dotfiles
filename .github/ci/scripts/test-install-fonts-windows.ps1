@@ -58,6 +58,14 @@ function Register-Font {
     $script:registered += , "$Name=$Path"
 }
 
+# Prints a case's outcome under the suite's prefix. Write-Host belongs in a Show- function, as
+# PSScriptAnalyzer's PSAvoidUsingWriteHost puts it, so Invoke-TestCase leaves the printing here.
+function Show-TestResult {
+    param([string]$Message)
+
+    Write-Host "[test-install-fonts-windows] $Message"
+}
+
 function Invoke-TestCase {
     param([string]$Description, [scriptblock]$Body)
 
@@ -70,10 +78,10 @@ function Invoke-TestCase {
     New-Item -ItemType Directory -Path $systemFonts -Force | Out-Null
     try {
         & $Body
-        Write-Host "[test-install-fonts-windows] PASS: $Description"
+        Show-TestResult "PASS: $Description"
     }
     catch {
-        Write-Host "[test-install-fonts-windows] FAIL: $Description -- $_"
+        Show-TestResult "FAIL: $Description -- $_"
         $script:failures++
     }
 }

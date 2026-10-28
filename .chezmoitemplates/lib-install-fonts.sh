@@ -24,41 +24,41 @@ resolve_nerd_fonts_version() {
 
 # Install a Nerd Font zip by name (e.g. "FiraCode", "Meslo")
 install_nerd_font_zip() {
-    local NAME="$1"
-    local VERSION="$2"
-    local FONT_DIR="$3"
-    mkdir -p "$FONT_DIR"
+    local name="$1"
+    local version="$2"
+    local font_dir="$3"
+    mkdir -p "$font_dir"
 
-    echo "[fonts] installing $NAME Nerd Font ($VERSION)..." >&2
-    local TEMP_DIR
-    TEMP_DIR="$(mktemp -d)"
+    echo "[fonts] installing $name Nerd Font ($version)..." >&2
+    local temp_dir
+    temp_dir="$(mktemp -d)"
 
-    download_https_only -o "$TEMP_DIR/$NAME.zip" "$NERD_FONTS_BASE_URL/$VERSION/$NAME.zip"
-    unzip -o "$TEMP_DIR/$NAME.zip" "*.ttf" -d "$TEMP_DIR/$NAME"
-    find "$TEMP_DIR/$NAME" -name "*.ttf" -exec cp {} "$FONT_DIR/" \;
-    rm -rf "$TEMP_DIR"
+    download_https_only -o "$temp_dir/$name.zip" "$NERD_FONTS_BASE_URL/$version/$name.zip"
+    unzip -o "$temp_dir/$name.zip" "*.ttf" -d "$temp_dir/$name"
+    find "$temp_dir/$name" -name "*.ttf" -exec cp {} "$font_dir/" \;
+    rm -rf "$temp_dir"
 }
 
 # MesloLGS NF - Nerd Font for Powerlevel10k (https://github.com/romkatv/powerlevel10k#fonts)
 install_meslo_lgs_nf() {
     echo "[fonts] installing MesloLGS NF fonts..." >&2
-    local FONT_DIR="$1"
-    mkdir -p "$FONT_DIR"
+    local font_dir="$1"
+    mkdir -p "$font_dir"
 
     for file in "${MESLO_LGS_FILES[@]}"; do
-        download_https_only -o "$FONT_DIR/$(printf '%b' "${file//%/\\x}")" "$MESLO_BASE_URL/$file"
+        download_https_only -o "$font_dir/$(printf '%b' "${file//%/\\x}")" "$MESLO_BASE_URL/$file"
     done
 }
 
 # Main entry point – call with the target font base directory.
 install_fonts() {
-    local FONT_BASE="$1"
+    local font_base="$1"
 
-    local NERD_FONTS_VERSION
-    NERD_FONTS_VERSION="$(resolve_nerd_fonts_version)"
+    local nerd_fonts_version
+    nerd_fonts_version="$(resolve_nerd_fonts_version)"
 
-    install_nerd_font_zip "FiraCode" "$NERD_FONTS_VERSION" "$FONT_BASE/FiraCode"
-    install_nerd_font_zip "Meslo"    "$NERD_FONTS_VERSION" "$FONT_BASE/Meslo"
-    install_meslo_lgs_nf "$FONT_BASE/MesloLGS NF"
+    install_nerd_font_zip "FiraCode" "$nerd_fonts_version" "$font_base/FiraCode"
+    install_nerd_font_zip "Meslo"    "$nerd_fonts_version" "$font_base/Meslo"
+    install_meslo_lgs_nf "$font_base/MesloLGS NF"
 }
 # =========================================================================================================

@@ -44,8 +44,8 @@ BARE_METAL='{"chezmoi":{"os":"linux","kernel":{"osrelease":"6.8.0-45-generic","v
 
 # render <on|off> <source file> [override JSON]
 render() {
-    local override="${3:-}"
-    sed "s|stat \"/run/systemd/system\"|stat \"$TMP/systemd-$1\"|g" "$2" |
+    local state="$1" template="$2" override="${3:-}"
+    sed "s|stat \"/run/systemd/system\"|stat \"$TMP/systemd-$state\"|g" "$template" |
         PATH="$TMP/bin" chezmoi execute-template --config "$TMP/chezmoi.yaml" \
             ${override:+--override-data "$override"}
 }
@@ -124,7 +124,8 @@ run_script() {
 
 # conf_is <expected content, printf %b>
 conf_is() {
-    printf '%b' "$1" | cmp -s - "$TMP/wsl.conf"
+    local expected="$1"
+    printf '%b' "$expected" | cmp -s - "$TMP/wsl.conf"
 }
 
 # given a distribution with no /etc/wsl.conf, as Kali's WSL image ships
@@ -249,7 +250,7 @@ done < <(grep -l 'systemctl' "$REPO_ROOT"/.chezmoiscripts/run_once_* "$REPO_ROOT
 
 [[ "$checked" -ge 3 ]] || fail "expected the bridge, Ollama and Tailscale installers among the scripts calling systemctl, found $checked"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-wsl-systemd] all systemd-on-WSL tests passed" >&2
 fi
 

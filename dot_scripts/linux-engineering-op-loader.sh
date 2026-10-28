@@ -122,6 +122,7 @@ _op_read_cache_names() {
     # _OP_* are the loader's own bookkeeping variables, not loaded entries
     case "$_cn_name" in
       "" | _OP_*) continue ;;
+      *) ;;
     esac
     _OP_CACHE_NAMES="${_OP_CACHE_NAMES:+$_OP_CACHE_NAMES }$_cn_name"
   done < "$_cn_file"
@@ -171,9 +172,12 @@ _op_prune_removed() {
 
 # Prune callbacks, kept here so .zshenv can reuse them without redefining them.
 _op_forget_variable() {
-  unset "$1"
+  # A prefixed local: one named like the variable it forgets would be what `unset` removed.
+  local _op_forget_name="$1"
+  unset "$_op_forget_name"
 }
 
 _op_forget_alias() {
-  unalias "$1" 2>/dev/null || true
+  local _op_forget_name="$1"
+  unalias "$_op_forget_name" 2>/dev/null || true
 }

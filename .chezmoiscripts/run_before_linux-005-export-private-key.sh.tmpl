@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Puts the age keys this machine needs in place, from 1Password, before any file is applied:
-#   ~/.ssh/chezmoi                decrypts every encrypted_*.age file (.kube, .histdb, .npmrc...)
+#   ~/.ssh/chezmoi                decrypts every encrypted_*.age file (.kube, .john, .npmrc...)
 #   ~/.ssh/omniroute-backup-key   encrypts the OmniRoute backups; WSL only, where they run
 #   ~/.config/aisync/key.txt      decrypts aifiles, which run_after_linux-014 syncs through aisync
 # .chezmoidata/age-keys.yaml names each item and each key's public half; see CLAUDE.md, "Age Keys".

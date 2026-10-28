@@ -9,6 +9,14 @@ EXIT_CODE=0
 # files, each named once here so a rename lands in every row at the same time.
 WSL_KERNEL="6.18.33.2-microsoft-standard-WSL2"
 WINDOWS_OS="windows"
+LINUX_OS="linux"
+ANDROID_OS="android"
+METAL_KERNEL="6.11.0-generic"
+BRIDGE_UNIT="ssh-agent-bridge"
+OLLAMA_UNIT="ollama.service"
+SYSTEMD_DIR=".config/systemd"
+TAILSCALE_UP=".local/bin/tailscale-up"
+TAILSCALE_WRAPPER=".local/bin/tailscale"
 BACKUP_SCRIPT=".local/bin/omniroute-backup"
 BACKUP_SERVICE=".config/systemd/user/omniroute-backup.service"
 BACKUP_TIMER=".config/systemd/user/omniroute-backup.timer"
@@ -49,13 +57,18 @@ check_platform() {
     local label
 
     while [[ $# -gt 0 ]]; do
-        case "$1" in
+        local option="$1"
+        case "$option" in
             --ignore) shift; must_ignore+=("$1") ;;
             --include) shift; must_include+=("$1") ;;
             --ignore-line) shift; must_ignore_line+=("$1") ;;
             --include-line) shift; must_include_line+=("$1") ;;
             --kernel) shift; kernel="$1" ;;
             --gpu) gpu="gpu" ;;
+            *)
+                echo "[test-chezmoiignore] FAIL: check_platform does not know the option '$option'" >&2
+                EXIT_CODE=1
+                ;;
         esac
         shift
     done
@@ -119,7 +132,7 @@ check_platform() {
 }
 
 # Linux assertions
-check_platform "linux" \
+check_platform "$LINUX_OS" \
     --ignore "android-*.sh" \
     --ignore "windows-*.ps1" \
     --ignore ".termux" \
@@ -134,7 +147,7 @@ check_platform "$WINDOWS_OS" \
     --include "AppData"
 
 # Android assertions
-check_platform "android" \
+check_platform "$ANDROID_OS" \
     --ignore "windows-*.ps1" \
     --ignore "linux-*.sh" \
     --include ".termux" \
@@ -144,7 +157,7 @@ check_platform "android" \
 # nothing else there; Android keeps the trust dialog and gets no status line. Windows, where
 # Claude Code is no longer installed, gets neither ~/.claude nor ~/.claude.json. The AI content
 # of ~/.claude (CLAUDE.md, rules, agents, commands, skills) is aisync's, not chezmoi's.
-check_platform "linux" \
+check_platform "$LINUX_OS" \
     --include-line ".claude" \
     --include-line ".claude.json" \
     --include ".claude/settings.json" \
@@ -155,7 +168,7 @@ check_platform "$WINDOWS_OS" \
     --ignore-line ".claude" \
     --ignore-line ".claude.json"
 
-check_platform "android" \
+check_platform "$ANDROID_OS" \
     --include-line ".claude" \
     --include-line ".claude.json" \
     --include ".claude/settings.json" \
@@ -164,117 +177,123 @@ check_platform "android" \
 
 # WSL's settings live in Windows' %UserProfile%\.wslconfig, so only Windows gets the file.
 check_platform "$WINDOWS_OS" --include-line ".wslconfig"
-check_platform "linux" --ignore-line ".wslconfig"
-check_platform "android" --ignore-line ".wslconfig"
+check_platform "$LINUX_OS" --ignore-line ".wslconfig"
+check_platform "$ANDROID_OS" --ignore-line ".wslconfig"
 
 # PowerShell 7's profile, which Windows Terminal dot-sources; on Linux the same path is pwsh's own
 # profile, and nothing here installs pwsh there.
 check_platform "$WINDOWS_OS" --include-line ".config/powershell"
-check_platform "linux" --ignore-line ".config/powershell"
-check_platform "android" --ignore-line ".config/powershell"
+check_platform "$LINUX_OS" --ignore-line ".config/powershell"
+check_platform "$ANDROID_OS" --ignore-line ".config/powershell"
 
 # The JetBrains themes are staged for the one script that fans them out, on Linux; Windows lost
 # its counterpart with the Toolbox, and Android never had one.
-check_platform "linux" --include ".local/share/jetbrains-themes"
+check_platform "$LINUX_OS" --include ".local/share/jetbrains-themes"
 check_platform "$WINDOWS_OS" --ignore-line ".local/share/jetbrains-themes"
-check_platform "android" --ignore-line ".local/share/jetbrains-themes"
+check_platform "$ANDROID_OS" --ignore-line ".local/share/jetbrains-themes"
 
 # ggshield's pre-commit hook is wired on Linux alone, and so is the ~/.config/git/ignore that
 # answers its `git check-ignore` (ggshield runs git without the global config, so
 # `core.excludesFile` never reaches it).
-check_platform "linux" --include-line ".config/git/ignore"
+check_platform "$LINUX_OS" --include-line ".config/git/ignore"
 check_platform "$WINDOWS_OS" --ignore-line ".config/git/ignore"
-check_platform "android" --ignore-line ".config/git/ignore"
+check_platform "$ANDROID_OS" --ignore-line ".config/git/ignore"
 
 # Git checks commit signatures against an allowed-signers file. .ssh is not deployed on Linux, so
 # Linux gets its copy beside .config/git/ignore, and Windows and Android read the one in .ssh.
-check_platform "linux" --include-line ".config/git/allowed_signers"
+check_platform "$LINUX_OS" --include-line ".config/git/allowed_signers"
 check_platform "$WINDOWS_OS" --ignore-line ".config/git/allowed_signers"
-check_platform "android" --ignore-line ".config/git/allowed_signers"
+check_platform "$ANDROID_OS" --ignore-line ".config/git/allowed_signers"
+
+# Atuin's client config: every zsh records its history through Atuin, on Linux and Termux alike;
+# Windows runs no zsh.
+check_platform "$LINUX_OS" --include-line ".config/atuin"
+check_platform "$ANDROID_OS" --include-line ".config/atuin"
+check_platform "$WINDOWS_OS" --ignore-line ".config/atuin"
 
 # aisync's exclusions keep aifiles' Linux/WSL copies of three files off the phone; everywhere else
 # ~/.config/aisync is aisync's own, so chezmoi must not create or own it.
-check_platform "android" --include-line ".config/aisync"
-check_platform "linux" --ignore-line ".config/aisync"
+check_platform "$ANDROID_OS" --include-line ".config/aisync"
+check_platform "$LINUX_OS" --ignore-line ".config/aisync"
 check_platform "$WINDOWS_OS" --ignore-line ".config/aisync"
 
 # WSL vs bare-metal Linux. The SSH agent bridge relays a Windows named pipe, so it must ship
 # on WSL and nowhere else -- on bare metal its unit would point at an npiperelay.exe that is
 # never installed. The only signal separating the two is the kernel release string.
-check_platform "linux" --kernel "$WSL_KERNEL" \
-    --include "ssh-agent-bridge" \
-    --include-line ".config/systemd"
+check_platform "$LINUX_OS" --kernel "$WSL_KERNEL" \
+    --include "$BRIDGE_UNIT" \
+    --include-line "$SYSTEMD_DIR"
 
-check_platform "linux" --kernel "6.11.0-generic" \
-    --ignore "ssh-agent-bridge" \
-    --ignore-line ".config/systemd"
+check_platform "$LINUX_OS" --kernel "$METAL_KERNEL" \
+    --ignore "$BRIDGE_UNIT" \
+    --ignore-line "$SYSTEMD_DIR"
 
 # The bridge is Linux-only regardless of kernel: the other platforms either are Windows
 # already or have no Windows agent to reach.
 check_platform "$WINDOWS_OS" --kernel "$WSL_KERNEL" \
-    --ignore-line ".config/systemd"
+    --ignore-line "$SYSTEMD_DIR"
 
-check_platform "android" --kernel "$WSL_KERNEL" \
-    --ignore-line ".config/systemd"
+check_platform "$ANDROID_OS" --kernel "$WSL_KERNEL" \
+    --ignore-line "$SYSTEMD_DIR"
 
 # The local model server (Ollama) ships wherever Linux has an NVIDIA driver, WSL or bare metal, and
 # nowhere else. A machine without the bridge still needs .config/systemd for the Ollama unit.
-check_platform "linux" --kernel "6.11.0-generic" --gpu \
-    --ignore "ssh-agent-bridge" \
-    --include "ollama.service" \
-    --include-line ".config/systemd"
+check_platform "$LINUX_OS" --kernel "$METAL_KERNEL" --gpu \
+    --ignore "$BRIDGE_UNIT" \
+    --include "$OLLAMA_UNIT" \
+    --include-line "$SYSTEMD_DIR"
 
-check_platform "linux" --kernel "$WSL_KERNEL" --gpu \
-    --include "ssh-agent-bridge" \
-    --include "ollama.service"
+check_platform "$LINUX_OS" --kernel "$WSL_KERNEL" --gpu \
+    --include "$BRIDGE_UNIT" \
+    --include "$OLLAMA_UNIT"
 
-check_platform "linux" --kernel "$WSL_KERNEL" \
-    --ignore "ollama.service"
+check_platform "$LINUX_OS" --kernel "$WSL_KERNEL" \
+    --ignore "$OLLAMA_UNIT"
 
 # A Windows machine with an NVIDIA card has nvidia-smi on PATH as well, so the OS check, not the
 # driver, has to keep the Linux unit off it.
 check_platform "$WINDOWS_OS" --gpu \
-    --ignore "ollama.service" \
-    --ignore-line ".config/systemd"
+    --ignore "$OLLAMA_UNIT" \
+    --ignore-line "$SYSTEMD_DIR"
 
 # The OmniRoute stack runs from the dotfiles checkout, where its .env lives; chezmoi deploys none
 # of it, on any platform.
-check_platform "linux" --kernel "$WSL_KERNEL" --gpu \
+check_platform "$LINUX_OS" --kernel "$WSL_KERNEL" --gpu \
     --ignore-line "local-services"
 
 check_platform "$WINDOWS_OS" \
     --ignore-line "local-services"
 
-check_platform "android" \
+check_platform "$ANDROID_OS" \
     --ignore-line "local-services"
 
 # Tailscale reaches every Linux machine, GPU or not. The tailscale wrapper runs Windows' CLI, which
 # is WSL's client, so it ships to WSL alone: on bare metal it would shadow tailscaled's own CLI.
-check_platform "linux" --kernel "6.11.0-generic" \
-    --include-line ".local/bin/tailscale-up" \
-    --ignore-line ".local/bin/tailscale"
+check_platform "$LINUX_OS" --kernel "$METAL_KERNEL" \
+    --include-line "$TAILSCALE_UP" \
+    --ignore-line "$TAILSCALE_WRAPPER"
 
-check_platform "linux" --kernel "$WSL_KERNEL" --gpu \
-    --include-line ".local/bin/tailscale-up" \
-    --include-line ".local/bin/tailscale"
+check_platform "$LINUX_OS" --kernel "$WSL_KERNEL" --gpu \
+    --include-line "$TAILSCALE_UP" \
+    --include-line "$TAILSCALE_WRAPPER"
 
 check_platform "$WINDOWS_OS" --gpu \
-    --ignore-line ".local/bin/tailscale-up" \
-    --ignore-line ".local/bin/tailscale"
+    --ignore-line "$TAILSCALE_UP" \
+    --ignore-line "$TAILSCALE_WRAPPER"
 
-check_platform "android" \
-    --ignore-line ".local/bin/tailscale-up" \
-    --ignore-line ".local/bin/tailscale"
+check_platform "$ANDROID_OS" \
+    --ignore-line "$TAILSCALE_UP" \
+    --ignore-line "$TAILSCALE_WRAPPER"
 
 # The OmniRoute backups and their restore serve the local stack, which runs from the dotfiles
 # checkout on WSL alone; both scripts and both units ship there and nowhere else.
-check_platform "linux" --kernel "6.11.0-generic" \
+check_platform "$LINUX_OS" --kernel "$METAL_KERNEL" \
     --ignore-line "$BACKUP_SCRIPT" \
     --ignore-line "$BACKUP_SERVICE" \
     --ignore-line "$BACKUP_TIMER" \
     --ignore-line "$RESTORE_SCRIPT"
 
-check_platform "linux" --kernel "$WSL_KERNEL" \
+check_platform "$LINUX_OS" --kernel "$WSL_KERNEL" \
     --include-line "$BACKUP_SCRIPT" \
     --include-line "$BACKUP_SERVICE" \
     --include-line "$BACKUP_TIMER" \
@@ -286,13 +305,13 @@ check_platform "$WINDOWS_OS" \
     --ignore-line "$BACKUP_TIMER" \
     --ignore-line "$RESTORE_SCRIPT"
 
-check_platform "android" \
+check_platform "$ANDROID_OS" \
     --ignore-line "$BACKUP_SCRIPT" \
     --ignore-line "$BACKUP_SERVICE" \
     --ignore-line "$BACKUP_TIMER" \
     --ignore-line "$RESTORE_SCRIPT"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-chezmoiignore] all platform logic tests passed" >&2
 fi
 

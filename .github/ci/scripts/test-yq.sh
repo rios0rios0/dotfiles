@@ -32,8 +32,9 @@ fi
 # The fabricated releases: one that reports the pinned version, one an older version, and one
 # whose bytes the pin does not cover.
 fake_yq() {
-    printf '#!/bin/bash\necho "yq (https://github.com/mikefarah/yq/) version v%s"\n' "$1" >"$2"
-    chmod +x "$2"
+    local version="$1" path="$2"
+    printf '#!/bin/bash\necho "yq (https://github.com/mikefarah/yq/) version v%s"\n' "$version" >"$path"
+    chmod +x "$path"
 }
 fake_yq "$VERSION" "$TMP/release"
 fake_yq "4.0.0" "$TMP/older"
@@ -86,7 +87,7 @@ installed_version() { "$HOME/.local/bin/yq" --version 2>/dev/null; }
 # when install_yq runs
 # then the pinned release is downloaded, verified and installed anyway
 run_install "$TMP/release"
-if [ "$(rc)" -eq 0 ] && [ "$(curl_calls)" -eq 1 ] &&
+if [[ "$(rc)" -eq 0 ]] && [[ "$(curl_calls)" -eq 1 ]] &&
     grep -qF "mikefarah/yq/releases/download/v$VERSION/yq_linux_" "$CURL_CALLS" &&
     [[ "$(installed_version)" == *"version v$VERSION" ]]; then
     pass "the Python yq on PATH does not stop the install of $VERSION"
@@ -98,7 +99,7 @@ fi
 # when install_yq runs again
 # then nothing is downloaded and the skip says why
 run_install "$TMP/release"
-if [ "$(rc)" -eq 0 ] && [ "$(curl_calls)" -eq 0 ] && grep -q "already installed, skipping" "$TMP/out"; then
+if [[ "$(rc)" -eq 0 ]] && [[ "$(curl_calls)" -eq 0 ]] && grep -q "already installed, skipping" "$TMP/out"; then
     pass "the pinned version is skipped"
 else
     fail "the pinned version was not skipped: rc=$(rc), $(cat "$TMP/out")"
@@ -109,7 +110,7 @@ fi
 # then it is replaced
 cp "$TMP/older" "$HOME/.local/bin/yq"
 run_install "$TMP/release"
-if [ "$(rc)" -eq 0 ] && [ "$(curl_calls)" -eq 1 ] && [[ "$(installed_version)" == *"version v$VERSION" ]]; then
+if [[ "$(rc)" -eq 0 ]] && [[ "$(curl_calls)" -eq 1 ]] && [[ "$(installed_version)" == *"version v$VERSION" ]]; then
     pass "an older yq is replaced by the pinned one"
 else
     fail "an older yq was not replaced: rc=$(rc), $(installed_version)"
@@ -120,7 +121,7 @@ fi
 # then it fails and installs nothing
 rm -f "$HOME/.local/bin/yq"
 run_install "$TMP/tampered"
-if [ "$(rc)" -ne 0 ] && [ ! -e "$HOME/.local/bin/yq" ] && grep -q "does not match its pinned SHA-256" "$TMP/out"; then
+if [[ "$(rc)" -ne 0 ]] && [[ ! -e "$HOME/.local/bin/yq" ]] && grep -q "does not match its pinned SHA-256" "$TMP/out"; then
     pass "a download that does not match the pin fails and installs nothing"
 else
     fail "a mismatched download: rc=$(rc), $(cat "$TMP/out")"
@@ -132,7 +133,7 @@ fi
 export CURL_FAIL=1
 run_install "$TMP/release"
 unset CURL_FAIL
-if [ "$(rc)" -ne 0 ] && [ ! -e "$HOME/.local/bin/yq" ] && grep -q "failed to download yq" "$TMP/out"; then
+if [[ "$(rc)" -ne 0 ]] && [[ ! -e "$HOME/.local/bin/yq" ]] && grep -q "failed to download yq" "$TMP/out"; then
     pass "a failed download fails the install"
 else
     fail "a failed download: rc=$(rc), $(cat "$TMP/out")"
@@ -157,7 +158,7 @@ else
     fail "the Linux removal script does not tombstone apt:yq"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-yq] all yq install tests passed" >&2
 fi
 exit "$EXIT_CODE"

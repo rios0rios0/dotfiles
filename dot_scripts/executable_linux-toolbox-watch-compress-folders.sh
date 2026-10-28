@@ -20,8 +20,9 @@ PID_FILE="/tmp/linux-toolbox-watch-compress-folders.pid"
 DEBOUNCE_TIME=5
 MAX_LOG_AGE_SECONDS=86400  # 1 day in seconds
 
+# ~/.histdb is not here: Atuin syncs the shell history now (CLAUDE.md, "Shell History (Atuin)"), and
+# archiving it after every command put a new 9 MB snapshot in the chezmoi source each time.
 WATCH_DIRS=(
-  "$HOME/.histdb"
   "$HOME/.john"
   "$HOME/.kube/config-files"
   "$HOME/.sqlmap"

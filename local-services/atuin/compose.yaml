@@ -1,0 +1,39 @@
+# Atuin's sync server, for the shell history of every device: see .docs/atuin-sync.md and CLAUDE.md,
+# "Shell History (Atuin)". It runs on the device .chezmoidata/atuin.yaml names as `serverDevice`,
+# from the checkout -- local-services is not deployed by chezmoi:
+#
+#   docker compose -f local-services/atuin/compose.yaml up -d
+#
+# and that device's tailscale-up shares its port with the tailnet. Each client encrypts its history
+# before sending it, so the database holds ciphertext. Atuin servers never sync with each other:
+# this is the only one.
+name: 'atuin'
+
+services:
+  atuin:
+    # The 18.24.2 release, pinned by digest: the version the Linux installer pins for the client
+    # (`install_atuin`), and the one Termux packages. Bump them together.
+    image: 'ghcr.io/atuinsh/atuin:18.24.2@sha256:d739b1f19ffee44f05c681cd3f9262d90e2da0ff51b15f23661a8d29f2d3f3c2'
+    command: ['start']
+    restart: 'always'
+    cap_drop: ['ALL']
+    security_opt: ['no-new-privileges:true']
+    environment:
+      # Every interface inside the container; the published port binds the host's loopback alone,
+      # and only tailscale serve forwards the tailnet to it.
+      ATUIN_HOST: '0.0.0.0'
+      # `port` in .chezmoidata/atuin.yaml, which the clients and tailscale-up read.
+      ATUIN_PORT: '8888'
+      # SQLite in the volume, not the Postgres of upstream's example: one user, a handful of devices.
+      ATUIN_DB_URI: 'sqlite:///config/atuin.db'
+      # Closed except while the account is registered: `ATUIN_OPEN_REGISTRATION=true docker compose
+      # ... up -d`, `atuin register`, then `up -d` once more without it (.docs/atuin-sync.md).
+      ATUIN_OPEN_REGISTRATION: "${ATUIN_OPEN_REGISTRATION:-false}"
+    ports:
+      - '127.0.0.1:8888:8888'
+    volumes:
+      # The image creates /config owned by its `atuin` user, which a new named volume inherits.
+      - 'atuin-config:/config'
+
+volumes:
+  atuin-config:

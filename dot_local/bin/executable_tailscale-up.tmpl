@@ -1,6 +1,7 @@
 {{- $llm := includeTemplate "lib-local-llm.tmpl" . | fromJson -}}
 {{- $oc := includeTemplate "lib-opencode.tmpl" . | fromJson -}}
-{{- $wsl := and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
+{{- $atuin := includeTemplate "lib-atuin.tmpl" . | fromJson -}}
+{{- $wsl :=and (eq .chezmoi.os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
 #!/bin/bash
 
 # tailscale-up: put this machine on the tailnet and keep it there. See CLAUDE.md, "Tailscale".
@@ -19,7 +20,8 @@
 # client is a service that starts with Windows and rejoins by itself, and its app owns the login,
 # so nothing here waits for a browser, needs root, or runs in every shell. What is left to do here
 # is sharing, on the tailnet, this machine's Ollama (.chezmoidata/local-llm.yaml) and the ocode web
-# UI (.chezmoidata/opencode.yaml), when those say so.
+# UI (.chezmoidata/opencode.yaml), when those say so, and the Atuin sync server on the one device
+# that runs it (.chezmoidata/atuin.yaml).
 {{- else }}
 #
 #   tailscale-up             starts tailscaled if it is off; logs in if needed, printing the login
@@ -42,7 +44,8 @@
 #         Peers are reached by address instead: `tailscale ip -4 <name>`, or
 #         `tailscale status --json`.
 #   - sharing, on the tailnet, this machine's Ollama (.chezmoidata/local-llm.yaml) and the ocode web
-#     UI (.chezmoidata/opencode.yaml), when those say so.
+#     UI (.chezmoidata/opencode.yaml), when those say so, and the Atuin sync server on the one
+#     device that runs it (.chezmoidata/atuin.yaml).
 {{- end }}
 
 set -euo pipefail
@@ -194,7 +197,7 @@ fi
 tailscale set "${prefs[@]}" 2>/dev/null || sudo tailscale set "${prefs[@]}"
 {{- end }}
 {{- $share_ollama := and $llm.enabled $llm.shareOnTailnet -}}
-{{- if or $share_ollama $oc.shareOnTailnet }}
+{{- if or $share_ollama $oc.shareOnTailnet $atuin.isServer }}
 
 # What this machine shares on the tailnet: forwards the client keeps in its own state, so they come
 # back with the service. Each is set here when it is missing or forwards anywhere else, as the one
@@ -250,6 +253,30 @@ if [[ "$(jq -r '.TCP["{{ $oc.webPort }}"].TCPForward // empty' <<<"$serve_json" 
         sudo tailscale serve --bg --tcp={{ $oc.webPort }} "tcp://$ocode_target" >/dev/null
 {{- end }}
     echo "[$prefix] sharing the ocode web UI with the tailnet on port {{ $oc.webPort }}" >&2
+fi
+{{- end }}
+{{- if $atuin.isServer }}
+
+# The Atuin sync server, on the tailnet's port {{ $atuin.port }}: where every other device syncs its
+# shell history. Docker publishes it on this machine's loopback alone{{ if $wsl }} -- Docker Desktop's
+# is Windows' --{{ end }} so the tailnet is the only way in from elsewhere. Until
+# `docker compose -f local-services/atuin/compose.yaml up -d` has started it once, the share
+# forwards to nothing.
+{{- if $wsl }}
+atuin_target="localhost:{{ $atuin.port }}"
+{{- else }}
+atuin_target="127.0.0.1:{{ $atuin.port }}"
+{{- end }}
+
+if [[ "$(jq -r '.TCP["{{ $atuin.port }}"].TCPForward // empty' <<<"$serve_json" 2>/dev/null)" != "$atuin_target" ]]; then
+{{- if $wsl }}
+    tailscale serve --bg --tcp={{ $atuin.port }} "tcp://$atuin_target" >/dev/null ||
+        stop "could not share the Atuin sync server through Windows' Tailscale client"
+{{- else }}
+    tailscale serve --bg --tcp={{ $atuin.port }} "tcp://$atuin_target" >/dev/null 2>&1 ||
+        sudo tailscale serve --bg --tcp={{ $atuin.port }} "tcp://$atuin_target" >/dev/null
+{{- end }}
+    echo "[$prefix] sharing the Atuin sync server with the tailnet on port {{ $atuin.port }}" >&2
 fi
 {{- end }}
 {{- end }}

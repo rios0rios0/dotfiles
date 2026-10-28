@@ -46,10 +46,11 @@ _aifiles_version() {
 
 # _aifiles_at_least <version> <minimum>
 _aifiles_at_least() {
+    local have_version="$1" want_version="$2"
     local -a have want
     local i
-    IFS=. read -r -a have <<<"$1"
-    IFS=. read -r -a want <<<"$2"
+    IFS=. read -r -a have <<<"$have_version"
+    IFS=. read -r -a want <<<"$want_version"
     for i in 0 1 2; do
         ((10#${have[i]:-0} > 10#${want[i]:-0})) && return 0
         ((10#${have[i]:-0} < 10#${want[i]:-0})) && return 1
@@ -60,9 +61,10 @@ _aifiles_at_least() {
 # _aifiles_key_matches <file> <recipient>: an identity age-keygen wrote names its public key in a
 # comment; one written without it is asked of age-keygen, where there is one.
 _aifiles_key_matches() {
-    [[ -f "$1" ]] || return 1
-    grep -qxF "# public key: $2" "$1" && return 0
-    command -v age-keygen >/dev/null 2>&1 && [[ "$(age-keygen -y "$1" 2>/dev/null)" == "$2" ]]
+    local key_file="$1" public_key="$2"
+    [[ -f "$key_file" ]] || return 1
+    grep -qxF "# public key: $public_key" "$key_file" && return 0
+    command -v age-keygen >/dev/null 2>&1 && [[ "$(age-keygen -y "$key_file" 2>/dev/null)" == "$public_key" ]]
 }
 
 # _aifiles_write_key <file> <recipient> <identity>: stages the identity beside the target and
