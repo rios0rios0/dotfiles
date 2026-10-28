@@ -20,7 +20,7 @@ The canonical engineering standards live in the
 repo-tailored index into that guide plus the rules that only apply here. Precedence, highest
 first:
 
-1. This repository's `.github/copilot-instructions.md`, `CLAUDE.md`, and `CONTRIBUTING.md` —
+1. This repository's `AGENTS.md`, `.github/copilot-instructions.md`, and `CONTRIBUTING.md` —
    they describe *this* codebase and its load-bearing invariants.
 2. The **rios0rios0/guide** wiki — the shared standard.
 3. General language idiom.
@@ -76,7 +76,7 @@ them before the generic ones.
 - **Apply must be idempotent.** `.chezmoiscripts/` entries are numbered for execution order and many are `run_once_`/`run_after_`. A script that appends to a file without a guard duplicates its line on every apply; a script renamed loses its `run_once` state and re-runs.
 - **`.chezmoiignore` is a Go template over `.chezmoi.os`** — a new file must be considered for all three platforms (Linux/WSL, Windows, Termux). A Windows-only file that is not ignored elsewhere breaks apply on the other two.
 - **`.chezmoiremove` deletes paths from the home directory on every apply.** Adding an entry destroys whatever is at that path — it needs an explicit justification, and a broad or templated path is a Critical finding.
-- **Shared fragments live in `.chezmoitemplates/`** (`lib-install-fonts.sh`, `lib-modify-mcp-servers.tmpl`, `lib-remove-dependencies.sh`, `username.tmpl`). Copying one inline instead of including it guarantees drift.
+- **Shared fragments live in `.chezmoitemplates/`** (the `lib-*` libraries, `allowed-signers.tmpl`, `username.tmpl`). Copying one inline instead of including it guarantees drift.
 - **`modify_` files merge, they do not overwrite.** `modify_dot_claude.json` rewrites a file the user also edits — it must preserve unknown keys.
 - **A `modify_` file that deploys on Windows must be a modify-template** (the `chezmoi:modify-template` marker, no `.tmpl` suffix, no `#!` line). Windows cannot start a script, so a bash one fails the whole apply there; `make test-modify-scripts` checks this against the file list chezmoi resolves for Windows.
 - **Shell changes are tested by the matching target**, for example `make test-template-render`, `make test-remove-dependencies`, `make test-shell-credentials`. A change to `dot_zshrc.tmpl` without a rendering test is incomplete.
@@ -103,20 +103,10 @@ configuration before invoking each tool — so **never invoke the tool binaries 
 that adds a direct binary invocation to a script or workflow, or that edits a tool
 configuration to make a finding disappear, is itself a finding.
 
-## Python conventions
+## Conventions
 
-See [Python Conventions](https://github.com/rios0rios0/guide/wiki/Python-Conventions), [Python Type System](https://github.com/rios0rios0/guide/wiki/Python-Type-System),
-[Python Logging](https://github.com/rios0rios0/guide/wiki/Python-Logging), and
-[Formatting and Linting](https://github.com/rios0rios0/guide/wiki/Python-Formatting-and-Linting).
-
-- `snake_case` for modules, functions, and variables; `PascalCase` for classes.
-- **Type hints on every parameter and return type.** `Any` as a catch-all is prohibited.
-- Logging uses Loguru (`from loguru import logger`) — not the standard `logging` module and
-  not `print()`. Normal output goes to stdout, warnings and errors to stderr.
-- Formatting is Black, imports are ordered by isort, linting is Flake8. Comments explain
-  *why*, not *what*.
-- Tests use pytest with `# given` / `# when` / `# then` blocks, mirroring the source tree
-  under `tests/`.
+This repository has no Python modules: the only Python `make lint-python` checks is a `PYEOF`
+heredoc inside a `modify_*` file, linted with ruff.
 
 ### Dispatch tables over `switch`
 
@@ -154,7 +144,7 @@ hand.
 - Fragment bodies start with a lowercase verb in simple past tense, capitalise proper nouns
   (GitHub, Go, Docker), and wrap code identifiers and versions in backticks.
 - `README.md` is updated whenever usage, setup, configuration, or architecture changes;
-  `.github/copilot-instructions.md` and `CLAUDE.md` whenever the workflow, commands, or
+  `.github/copilot-instructions.md` and `AGENTS.md` whenever the workflow, commands, or
   structure changes. Documentation and code ship in one commit.
 
 ## Git Flow and pull-request hygiene
@@ -218,7 +208,7 @@ A review that raises noise gets ignored. Do not report these:
 ### Change-control checklist
 - [ ] Changelog entry present for every behavioural change
 - [ ] `README.md` updated if usage, setup, or architecture changed
-- [ ] `.github/copilot-instructions.md` and `CLAUDE.md` updated if the workflow, commands, or structure changed
+- [ ] `.github/copilot-instructions.md` and `AGENTS.md` updated if the workflow, commands, or structure changed
 - [ ] Commit messages follow `type(SCOPE): message` in simple past tense
 - [ ] Breaking changes flagged in the commit footer, the changelog, and the PR description
 

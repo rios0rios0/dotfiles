@@ -1,6 +1,6 @@
-# CLAUDE.md
+# AGENTS.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+This file provides guidance to AI coding agents (Claude Code, Codex, Cursor, GitHub Copilot) when working with code in this repository.
 
 ## What This Repository Is
 
@@ -55,36 +55,6 @@ make test-install-fonts-windows     # the Windows fonts, per user: what is missi
 make test-powershell-profile-windows # PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh)
 ```
 
-## Essential Commands
-
-```bash
-chezmoi status                      # show managed files and their state
-chezmoi diff                        # preview pending changes
-chezmoi apply --dry-run             # test without applying
-chezmoi apply                       # apply configuration to home directory
-chezmoi apply --verbose             # apply with detailed output
-chezmoi update                      # pull repo changes and apply
-chezmoi edit ~/.zshrc               # edit a managed file
-chezmoi add ~/.new-file             # add a new file to management
-chezmoi add --encrypt ~/.secret     # add with age encryption
-chezmoi cat ~/.ssh/config           # decrypt and display an encrypted file
-chezmoi execute-template < file.tmpl  # test template rendering
-chezmoi doctor                      # diagnose installation issues
-```
-
-## Chezmoi File Naming Conventions
-
-| Prefix/Suffix       | Meaning                                                |
-|---------------------|--------------------------------------------------------|
-| `dot_`              | Becomes `.` in target (e.g., `dot_zshrc` → `~/.zshrc`) |
-| `.tmpl`             | Processed as Go template before deployment             |
-| `encrypted_*.age`   | Age-encrypted file, decrypted on apply                 |
-| `run_before_*`      | Script runs before file application, on every apply    |
-| `run_once_before_*` | Script runs once before file application               |
-| `run_after_*`       | Script runs after every application                    |
-| `run_onchange_after_*` | Script runs after application, only when its own content changes |
-| `private_`          | File deployed with restricted permissions              |
-
 ## Platform Targeting
 
 Platform-specific logic is handled in two ways:
@@ -115,10 +85,7 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 
 ## Template Variables
 
-Commonly used chezmoi template variables in this repo:
-- `.chezmoi.os` — `"linux"`, `"windows"`, `"android"`
-- `.chezmoi.hostname`, `.chezmoi.homeDir`, `.chezmoi.arch`
-- `.chezmoi.kernel` — Used to detect WSL (`microsoft` in kernel name)
+- `.chezmoi.kernel` — Used to detect WSL (`microsoft` in kernel name); `.chezmoi.os` alone does not separate WSL from bare metal
 - `onepassword` — Fetch full item by name/UUID from 1Password (preferred — returns `.title` + `.fields`)
 - `onepasswordRead` — Fetch a single scalar field by `op://` URI (use only for simple direct reads)
 
@@ -1097,7 +1064,7 @@ OpenCode runs on the OmniRoute gateway: `dot_config/opencode/opencode.json.tmpl`
 | Global config | `dot_config/opencode/opencode.json.tmpl`, applied on every platform that gets a shell |
 | CLI | `ocode`, built into `~/.local/bin/ocode` by `run_after_linux-006-build-ocode.sh` (see "The Fork Build" below), Linux only |
 | Look | `dot_config/opencode/cli.json` |
-| Rules | `~/.config/opencode/AGENTS.md` and `rules/`, synced by aisync, not chezmoi; each project's `CLAUDE.md` arrives through `instructions` |
+| Rules | `~/.config/opencode/AGENTS.md` and `rules/`, synced by aisync, not chezmoi; a project's `AGENTS.md` arrives by discovery, and its `CLAUDE.md` through `instructions` |
 | Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported by the credential loader and read at config load as `{env:OMNIROUTE_API_KEY}` |
 | Web UI on the tailnet | `.chezmoidata/opencode.yaml` (port, share switch) read through `lib-opencode.tmpl`; `tailscale-up` forwards it as a plain-TCP `serve` entry, on loopback. Pair with `ocode pair --url http://<machine>.<tailnet>.ts.net:<webPort>`; see `.docs/opencode-local.md` |
 
@@ -1383,7 +1350,7 @@ import.
 
 ## systemd on WSL (Turned On by chezmoi)
 
-The SSH agent bridge, Ollama and the OmniRoute backups run as systemd user units, and WSL boots a
+The SSH agent bridge, Ollama, and the OmniRoute and home-secrets backups run as systemd user units, and WSL boots a
 distribution with systemd only when `/etc/wsl.conf` has `systemd=true` under `[boot]`. Kali's WSL image ships no
 `/etc/wsl.conf`, so PID 1 is WSL's own `init`. `systemctl --user` then fails with `Failed to connect
 to user scope bus via local transport: No such file or directory` -- the socket it looks for in
@@ -1395,7 +1362,7 @@ Two halves make the fix automatic, and both are needed:
 | Half | Mechanism |
 |------|-----------|
 | Turn it on | `.chezmoiscripts/run_before_linux-000-enable-wsl-systemd.sh.tmpl` sets `systemd=true` under `[boot]` through sudo and says to restart WSL. It renders to nothing unless the kernel is WSL's and systemd is not PID 1, so it runs on every apply until WSL boots with systemd, and never after |
-| Finish what waited | Each installer that calls `systemctl` -- the bridge, Ollama, the OmniRoute backups, and Tailscale's bare-metal half -- renders `systemd running` or `systemd not running` into a comment. Without systemd it stopped early and exited 0, which chezmoi records as done; the line changing is what runs it again on the first apply after the restart |
+| Finish what waited | Each installer that calls `systemctl` -- the bridge, Ollama, the OmniRoute and home-secrets backups, and Tailscale's bare-metal half -- renders `systemd running` or `systemd not running` into a comment. Without systemd it stopped early and exited 0, which chezmoi records as done; the line changing is what runs it again on the first apply after the restart |
 
 On a machine that boots without systemd: `chezmoi apply` writes the file and the installers warn;
 `wsl.exe --shutdown` and a new terminal start systemd; the next `chezmoi apply` sets up the bridge
@@ -1693,6 +1660,7 @@ writes. `.chezmoidata/age-keys.yaml` names each item and each key's public half:
 | chezmoi | `~/.ssh/chezmoi` | `chezmoi.age` | Linux/WSL and Windows: decrypts every `encrypted_*.age` file |
 | OmniRoute backups | `~/.ssh/omniroute-backup-key` | `omniroute-backup.age` | WSL alone, where `omniroute-backup` runs |
 | aisync | `~/.config/aisync/key.txt` | `aisync.age` | Linux/WSL and Android: decrypts aifiles, which the aisync hook pulls (see "AI Rules Sync") |
+| Home-secrets backups | `~/.ssh/secrets-backup-key` | `secrets-backup.age` | WSL alone, where `secrets-backup` runs (see "Home-Secrets Backups") |
 
 None is the SSH key that signs commits. The chezmoi files were encrypted to that key until
 2026-10-27; they are re-encrypted to `chezmoi.age` now, and that key still opens only the older

@@ -50,7 +50,7 @@ development practices, refer to the **[Development Guide](https://github.com/rio
     ```bash
     chlog new --kind Added --body 'added the thing that was not there before'
     ```
-11. Commit following the [commit conventions](https://github.com/rios0rios0/guide/wiki/Life-Cycle/Git-Flow)
+11. Commit following the [commit conventions](https://github.com/rios0rios0/guide/wiki/Git-Flow)
 12. Open a pull request against `main`
 
 ## Removing a Dependency
@@ -64,7 +64,8 @@ state, so removals must be declared explicitly:
    `run_once_before_*-install-dependencies.*` script.
 2. Add a `"<strategy>:<target>"` tombstone to
    `.chezmoiscripts/run_onchange_after_<platform>-*-remove-dependencies.*` for **every**
-   platform that installed it, commenting the removing commit.
+   platform that installed it, commenting the pull request that removed it (not a commit
+   hash from the feature branch, which a rebase before merge rewrites).
 3. Add any orphaned configuration directory to `.chezmoiremove`.
 
 Available strategies: `apt`, `gh_extension`, `npm_global`, `path`, `pipx` (Linux/Android,
