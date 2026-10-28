@@ -1,0 +1,16 @@
+# The Docker Desktop settings chezmoi keeps in %APPDATA%\Docker\settings-store.json on Windows,
+# through AppData/Roaming/Docker/modify_settings-store.json. Only these keys are managed: the rest
+# of the file is Docker Desktop's own. Docker Desktop reads the file when it starts and writes it
+# back from memory whenever a setting changes in its UI, so a merge takes effect at its next start,
+# and the apply after such a change merges again. See CLAUDE.md, "Docker Desktop Settings".
+dockerDesktop:
+  # The WSL distributions Docker Desktop integrates with: its CLI, and the containers' published
+  # ports, inside each. Added to any the file already lists, never replacing them.
+  wslDistros: ['kali-linux']
+  # Settings set to these values, by their names in settings-store.json.
+  settings:
+    # "Enable integration with my default WSL distro".
+    EnableIntegrationWithDefaultWslDistro: true
+    # "Start Docker Desktop when you sign in to your computer": the Atuin sync server and the
+    # OmniRoute stack run in it, and both stay down after a reboot until Docker Desktop starts.
+    AutoStart: true

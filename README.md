@@ -140,7 +140,7 @@ dot_ssh/                 # SSH config, keys, signing (1Password-backed) -> ~/.ss
 dot_aws/                 # Encrypted AWS credentials -> ~/.aws/
 dot_azure/               # Encrypted Azure profile -> ~/.azure/
 private_dot_kube/        # Encrypted Kubernetes configs -> ~/.kube/ (owner-only)
-AppData/                 # Windows Terminal settings (Windows only)
+AppData/                 # Windows Terminal settings, and Docker Desktop's WSL integration and start at sign-in, merged into its own settings (Windows only)
 modify_dot_claude.json   # MCP server config for Claude Code (Linux, Android) -> ~/.claude.json
 ```
 
@@ -262,7 +262,7 @@ On bare-metal Linux, `chezmoi apply` installs Tailscale from its signed apt repo
 
 ## Shell History
 
-Every zsh, on Linux and Termux, records its commands with [Atuin](https://atuin.sh), and Ctrl-R and the up arrow search them. Atuin syncs them through a server of our own: a Docker container on the laptop (`alien-a51`), which its `tailscale-up` shares on the tailnet. Each device encrypts its history before sending it, with a key that never leaves the devices, and the client never contacts Atuin's own servers. A device that is offline keeps recording and catches up the next time it reaches the server. Moving the server to an always-on machine is [#272](https://github.com/rios0rios0/dotfiles/issues/272). The [Atuin guide](.docs/atuin-sync.md) covers starting the server, the account, and the one-time import of the old zsh-histdb history.
+Every zsh, on Linux and Termux, records its commands with [Atuin](https://atuin.sh), and Ctrl-R and the up arrow search them. Atuin syncs them through a server of our own: a Docker container on the laptop (`alien-a51`), which its `tailscale-up` shares on the tailnet. Each device encrypts its history before sending it, with a key that never leaves the devices, and the client never contacts Atuin's own servers. A device that is offline keeps recording and catches up the next time it reaches the server. Moving the server to an always-on machine is [#272](https://github.com/rios0rios0/dotfiles/issues/272). Once the account exists -- registered by hand, once, with its password and encryption key in the 1Password item `Atuin` -- every `chezmoi apply` logs in a device that is not logged in yet and imports its old zsh-histdb history once. The [Atuin guide](.docs/atuin-sync.md) covers starting the server, the account, and doing either by hand.
 
 ## Chezmoi Conventions
 

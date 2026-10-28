@@ -1,0 +1,50 @@
+{{- /* chezmoi:modify-template */ -}}
+{{- /*
+  Keeps the Docker Desktop settings .chezmoidata/docker-desktop.yaml names in
+  %APPDATA%\Docker\settings-store.json: each managed setting whose value differs is set back, and
+  every WSL distribution it names joins IntegratedWslDistros, after the ones already there. Every
+  other key is Docker Desktop's and stays as it is.
+
+  Docker Desktop reads the file when it starts and writes it back from memory whenever a setting
+  changes in its UI, so a merge takes effect at its next start, and an apply after such a change
+  merges again. A machine where Docker Desktop has not run yet gets a file holding only these keys,
+  which its first start reads.
+
+  A modify-template for the reasons given in modify_dot_claude.json at the source root, which also
+  explain why it has no .tmpl suffix. When nothing differs, the current content is returned byte for
+  byte; a real change re-serialises the file, and toPrettyJson then sorts its keys. Invalid JSON
+  fails the template instead of replacing the file. Windows only: .chezmoiignore keeps AppData off
+  every other platform.
+*/ -}}
+{{- $want := .dockerDesktop -}}
+{{- $settings := dict -}}
+{{- if trim .chezmoi.stdin -}}
+{{-   $settings = fromJson .chezmoi.stdin -}}
+{{- end -}}
+{{- $updated := list -}}
+{{- range $key, $value := $want.settings -}}
+{{-   if ne (toJson (get $settings $key)) (toJson $value) -}}
+{{-     $_ := set $settings $key $value -}}
+{{-     $updated = append $updated $key -}}
+{{-   end -}}
+{{- end -}}
+{{- $distros := list -}}
+{{- if kindIs "slice" (get $settings "IntegratedWslDistros") -}}
+{{-   $distros = get $settings "IntegratedWslDistros" -}}
+{{- end -}}
+{{- $missing := list -}}
+{{- range $want.wslDistros -}}
+{{-   if not (has . $distros) -}}
+{{-     $missing = append $missing . -}}
+{{-   end -}}
+{{- end -}}
+{{- if $missing -}}
+{{-   $_ := set $settings "IntegratedWslDistros" (concat $distros $missing) -}}
+{{-   $updated = append $updated "IntegratedWslDistros" -}}
+{{- end -}}
+{{- if $updated -}}
+{{-   warnf `[docker-settings] set %s in %%APPDATA%%\Docker\settings-store.json; Docker Desktop reads it at its next start` (join ", " $updated) -}}
+{{-   toPrettyJson $settings -}}
+{{- else -}}
+{{-   .chezmoi.stdin -}}
+{{- end -}}

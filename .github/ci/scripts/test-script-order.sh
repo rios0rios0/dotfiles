@@ -89,6 +89,16 @@ PHASE=after check_order "android" \
     "006-setup-sentry-cli" \
     "008-sync-aifiles"
 
+# Atuin: the login comes before the one-time import, whose sync uploads what it imported. Both are
+# after-scripts, so the files (the client's config) and the installers (atuin, sqlite3) come first.
+PHASE=after check_order "linux" \
+    "016-login-atuin" \
+    "017-import-atuin-history"
+
+PHASE=after check_order "android" \
+    "009-login-atuin" \
+    "010-import-atuin-history"
+
 if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-script-order] all script ordering tests passed" >&2
 fi

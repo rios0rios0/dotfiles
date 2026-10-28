@@ -444,6 +444,64 @@ wslconfig_leaves_utf16_alone() {
     cmp -s "$SANDBOX/wslconfig.utf16" "$SANDBOX/wslconfig.utf16.out"
 }
 
+# --- Docker Desktop's settings-store.json ---------------------------------------
+# Docker Desktop's own settings, as JSON: the template keeps .chezmoidata/docker-desktop.yaml's
+# settings and WSL distributions, and every other key Docker Desktop writes.
+
+DOCKER_SOURCE="AppData/Roaming/Docker/modify_settings-store.json"
+DOCKER_TARGET="AppData/Roaming/Docker/settings-store.json"
+DOCKER_MANAGED='del(.AutoStart, .EnableIntegrationWithDefaultWslDistro, .IntegratedWslDistros)'
+
+docker_creates_the_settings() {
+    # given no settings-store.json, as before Docker Desktop's first start
+
+    # when
+    local out
+    out=$(apply_modify_template "$DOCKER_SOURCE" "$DOCKER_TARGET" "") || return 1
+
+    # then: the integration with the WSL distribution, and the start at sign-in
+    jq -e '. == {"AutoStart": true, "EnableIntegrationWithDefaultWslDistro": true, "IntegratedWslDistros": ["kali-linux"]}' \
+        <<<"$out" >/dev/null
+}
+
+docker_passes_a_matching_file_through() {
+    # given the file as Docker Desktop writes it, every managed setting in place and another
+    # distribution listed first
+    printf '{\n  "AutoStart": true,\n  "EnableIntegrationWithDefaultWslDistro": true,\n  "IntegratedWslDistros": [\n    "Ubuntu",\n    "kali-linux"\n  ],\n  "MemoryMiB": 8192\n}' \
+        > "$SANDBOX/docker.json"
+
+    # when
+    apply_modify_template "$DOCKER_SOURCE" "$DOCKER_TARGET" "$(cat "$SANDBOX/docker.json")" \
+        > "$SANDBOX/docker.out" || return 1
+
+    # then
+    cmp -s "$SANDBOX/docker.json" "$SANDBOX/docker.out"
+}
+
+docker_keeps_other_keys_and_distros() {
+    # given another distribution, settings of Docker Desktop's own, and the start at sign-in off
+    local input='{"AutoStart": false, "IntegratedWslDistros": ["Ubuntu"], "MemoryMiB": 8192, "ProxyHttpMode": "system", "Extensions": {"enabled": true, "list": [1, 2]}}'
+
+    # when
+    local out
+    out=$(apply_modify_template "$DOCKER_SOURCE" "$DOCKER_TARGET" "$input") || return 1
+
+    # then: the distribution joins after the one listed, the settings are set, and the rest stays
+    jq -e '.IntegratedWslDistros == ["Ubuntu", "kali-linux"] and .AutoStart == true and .EnableIntegrationWithDefaultWslDistro == true' \
+        <<<"$out" >/dev/null &&
+        [[ "$(jq -cS "$DOCKER_MANAGED" <<<"$out")" == "$(jq -cS "$DOCKER_MANAGED" <<<"$input")" ]]
+}
+
+docker_fails_on_invalid_json() {
+    # given a corrupt settings-store.json
+
+    # when
+    if apply_modify_template "$DOCKER_SOURCE" "$DOCKER_TARGET" '{"AutoStart": ' >/dev/null; then
+        # then: the template must not have produced a replacement
+        return 1
+    fi
+}
+
 windows_deploys_only_modify_templates() {
     # given the source state as chezmoi resolves it for Windows, which cannot start
     # a #! script: every modify_ file there must be a modify-template
@@ -512,6 +570,12 @@ else
     run_case "wslconfig: sets a value back and keeps every other line" wslconfig_keeps_everything_else
     run_case "wslconfig: keeps a UTF-8 BOM and reads the section behind it" wslconfig_keeps_a_utf8_bom
     run_case "wslconfig: leaves a UTF-16 file as it is" wslconfig_leaves_utf16_alone
+    run_case "Docker Desktop settings: created with the managed keys when the file is missing" docker_creates_the_settings
+    run_case "Docker Desktop settings: passes a file with every setting in place through byte for byte" \
+        docker_passes_a_matching_file_through
+    run_case "Docker Desktop settings: sets the managed keys and keeps every other key and distribution" \
+        docker_keeps_other_keys_and_distros
+    run_case "Docker Desktop settings: fails on invalid JSON instead of replacing the file" docker_fails_on_invalid_json
     run_case "every modify_ file that deploys on Windows is a modify-template" windows_deploys_only_modify_templates
 fi
 

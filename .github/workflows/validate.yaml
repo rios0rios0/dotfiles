@@ -424,8 +424,8 @@ jobs:
           sha256sum --check --ignore-missing checksums.txt
           tar -xzf "$archive" chezmoi
           sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install jq
-        run: sudo apt-get install -y jq
+      - name: Install jq and sqlite3
+        run: sudo apt-get install -y jq sqlite3
       - name: Test the shell history setup (Atuin)
         run: make test-atuin
 

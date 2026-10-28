@@ -1,13 +1,17 @@
 {{- /*
   The Atuin settings for this device, as JSON: .atuin from .chezmoidata/atuin.yaml with
-  .atuin.devices.<deviceName> laid over it, plus two values derived from them:
+  .atuin.devices.<deviceName> laid over it, plus values derived from them:
     isServer     this device runs the sync server
     syncAddress  where its client syncs: loopback on the server device itself, whose own name
                  resolves to 127.0.1.1 under WSL rather than to its tailnet address, and
                  serverHost everywhere else
+    histdbHosts  the zsh-histdb hosts whose commands it imports once, unless the device names
+                 them: the name it records under, its hostname, or `localhost` on Termux, which
+                 every phone reports
 
-  dot_config/atuin/config.toml.tmpl and tailscale-up read it, so where the server runs and how
-  every client reaches it are one declaration rather than one per consumer:
+  dot_config/atuin/config.toml.tmpl, tailscale-up and the login and import scripts read it, so
+  where the server runs and how every client reaches it are one declaration rather than one per
+  consumer:
       includeTemplate "lib-atuin.tmpl" . | fromJson
 */ -}}
 {{- /* deviceName is read with `get`, as lib-opencode.tmpl does and for the same reason: a config
@@ -28,4 +32,7 @@
 {{- $host := ternary "127.0.0.1" $settings.serverHost $isServer -}}
 {{- $_ := set $settings "isServer" $isServer -}}
 {{- $_ := set $settings "syncAddress" (printf "http://%s:%v" $host $settings.port) -}}
+{{- if not (hasKey $settings "histdbHosts") -}}
+{{-   $_ := set $settings "histdbHosts" (list (ternary "localhost" .chezmoi.hostname (eq .chezmoi.os "android"))) -}}
+{{- end -}}
 {{- toJson $settings -}}
