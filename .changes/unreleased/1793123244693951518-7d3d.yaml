@@ -1,4 +1,0 @@
-kind: 'Removed'
-body: 'removed from Windows the apps and CLIs it no longer uses -- VirtualBox, Slack, Discord, Claude Code, NVM for Windows, the GitHub CLI, Go, the JetBrains Toolbox, Visual Studio 2022, Postman, ShellCheck, yq, jq and bat -- with what served only them: the `nvm install --lts` step, the JetBrains themes script and its staged themes, and Claude Code''s `~/.claude.json` and `~/.claude/` files, which Windows no longer receives; the next apply runs `winget uninstall` for each and leaves their data directories in place'
-breaking: true
-time: '2026-10-27T17:47:24.693951518Z'

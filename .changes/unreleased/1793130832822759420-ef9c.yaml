@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed PowerShell 7 starting without Oh My Posh where OneDrive holds Documents: `run_after_windows-006-setup-powershell-profile.ps1` wrote its block into the profile in the Documents folder Windows reports, where Controlled Folder Access blocked it, and printed that it had set up Oh My Posh, because `Set-Content` failed without stopping; chezmoi now keeps PowerShell 7''s profile in the user folder as `~/.config/powershell/profile.ps1`, and Windows Terminal''s PowerShell profile dot-sources it (`pwsh.exe -NoExit -Command`), so nothing writes into Documents; `make test-powershell-profile-windows` runs that command line against a stubbed `oh-my-posh`'
-time: '2026-10-27T19:53:52.822759420Z'

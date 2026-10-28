@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'changed the icon of the Kali profile in Windows Terminal to a red dragon on a black disc, a 1024x1024 PNG kept under the same name, `kali-dragon-icon.png`, so `settings.json` needs no change'
-time: '2026-10-27T20:05:28.797301110Z'

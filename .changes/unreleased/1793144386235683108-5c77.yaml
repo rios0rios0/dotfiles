@@ -1,3 +1,0 @@
-kind: 'Removed'
-body: 'removed `zsh-histdb` and the encrypted copy of `~/.histdb` from the repository, which Atuin replaces: the copy had stopped at 2025-03-14, the folder watcher had been archiving `~/.histdb` into the chezmoi source after nearly every command without anything committing it, and whole-file copies could not merge two devices'' history; tombstones remove the plugin''s `zinit` checkout and its Oh My Zsh link on Linux and Android, while `~/.histdb` itself stays as a fallback after its one-time import into Atuin'
-time: '2026-10-27T23:39:46.235683108Z'

@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'upgraded `pip` in the `pyenv` Python to its latest release on every pass of the Linux dependency installer, so `pip install` no longer ends with `A new release of pip is available` (Python `3.13.2` ships `pip` `24.3.1`); `pipx` keeps its own `pip` for the virtualenvs it manages'
-time: '2026-10-27T21:52:40.284921437Z'

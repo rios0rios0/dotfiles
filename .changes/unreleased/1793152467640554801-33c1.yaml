@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added Docker Desktop''s settings to the Windows apply: `AppData/Roaming/Docker/modify_settings-store.json` merges `.chezmoidata/docker-desktop.yaml` into `%APPDATA%\Docker\settings-store.json`, turning on the WSL integration for `kali-linux` and the start at sign-in, so `docker` works in WSL and the Atuin sync server and the OmniRoute stack come back after a reboot; every other key and distribution stays, a matching file passes through untouched, and Docker Desktop reads the change at its next start'
-time: '2026-10-28T01:54:27.640554801Z'

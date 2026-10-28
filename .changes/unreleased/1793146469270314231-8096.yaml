@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'resolved every finding SonarCloud reported on the repository: conditionals use `[[ ]]`, functions copy their positional parameters into named locals, repeated literals became constants, every `case` has a default branch, local variables are lowercase, the Windows test suites print their results through a `Show-` function, the template checker''s `main` was split into functions, and the Atuin test''s assertions on the plain-HTTP sync addresses carry `NOSONAR` beside the reason they need no TLS; an apply behaves as before, except that the font installers on Linux and Android run once more, because `lib-install-fonts.sh` changed, and download the fonts again'
-time: '2026-10-28T00:14:29.270314231Z'

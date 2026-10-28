@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the `.wslconfig` merge for files Windows PowerShell 5.1 writes: a UTF-8 BOM, from `Set-Content -Encoding UTF8`, hid the first section, so the merge added a second `[experimental]` instead of setting the value in place, and it now stays in front and is read past; a UTF-16 file, from `>` or `Out-File`, would have had ASCII lines written into it, and is now passed through untouched with a warning'
-time: '2026-10-27T19:43:40.660438761Z'

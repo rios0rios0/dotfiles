@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'the ocode fork builder now clones `rios0rios0/opencode` onto `reworked` under `~/Development/github.com/rios0rios0/opencode` when the checkout is missing and switches an existing checkout off another branch, so a fresh machine gets `ocode` and an editable checkout from one `chezmoi apply`, while a failed clone, a non-checkout directory and a checkout without the branch warn and skip instead of failing the apply'
-time: '2026-10-23T19:58:02.396244794Z'

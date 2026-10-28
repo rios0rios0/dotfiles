@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed `chezmoi add --encrypt` stopping with `age: error: missing recipients`, since the config named an identity but no recipient: `.chezmoi.yaml.tmpl` sets `age.recipientsFile` to `~/.age_recipients`, which reaches a machine with its next `chezmoi init`'
-time: '2026-10-27T18:36:07.303328655Z'

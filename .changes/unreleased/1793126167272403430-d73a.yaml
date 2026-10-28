@@ -1,4 +1,0 @@
-kind: 'Changed'
-body: 'changed the chezmoi encryption key from the SSH key that signs commits to an age key of its own, the `chezmoi.age` item in 1Password''s `Private` vault: every `encrypted_*.age` file is re-encrypted to it (each checked to decrypt to the same SHA-256), `.chezmoidata/age-keys.yaml` names it and its public key, `~/.age_recipients` is rendered from there instead of from 1Password, and the export scripts replace a `~/.ssh/chezmoi` holding the old key on the next apply; the old key still decrypts only the older versions in the repository''s history'
-breaking: true
-time: '2026-10-27T18:36:07.272403430Z'

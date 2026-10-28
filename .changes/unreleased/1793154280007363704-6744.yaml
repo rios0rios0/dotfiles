@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added "Recover from an old Docker Desktop disk" to `.docs/omniroute-local.md`: with no archive left, the OmniRoute database comes out of the old installation''s `docker_data.vhdx` through a copy, `qemu-img` (the journal replayed, a sparse raw image), `debugfs` in read-only mode and `VACUUM INTO`, packed as an archive `omniroute-restore` checks before it restores, as was done on `alien-a51` on 2026-10-28'
-time: '2026-10-28T02:24:40.008061774Z'
