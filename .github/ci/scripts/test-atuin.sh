@@ -409,9 +409,14 @@ run_rendered() {
 }
 state_rc() { cat "$ATUIN_STATE/rc"; }
 state_out() { cat "$ATUIN_STATE/out"; }
-calls() { grep -c -- "$1" "$ATUIN_STATE/${2:-argv}" 2>/dev/null || true; }
+calls() {
+    local pattern="$1" log="${2:-argv}"
+    grep -c -- "$pattern" "$ATUIN_STATE/$log" 2>/dev/null || true
+}
+# What .github/ci/fixtures/mock-op.sh answers for every 1Password read, which Termux's render embeds.
+MOCK_SECRET='stub-value'
 # leaks: every place a secret must never reach -- the stubs' arguments and the script's output
-leaks() { cat "$ATUIN_STATE/argv" "$ATUIN_STATE/op-argv" "$ATUIN_STATE/out" 2>/dev/null | grep -c 'fixture-\|stub-value' || true; }
+leaks() { cat "$ATUIN_STATE/argv" "$ATUIN_STATE/op-argv" "$ATUIN_STATE/out" 2>/dev/null | grep -c "fixture-\\|$MOCK_SECRET" || true; }
 
 render linux "$LOGIN_LINUX" >"$TMP/login-linux.sh"
 render linux "$LOGIN_LINUX" "{\"deviceName\":\"$SERVER\"}" >"$TMP/login-server.sh"
@@ -513,16 +518,16 @@ PATH="$ACCT_BIN:$PATH" render android "$LOGIN_ANDROID" >"$TMP/login-android-out.
 : >"$ATUIN_STATE/logged-in"
 PATH="$ACCT_BIN:$PATH" render android "$LOGIN_ANDROID" >"$TMP/login-android-in.sh" 2>"$TMP/render.err" ||
     fail "Termux's login does not render with a session: $(cat "$TMP/render.err")"
-if grep -qx 'stub-value' "$TMP/login-android-out.sh" && grep -qx 'END_OF_ATUIN_KEY' "$TMP/login-android-out.sh" &&
-    ! grep -q 'stub-value\|END_OF_ATUIN' "$TMP/login-android-in.sh"; then
+if grep -qx "$MOCK_SECRET" "$TMP/login-android-out.sh" && grep -qx 'END_OF_ATUIN_KEY' "$TMP/login-android-out.sh" &&
+    ! grep -q "$MOCK_SECRET\\|END_OF_ATUIN" "$TMP/login-android-in.sh"; then
     pass "Termux's login renders the secrets only when the render finds no session"
 else
-    fail "Termux's render: $(grep -c 'stub-value' "$TMP/login-android-out.sh") values without a session, $(grep -c 'stub-value' "$TMP/login-android-in.sh") with one"
+    fail "Termux's render: $(grep -c "$MOCK_SECRET" "$TMP/login-android-out.sh") values without a session, $(grep -c "$MOCK_SECRET" "$TMP/login-android-in.sh") with one"
 fi
 new_state
 run_rendered "$TMP/login-android-out.sh"
 if [[ "$(state_rc)" -eq 0 && ! -e "$ATUIN_STATE/op-argv" ]] && grep -qx "login -u rios0rios0" "$ATUIN_STATE/argv" &&
-    [[ "$(cat "$ATUIN_STATE/login-password")" == "stub-value" && "$(cat "$ATUIN_STATE/login-stdin")" == "stub-value" ]] &&
+    [[ "$(cat "$ATUIN_STATE/login-password")" == "$MOCK_SECRET" && "$(cat "$ATUIN_STATE/login-stdin")" == "$MOCK_SECRET" ]] &&
     [[ "$(leaks)" -eq 0 ]]; then
     pass "Termux logs in with the rendered secrets, the password in the environment and the key on stdin"
 else
@@ -550,8 +555,12 @@ INSERT INTO history (session, command_id, place_id, exit_status, start_time, dur
     (3, 3, 3, 0, 1750000000, 1),
     (4, 1, 4, 0, 1760000000, 1);
 SQL
+    HISTORY_COUNT='SELECT COUNT(*) FROM history;'
     # imported <query>: a query against the copy the atuin stub received
-    imported() { sqlite3 "$ATUIN_STATE/imported.db" "$1"; }
+    imported() {
+        local query="$1"
+        sqlite3 "$ATUIN_STATE/imported.db" "$query"
+    }
     marker() { echo "$ATUIN_HOME/data/.dotfiles-histdb-imported"; }
 
     render linux "$IMPORT_LINUX" '{"chezmoi":{"hostname":"alien-a51"}}' >"$TMP/import-laptop.sh"
@@ -564,9 +573,9 @@ SQL
     run_rendered "$TMP/import-laptop.sh"
     # then Atuin gets a copy with the laptop's own two commands, the database itself is untouched,
     # the copy is gone, the marker is written, and nothing syncs before the login
-    if [[ "$(state_rc)" -eq 0 && "$(imported 'SELECT COUNT(*) FROM history;')" -eq 2 ]] &&
+    if [[ "$(state_rc)" -eq 0 && "$(imported "$HISTORY_COUNT")" -eq 2 ]] &&
         [[ "$(imported 'SELECT DISTINCT p.host FROM history h JOIN places p ON p.id = h.place_id;')" == "alien-a51" ]] &&
-        [[ "$(sqlite3 "$HISTDB" 'SELECT COUNT(*) FROM history;')" -eq 7 ]] &&
+        [[ "$(sqlite3 "$HISTDB" "$HISTORY_COUNT")" -eq 7 ]] &&
         [[ ! -e "$(cat "$ATUIN_STATE/histdb-path")" && -e "$(marker)" && "$(calls sync)" -eq 0 ]] &&
         grep -q "imported 2 commands from zsh-histdb, recorded under alien-a51" "$ATUIN_STATE/out"; then
         pass "the laptop imports its own commands from a private copy, and writes the marker"
@@ -589,7 +598,7 @@ SQL
     # when the import runs
     run_rendered "$TMP/import-desktop.sh"
     # then both names are imported, and the sync that uploads them gets a session of its own
-    if [[ "$(state_rc)" -eq 0 && "$(imported 'SELECT COUNT(*) FROM history;')" -eq 4 ]] &&
+    if [[ "$(state_rc)" -eq 0 && "$(imported "$HISTORY_COUNT")" -eq 4 ]] &&
         [[ -n "$(cat "$ATUIN_STATE/sync-session" 2>/dev/null)" ]] && grep -q "synced them with the server" "$ATUIN_STATE/out"; then
         pass "the desktop imports both of its names, and syncs with an ATUIN_SESSION of its own"
     else
@@ -601,7 +610,7 @@ SQL
     # when the import runs
     run_rendered "$TMP/import-phone.sh"
     # then they are imported under the device's name, as the shell now records them
-    if [[ "$(state_rc)" -eq 0 && "$(imported 'SELECT COUNT(*) FROM history;')" -eq 1 ]] &&
+    if [[ "$(state_rc)" -eq 0 && "$(imported "$HISTORY_COUNT")" -eq 1 ]] &&
         [[ "$(imported 'SELECT DISTINCT p.host FROM history h JOIN places p ON p.id = h.place_id;')" == "testdevice" ]]; then
         pass "Termux imports the commands recorded under localhost, named after the device"
     else
