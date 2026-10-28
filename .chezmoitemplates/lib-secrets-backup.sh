@@ -99,3 +99,20 @@ secrets_entry_allowed() {
     done
     return 1
 }
+
+# secrets_tar_types_ok <tarfile>: whether every member is a regular file or a directory. The name
+# allowlist cannot see this, and it is the other half of the planted-archive defence: a symlink
+# (`.john` -> `.ssh`) or a hard link whose name passes the allowlist would, on a fresh restore, be
+# created before a later member is written through it, outside the sources -- GNU tar defers only
+# symlinks whose target is absolute or holds `..`. `tar -tvf` leads each line with the type
+# character (ls -l style), so refusing anything but `-` and `d` refuses `l`, `h` and every special
+# file. The mode is the first field, so a name with spaces does not throw the check off.
+secrets_tar_types_ok() {
+    local modestr _
+    while read -r modestr _; do
+        case "${modestr:0:1}" in
+            -|d) ;;
+            *) return 1 ;;
+        esac
+    done < <(tar -tvf "$1" 2>/dev/null)
+}

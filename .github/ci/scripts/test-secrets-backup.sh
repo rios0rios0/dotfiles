@@ -293,6 +293,23 @@ else
     pass "a device name with a path in it is refused"
 fi
 
+# A source that holds a symlink fails the backup: only regular files and directories are backed up,
+# so a symlink can never ride into an archive a restore would then have to refuse.
+rm -rf "$TMP/rootsym"
+mkdir -p "$TMP/rootsym/.john"
+ln -s /etc/passwd "$TMP/rootsym/.john/link"
+if SECRETS_BACKUP_ROOT="$TMP/rootsym" SECRETS_BACKUP_DIR="$TMP/backupssym" SECRETS_BACKUP_MIRROR="" \
+    "$SCRIPT" >/dev/null 2>"$TMP/symbackup.log"; then
+    fail "a source holding a symlink backed up"
+else
+    if grep -q "symlink or a special file" "$TMP/symbackup.log" &&
+        ! find "$TMP/backupssym" -name "$ARCHIVE_GLOB" 2>/dev/null | grep -q .; then
+        pass "a source holding a symlink fails the backup, and writes no archive"
+    else
+        fail "a symlink source was not refused cleanly: $(cat "$TMP/symbackup.log")"
+    fi
+fi
+
 # --- The installer: the WSL gate and the systemd handoff ---------------------
 
 mkdir -p "$TMP/systemd" "$TMP/stubctl" "$TMP/emptyhome"

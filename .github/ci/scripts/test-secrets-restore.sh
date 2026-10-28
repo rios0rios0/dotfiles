@@ -148,6 +148,23 @@ else
         fail "the absolute-path refusal is unclear: $(cat "$TMP/plant2.log")"
 fi
 
+# A planted archive whose entry is a symlink -- its name under a source, so the name check passes --
+# is refused by the type check before anything is extracted. This is the escape the name allowlist
+# alone cannot see: a `.john` symlink to `.ssh` would let a later member write through it.
+PLANT_SYM="$TMP/plantsym"
+mkdir -p "$PLANT_SYM"
+ln -s .ssh "$PLANT_SYM/.john"
+tar -C "$PLANT_SYM" -cf - .john | age -e -i "$KEY" -o "$TMP/planted-symlink.tar.age"
+if SECRETS_RESTORE_ROOT="$TMP/destsym" "$RESTORE" --yes "$TMP/planted-symlink.tar.age" >/dev/null 2>"$TMP/sym.log"; then
+    fail "a planted archive with a symlink entry was restored"
+else
+    if grep -q "symlink or a special file" "$TMP/sym.log" && [[ ! -e "$TMP/destsym/.john" ]]; then
+        pass "a planted symlink entry is refused, and nothing is written"
+    else
+        fail "a planted symlink was mishandled: $(cat "$TMP/sym.log")"
+    fi
+fi
+
 # A missing identity fails before anything is read.
 if SECRETS_RESTORE_ROOT="$TMP/dest4" SECRETS_BACKUP_IDENTITY="$TMP/nope" "$RESTORE" --yes >/dev/null 2>"$TMP/nokey.log"; then
     fail "a missing identity exits 0"
