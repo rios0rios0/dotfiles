@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `secrets-backup` and `secrets-restore` (WSL only): age-encrypted daily backups of `~/.john`, `~/.sqlmap` and `~/.kube` (`config` and `config-files`) -- the folders #276 stopped syncing through chezmoi -- kept in `~/.local/share/secrets-backups` and copied to the personal OneDrive per device, exactly as the OmniRoute backups are. They use a dedicated `secrets-backup.age` key, carry only the configured sources, and the restore refuses a planted archive (an absolute path, a `..` component, or anything outside the sources) and never overwrites an existing folder without `--force`; a systemd user timer runs the backup daily at 03:45. See `.docs/secrets-backup.md`.'
+time: '2026-10-28T19:33:24.753049000Z'

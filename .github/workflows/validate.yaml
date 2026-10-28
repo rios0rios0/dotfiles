@@ -537,6 +537,50 @@ jobs:
       - name: 'Test the image pin updater and its failure paths'
         run: 'make test-omniroute-image'
 
+  test-secrets-backup:
+    name: 'Test (home-secrets encrypted backups)'
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Install chezmoi'
+        run: |
+          cd "$(mktemp -d)"
+          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive" chezmoi
+          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
+      - name: 'Install age'
+        run: 'sudo apt-get install -y age'
+      - name: 'Test the archive, its allowlist, retention, the personal OneDrive mirror and the installer gate'
+        run: 'make test-secrets-backup'
+
+  test-secrets-restore:
+    name: 'Test (home-secrets restore)'
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Install chezmoi'
+        run: |
+          cd "$(mktemp -d)"
+          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive" chezmoi
+          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
+      - name: 'Install age'
+        run: 'sudo apt-get install -y age'
+      - name: 'Test the restore allowlist, the no-overwrite default and the per-source extraction'
+        run: 'make test-secrets-restore'
+
   test-ocode:
     name: 'Test (ocode fork build)'
     runs-on: 'ubuntu-latest'
