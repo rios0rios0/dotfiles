@@ -834,8 +834,9 @@ portable content.
     the instructions describe WSL. `~/.config/aisync/exclude` keeps the three out of the phone's sync
     in both directions, so a manual `aisync sync` there cannot publish the phone's copies either.
 11. **chezmoi manages nothing in aisync's allowlists, and `.chezmoiremove` lists nothing aisync
-    writes**, except `.cursor`: aifiles enables Cursor, but aisync syncs a tool's personal files only
-    where its directory exists, and the apply removes `~/.cursor` before the hook runs.
+    writes.** aifiles syncs only Claude Code and OpenCode (rios0rios0/aifiles#34 dropped Cursor,
+    Codex and Copilot), and chezmoi manages neither tool's directory; the `.cursor` entry in
+    `.chezmoiremove` is the retired Cursor CLI's tombstone (601cbeb), not a path aisync writes.
 
 The first sync on a new machine needs nothing by hand: the apply fetches the key, clones aifiles and
 pulls. To leave aifiles alone for one apply, set `SKIP_AIFILES_SYNC=1`. `make test-aifiles-sync`
