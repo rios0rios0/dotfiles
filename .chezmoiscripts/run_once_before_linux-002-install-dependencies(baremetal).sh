@@ -10,7 +10,7 @@ if grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null; then
 fi
 
 # Detect the distribution
-if [ -f /etc/os-release ]; then
+if [[ -f /etc/os-release ]]; then
     # shellcheck source=/dev/null
     . /etc/os-release
     DISTRO="$ID"
@@ -61,14 +61,14 @@ install_genymotion() {
     fi
 
     echo "Installing Genymotion..."
-    local TEMP_DIR
-    TEMP_DIR="$(mktemp -d)"
+    local temp_dir
+    temp_dir="$(mktemp -d)"
 
-    download_https_only -o "$TEMP_DIR/genymotion.bin" "https://dl.genymotion.com/releases/genymotion-3.8.0/genymotion-3.8.0-linux_x64.bin"
-    chmod +x "$TEMP_DIR/genymotion.bin"
-    sudo "$TEMP_DIR/genymotion.bin" -d /opt/genymotion -- -y
+    download_https_only -o "$temp_dir/genymotion.bin" "https://dl.genymotion.com/releases/genymotion-3.8.0/genymotion-3.8.0-linux_x64.bin"
+    chmod +x "$temp_dir/genymotion.bin"
+    sudo "$temp_dir/genymotion.bin" -d /opt/genymotion -- -y
     sudo ln -sf /opt/genymotion/genymotion /usr/local/bin/genymotion
-    rm -rf "$TEMP_DIR"
+    rm -rf "$temp_dir"
 }
 
 # Reactotron - React/React Native debugging tool (https://github.com/infinitered/reactotron)
@@ -79,18 +79,18 @@ install_reactotron() {
     fi
 
     echo "Installing Reactotron..."
-    local TEMP_DIR
-    TEMP_DIR="$(mktemp -d)"
+    local temp_dir
+    temp_dir="$(mktemp -d)"
 
-    local LATEST_TAG
-    LATEST_TAG="$(download_https_only "https://api.github.com/repos/infinitered/reactotron/releases/latest" | jq -r '.tag_name')"
+    local latest_tag
+    latest_tag="$(download_https_only "https://api.github.com/repos/infinitered/reactotron/releases/latest" | jq -r '.tag_name')"
     # The tag format is "reactotron-app@X.Y.Z", extract the version number
-    local VERSION
-    VERSION="${LATEST_TAG##*@}"
+    local version
+    version="${latest_tag##*@}"
 
-    download_https_only -o "$TEMP_DIR/reactotron.deb" "https://github.com/infinitered/reactotron/releases/download/${LATEST_TAG}/reactotron-app_${VERSION}_amd64.deb"
-    sudo dpkg -i "$TEMP_DIR/reactotron.deb" || sudo apt install --fix-broken --yes
-    rm -rf "$TEMP_DIR"
+    download_https_only -o "$temp_dir/reactotron.deb" "https://github.com/infinitered/reactotron/releases/download/${latest_tag}/reactotron-app_${version}_amd64.deb"
+    sudo dpkg -i "$temp_dir/reactotron.deb" || sudo apt install --fix-broken --yes
+    rm -rf "$temp_dir"
 }
 
 # R-Linux 5 - data recovery tool (https://www.r-studio.com/free-linux-recovery/)
@@ -101,12 +101,12 @@ install_rlinux() {
     fi
 
     echo "Installing R-Linux 5..."
-    local TEMP_DIR
-    TEMP_DIR="$(mktemp -d)"
+    local temp_dir
+    temp_dir="$(mktemp -d)"
 
-    download_https_only -o "$TEMP_DIR/rlinux.deb" "https://www.r-studio.com/downloads/RLinux_amd64.deb"
-    sudo dpkg -i "$TEMP_DIR/rlinux.deb" || sudo apt install --fix-broken --yes
-    rm -rf "$TEMP_DIR"
+    download_https_only -o "$temp_dir/rlinux.deb" "https://www.r-studio.com/downloads/RLinux_amd64.deb"
+    sudo dpkg -i "$temp_dir/rlinux.deb" || sudo apt install --fix-broken --yes
+    rm -rf "$temp_dir"
 }
 
 # Slack - team communication (https://slack.com/downloads/linux)
@@ -117,14 +117,14 @@ install_slack() {
     fi
 
     echo "Installing Slack..."
-    local TEMP_DIR
-    TEMP_DIR="$(mktemp -d)"
+    local temp_dir
+    temp_dir="$(mktemp -d)"
 
     # Download the latest Slack .deb package
-    download_https_only -o "$TEMP_DIR/slack.deb" "https://packagemanager.rstudio.com/client/#/repos/2/packages/slack-desktop" 2>/dev/null \
-        || download_https_only -o "$TEMP_DIR/slack.deb" "https://downloads.slack-edge.com/desktop-releases/linux/x64/4.42.2/slack-desktop-4.42.2-amd64.deb"
-    sudo dpkg -i "$TEMP_DIR/slack.deb" || sudo apt install --fix-broken --yes
-    rm -rf "$TEMP_DIR"
+    download_https_only -o "$temp_dir/slack.deb" "https://packagemanager.rstudio.com/client/#/repos/2/packages/slack-desktop" 2>/dev/null \
+        || download_https_only -o "$temp_dir/slack.deb" "https://downloads.slack-edge.com/desktop-releases/linux/x64/4.42.2/slack-desktop-4.42.2-amd64.deb"
+    sudo dpkg -i "$temp_dir/slack.deb" || sudo apt install --fix-broken --yes
+    rm -rf "$temp_dir"
 }
 
 # VirtualBox (https://www.virtualbox.org/wiki/Linux_Downloads)
@@ -139,10 +139,10 @@ install_virtualbox() {
     # Add Oracle VirtualBox repository key
     download_https_only https://www.virtualbox.org/download/oracle_vbox_2016.asc | sudo gpg --yes --dearmor -o /usr/share/keyrings/oracle-virtualbox-2016.gpg
 
-    local CODENAME
-    CODENAME="$(lsb_release -cs)"
+    local codename
+    codename="$(lsb_release -cs)"
 
-    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/oracle-virtualbox-2016.gpg] https://download.virtualbox.org/virtualbox/debian $CODENAME contrib" | sudo tee /etc/apt/sources.list.d/virtualbox.list
+    echo "deb [arch=amd64 signed-by=/usr/share/keyrings/oracle-virtualbox-2016.gpg] https://download.virtualbox.org/virtualbox/debian $codename contrib" | sudo tee /etc/apt/sources.list.d/virtualbox.list
 
     sudo apt update
     sudo apt install --no-install-recommends --yes virtualbox-7.1

@@ -33,6 +33,8 @@ ZSHENV_TMPL="$REPO_ROOT/dot_zshenv.tmpl"
 LINUX_INSTALLER="$REPO_ROOT/.chezmoiscripts/run_once_before_linux-002-install-dependencies.sh.tmpl"
 ANDROID_INSTALLER="$REPO_ROOT/.chezmoiscripts/run_once_before_android-002-install-dependencies.sh.tmpl"
 EXIT_CODE=0
+# What the fake ocode the builds install says, so a check can tell it from the one it replaced.
+FAKE_OCODE="fake ocode"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -192,9 +194,10 @@ printf '#!/bin/bash\necho fake ocode\n' >"$out/cli-linux-x64/bin/opencode"
 chmod +x "$out/cli-linux-x64/bin/opencode"
 STUB
 make_bun_stub() {
-    mkdir -p "$(dirname "$1")"
-    sed "s/@VERSION@/$2/" "$TMP/bun-stub.in" >"$1"
-    chmod +x "$1"
+    local path="$1" version="$2"
+    mkdir -p "$(dirname "$path")"
+    sed "s/@VERSION@/$version/" "$TMP/bun-stub.in" >"$path"
+    chmod +x "$path"
 }
 make_bun_stub "$BUN_STUB/bun" "$PIN"
 chmod +x "$STUB/git"
@@ -258,15 +261,18 @@ rc() { cat "$TMP/rc"; }
 calls() { wc -l <"$BUN_CALLS"; }
 installs() { grep -c '^install|' "$BUN_LOG" || true; }
 # The last install or build ($1) the bun stubs recorded.
-last_entry() { grep "^$1|" "$BUN_LOG" | tail -n 1 || true; }
+last_entry() {
+    local kind="$1"
+    grep "^$kind|" "$BUN_LOG" | tail -n 1 || true
+}
 # Whether the last install and the last build both ran with bun $1, and a `bun` that either of
 # them spawned would have run $1 too.
 ran_with() {
-    local kind entry self spawned
+    local expected="$1" kind entry self spawned
     for kind in install build; do
         entry="$(last_entry "$kind")"
         IFS='|' read -r _ self _ spawned _ <<<"$entry"
-        [ "$self" = "$1" ] && [ "$spawned" = "$1" ] || return 1
+        [[ "$self" == "$expected" ]] && [[ "$spawned" == "$expected" ]] || return 1
     done
 }
 
@@ -278,15 +284,15 @@ ran_with() {
 #    branch build's preview version falls below it.
 rm -rf "$CHECKOUT"
 run_script
-[ "$(rc)" -eq 0 ] || fail "the clone must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "the clone must exit 0"
 grep -qF "clone --origin fork --branch reworked https://github.com/rios0rios0/opencode.git $CHECKOUT" "$GIT_CALLS" ||
     fail "a missing checkout must be cloned from the fork on its branch"
-[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ] || fail "the clone must land on the fork's branch"
-[ "$(cat "$CHECKOUT/.git/remotes/origin")" = "https://github.com/sst/opencode.git" ] ||
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the clone must land on the fork's branch"
+[[ "$(cat "$CHECKOUT/.git/remotes/origin")" = "https://github.com/sst/opencode.git" ]] ||
     fail "the clone must get sst upstream as origin"
-[ -x "$HOME/.local/bin/ocode" ] || fail "the build after the clone must install an executable ocode"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake0001" ] || fail "marker must hold the built head"
-[ "$(calls)" -eq 1 ] || fail "the first build must invoke bun once"
+[[ -x "$HOME/.local/bin/ocode" ]] || fail "the build after the clone must install an executable ocode"
+[[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake0001" ]] || fail "marker must hold the built head"
+[[ "$(calls)" -eq 1 ]] || fail "the first build must invoke bun once"
 identity="$(tail -n 1 "$BUN_ENV")"
 [ "${identity%%/*}" = "feat-provider-omniroute" ] || fail "the build must carry the fork's channel: $identity"
 [[ "${identity##*/}" =~ ^2\.1\.4-reworked\.[0-9]{10}$ ]] ||
@@ -323,8 +329,8 @@ before="$(calls)"
 run_script
 [ "$(rc)" -eq 0 ] || fail "a branch switch must exit 0"
 grep -q "checkout is on main, switching to reworked" "$TMP/out" || fail "the switch must say which branch it came from"
-[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ] || fail "the checkout must end on the fork's branch"
-[ "$(calls)" -eq "$before" ] || fail "an unchanged head must not rebuild after a branch switch"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the checkout must end on the fork's branch"
+[[ "$(calls)" -eq "$before" ]] || fail "an unchanged head must not rebuild after a branch switch"
 pass "a checkout on another branch is switched to the fork's without rebuilding"
 
 # 3) The branch is missing locally but the fork's remote-tracking one is there: it is created
@@ -336,7 +342,7 @@ run_script
 [ "$(rc)" -eq 0 ] || fail "tracking the fork's branch must exit 0"
 grep -qF "checkout -b reworked --track fork/reworked" "$GIT_CALLS" ||
     fail "a missing local branch must be created from fork/<branch>"
-[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ] || fail "the tracked branch must be checked out"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the tracked branch must be checked out"
 pass "a missing local branch is created from the fork's remote-tracking one"
 
 # 4) Neither the branch nor the fork's remote one exists: the checkout is left alone and
@@ -346,9 +352,9 @@ printf 'main\n' >"$CHECKOUT/.git/HEAD_REF"
 rm -f "$HOME/.local/bin/ocode"
 before="$(calls)"
 run_script
-[ "$(rc)" -eq 0 ] || fail "a checkout without the fork's branch must skip"
+[[ "$(rc)" -eq 0 ]] || fail "a checkout without the fork's branch must skip"
 grep -q "has no reworked branch" "$TMP/out" || fail "the missing branch must be reported"
-[ "$(calls)" -eq "$before" ] || fail "a checkout without the fork's branch must not build"
+[[ "$(calls)" -eq "$before" ]] || fail "a checkout without the fork's branch must not build"
 [ ! -e "$HOME/.local/bin/ocode" ] || fail "a checkout without the fork's branch must not install a binary"
 pass "a checkout with no fork branch warns and builds nothing"
 
@@ -389,8 +395,8 @@ chmod +x "$HOME/.local/bin/ocode"
 # 7) Unchanged head: no rebuild, and no install either -- an unchanged apply stays a no-op.
 run_script
 [ "$(rc)" -eq 0 ] || fail "unchanged apply must exit 0"
-[ "$(calls)" -eq 1 ] || fail "unchanged head must not rebuild"
-[ "$(installs)" -eq 1 ] || fail "unchanged head must not install the dependencies"
+[[ "$(calls)" -eq 1 ]] || fail "unchanged head must not rebuild"
+[[ "$(installs)" -eq 1 ]] || fail "unchanged head must not install the dependencies"
 pass "unchanged head does not rebuild"
 
 # 8) New head: rebuild and move the marker. The install runs again: it belongs to every build,
@@ -398,16 +404,16 @@ pass "unchanged head does not rebuild"
 printf 'fake4567\n' >"$CHECKOUT/.git/HEAD"
 run_script
 [ "$(rc)" -eq 0 ] || fail "rebuild must exit 0"
-[ "$(calls)" -eq 2 ] || fail "new head must rebuild"
-[ "$(installs)" -eq 2 ] || fail "a rebuild must install the dependencies first"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake4567" ] || fail "marker must move with the head"
+[[ "$(calls)" -eq 2 ]] || fail "new head must rebuild"
+[[ "$(installs)" -eq 2 ]] || fail "a rebuild must install the dependencies first"
+[[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake4567" ]] || fail "marker must move with the head"
 pass "new head rebuilds"
 
 # 9) Binary deleted but head unchanged: the rebuild restores it.
 rm -f "$HOME/.local/bin/ocode"
 run_script
-[ "$(rc)" -eq 0 ] || fail "missing binary must rebuild"
-[ -x "$HOME/.local/bin/ocode" ] || fail "missing binary must be reinstalled"
+[[ "$(rc)" -eq 0 ]] || fail "missing binary must rebuild"
+[[ -x "$HOME/.local/bin/ocode" ]] || fail "missing binary must be reinstalled"
 pass "missing binary is reinstalled"
 
 # 10) bun off PATH but at ~/.bun/bin: the build runs anyway. This is the first apply after
@@ -418,9 +424,9 @@ cp "$BUN_STUB/bun" "$HOME/.bun/bin/bun"
 rm -f "$HOME/.local/bin/ocode"
 (cd "$TMP" && PATH="$RELEASE_STUB:$STUB:/usr/bin:/bin" bash "$SCRIPT") >"$TMP/out" 2>&1
 echo $? >"$TMP/rc"
-[ "$(rc)" -eq 0 ] || fail "the ~/.bun/bin fallback must build"
-[ "$(calls)" -eq 4 ] || fail "the ~/.bun/bin fallback must invoke bun"
-[ -x "$HOME/.local/bin/ocode" ] || fail "the ~/.bun/bin fallback must install the binary"
+[[ "$(rc)" -eq 0 ]] || fail "the ~/.bun/bin fallback must build"
+[[ "$(calls)" -eq 4 ]] || fail "the ~/.bun/bin fallback must invoke bun"
+[[ -x "$HOME/.local/bin/ocode" ]] || fail "the ~/.bun/bin fallback must install the binary"
 ran_with "$HOME/.bun/bin/bun" || fail "the ~/.bun/bin fallback must install and build with that bun: $(tail -n 2 "$BUN_LOG")"
 pass "bun at ~/.bun/bin is used when PATH has none"
 
@@ -429,7 +435,7 @@ pass "bun at ~/.bun/bin is used when PATH has none"
 rm -rf "$HOME/.bun"
 (cd "$TMP" && PATH="$STUB" /bin/bash "$SCRIPT") >"$TMP/out" 2>&1
 echo $? >"$TMP/rc"
-[ "$(rc)" -eq 0 ] || fail "a machine without bun must skip"
+[[ "$(rc)" -eq 0 ]] || fail "a machine without bun must skip"
 grep -q "bun is not installed" "$TMP/out" || fail "a machine without bun must say why"
 pass "a machine without bun skips"
 
@@ -483,8 +489,8 @@ curl_calls() { wc -l <"$CURL_CALLS"; }
 mkdir -p "$HOME/.bun/bin"
 cp "$BUN_STUB/bun" "$HOME/.bun/bin/bun"
 run_install_bun
-[ "$(rc)" -eq 0 ] || fail "the installed skip must exit 0"
-[ "$(curl_calls)" -eq 0 ] || fail "the installed skip must not download anything"
+[[ "$(rc)" -eq 0 ]] || fail "the installed skip must exit 0"
+[[ "$(curl_calls)" -eq 0 ]] || fail "the installed skip must not download anything"
 grep -q "bun is already installed, skipping" "$TMP/out" || fail "the installed skip must say why"
 pass "an installed bun is skipped"
 
@@ -493,10 +499,10 @@ pass "an installed bun is skipped"
 #    chezmoi owns and rewrites.
 rm -rf "$HOME/.bun"
 run_install_bun
-[ "$(rc)" -eq 0 ] || fail "the install must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "the install must exit 0"
 grep -q 'https://bun.sh/install' "$CURL_CALLS" || fail "the install must fetch the bun installer"
-[ "$(sed -n '1p' "$INSTALLER_CALLS")" = "shell=" ] || fail "the installer must run with SHELL empty: $(sed -n '1p' "$INSTALLER_CALLS")"
-[ "$(sed -n '2p' "$INSTALLER_CALLS")" = "args=" ] || fail "the installer must be run without arguments: $(sed -n '2p' "$INSTALLER_CALLS")"
+[[ "$(sed -n '1p' "$INSTALLER_CALLS")" = "shell=" ]] || fail "the installer must run with SHELL empty: $(sed -n '1p' "$INSTALLER_CALLS")"
+[[ "$(sed -n '2p' "$INSTALLER_CALLS")" = "args=" ]] || fail "the installer must be run without arguments: $(sed -n '2p' "$INSTALLER_CALLS")"
 pass "the upstream installer runs with SHELL empty"
 
 # 14) A failed download fails the install, so `verify` retries it on the next apply.
@@ -504,7 +510,7 @@ rm -rf "$HOME/.bun"
 export CURL_FAIL=1
 run_install_bun
 unset CURL_FAIL
-[ "$(rc)" -ne 0 ] || fail "a failed download must exit non-zero"
+[[ "$(rc)" -ne 0 ]] || fail "a failed download must exit non-zero"
 grep -q "failed to download the bun installer" "$TMP/out" || fail "a failed download must say what failed"
 pass "a failed download fails the install"
 
@@ -513,7 +519,7 @@ rm -rf "$HOME/.bun"
 export INSTALLER_FAIL=7
 run_install_bun
 unset INSTALLER_FAIL
-[ "$(rc)" -ne 0 ] || fail "a failed installer must exit non-zero"
+[[ "$(rc)" -ne 0 ]] || fail "a failed installer must exit non-zero"
 grep -q "exited with status 7" "$TMP/out" || fail "a failed installer must report its status"
 pass "a failed installer fails the install"
 
@@ -541,7 +547,8 @@ data:
 EOF
 
 render() {
-    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "{\"chezmoi\":{\"os\":\"$1\"}}" <"$ZSHENV_TMPL"
+    local os="$1"
+    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "{\"chezmoi\":{\"os\":\"$os\"}}" <"$ZSHENV_TMPL"
 }
 
 if ! command -v chezmoi >/dev/null 2>&1; then
@@ -593,12 +600,12 @@ start_running_ocode
 unanswered_pid=$!
 before="$(calls)"
 run_script
-[ "$(rc)" -eq 0 ] || fail "an unanswered prompt must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "an unanswered prompt must exit 0"
 grep -q "ocode is running" "$TMP/out" || fail "a running ocode must be reported"
 grep -q "leaving PID" "$TMP/out" || fail "an unanswered prompt must say the session is left alone"
-[ "$(calls)" -eq $((before + 1)) ] || fail "an unanswered prompt must build anyway"
+[[ "$(calls)" -eq $((before + 1)) ]] || fail "an unanswered prompt must build anyway"
 [ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake7890" ] || fail "an unanswered prompt must move the marker"
-grep -q "fake ocode" "$HOME/.local/bin/ocode" || fail "an unanswered prompt must install the new binary"
+grep -q "$FAKE_OCODE" "$HOME/.local/bin/ocode" || fail "an unanswered prompt must install the new binary"
 kill -0 "$unanswered_pid" 2>/dev/null || fail "the running ocode must survive the build"
 kill "$unanswered_pid" 2>/dev/null || true
 wait "$unanswered_pid" 2>/dev/null || true
@@ -613,9 +620,9 @@ printf 'n\n' >"$TMP/answer"
 run_script "$TMP/answer"
 [ "$(rc)" -eq 0 ] || fail "a declined prompt must exit 0"
 grep -q "leaving PID" "$TMP/out" || fail "a declined prompt must say the session is left alone"
-[ "$(calls)" -eq $((before + 1)) ] || fail "a declined prompt must build anyway"
+[[ "$(calls)" -eq $((before + 1)) ]] || fail "a declined prompt must build anyway"
 [ "$(cat "$HOME/.cache/ocode-built-commit")" = "fakeabcd" ] || fail "a declined prompt must move the marker"
-grep -q "fake ocode" "$HOME/.local/bin/ocode" || fail "a declined prompt must install the new binary"
+grep -q "$FAKE_OCODE" "$HOME/.local/bin/ocode" || fail "a declined prompt must install the new binary"
 kill -0 "$declined_pid" 2>/dev/null || fail "the running ocode must survive a declined prompt"
 kill "$declined_pid" 2>/dev/null || true
 wait "$declined_pid" 2>/dev/null || true
@@ -630,9 +637,9 @@ before="$(calls)"
 run_script "$TMP/answer"
 [ "$(rc)" -eq 0 ] || fail "an accepted prompt must exit 0"
 grep -q "killed PID" "$TMP/out" || fail "an accepted prompt must report the kill"
-[ "$(calls)" -eq $((before + 1)) ] || fail "an accepted prompt must build"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fakefade" ] || fail "an accepted prompt must move the marker"
-grep -q "fake ocode" "$HOME/.local/bin/ocode" || fail "an accepted prompt must install the new binary"
+[[ "$(calls)" -eq $((before + 1)) ]] || fail "an accepted prompt must build"
+[[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fakefade" ]] || fail "an accepted prompt must move the marker"
+grep -q "$FAKE_OCODE" "$HOME/.local/bin/ocode" || fail "an accepted prompt must install the new binary"
 wait "$accepted_pid" 2>/dev/null || true
 if kill -0 "$accepted_pid" 2>/dev/null; then
     fail "the killed ocode must be gone"
@@ -644,8 +651,8 @@ start_running_ocode
 unchanged_pid=$!
 before="$(calls)"
 run_script
-[ "$(rc)" -eq 0 ] || fail "an unchanged head must exit 0 with ocode running"
-[ "$(calls)" -eq "$before" ] || fail "an unchanged head must not build with ocode running"
+[[ "$(rc)" -eq 0 ]] || fail "an unchanged head must exit 0 with ocode running"
+[[ "$(calls)" -eq "$before" ]] || fail "an unchanged head must not build with ocode running"
 if grep -q "ocode is running" "$TMP/out"; then
     fail "an unchanged head must not prompt about ocode"
 fi
@@ -662,13 +669,13 @@ before="$(calls)"
 run_script
 unset BUN_STUB_RACE BUN_RACE_PID BUN_RACE_FIFO
 race_pid="$(cat "$TMP/race-pid")"
-[ "$(rc)" -eq 0 ] || fail "a process started mid-build must not fail the install"
+[[ "$(rc)" -eq 0 ]] || fail "a process started mid-build must not fail the install"
 if grep -q "Text file busy" "$TMP/out"; then
     fail "the install must not lose the running-binary race"
 fi
-[ "$(calls)" -eq $((before + 1)) ] || fail "the race case must build once"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake9999" ] || fail "the race case must move the marker"
-grep -q "fake ocode" "$HOME/.local/bin/ocode" || fail "the race case must install the new binary"
+[[ "$(calls)" -eq $((before + 1)) ]] || fail "the race case must build once"
+[[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake9999" ]] || fail "the race case must move the marker"
+grep -q "$FAKE_OCODE" "$HOME/.local/bin/ocode" || fail "the race case must install the new binary"
 kill -0 "$race_pid" 2>/dev/null || fail "the racing process must be left running (it holds the old file)"
 kill "$race_pid" 2>/dev/null || true
 wait "$race_pid" 2>/dev/null || true
@@ -685,12 +692,12 @@ RELEASE="$RELEASE_ROOT/bun-v$PIN"
 # SHASUMS256.txt that goes with them, the layout of bun's own releases: <asset>.zip holding
 # <asset>/bun.
 build_release() {
-    local asset
+    local binary="$1" asset
     rm -rf "$TMP/release-src" "$RELEASE"
     mkdir -p "$RELEASE"
     for asset in bun-linux-aarch64 bun-linux-x64-baseline bun-linux-x64; do
         mkdir -p "$TMP/release-src/$asset"
-        cp "$1" "$TMP/release-src/$asset/bun"
+        cp "$binary" "$TMP/release-src/$asset/bun"
         chmod +x "$TMP/release-src/$asset/bun"
         (cd "$TMP/release-src" && zip -q -r "$RELEASE/$asset.zip" "$asset")
     done
@@ -726,17 +733,17 @@ leftovers() {
 rm -rf "$HOME/.cache/ocode-bun"
 new_head
 run_script
-[ "$(rc)" -eq 0 ] || fail "fetching the pinned bun must exit 0: $(cat "$TMP/out")"
+[[ "$(rc)" -eq 0 ]] || fail "fetching the pinned bun must exit 0: $(cat "$TMP/out")"
 grep -qF "$BUN_RELEASES/bun-v$PIN/$x64_asset.zip" "$RELEASE_CALLS" ||
     fail "the download must fetch the $x64_asset asset of bun v$PIN: $(cat "$RELEASE_CALLS")"
 grep -qF "$BUN_RELEASES/bun-v$PIN/SHASUMS256.txt" "$RELEASE_CALLS" || fail "the download must fetch the release's SHASUMS256.txt"
-[ "$(grep -c -v -e "--proto =https --proto-redir =https" "$RELEASE_CALLS" || true)" -eq 0 ] ||
+[[ "$(grep -c -v -e "--proto =https --proto-redir =https" "$RELEASE_CALLS" || true)" -eq 0 ]] ||
     fail "every download must be HTTPS-only, redirects included: $(cat "$RELEASE_CALLS")"
-[ "$("$cache/bun" --version 2>/dev/null)" = "$PIN" ] || fail "the pinned bun must be cached at $cache/bun"
+[[ "$("$cache/bun" --version 2>/dev/null)" = "$PIN" ]] || fail "the pinned bun must be cached at $cache/bun"
 ran_with "$cache/bun" || fail "the cached pinned bun must run the install and the build, first on PATH: $(tail -n 2 "$BUN_LOG")"
 grep -qF "the checkout pins bun $PIN and $BUN_STUB/bun reports $NEWER" "$TMP/out" || fail "the drift must be reported"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "$(cat "$CHECKOUT/.git/HEAD")" ] || fail "the build with the pinned bun must move the marker"
-[ -z "$(leftovers)" ] || fail "the download must leave nothing behind: $(leftovers)"
+[[ "$(cat "$HOME/.cache/ocode-built-commit")" == "$(cat "$CHECKOUT/.git/HEAD")" ]] || fail "the build with the pinned bun must move the marker"
+[[ -z "$(leftovers)" ]] || fail "the download must leave nothing behind: $(leftovers)"
 if grep -q "WARN" "$TMP/out"; then
     fail "a successful fetch must not warn: $(grep WARN "$TMP/out")"
 fi
@@ -745,8 +752,8 @@ pass "a drifted bun gets the pinned one downloaded, verified and cached, and tha
 # 24) Cached: used as it is, nothing is downloaded.
 new_head
 run_script
-[ "$(rc)" -eq 0 ] || fail "a cached pinned bun must build"
-[ ! -s "$RELEASE_CALLS" ] || fail "a cached pinned bun must not be downloaded again: $(cat "$RELEASE_CALLS")"
+[[ "$(rc)" -eq 0 ]] || fail "a cached pinned bun must build"
+[[ ! -s "$RELEASE_CALLS" ]] || fail "a cached pinned bun must not be downloaded again: $(cat "$RELEASE_CALLS")"
 ran_with "$cache/bun" || fail "the cached pinned bun must run the install and the build: $(tail -n 2 "$BUN_LOG")"
 grep -qF "using the cached $cache/bun" "$TMP/out" || fail "the cached bun must be named"
 pass "a cached copy of the pinned bun is used without a download"
@@ -756,9 +763,9 @@ pass "a cached copy of the pinned bun is used without a download"
 make_bun_stub "$cache/bun" "0.0.0"
 new_head
 run_script
-[ "$(rc)" -eq 0 ] || fail "a stale cached bun must not fail the build"
+[[ "$(rc)" -eq 0 ]] || fail "a stale cached bun must not fail the build"
 grep -qF "/bun-v$PIN/$x64_asset.zip" "$RELEASE_CALLS" || fail "a stale cached bun must be fetched again"
-[ "$("$cache/bun" --version 2>/dev/null)" = "$PIN" ] || fail "the stale cached bun must be replaced by the pinned one"
+[[ "$("$cache/bun" --version 2>/dev/null)" = "$PIN" ]] || fail "the stale cached bun must be replaced by the pinned one"
 ran_with "$cache/bun" || fail "the refetched bun must run the install and the build"
 pass "a cached bun that does not report the pin is fetched again rather than trusted"
 
@@ -768,7 +775,7 @@ export FAKE_UNAME_M="aarch64"
 new_head
 run_script
 export FAKE_UNAME_M="x86_64"
-[ "$(rc)" -eq 0 ] || fail "an arm64 fetch must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "an arm64 fetch must exit 0"
 grep -qF "$BUN_RELEASES/bun-v$PIN/bun-linux-aarch64.zip" "$RELEASE_CALLS" ||
     fail "an arm64 machine must fetch bun-linux-aarch64: $(cat "$RELEASE_CALLS")"
 ran_with "$cache/bun" || fail "the aarch64 build must run the install and the build"
@@ -781,13 +788,13 @@ export RELEASE_FAIL=1
 new_head
 run_script
 unset RELEASE_FAIL
-[ "$(rc)" -eq 0 ] || fail "a failed download must not fail the apply"
+[[ "$(rc)" -eq 0 ]] || fail "a failed download must not fail the apply"
 grep -qF "WARN: failed to download bun $PIN from $BUN_RELEASES/bun-v$PIN" "$TMP/out" || fail "a failed download must say what failed"
 grep -qF "WARN: bun $PIN is not available, so the build uses $BUN_STUB/bun" "$TMP/out" || fail "the fallback must name the bun it uses"
 ran_with "$BUN_STUB/bun" || fail "without the network the resolved bun must run the install and the build"
-[ ! -e "$cache/bun" ] || fail "a failed download must cache nothing"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "$(cat "$CHECKOUT/.git/HEAD")" ] || fail "the fallback build must move the marker"
-[ -z "$(leftovers)" ] || fail "a failed download must leave nothing behind: $(leftovers)"
+[[ ! -e "$cache/bun" ]] || fail "a failed download must cache nothing"
+[[ "$(cat "$HOME/.cache/ocode-built-commit")" == "$(cat "$CHECKOUT/.git/HEAD")" ]] || fail "the fallback build must move the marker"
+[[ -z "$(leftovers)" ]] || fail "a failed download must leave nothing behind: $(leftovers)"
 pass "without the network the build warns and falls back to the resolved bun"
 
 # 28) A zip that does not match the release's SHASUMS256.txt -- a corrupted download -- is never
@@ -797,7 +804,7 @@ printf 'x' >>"$RELEASE/$x64_asset.zip"
 new_head
 run_script
 cp "$TMP/good.zip" "$RELEASE/$x64_asset.zip"
-[ "$(rc)" -eq 0 ] || fail "a checksum mismatch must not fail the apply"
+[[ "$(rc)" -eq 0 ]] || fail "a checksum mismatch must not fail the apply"
 grep -qF "WARN: $x64_asset.zip does not match the checksum in the SHASUMS256.txt of bun $PIN" "$TMP/out" ||
     fail "a checksum mismatch must be reported"
 [ ! -e "$cache" ] || fail "a zip that fails its checksum must not reach the cache"
@@ -814,9 +821,9 @@ run_script
 build_release "$TMP/pinned-bun"
 [ "$(rc)" -eq 0 ] || fail "a bun that cannot start must not fail the apply"
 grep -qF "WARN: the downloaded bun reports no version rather than $PIN" "$TMP/out" || fail "a bun that cannot start must be reported"
-[ ! -e "$cache" ] || fail "a bun that cannot start must not be cached, nor leave its directory"
+[[ ! -e "$cache" ]] || fail "a bun that cannot start must not be cached, nor leave its directory"
 ran_with "$BUN_STUB/bun" || fail "a bun that cannot start must fall back to the resolved one"
-[ -z "$(leftovers)" ] || fail "a discarded bun must leave nothing behind: $(leftovers)"
+[[ -z "$(leftovers)" ]] || fail "a discarded bun must leave nothing behind: $(leftovers)"
 pass "a downloaded bun that cannot report the pinned version is discarded"
 
 # 30) An architecture bun publishes no Linux build for downloads nothing and falls back.
@@ -825,7 +832,7 @@ export FAKE_UNAME_M="riscv64"
 new_head
 run_script
 export FAKE_UNAME_M="x86_64"
-[ "$(rc)" -eq 0 ] || fail "an unsupported architecture must not fail the apply"
+[[ "$(rc)" -eq 0 ]] || fail "an unsupported architecture must not fail the apply"
 grep -qF "WARN: bun publishes no Linux build for riscv64" "$TMP/out" || fail "an unsupported architecture must be reported"
 [ ! -s "$RELEASE_CALLS" ] || fail "an unsupported architecture must download nothing: $(cat "$RELEASE_CALLS")"
 ran_with "$BUN_STUB/bun" || fail "an unsupported architecture must fall back to the resolved bun"
@@ -837,7 +844,7 @@ new_head
 run_script
 [ "$(rc)" -eq 0 ] || fail "a missing pin must not fail the apply"
 grep -qF "WARN: $CHECKOUT/package.json pins no bun release (packageManager is missing)" "$TMP/out" || fail "a missing pin must be reported"
-[ ! -s "$RELEASE_CALLS" ] || fail "a missing pin must download nothing"
+[[ ! -s "$RELEASE_CALLS" ]] || fail "a missing pin must download nothing"
 ran_with "$BUN_STUB/bun" || fail "a missing pin must fall back to the resolved bun"
 pass "a checkout that pins no bun builds with the resolved one"
 
@@ -847,9 +854,9 @@ for value in "bun@canary" "bun@^1.4.2" "pnpm@9.15.0"; do
     write_manifest "$value"
     new_head
     run_script
-    [ "$(rc)" -eq 0 ] || fail "$value: must not fail the apply"
+    [[ "$(rc)" -eq 0 ]] || fail "$value: must not fail the apply"
     grep -qF "pins no bun release (packageManager is $value)" "$TMP/out" || fail "$value: must be reported as no pin"
-    [ ! -s "$RELEASE_CALLS" ] || fail "$value: must download nothing"
+    [[ ! -s "$RELEASE_CALLS" ]] || fail "$value: must download nothing"
     ran_with "$BUN_STUB/bun" || fail "$value: must fall back to the resolved bun"
 done
 pass "a packageManager that names no bun release falls back without a download"
@@ -858,9 +865,9 @@ pass "a packageManager that names no bun release falls back without a download"
 printf 'not json\n' >"$CHECKOUT/package.json"
 new_head
 run_script
-[ "$(rc)" -eq 0 ] || fail "an unreadable package.json must not fail the apply"
+[[ "$(rc)" -eq 0 ]] || fail "an unreadable package.json must not fail the apply"
 grep -qF "WARN: could not read packageManager from $CHECKOUT/package.json" "$TMP/out" || fail "an unreadable package.json must be reported"
-[ ! -s "$RELEASE_CALLS" ] || fail "an unreadable package.json must download nothing"
+[[ ! -s "$RELEASE_CALLS" ]] || fail "an unreadable package.json must download nothing"
 ran_with "$BUN_STUB/bun" || fail "an unreadable package.json must fall back to the resolved bun"
 pass "an unreadable package.json falls back to the resolved bun"
 write_manifest "bun@$PIN"
@@ -874,10 +881,10 @@ export BUN_INSTALL_FAIL=1
 new_head
 run_script
 unset BUN_INSTALL_FAIL
-[ "$(rc)" -ne 0 ] || fail "a failed install must fail the apply"
+[[ "$(rc)" -ne 0 ]] || fail "a failed install must fail the apply"
 grep -qF "ERROR: bun install --frozen-lockfile failed in $CHECKOUT" "$TMP/out" || fail "a failed install must say what failed"
-[ "$(calls)" -eq "$before" ] || fail "a failed install must not build"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "$marker_before" ] || fail "a failed install must leave the marker, so the next apply retries"
+[[ "$(calls)" -eq "$before" ]] || fail "a failed install must not build"
+[[ "$(cat "$HOME/.cache/ocode-built-commit")" = "$marker_before" ]] || fail "a failed install must leave the marker, so the next apply retries"
 pass "a failed dependency install fails the apply before the build"
 
 # 35) The version follows the release the checkout is built on: a checkout rebased onto the next
@@ -885,7 +892,7 @@ pass "a failed dependency install fails the apply before the build"
 write_cli_manifest "2.2.0"
 new_head
 run_script
-[ "$(rc)" -eq 0 ] || fail "a build on another release must succeed: $(cat "$TMP/out")"
+[[ "$(rc)" -eq 0 ]] || fail "a build on another release must succeed: $(cat "$TMP/out")"
 identity="$(tail -n 1 "$BUN_ENV")"
 [[ "${identity##*/}" =~ ^2\.2\.0-reworked\.[0-9]{10}$ ]] || fail "the version must follow the checkout's release: $identity"
 pass "the build version follows the upstream release the checkout is built on"
@@ -897,7 +904,7 @@ for manifest in '{"name": "@opencode/cli"}' '{"name": "@opencode/cli", "version"
     printf '%s\n' "$manifest" >"$CHECKOUT/packages/cli/package.json"
     new_head
     run_script
-    [ "$(rc)" -eq 0 ] || fail "$manifest: a CLI package without a release version must not fail the apply"
+    [[ "$(rc)" -eq 0 ]] || fail "$manifest: a CLI package without a release version must not fail the apply"
     identity="$(tail -n 1 "$BUN_ENV")"
     [[ "${identity##*/}" =~ ^2\.0\.0-reworked\.[0-9]{10}$ ]] || fail "$manifest: must stamp 2.0.0 as the fork's build: $identity"
     grep -qE "WARN: .*$CHECKOUT/packages/cli/package\.json.*so the build is stamped 2\.0\.0" "$TMP/out" ||
@@ -906,7 +913,7 @@ done
 write_cli_manifest "$CLONE_RELEASE"
 pass "a CLI package that names no release version stamps 2.0.0 with a warning"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-ocode] all ocode fork-builder and bun provisioning tests passed" >&2
 fi
 exit $EXIT_CODE

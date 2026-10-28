@@ -39,7 +39,7 @@ declare -A TEMPLATE_CHECKS=(
 
 for tmpl in "${!TEMPLATE_CHECKS[@]}"; do
     file="$REPO_ROOT/$tmpl"
-    if [ ! -f "$file" ]; then
+    if [[ ! -f "$file" ]]; then
         echo "[test-template-render] SKIP: $tmpl (not found)" >&2
         continue
     fi
@@ -54,7 +54,7 @@ for tmpl in "${!TEMPLATE_CHECKS[@]}"; do
 
     # Format-specific validation
     check="${TEMPLATE_CHECKS[$tmpl]}"
-    if [ -n "$check" ] && ! echo "$output" | grep -qE "$check"; then
+    if [[ -n "$check" ]] && ! echo "$output" | grep -qE "$check"; then
         echo "[test-template-render] FAIL: $tmpl (expected pattern '$check' not found in output)" >&2
         EXIT_CODE=1
         continue
@@ -68,7 +68,7 @@ done
 # so the github/gist/gitlab/bitbucket blocks render with ProxyCommand pointing
 # at ssh.github.com:443 / altssh.gitlab.com:443 / altssh.bitbucket.org:443).
 ssh_config_file="$REPO_ROOT/dot_ssh/config.tmpl"
-if [ -f "$ssh_config_file" ]; then
+if [[ -f "$ssh_config_file" ]]; then
     err_file="$TMPDIR/err-ssh-config-extra"
     if ssh_output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$ssh_config_file" 2>"$err_file"); then
         for pattern in \
@@ -93,10 +93,10 @@ fi
 
 # Test docker config template (must be valid JSON)
 docker_tmpl="$REPO_ROOT/dot_docker/config.json.tmpl"
-if [ -f "$docker_tmpl" ]; then
+if [[ -f "$docker_tmpl" ]]; then
     err_file="$TMPDIR/err-docker"
     if output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$docker_tmpl" 2>"$err_file"); then
-        if [ -n "$output" ] && ! echo "$output" | jq empty 2>/dev/null; then
+        if [[ -n "$output" ]] && ! echo "$output" | jq empty 2>/dev/null; then
             echo "[test-template-render] FAIL: dot_docker/config.json.tmpl (invalid JSON output)" >&2
             EXIT_CODE=1
         else
@@ -141,7 +141,7 @@ for script in run_after_windows-001-create-ssh-public-keys.ps1.tmpl run_after_wi
     set_contents=$(grep -c '^Set-Content ' <<<"$output" || true)
     unterminated=$(grep '^Set-Content ' <<<"$output" | grep -cv -- '-Force$' || true)
     glued=$(grep -cE '[^[:space:]]#' <<<"$output" || true)
-    if [ "$set_contents" = "2" ] && [ "$unterminated" = "0" ] && [ "$glued" = "0" ]; then
+    if [[ "$set_contents" = "2" ]] && [[ "$unterminated" = "0" ]] && [[ "$glued" = "0" ]]; then
         echo "[test-template-render] PASS: $script keeps each entry's block on its own lines" >&2
     else
         echo "[test-template-render] FAIL: $script ($set_contents Set-Content lines, $unterminated not ending in -Force, $glued comments glued to code)" >&2
@@ -158,7 +158,7 @@ guard="$REPO_ROOT/.chezmoiscripts/run_before_000-verify-chezmoi-config.tmpl"
 # when
 if output=$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" < "$guard" 2>&1) &&
     # then
-    [ -z "${output//[[:space:]]/}" ]; then
+    [[ -z "${output//[[:space:]]/}" ]]; then
     echo "[test-template-render] PASS: config guard renders to nothing for a current config" >&2
 else
     echo "[test-template-render] FAIL: config guard is not silent for a current config: $output" >&2
@@ -193,20 +193,21 @@ printf '#!/bin/sh\nexit 0\n' > "$TMPDIR/signer/op-ssh-sign.exe"
 chmod +x "$TMPDIR/signer/op-ssh-sign.exe"
 # signing <label> <PATH> <override data> <program> <allowed-signers file, as a glob>
 signing() {
+    local label="$1" path_dir="$2" override="$3" want_program="$4" want_allowed="$5"
     local rendered program allowed
-    rendered="$(PATH="$2:/usr/bin:/bin" "$CHEZMOI" execute-template --config="$TMPDIR/chezmoi.yaml" --override-data "$3" \
+    rendered="$(PATH="$path_dir:/usr/bin:/bin" "$CHEZMOI" execute-template --config="$TMPDIR/chezmoi.yaml" --override-data "$override" \
         < "$REPO_ROOT/dot_gitconfig.tmpl" 2>/dev/null)" || {
-        echo "[test-template-render] FAIL: $1 gitconfig does not render" >&2
+        echo "[test-template-render] FAIL: $label gitconfig does not render" >&2
         EXIT_CODE=1
         return
     }
     program="$(sed -n 's/^    program = "\(.*\)"$/\1/p' <<<"$rendered")"
     allowed="$(sed -n 's/^    allowedSignersFile = "\(.*\)"$/\1/p' <<<"$rendered")"
     # shellcheck disable=SC2053 # the expected file is a glob on purpose
-    if [[ "$program" == "$4" && "$allowed" == $5 ]]; then
-        echo "[test-template-render] PASS: $1 signs with $4 and verifies against $allowed" >&2
+    if [[ "$program" == "$want_program" && "$allowed" == $want_allowed ]]; then
+        echo "[test-template-render] PASS: $label signs with $want_program and verifies against $allowed" >&2
     else
-        echo "[test-template-render] FAIL: $1 signs with '$program' and verifies against '$allowed'" >&2
+        echo "[test-template-render] FAIL: $label signs with '$program' and verifies against '$allowed'" >&2
         EXIT_CODE=1
     fi
 }
@@ -232,7 +233,7 @@ else
     EXIT_CODE=1
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-template-render] all template rendering tests passed" >&2
 fi
 

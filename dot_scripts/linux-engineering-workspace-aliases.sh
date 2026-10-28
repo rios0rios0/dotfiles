@@ -40,14 +40,15 @@ _ws_names=""
 _on_workspace() {
   # Always write to cache — keeps behavior consistent with shell-credentials.sh
   # and guarantees the file is populated whether or not the alias exists.
-  printf 'alias %s=%q\n' "$1" "cd ${2}" >> "$_ws_cache"
-  _ws_names="${_ws_names:+$_ws_names }$1"
-  if alias "$1" &>/dev/null && [[ -z "$_OP_FORCE_RELOAD" ]]; then
-    printf '[workspaces] SKIP: alias "%s" (already set)\n' "$1" >&2
+  local _ws_alias="$1" _ws_dir="$2"
+  printf 'alias %s=%q\n' "$_ws_alias" "cd ${_ws_dir}" >> "$_ws_cache"
+  _ws_names="${_ws_names:+$_ws_names }$_ws_alias"
+  if alias "$_ws_alias" &>/dev/null && [[ -z "$_OP_FORCE_RELOAD" ]]; then
+    printf '[workspaces] SKIP: alias "%s" (already set)\n' "$_ws_alias" >&2
   else
-    printf '[workspaces] creating alias "%s"\n' "$1" >&2
+    printf '[workspaces] creating alias "%s"\n' "$_ws_alias" >&2
     # shellcheck disable=SC2139
-    alias "${1}=cd ${2}"
+    alias "${_ws_alias}=cd ${_ws_dir}"
   fi
 }
 

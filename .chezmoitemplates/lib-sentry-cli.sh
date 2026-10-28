@@ -21,10 +21,11 @@ sentry_cli_version() {
 
 # True when version $1 is version $2 or newer; both are MAJOR.MINOR.PATCH
 sentry_cli_version_at_least() {
+    local have_version="$1" want_version="$2"
     local -a have want
     local i
-    IFS=. read -r -a have <<< "$1"
-    IFS=. read -r -a want <<< "$2"
+    IFS=. read -r -a have <<< "$have_version"
+    IFS=. read -r -a want <<< "$want_version"
     for i in 0 1 2; do
         (( 10#${have[i]} > 10#${want[i]} )) && return 0
         (( 10#${have[i]} < 10#${want[i]} )) && return 1

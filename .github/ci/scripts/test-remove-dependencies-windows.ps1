@@ -34,6 +34,14 @@ function npm {
 # Defines the handlers and Invoke-TombstoneList without applying the real list.
 . $scriptUnderTest
 
+# Prints a case's outcome under the suite's prefix. Write-Host belongs in a Show- function, as
+# PSScriptAnalyzer's PSAvoidUsingWriteHost puts it, so Invoke-TestCase leaves the printing here.
+function Show-TestResult {
+    param([string]$Message)
+
+    Write-Host "[test-remove-dependencies-windows] $Message"
+}
+
 function Invoke-TestCase {
     param([string]$Description, [scriptblock]$Body)
 
@@ -43,10 +51,10 @@ function Invoke-TestCase {
     $script:uninstallExitCode = 0
     try {
         & $Body
-        Write-Host "[test-remove-dependencies-windows] PASS: $Description"
+        Show-TestResult "PASS: $Description"
     }
     catch {
-        Write-Host "[test-remove-dependencies-windows] FAIL: $Description -- $_"
+        Show-TestResult "FAIL: $Description -- $_"
         $script:failures++
     }
 }

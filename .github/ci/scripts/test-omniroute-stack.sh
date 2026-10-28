@@ -34,8 +34,9 @@ EOF
 
 # render <os> <kernel release>
 render() {
+    local os="$1" osrelease="$2"
     chezmoi execute-template --config "$TMP/chezmoi.yaml" \
-        --override-data "{\"chezmoi\":{\"os\":\"$1\",\"kernel\":{\"osrelease\":\"$2\",\"ostype\":\"Linux\",\"version\":\"#1 SMP\"}}}" \
+        --override-data "{\"chezmoi\":{\"os\":\"$os\",\"kernel\":{\"osrelease\":\"$osrelease\",\"ostype\":\"Linux\",\"version\":\"#1 SMP\"}}}" \
         < "$TEMPLATE"
 }
 
@@ -90,7 +91,7 @@ cat > "$STUB/cmd.exe" <<'STUB_CMD'
 #!/bin/bash
 for arg in "$@"; do
     if [[ "$arg" =~ ^echo\ %([A-Za-z]+)%$ ]]; then
-        var="FAKE_WIN_${BASH_REMATCH[1]}"
+        var="FAKE_WIN_${BASH_REMATCH[1]^^}"
         printf '%s\r\n' "${!var:-%${BASH_REMATCH[1]}%}"
         exit 0
     fi
@@ -119,15 +120,19 @@ reset() {
     printf 'name: dotfiles\n' > "$OMNIROUTE_COMPOSE_DIR/compose.yaml"
     printf 'STORAGE_ENCRYPTION_KEY=x\n' > "$OMNIROUTE_COMPOSE_DIR/.env"
     unset FAKE_DOCKER_DOWN FAKE_CONFIG_FAIL FAKE_STATE FAKE_IMAGE FAKE_VOLUME FAKE_PULL_FAIL FAKE_UP_FAIL \
-        FAKE_WIN_OneDriveConsumer FAKE_WIN_APPDATA OMNIROUTE_DOCKER_SETTINGS
+        FAKE_WIN_ONEDRIVECONSUMER FAKE_WIN_APPDATA OMNIROUTE_DOCKER_SETTINGS
 }
 
 # start <case>: runs the script, stdout and stderr in $TMP/<case>.log; returns its exit code.
 start() {
-    bash "$SCRIPT" > "$TMP/$1.log" 2>&1
+    local name="$1"
+    bash "$SCRIPT" > "$TMP/$name.log" 2>&1
 }
 
-called() { grep -qE "$1" "$FAKE/calls.log"; }
+called() {
+    local pattern="$1"
+    grep -qE "$pattern" "$FAKE/calls.log"
+}
 # Nothing that makes a database: the volume, the containers, or anything that removes one.
 creates_nothing() { ! called 'volume create|compose (create|up|down|run)|docker run'; }
 
@@ -240,7 +245,7 @@ else
     fail "no data volume: $(cat "$TMP/novolume.log")"
 fi
 reset
-export FAKE_WIN_OneDriveConsumer='C:\Users\Test\OneDrive'
+export FAKE_WIN_ONEDRIVECONSUMER='C:\Users\Test\OneDrive'
 mkdir -p "$FAKE_C/Users/Test/OneDrive/Backup/omniroute/mxhero-z790"
 touch "$FAKE_C/Users/Test/OneDrive/Backup/omniroute/mxhero-z790/omniroute-20261003T033000Z.tar.age"
 if start otherdevice && grep -q "the mirror holds other devices' (mxhero-z790): 'omniroute-restore --device <name>'" "$TMP/otherdevice.log" &&

@@ -44,7 +44,7 @@ check_installer() {
 check_installer "the Linux installer" "$REPO_ROOT/.chezmoiscripts/run_once_before_linux-002-install-dependencies.sh.tmpl"
 check_installer "the Android installer" "$REPO_ROOT/.chezmoiscripts/run_once_before_android-002-install-dependencies.sh.tmpl"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-terra-update] all terra update tests passed" >&2
 fi
 exit $EXIT_CODE

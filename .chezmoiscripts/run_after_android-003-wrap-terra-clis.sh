@@ -25,7 +25,8 @@ is_wrapper() {
     # Match only the current single-tool form. Old wrappers that chain
     # `sigsys_launcher termux-etc-seccomp` also contain the string
     # `termux-etc-seccomp`, but must be replaced by the simpler form.
-    [ -f "$1" ] && grep -q 'exec termux-etc-seccomp' "$1" 2>/dev/null
+    local file="$1"
+    [[ -f "$file" ]] && grep -q 'exec termux-etc-seccomp' "$file" 2>/dev/null
 }
 
 wrap_go_cli() {
@@ -34,7 +35,7 @@ wrap_go_cli() {
     raw="$BIN_DIR/${name}_raw"
 
     # Nothing to wrap if the CLI hasn't been installed yet.
-    if [ ! -e "$target" ] && [ ! -e "$raw" ]; then
+    if [[ ! -e "$target" ]] && [[ ! -e "$raw" ]]; then
         return 0
     fi
 
@@ -46,11 +47,11 @@ wrap_go_cli() {
     # If $target is a real binary (first install, or `terra update` clobbered
     # the previous wrapper), promote it to ${name}_raw so the new wrapper can
     # exec it.
-    if [ -f "$target" ]; then
+    if [[ -f "$target" ]]; then
         mv -f "$target" "$raw"
     fi
 
-    if [ ! -x "$raw" ]; then
+    if [[ ! -x "$raw" ]]; then
         echo "[${name}-wrapper] WARN: ${raw} missing or not executable; skipping wrap" >&2
         return 0
     fi
@@ -102,7 +103,7 @@ wrap_external_cli() {
     binary="$2"
     target="$BIN_DIR/$name"
 
-    if [ ! -x "$binary" ]; then
+    if [[ ! -x "$binary" ]]; then
         echo "[${name}-wrapper] WARN: ${binary} missing or not executable; skipping wrap" >&2
         return 0
     fi

@@ -61,7 +61,7 @@ USAGE_STALE=3600   # past this the cached figure is drawn dimmed
 
 read_account() {  # the e-mail of the account Claude Code is currently logged in as
     local raw f="$CFG/.claude.json"
-    [ -r "$f" ] || f="$HOME/.claude.json"
+    [[ -r "$f" ]] || f="$HOME/.claude.json"
     raw=$(grep -m1 -o '"emailAddress"[[:space:]]*:[[:space:]]*"[^"]*"' \
           "$f" 2>/dev/null) || return 0
     raw=${raw#*:}                    # drop the key
@@ -73,18 +73,18 @@ read_account() {  # the e-mail of the account Claude Code is currently logged in
 refresh_usage() {
     local cred="$CFG/.credentials.json" tok exp now resp tmp account
 
-    [ -r "$cred" ] || return 1
+    [[ -r "$cred" ]] || return 1
     command -v curl >/dev/null 2>&1 || return 1
     command -v jq   >/dev/null 2>&1 || return 1
 
     tok=$(jq -r '.claudeAiOauth.accessToken // empty' "$cred" 2>/dev/null)
     exp=$(jq -r '((.claudeAiOauth.expiresAt // 0) / 1000) | floor' "$cred" 2>/dev/null)
-    [ -n "$tok" ] || return 1
+    [[ -n "$tok" ]] || return 1
 
     # An expired token would only earn a 401. Leave the cache alone and let a
     # later render retry once Claude Code has refreshed the credentials itself.
     now=$EPOCHSECONDS
-    [ "${exp:-0}" -gt "$((now + 30))" ] || return 1
+    [[ "${exp:-0}" -gt "$((now + 30))" ]] || return 1
 
     # The token goes to curl on stdin (-H @-), never in argv: every local user can
     # read a process's arguments in /proc/<pid>/cmdline.
@@ -93,7 +93,7 @@ refresh_usage() {
         -H 'Content-Type: application/json' \
         -H 'anthropic-beta: oauth-2025-04-20' \
         <<<"Authorization: Bearer $tok" 2>/dev/null) || return 1
-    [ -n "$resp" ] || return 1
+    [[ -n "$resp" ]] || return 1
 
     account=$(read_account)
 
@@ -122,11 +122,11 @@ refresh_usage() {
         ] | .[]
     ' > "$tmp" 2>/dev/null || { rm -f "$tmp"; return 1; }
 
-    [ -s "$tmp" ] || { rm -f "$tmp"; return 1; }
+    [[ -s "$tmp" ]] || { rm -f "$tmp"; return 1; }
     mv -f "$tmp" "$USAGE_CACHE" 2>/dev/null || rm -f "$tmp"
 }
 
-if [ "$1" = "--refresh-usage" ]; then
+if [[ "$1" = "--refresh-usage" ]]; then
     refresh_usage
     exit
 fi
@@ -176,6 +176,7 @@ if [ -r "$USAGE_CACHE" ]; then
             five_at)  usage_five_at=$_v   ;;
             seven)    usage_seven=$_v     ;;
             seven_at) usage_seven_at=$_v  ;;
+            *)        ;;   # a key this revision does not read
         esac
     done < "$USAGE_CACHE"
 fi
@@ -185,7 +186,7 @@ fi
 account=$(read_account)
 
 # Caps cached under a different account describe someone else's plan.
-if [ -n "$usage_account" ] && [ -n "$account" ] && [ "$usage_account" != "$account" ]; then
+if [[ -n "$usage_account" ]] && [[ -n "$account" ]] && [[ "$usage_account" != "$account" ]]; then
     usage_scoped=""
     usage_fetched=0
 fi
@@ -195,11 +196,11 @@ usage_age=$(( now - usage_fetched ))
 # A profile without a claude.ai login has nothing to fetch, and a refresh that
 # cannot succeed never writes the cache, so trying anyway would fork one on
 # every redraw.
-if [ "$usage_age" -ge "$USAGE_TTL" ] && [ -r "$CFG/.credentials.json" ]; then
-    if [ -d "$USAGE_LOCK" ]; then
+if [[ "$usage_age" -ge "$USAGE_TTL" ]] && [[ -r "$CFG/.credentials.json" ]]; then
+    if [[ -d "$USAGE_LOCK" ]]; then
         # Reap a lock left behind by a refresh that was killed mid-flight.
         lock_age=$(( now - $(stat -c %Y "$USAGE_LOCK" 2>/dev/null || echo "$now") ))
-        [ "$lock_age" -gt 120 ] && rmdir "$USAGE_LOCK" 2>/dev/null
+        [[ "$lock_age" -gt 120 ]] && rmdir "$USAGE_LOCK" 2>/dev/null
     fi
     if mkdir "$USAGE_LOCK" 2>/dev/null; then
         # Fully detached: all three descriptors are closed, so Claude Code never
@@ -211,8 +212,8 @@ fi
 
 # stdin is authoritative for the two windows it carries; the cache fills in only
 # when the payload omits them (API-key auth, or an older CLI).
-[ "${five_pct:--1}"  -lt 0 ] && { five_pct=$usage_five;   five_at=$usage_five_at;   }
-[ "${seven_pct:--1}" -lt 0 ] && { seven_pct=$usage_seven; seven_at=$usage_seven_at; }
+[[ "${five_pct:--1}"  -lt 0 ]] && { five_pct=$usage_five;   five_at=$usage_five_at;   }
+[[ "${seven_pct:--1}" -lt 0 ]] && { seven_pct=$usage_seven; seven_at=$usage_seven_at; }
 
 # =============================================================================
 # p10k palette (~/.p10k.zsh)
@@ -268,21 +269,22 @@ vis_len() {
 # Room for a line, in Ink's units. Three columns are held back to cover
 # `statusLine.padding` being restored to its default of 1 on each side.
 BUDGET=$(( ${COLUMNS:-0} - 3 ))
-[ "$BUDGET" -gt 0 ] || BUDGET=0     # 0 == width unknown, never degrade
+[[ "$BUDGET" -gt 0 ]] || BUDGET=0     # 0 == width unknown, never degrade
 
 fits() {
-    [ "$BUDGET" -le 0 ] && return 0
-    vis_len "$1"
-    [ "$VIS_INK" -le "$BUDGET" ]
+    local text="$1"
+    [[ "$BUDGET" -le 0 ]] && return 0
+    vis_len "$text"
+    [[ "$VIS_INK" -le "$BUDGET" ]]
 }
 
 human() {  # 94045 -> 94k, 1000000 -> 1M
     local n=$1
-    if [ "$n" -ge 1000000 ]; then
+    if [[ "$n" -ge 1000000 ]]; then
         local whole=$(( n / 1000000 )) frac=$(( (n % 1000000) / 100000 ))
-        if [ "$frac" -eq 0 ]; then printf '%dM' "$whole"
+        if [[ "$frac" -eq 0 ]]; then printf '%dM' "$whole"
         else printf '%d.%dM' "$whole" "$frac"; fi
-    elif [ "$n" -ge 1000 ]; then
+    elif [[ "$n" -ge 1000 ]]; then
         printf '%dk' $(( n / 1000 ))
     else
         printf '%d' "$n"
@@ -293,8 +295,8 @@ human() {  # 94045 -> 94k, 1000000 -> 1M
 # rotates to a backup account.
 usage_color() {
     local p=$1
-    if   [ "$p" -ge 90 ]; then printf '%s' "$C_CRIT"
-    elif [ "$p" -ge 70 ]; then printf '%s' "$C_WARN"
+    if   [[ "$p" -ge 90 ]]; then printf '%s' "$C_CRIT"
+    elif [[ "$p" -ge 70 ]]; then printf '%s' "$C_WARN"
     else                       printf '%s' "$C_OK"
     fi
 }
@@ -304,12 +306,12 @@ PROMPT=""
 join_segments() {
     local body="" s
     for s in "$@"; do
-        [ -n "$s" ] || continue
-        [ -n "$body" ] && body+=" ${C_SEP}${SEP} "
+        [[ -n "$s" ]] || continue
+        [[ -n "$body" ]] && body+=" ${C_SEP}${SEP} "
         body+=$s
     done
     PROMPT="${body}${R}"
-    [ -n "$body" ]
+    [[ -n "$body" ]]
 }
 
 # Last-resort trim so a line can never exceed the terminal and be truncated by
@@ -320,10 +322,10 @@ join_segments() {
 clamp_line() {  # clamp_line <line> -> $LINE
     local s=$1 out="" chunk c w=0 step
     LINE=$s
-    [ "$BUDGET" -gt 0 ] || return 0
+    [[ "$BUDGET" -gt 0 ]] || return 0
     vis_len "$s"
-    [ "$VIS_INK" -gt "$BUDGET" ] || return 0
-    while [ -n "$s" ]; do
+    [[ "$VIS_INK" -gt "$BUDGET" ]] || return 0
+    while [[ -n "$s" ]]; do
         if [[ $s == $'\033'* ]]; then
             chunk="${s%%m*}m"
             out+=$chunk
@@ -332,7 +334,7 @@ clamp_line() {  # clamp_line <line> -> $LINE
         fi
         c=${s:0:1}
         if [[ $AMBIGUOUS == *"$c"* ]]; then step=2; else step=1; fi
-        [ $(( w + step )) -le "$BUDGET" ] || break
+        [[ $(( w + step )) -le "$BUDGET" ]] || break
         out+=$c
         w=$(( w + step ))
         s=${s:1}
@@ -348,35 +350,37 @@ clamp_line() {  # clamp_line <line> -> $LINE
 repo_root="" branch=""
 {
     _d=$raw_cwd
-    while [ -n "$_d" ] && [ "$_d" != "/" ] && [ ! -e "$_d/.git" ]; do
+    while [[ -n "$_d" ]] && [[ "$_d" != "/" ]] && [[ ! -e "$_d/.git" ]]; do
         _d=${_d%/*}
     done
-    if [ -n "$_d" ] && [ -e "$_d/.git" ]; then
+    if [[ -n "$_d" ]] && [[ -e "$_d/.git" ]]; then
         repo_root=$_d
         _gitdir="$_d/.git"
-        if [ -f "$_gitdir" ]; then
+        if [[ -f "$_gitdir" ]]; then
             # worktree or submodule: ".git" is a file holding "gitdir: <path>"
             IFS= read -r _line < "$_gitdir" && _gitdir=${_line#gitdir: }
-            [ "${_gitdir#/}" = "$_gitdir" ] && _gitdir="$_d/$_gitdir"
+            [[ "${_gitdir#/}" = "$_gitdir" ]] && _gitdir="$_d/$_gitdir"
         fi
-        if [ -r "$_gitdir/HEAD" ] && IFS= read -r _head < "$_gitdir/HEAD"; then
+        if [[ -r "$_gitdir/HEAD" ]] && IFS= read -r _head < "$_gitdir/HEAD"; then
             case $_head in
                 "ref: refs/heads/"*) branch=${_head#ref: refs/heads/} ;;
                 "ref: "*)            branch=${_head#ref: } ;;
                 ?*)                  branch=${_head:0:7} ;;   # detached HEAD
+                *)                   ;;                        # an empty HEAD file: no branch
             esac
         fi
     fi
 } 2>/dev/null
 
 # p10k shortens a branch over 32 characters to the first 12 ... the last 12.
-[ ${#branch} -gt 32 ] && branch="${branch:0:12}…${branch: -12}"
+[[ ${#branch} -gt 32 ]] && branch="${branch:0:12}…${branch: -12}"
 
 # $HOME collapses to ~, as p10k's dir segment does.
 cwd=$raw_cwd
 case $cwd in
     "$HOME")   cwd='~' ;;
     "$HOME"/*) cwd="~${cwd#"$HOME"}" ;;
+    *)         ;;   # outside $HOME: shown as it is
 esac
 
 # The repo root is an anchor (DIR_ANCHOR_FOREGROUND, bold); the rest takes
@@ -384,23 +388,23 @@ esac
 # approximating POWERLEVEL9K_SHORTEN_STRATEGY=truncate_to_unique.
 dir_segment() {  # dir_segment <level 0|1|2>
     local level=$1 anchor="" head="" tail="" out
-    if [ -n "$repo_root" ]; then
+    if [[ -n "$repo_root" ]]; then
         anchor=${repo_root##*/}
         head=${cwd%/"$anchor"*}
-        [ "$head" = "$cwd" ] && anchor=""
+        [[ "$head" = "$cwd" ]] && anchor=""
     fi
-    [ -z "$anchor" ] && head=$cwd
-    [ -n "$anchor" ] && tail=${cwd#"$head"/"$anchor"}
+    [[ -z "$anchor" ]] && head=$cwd
+    [[ -n "$anchor" ]] && tail=${cwd#"$head"/"$anchor"}
 
-    if [ "$level" -ge 1 ]; then
+    if [[ "$level" -ge 1 ]]; then
         local first=${head%%/*} rest=${head#*/} acc part parts
         acc=$first
-        if [ "$rest" != "$head" ]; then
+        if [[ "$rest" != "$head" ]]; then
             # Split with read rather than an unquoted $rest, which would also glob.
             IFS=/ read -ra parts <<< "$rest"
             for part in "${parts[@]}"; do
-                [ -n "$part" ] || continue
-                if [ "$level" -ge 2 ]; then acc+="/${part:0:1}"
+                [[ -n "$part" ]] || continue
+                if [[ "$level" -ge 2 ]]; then acc+="/${part:0:1}"
                 else                        acc+="/${part:0:3}"; fi
             done
         fi
@@ -408,27 +412,27 @@ dir_segment() {  # dir_segment <level 0|1|2>
     fi
 
     out="${C_DIR}${head}"
-    [ -n "$anchor" ] && out+="${C_DIR}/${B}${C_ANCHOR}${anchor}${NB}${C_DIR}${tail}"
+    [[ -n "$anchor" ]] && out+="${C_DIR}/${B}${C_ANCHOR}${anchor}${NB}${C_DIR}${tail}"
     printf '%s' "$out"
 }
 
 seg_vcs=""
-[ -n "$branch" ] && seg_vcs="${C_VCS}${I_BRANCH} ${branch}"
+[[ -n "$branch" ]] && seg_vcs="${C_VCS}${I_BRANCH} ${branch}"
 seg_acct=""
-[ -n "$account" ] && seg_acct="${C_ACCT}${account}"
+[[ -n "$account" ]] && seg_acct="${C_ACCT}${account}"
 
 # p10k's `context` segment (%n@%m). $HOSTNAME is not exported to hook commands,
 # so the host comes from procfs -- a file read rather than a `hostname` fork.
 _user=${USER:-${LOGNAME:-}}
-[ -n "$_user" ] || _user=$(id -un 2>/dev/null)
+[[ -n "$_user" ]] || _user=$(id -un 2>/dev/null)
 _host=${HOSTNAME:-}
-[ -n "$_host" ] || { IFS= read -r _host < /proc/sys/kernel/hostname 2>/dev/null || _host=""; }
+[[ -n "$_host" ]] || { IFS= read -r _host < /proc/sys/kernel/hostname 2>/dev/null || _host=""; }
 _host=${_host%%.*}
 seg_context=""
-[ -n "$_user" ] && [ -n "$_host" ] && seg_context="${C_CONTEXT}${_user}@${_host}"
+[[ -n "$_user" ]] && [[ -n "$_host" ]] && seg_context="${C_CONTEXT}${_user}@${_host}"
 
 chroot_prefix=""
-[ -n "$debian_chroot" ] && chroot_prefix="${C_DIM}(${debian_chroot})${R} "
+[[ -n "$debian_chroot" ]] && chroot_prefix="${C_DIM}(${debian_chroot})${R} "
 
 # The leading reset matters: Claude Code draws each row inside an Ink
 # <Text dimColor>, so without it the frame comes out dimmed twice and vanishes.
@@ -453,19 +457,19 @@ line1=$LINE
 
 model=${model% (*)}   # the window size is already spelled out by the ctx segment
 seg_model=""
-[ -n "$model" ] && seg_model="${B}${C_MODEL}${model}${NB}"
+[[ -n "$model" ]] && seg_model="${B}${C_MODEL}${model}${NB}"
 
 seg_venv=""
-[ -n "$VIRTUAL_ENV" ] && seg_venv="${C_DIM}${VIRTUAL_ENV##*/}"
+[[ -n "$VIRTUAL_ENV" ]] && seg_venv="${C_DIM}${VIRTUAL_ENV##*/}"
 
 ctx_segment() {  # ctx_segment <level 0|1>
     local level=$1 out
-    if [ "${ctx_left:--1}" -lt 0 ]; then
+    if [[ "${ctx_left:--1}" -lt 0 ]]; then
         printf '%s' "${C_DIM}ctx n/a"
         return
     fi
     out="$(usage_color $(( 100 - ctx_left )))ctx ${ctx_left}% left"
-    if [ "$level" -eq 0 ] && [ "${ctx_size:-0}" -gt 0 ]; then
+    if [[ "$level" -eq 0 ]] && [[ "${ctx_size:-0}" -gt 0 ]]; then
         out+="${C_DIM} ($(human "${ctx_tokens:-0}")/$(human "$ctx_size"))"
     fi
     printf '%s' "$out"
@@ -473,15 +477,15 @@ ctx_segment() {  # ctx_segment <level 0|1>
 
 # Model-scoped weekly caps (Fable, and anything else the plan carries).
 scoped_segments=()
-if [ -n "$usage_scoped" ]; then
+if [[ -n "$usage_scoped" ]]; then
     _stale=""
-    [ "$usage_age" -ge "$USAGE_STALE" ] && _stale=1
+    [[ "$usage_age" -ge "$USAGE_STALE" ]] && _stale=1
     IFS='|' read -ra _entries <<< "$usage_scoped"
     for _e in "${_entries[@]}"; do
-        [ -n "$_e" ] || continue
+        [[ -n "$_e" ]] || continue
         IFS=':' read -r _name _pct _at <<< "$_e"
-        [ -n "$_name" ] && [ -n "$_pct" ] || continue
-        if [ -n "$_stale" ]; then
+        [[ -n "$_name" ]] && [[ -n "$_pct" ]] || continue
+        if [[ -n "$_stale" ]]; then
             scoped_segments+=( "${C_DIM}${_name} ${_pct}%" )
         else
             scoped_segments+=( "$(usage_color "$_pct")${_name} ${_pct}%" )
@@ -493,16 +497,16 @@ LIMITS=()
 limit_segments() {  # limit_segments <level 0|1>
     local level=$1 s
     LIMITS=()
-    if [ "${five_pct:--1}" -ge 0 ]; then
+    if [[ "${five_pct:--1}" -ge 0 ]]; then
         s="$(usage_color "$five_pct")5h ${five_pct}%"
-        if [ "$level" -eq 0 ] && [ "${five_at:-0}" -gt 0 ]; then
+        if [[ "$level" -eq 0 ]] && [[ "${five_at:-0}" -gt 0 ]]; then
             printf -v s '%s%s (%(%H:%M)T)' "$s" "$C_DIM" "$five_at"
         fi
         LIMITS+=( "$s" )
     fi
-    if [ "${seven_pct:--1}" -ge 0 ]; then
+    if [[ "${seven_pct:--1}" -ge 0 ]]; then
         s="$(usage_color "$seven_pct")7d ${seven_pct}%"
-        if [ "$level" -eq 0 ] && [ "${seven_at:-0}" -gt 0 ]; then
+        if [[ "$level" -eq 0 ]] && [[ "${seven_at:-0}" -gt 0 ]]; then
             printf -v s '%s%s (%(%a %H:%M)T)' "$s" "$C_DIM" "$seven_at"
         fi
         LIMITS+=( "$s" )

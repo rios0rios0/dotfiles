@@ -21,11 +21,12 @@ SHIM="$REPO_ROOT/dot_local/bin/executable_xclip"
 STAGER="$REPO_ROOT/dot_local/bin/executable_clipshot"
 LIB="$REPO_ROOT/dot_local/lib/claude-clipboard.sh"
 EXIT_CODE=0
+FRESH_SHOT="fresh.png"
 
 echo "[test-clipboard-shim] testing the Claude Code clipboard shim..." >&2
 
 for required in "$SHIM" "$STAGER" "$LIB"; do
-    if [ ! -f "$required" ]; then
+    if [[ ! -f "$required" ]]; then
         echo "[test-clipboard-shim] FAIL: not found at $required" >&2
         exit 1
     fi
@@ -38,7 +39,8 @@ pass() { echo "[test-clipboard-shim] PASS: $1" >&2; }
 fail() { echo "[test-clipboard-shim] FAIL: $1" >&2; EXIT_CODE=1; }
 
 check() {
-    if [ "$2" = "true" ]; then pass "$1"; else fail "$1"; fi
+    local description="$1" condition="$2"
+    if [[ "$condition" == "true" ]]; then pass "$description"; else fail "$description"; fi
 }
 
 # A real 1x1 PNG, so the bytes the shim emits can be compared exactly.
@@ -82,13 +84,14 @@ save_image() {
 }
 
 add_shot() {
-    cp "$PNG_FIXTURE" "$SHOTS/$1"
-    touch -d "${2:-now}" "$SHOTS/$1"
+    local name="$1" when="${2:-now}"
+    cp "$PNG_FIXTURE" "$SHOTS/$name"
+    touch -d "$when" "$SHOTS/$name"
 }
 
 # --- a fresh capture is offered, saved intact, then consumed -----------------
 reset_state
-add_shot "fresh.png"
+add_shot "$FRESH_SHOT"
 clipboard_has_image && r=true || r=false
 check "offers a screenshot taken inside the freshness window" "$r"
 
@@ -103,7 +106,7 @@ check "reports an empty clipboard on the second paste (consumed)" "$r"
 
 # --- consumption is opt-out --------------------------------------------------
 reset_state
-add_shot "fresh.png"
+add_shot "$FRESH_SHOT"
 save_image
 CLAUDE_CLIPBOARD_REPEAT=1 clipboard_has_image && r=true || r=false
 check "keeps re-offering the same image under CLAUDE_CLIPBOARD_REPEAT" "$r"
@@ -120,7 +123,7 @@ check "offers that same capture when the window is widened" "$r"
 
 # --- checkImage must not consume, or the saveImage that follows attaches nothing
 reset_state
-add_shot "fresh.png"
+add_shot "$FRESH_SHOT"
 clipboard_has_image
 save_image && r=true || r=false
 check "saveImage still succeeds after checkImage ran first" "$r"
@@ -140,7 +143,7 @@ check "clipshot -c clears the staged image" "$r"
 # Regression guard: clipshot once carried its own copy of the watch-dir list,
 # so `-s` could report a different pick than Ctrl+V would attach.
 reset_state
-add_shot "fresh.png"
+add_shot "$FRESH_SHOT"
 status_out=$(clipshot -s 2>&1 || true)
 case "$status_out" in
     *"$SHOTS/fresh.png"*) r=true ;;
@@ -175,7 +178,7 @@ check "reports an empty clipboard when no image exists" "$r"
 /bin/sh -c 'xclip -selection clipboard -t application/pdf -o' >/dev/null 2>&1 && r=false || r=true
 check "exits non-zero for a target it does not implement" "$r"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-clipboard-shim] all clipboard shim tests passed" >&2
 fi
 exit "$EXIT_CODE"

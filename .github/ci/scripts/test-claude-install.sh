@@ -138,7 +138,7 @@ else
     fail "the Linux removal script tombstones Claude Code's npm package"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-claude-install] all Claude Code install tests passed" >&2
 fi
 

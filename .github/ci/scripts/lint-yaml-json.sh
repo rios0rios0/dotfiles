@@ -30,7 +30,7 @@ while IFS= read -r -d '' file; do
     fi
 done < <(find "$REPO_ROOT" \( -name '*.yaml' -o -name '*.yml' \) -not -path '*/.git/*' -not -path '*/.github/ci/*' -not -name '*.tmpl' -print0)
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[lint-syntax] all YAML/JSON files valid" >&2
 fi
 

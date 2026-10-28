@@ -13,6 +13,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 EXIT_CODE=0
+# What every forced pull logs: the sync keeps aifiles' side whenever both sides changed.
+PULLED='pull --force --prefer remote$'
 
 pass() { echo "[test-aifiles-sync] PASS: $1" >&2; }
 fail() { echo "[test-aifiles-sync] FAIL: $1" >&2; EXIT_CODE=1; }
@@ -132,11 +134,12 @@ OVERRIDE="$(jq -nc --arg r "$RECIPIENT" \
 # render <platform> <output>: the platform's script, with the sandbox as HOME, so the Android
 # template looks for the key where the cases put it.
 render() {
+    local platform="$1" output="$2"
     local template="$REPO_ROOT/.chezmoiscripts/run_after_linux-014-sync-aifiles.sh.tmpl"
-    [[ "$1" == android ]] && template="$REPO_ROOT/.chezmoiscripts/run_after_android-008-sync-aifiles.sh.tmpl"
+    [[ "$platform" == android ]] && template="$REPO_ROOT/.chezmoiscripts/run_after_android-008-sync-aifiles.sh.tmpl"
     HOME="$TMP/home" OP_SERVE="${OP_SERVE:-$TMP/aifiles.id}" PATH="$TMP/bin:$PATH" \
-        chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "$OVERRIDE" <"$template" >"$2"
-    bash -n "$2" || fail "the rendered $1 script is not valid bash"
+        chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "$OVERRIDE" <"$template" >"$output"
+    bash -n "$output" || fail "the rendered $platform script is not valid bash"
 }
 
 export AISYNC_LOG="$TMP/aisync.log" AISYNC_SSH_LOG="$TMP/ssh.log" AISYNC_VERSION_FILE="$TMP/version"
@@ -163,8 +166,8 @@ reset() {
 # run <script>: the rendered hook against the sandbox. PATH is the stubs and the system's own
 # directories only, so the real aisync in ~/.local/bin can never answer.
 run() {
-    local rc=0
-    HOME="$TMP/home" PATH="$TMP/bin:/usr/bin:/bin" TMPDIR="$TMP/tmp" bash "$1" >"$TMP/out" 2>&1 || rc=$?
+    local script="$1" rc=0
+    HOME="$TMP/home" PATH="$TMP/bin:/usr/bin:/bin" TMPDIR="$TMP/tmp" bash "$script" >"$TMP/out" 2>&1 || rc=$?
     echo "$rc"
 }
 pulls() { grep -c '^--use-system-git --repo .* pull' "$AISYNC_LOG" || true; }
@@ -180,7 +183,7 @@ reset
 rc="$(run "$TMP/linux.sh")"
 if [[ "$rc" == 0 && -d "$repo/.git" && -z "$(git -C "$repo" status --porcelain)" ]] &&
     grep -q '^--use-system-git --repo .*/repo\.[^ ]* init --remote-url git@github.com-mine:rios0rios0/aifiles\.git$' "$AISYNC_LOG" &&
-    grep -q 'pull --force --prefer remote$' "$AISYNC_LOG" && grep -q 'in sync with aifiles' "$TMP/out"; then
+    grep -q "$PULLED" "$AISYNC_LOG" && grep -q 'in sync with aifiles' "$TMP/out"; then
     pass "a first apply clones aifiles and pulls with --prefer remote, leaving the clone clean"
 else
     fail "first sync: rc=$rc, $(cat "$TMP/out"), calls: $(cat "$AISYNC_LOG")"
@@ -288,7 +291,7 @@ rc="$(AISYNC_PULL_EXIT=1 run "$TMP/linux.sh")"
 # when / then: the next apply is still a first sync, even though aisync wrote its manifest
 echo '{}' >"$TMP/home/.claude/.aisync-manifest.json"
 rc2="$(run "$TMP/linux.sh")"
-if [[ "$rc" == 0 && "$rc2" == 0 ]] && tail -1 "$AISYNC_LOG" | grep -q 'pull --force --prefer remote$'; then
+if [[ "$rc" == 0 && "$rc2" == 0 ]] && tail -1 "$AISYNC_LOG" | grep -q "$PULLED"; then
     pass "an interrupted first sync is finished as a first sync"
 else
     fail "interrupted first sync: rc=$rc/$rc2, last call: $(tail -1 "$AISYNC_LOG")"
@@ -325,7 +328,7 @@ fi
 mkdir -p "$TMP/home/.local/bin"
 cp "$TMP/aisync" "$TMP/home/.local/bin/aisync"
 rc="$(run "$TMP/linux.sh")"
-if [[ "$rc" == 0 ]] && grep -q 'pull --force --prefer remote$' "$AISYNC_LOG"; then
+if [[ "$rc" == 0 ]] && grep -q "$PULLED" "$AISYNC_LOG"; then
     pass "aisync is found in ~/.local/bin when PATH lacks it"
 else
     fail "~/.local/bin aisync: rc=$rc, $(cat "$TMP/out")"
@@ -337,7 +340,7 @@ reset
 echo "1.5.13" >"$AISYNC_VERSION_FILE"
 # when / then: Linux upgrades it and goes on; a failed upgrade stops before any clone
 rc="$(run "$TMP/linux.sh")"
-if [[ "$rc" == 0 ]] && grep -q '^self-update --force$' "$AISYNC_LOG" && grep -q 'pull --force --prefer remote$' "$AISYNC_LOG"; then
+if [[ "$rc" == 0 ]] && grep -q '^self-update --force$' "$AISYNC_LOG" && grep -q "$PULLED" "$AISYNC_LOG"; then
     pass "an older aisync is upgraded on Linux before the sync"
 else
     fail "upgrade: rc=$rc, $(cat "$TMP/out")"
@@ -353,7 +356,7 @@ fi
 reset
 echo "dev" >"$AISYNC_VERSION_FILE"
 rc="$(run "$TMP/linux.sh")"
-if [[ "$rc" == 0 ]] && ! grep -q 'self-update' "$AISYNC_LOG" && grep -q 'pull --force --prefer remote$' "$AISYNC_LOG"; then
+if [[ "$rc" == 0 ]] && ! grep -q 'self-update' "$AISYNC_LOG" && grep -q "$PULLED" "$AISYNC_LOG"; then
     pass "a development build is left alone"
 else
     fail "dev build: rc=$rc, $(cat "$TMP/out")"
@@ -491,7 +494,7 @@ else
     fail "chezmoi's entries in aisync's directories: dot_claude: $claude_entries; dot_config/opencode: $opencode_entries"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-aifiles-sync] all aisync hook tests passed" >&2
 fi
 exit "$EXIT_CODE"

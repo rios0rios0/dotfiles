@@ -3,6 +3,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 EXIT_CODE=0
+SERVERS='.mcpServers'
+SERVER_NAMES='.mcpServers | keys'
 
 echo "[test-modify-scripts] testing modify scripts with sample input..." >&2
 
@@ -13,7 +15,7 @@ test_modify() {
     local check_pattern="$3"
     local description="$4"
 
-    if [ ! -f "$file" ]; then
+    if [[ ! -f "$file" ]]; then
         echo "[test-modify-scripts] SKIP: $description (file not found)" >&2
         return
     fi
@@ -25,7 +27,7 @@ test_modify() {
         return
     }
 
-    if [ -n "$check_pattern" ] && ! echo "$output" | grep -qE "$check_pattern"; then
+    if [[ -n "$check_pattern" ]] && ! echo "$output" | grep -qE "$check_pattern"; then
         echo "[test-modify-scripts] FAIL: $description (expected pattern '$check_pattern' not in output)" >&2
         EXIT_CODE=1
         return
@@ -70,10 +72,10 @@ apply_modify_template() {
     cp -r "$REPO_ROOT/.chezmoitemplates" "$case_dir/src/"
     cp -r "$REPO_ROOT/.chezmoidata" "$case_dir/src/"
     cp "$REPO_ROOT/$source_file" "$case_dir/src/$source_file"
-    if [ -n "${CASE_CONTENT_FILE:-}" ]; then
+    if [[ -n "${CASE_CONTENT_FILE:-}" ]]; then
         # for content a shell string cannot hold, such as UTF-16's NUL bytes
         cp "$CASE_CONTENT_FILE" "$case_dir/dest/$target"
-    elif [ -n "$content" ]; then
+    elif [[ -n "$content" ]]; then
         printf '%s' "$content" > "$case_dir/dest/$target"
     fi
     : > "$case_dir/chezmoi.yaml"
@@ -104,14 +106,14 @@ mcp_creates_the_file() {
     out=$(apply_modify_template modify_dot_claude.json .claude.json "" "${LINUX[@]}") || return 1
 
     # then
-    [ "$(jq -c 'keys' <<<"$out")" = '["mcpServers"]' ] &&
-        [ "$(jq -c '.mcpServers | keys' <<<"$out")" = '["chrome-devtools","context7"]' ]
+    [[ "$(jq -c 'keys' <<<"$out")" = '["mcpServers"]' ]] &&
+        [[ "$(jq -c "$SERVER_NAMES" <<<"$out")" = '["chrome-devtools","context7"]' ]]
 }
 
 mcp_passes_a_matching_file_through() {
     # given a file whose servers already match, in its owner's key order
     local servers
-    servers=$(apply_modify_template modify_dot_claude.json .claude.json "" "${LINUX[@]}" | jq -c '.mcpServers') ||
+    servers=$(apply_modify_template modify_dot_claude.json .claude.json "" "${LINUX[@]}" | jq -c "$SERVERS") ||
         return 1
     jq --indent 2 --argjson servers "$servers" \
         '{zeta: "café <b> & c", numStartups: 42, mcpServers: ($servers + {custom: {command: "x"}})}' \
@@ -134,17 +136,17 @@ mcp_replaces_a_stale_server_only() {
     out=$(apply_modify_template modify_dot_claude.json .claude.json "$input" "${LINUX[@]}") || return 1
 
     # then
-    [ "$(jq -r '.theme' <<<"$out")" = "dark" ] &&
-        [ "$(jq -r '.mcpServers.custom.command' <<<"$out")" = "mine" ] &&
-        [ "$(jq -r '.mcpServers.context7.url' <<<"$out")" = "https://mcp.context7.com/mcp" ] &&
-        [ "$(jq -r '.mcpServers | length' <<<"$out")" = "3" ]
+    [[ "$(jq -r '.theme' <<<"$out")" = "dark" ]] &&
+        [[ "$(jq -r '.mcpServers.custom.command' <<<"$out")" = "mine" ]] &&
+        [[ "$(jq -r '.mcpServers.context7.url' <<<"$out")" = "https://mcp.context7.com/mcp" ]] &&
+        [[ "$(jq -r '.mcpServers | length' <<<"$out")" = "3" ]]
 }
 
 mcp_retires_the_dropped_servers() {
     # given a Linux file that already holds today's servers, next to the four this repository set
     # until they were retired, a server the user added, and a key of Claude Code's own
     local servers
-    servers=$(apply_modify_template modify_dot_claude.json .claude.json "" "${LINUX[@]}" | jq -c '.mcpServers') ||
+    servers=$(apply_modify_template modify_dot_claude.json .claude.json "" "${LINUX[@]}" | jq -c "$SERVERS") ||
         return 1
     local input
     input=$(jq -c --argjson servers "$servers" '{numStartups: 42, mcpServers: ($servers + {
@@ -157,8 +159,8 @@ mcp_retires_the_dropped_servers() {
     out=$(apply_modify_template modify_dot_claude.json .claude.json "$input" "${LINUX[@]}") || return 1
 
     # then: removing them is a change on its own, so the file is rewritten without them
-    [ "$(jq -c '.mcpServers | keys' <<<"$out")" = '["chrome-devtools","context7","custom"]' ] &&
-        [ "$(jq -r '.numStartups' <<<"$out")" = "42" ]
+    [[ "$(jq -c "$SERVER_NAMES" <<<"$out")" = '["chrome-devtools","context7","custom"]' ]] &&
+        [[ "$(jq -r '.numStartups' <<<"$out")" = "42" ]]
 }
 
 mcp_retires_only_what_the_platform_had() {
@@ -172,8 +174,8 @@ mcp_retires_only_what_the_platform_had() {
         return 1
 
     # then
-    [ "$(jq -c '.mcpServers | keys' <<<"$out")" = '["context7","kubernetes"]' ] &&
-        [ "$(jq -r '.mcpServers.kubernetes.command' <<<"$out")" = "mine" ]
+    [[ "$(jq -c "$SERVER_NAMES" <<<"$out")" = '["context7","kubernetes"]' ]] &&
+        [[ "$(jq -r '.mcpServers.kubernetes.command' <<<"$out")" = "mine" ]]
 }
 
 mcp_keeps_the_browser_on_linux() {
@@ -185,7 +187,7 @@ mcp_keeps_the_browser_on_linux() {
     out=$(apply_modify_template modify_dot_claude.json .claude.json "" "${ANDROID[@]}") || return 1
 
     # then
-    [ "$(jq -c '.mcpServers | keys' <<<"$out")" = '["context7"]' ]
+    [[ "$(jq -c "$SERVER_NAMES" <<<"$out")" = '["context7"]' ]]
 }
 
 mcp_sets_only_remote_servers_on_android() {
@@ -197,8 +199,8 @@ mcp_sets_only_remote_servers_on_android() {
         "${ANDROID[@]}") || return 1
 
     # then: none of ours starts a process against Termux's budget
-    [ "$(jq -c '.mcpServers | keys' <<<"$out")" = '["context7","custom"]' ] &&
-        [ "$(jq -r '.mcpServers.context7.type' <<<"$out")" = "http" ]
+    [[ "$(jq -c "$SERVER_NAMES" <<<"$out")" = '["context7","custom"]' ]] &&
+        [[ "$(jq -r '.mcpServers.context7.type' <<<"$out")" = "http" ]]
 }
 
 mcphub_uses_the_same_servers() {
@@ -213,8 +215,8 @@ mcphub_uses_the_same_servers() {
     claude=$(apply_modify_template modify_dot_claude.json .claude.json "$input" "${ANDROID[@]}") || return 1
 
     # then
-    [ "$(jq -S -c '.mcpServers' <<<"$hub")" = "$(jq -S -c '.mcpServers' <<<"$claude")" ] &&
-        [ "$(jq -c '.mcpServers | keys' <<<"$hub")" = '["context7"]' ]
+    [[ "$(jq -S -c "$SERVERS" <<<"$hub")" == "$(jq -S -c "$SERVERS" <<<"$claude")" ]] &&
+        [[ "$(jq -c "$SERVER_NAMES" <<<"$hub")" = '["context7"]' ]]
 }
 
 mcp_placeholders_resolve_in_both_readers() {
@@ -239,7 +241,7 @@ mcp_keeps_secrets_off_argv() {
 
     # then: a placeholder there would put its value on the process's argv, which any local user
     # can read in /proc/<pid>/cmdline -- values travel through env or a header instead
-    [ -n "$argv" ] && ! grep -q -F '${' <<<"$argv"
+    [[ -n "$argv" ]] && ! grep -q -F '${' <<<"$argv"
 }
 
 trust_covers_every_repository() {
@@ -255,10 +257,10 @@ trust_covers_every_repository() {
         '{"projects": {"'"$home"'": {"allowedTools": ["Read"]}}}') || return 1
 
     # then
-    [ "$(jq -r '.projects | keys | length' <<<"$out")" = "4" ] &&
-        [ "$(jq -r --arg d "$base/repo-b" '.projects[$d].hasTrustDialogAccepted' <<<"$out")" = "true" ] &&
-        [ "$(jq -r --arg d "$home" '.projects[$d].allowedTools[0]' <<<"$out")" = "Read" ] &&
-        [ "$(jq -r --arg d "$base/notes.txt" '.projects[$d]' <<<"$out")" = "null" ]
+    [[ "$(jq -r '.projects | keys | length' <<<"$out")" = "4" ]] &&
+        [[ "$(jq -r --arg d "$base/repo-b" '.projects[$d].hasTrustDialogAccepted' <<<"$out")" = "true" ]] &&
+        [[ "$(jq -r --arg d "$home" '.projects[$d].allowedTools[0]' <<<"$out")" = "Read" ]] &&
+        [[ "$(jq -r --arg d "$base/notes.txt" '.projects[$d]' <<<"$out")" = "null" ]]
 }
 
 trust_passes_a_trusted_file_through() {
@@ -288,9 +290,9 @@ settings_fills_a_missing_file() {
     out=$(apply_modify_template dot_claude/modify_settings.json .claude/settings.json "" "${ANDROID[@]}") || return 1
 
     # then: the rules and effortLevel, and none of Linux's look
-    [ "$(jq -c 'keys' <<<"$out")" = '["effortLevel","permissions"]' ] &&
-        [ "$(jq -r '.effortLevel' <<<"$out")" = "high" ] &&
-        [ "$(jq -r '.permissions.allow | length' <<<"$out")" = "22" ]
+    [[ "$(jq -c 'keys' <<<"$out")" = '["effortLevel","permissions"]' ]] &&
+        [[ "$(jq -r '.effortLevel' <<<"$out")" = "high" ]] &&
+        [[ "$(jq -r '.permissions.allow | length' <<<"$out")" = "22" ]]
 }
 
 settings_keeps_user_choices() {
@@ -303,11 +305,11 @@ settings_keeps_user_choices() {
         return 1
 
     # then
-    [ "$(jq -r '.effortLevel' <<<"$out")" = "low" ] &&
-        [ "$(jq -r '.permissions.allow[0]' <<<"$out")" = "Bash(make:*)" ] &&
-        [ "$(jq -r '.permissions.allow | length' <<<"$out")" = "23" ] &&
-        [ "$(jq -r '.permissions.allow | unique | length' <<<"$out")" = "23" ] &&
-        [ "$(jq -r '.permissions.deny[0]' <<<"$out")" = "Bash(rm:*)" ]
+    [[ "$(jq -r '.effortLevel' <<<"$out")" = "low" ]] &&
+        [[ "$(jq -r '.permissions.allow[0]' <<<"$out")" = "Bash(make:*)" ]] &&
+        [[ "$(jq -r '.permissions.allow | length' <<<"$out")" = "23" ]] &&
+        [[ "$(jq -r '.permissions.allow | unique | length' <<<"$out")" = "23" ]] &&
+        [[ "$(jq -r '.permissions.deny[0]' <<<"$out")" = "Bash(rm:*)" ]]
 }
 
 settings_retires_the_github_mcp_rule() {
@@ -321,8 +323,8 @@ settings_retires_the_github_mcp_rule() {
         return 1
 
     # then: the rule is gone and the others keep their order
-    [ "$(jq -r '.permissions.allow | index("mcp__github__*")' <<<"$out")" = "null" ] &&
-        [ "$(jq -r '.permissions.allow[0:2] | join(" ")' <<<"$out")" = "Bash(make:*) Read" ]
+    [[ "$(jq -r '.permissions.allow | index("mcp__github__*")' <<<"$out")" = "null" ]] &&
+        [[ "$(jq -r '.permissions.allow[0:2] | join(" ")' <<<"$out")" = "Bash(make:*) Read" ]]
 }
 
 settings_passes_a_complete_file_through() {
@@ -350,13 +352,13 @@ settings_gives_linux_the_look_only() {
         "${LINUX[@]}") || return 1
 
     # then: the look is set, the user's keys stay, and no rule or effortLevel arrives
-    [ "$(jq -r '.theme' <<<"$out")" = "dark-ansi" ] &&
-        [ "$(jq -r '.tui' <<<"$out")" = "fullscreen" ] &&
-        [ "$(jq -r '.statusLine.command' <<<"$out")" = "bash $home/.claude/statusline-command.sh" ] &&
-        [ "$(jq -r '.statusLine.padding' <<<"$out")" = "0" ] &&
-        [ "$(jq -r '.model' <<<"$out")" = "opus" ] &&
-        [ "$(jq -c '.permissions' <<<"$out")" = '{"defaultMode":"auto"}' ] &&
-        [ "$(jq -r 'has("effortLevel")' <<<"$out")" = "false" ]
+    [[ "$(jq -r '.theme' <<<"$out")" = "dark-ansi" ]] &&
+        [[ "$(jq -r '.tui' <<<"$out")" = "fullscreen" ]] &&
+        [[ "$(jq -r '.statusLine.command' <<<"$out")" = "bash $home/.claude/statusline-command.sh" ]] &&
+        [[ "$(jq -r '.statusLine.padding' <<<"$out")" = "0" ]] &&
+        [[ "$(jq -r '.model' <<<"$out")" = "opus" ]] &&
+        [[ "$(jq -c '.permissions' <<<"$out")" = '{"defaultMode":"auto"}' ]] &&
+        [[ "$(jq -r 'has("effortLevel")' <<<"$out")" = "false" ]]
 }
 
 settings_passes_a_linux_file_with_the_look_through() {
@@ -387,7 +389,7 @@ wslconfig_creates_the_settings() {
     out=$(apply_modify_template modify_dot_wslconfig .wslconfig "") || return 1
 
     # then: both sections, in the CRLF the WSL Settings app writes
-    [ "$out" = $'[experimental]\r\nautoMemoryReclaim=Gradual\r\nsparseVhd=true\r\n[general]\r\ninstanceIdleTimeout=-1\r' ]
+    [[ "$out" = $'[experimental]\r\nautoMemoryReclaim=Gradual\r\nsparseVhd=true\r\n[general]\r\ninstanceIdleTimeout=-1\r' ]]
 }
 
 wslconfig_passes_the_apps_file_through() {
@@ -413,7 +415,7 @@ wslconfig_keeps_everything_else() {
     out=$(apply_modify_template modify_dot_wslconfig .wslconfig "$input") || return 1
 
     # then: the value is set back in place, the missing keys join their sections, and the rest stays
-    [ "$out" = $'# mine\n[wsl2]\nmemory=16GB\n\n[experimental]\nautoMemoryReclaim=Gradual\nnetworkingMode=mirrored\nsparseVhd=true\n\n[general]\ninstanceIdleTimeout=-1' ]
+    [[ "$out" = $'# mine\n[wsl2]\nmemory=16GB\n\n[experimental]\nautoMemoryReclaim=Gradual\nnetworkingMode=mirrored\nsparseVhd=true\n\n[general]\ninstanceIdleTimeout=-1' ]]
 }
 
 wslconfig_keeps_a_utf8_bom() {
@@ -426,7 +428,7 @@ wslconfig_keeps_a_utf8_bom() {
     out=$(apply_modify_template modify_dot_wslconfig .wslconfig "$input") || return 1
 
     # then: the value is set back under the BOM, with no second [experimental] section
-    [ "$out" = $'\xef\xbb\xbf[experimental]\r\nautoMemoryReclaim=Gradual\r\nsparseVhd=true\r\n[general]\r\ninstanceIdleTimeout=-1\r' ]
+    [[ "$out" = $'\xef\xbb\xbf[experimental]\r\nautoMemoryReclaim=Gradual\r\nsparseVhd=true\r\n[general]\r\ninstanceIdleTimeout=-1\r' ]]
 }
 
 wslconfig_leaves_utf16_alone() {
@@ -513,7 +515,7 @@ else
     run_case "every modify_ file that deploys on Windows is a modify-template" windows_deploys_only_modify_templates
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-modify-scripts] all modify script tests passed" >&2
 fi
 

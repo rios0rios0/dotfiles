@@ -34,7 +34,7 @@ check_order() {
         local found=false
         for i in "${!actual[@]}"; do
             if [[ "${actual[$i]}" == *"$expected_pattern"* ]]; then
-                if [ "$i" -le "$last_idx" ]; then
+                if [[ "$i" -le "$last_idx" ]]; then
                     echo "[test-script-order] FAIL ($platform): '$expected_pattern' sorts before a previous dependency" >&2
                     EXIT_CODE=1
                 fi
@@ -89,7 +89,7 @@ PHASE=after check_order "android" \
     "006-setup-sentry-cli" \
     "008-sync-aifiles"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-script-order] all script ordering tests passed" >&2
 fi
 

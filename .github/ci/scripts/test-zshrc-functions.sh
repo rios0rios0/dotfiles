@@ -287,9 +287,10 @@ EOF
         # Runs rebuild-ocode from a directory under the given PATH, leaving stdout in $TMP/out,
         # stderr in $TMP/err and the status in $STATUS, and starting with an empty chezmoi log.
         run_rebuild_ocode() {
+            local dir="$1" path_value="$2"
             : > "$TMP/chezmoi.log"
             STATUS=0
-            (cd "$1" && LC_ALL=C PATH="$2" "$ZSH_BIN" -f -c 'source "$1"; rebuild-ocode' _ "$rebuild_ocode") \
+            (cd "$dir" && LC_ALL=C PATH="$path_value" "$ZSH_BIN" -f -c 'source "$1"; rebuild-ocode' _ "$rebuild_ocode") \
                 > "$TMP/out" 2> "$TMP/err" || STATUS=$?
         }
 

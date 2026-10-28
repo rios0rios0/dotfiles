@@ -27,7 +27,7 @@ if ! command -v zsh >/dev/null 2>&1; then
 fi
 
 for script in linux-engineering-op-loader.sh linux-engineering-shell-credentials.sh linux-engineering-workspace-aliases.sh; do
-    if [ ! -f "$SCRIPTS_DIR/$script" ]; then
+    if [[ ! -f "$SCRIPTS_DIR/$script" ]]; then
         echo "[test-shell-credentials] FAIL: script not found at $SCRIPTS_DIR/$script" >&2
         exit 1
     fi
@@ -111,7 +111,7 @@ run_case() {
         echo "[test-shell-credentials] PASS: $description" >&2
     else
         echo "[test-shell-credentials] FAIL: $description" >&2
-        [ -n "$output" ] && echo "$output" >&2
+        [[ -n "$output" ]] && echo "$output" >&2
         EXIT_CODE=1
     fi
 }
@@ -236,7 +236,7 @@ mode=$(stat -c %a "$HOME/.cache/op-credentials.env")
 CASE
 )"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-shell-credentials] all cases passed" >&2
 fi
 

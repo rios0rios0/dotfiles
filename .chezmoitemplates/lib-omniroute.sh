@@ -23,11 +23,11 @@ OMNIROUTE_DEFAULT_CA_BUNDLE='/etc/ssl/certs/ca-certificates.crt'
 # keeps it, because a systemd unit's PATH holds none of Windows' directories; it prints an unset
 # variable back as %NAME%, and its warning about starting in a WSL (UNC) directory goes to stderr.
 omniroute_windows_path() {
-    local cmd value
+    local variable="$1" cmd value
     cmd="$(command -v cmd.exe 2>/dev/null)" || cmd="/mnt/c/Windows/System32/cmd.exe"
     [[ -x "$cmd" ]] || return 2
-    value="$("$cmd" /d /c "echo %$1%" 2>/dev/null | tr -d '\r')" || return 1
-    [[ -n "$value" && "$value" != "%$1%" ]] || return 1
+    value="$("$cmd" /d /c "echo %$variable%" 2>/dev/null | tr -d '\r')" || return 1
+    [[ -n "$value" && "$value" != "%$variable%" ]] || return 1
     wslpath -u "$value" 2>/dev/null || return 1
 }
 
@@ -93,13 +93,13 @@ omniroute_list_archives() {
 # OmniRoute's bootstrap both strip, or nothing. It reads secrets too: callers capture it into a
 # variable, never print it.
 omniroute_env_value() {
-    local line value=""
-    [[ -f "$2" ]] || return 0
+    local key="$1" env_file="$2" line value=""
+    [[ -f "$env_file" ]] || return 0
     while IFS= read -r line || [[ -n "$line" ]]; do
         line="${line%$'\r'}"
         line="${line#"${line%%[![:space:]]*}"}"
-        [[ "$line" == "$1="* ]] && value="${line#*=}"
-    done < "$2"
+        [[ "$line" == "$key="* ]] && value="${line#*=}"
+    done < "$env_file"
     if [[ ${#value} -ge 2 && ( "$value" == \"*\" || "$value" == \'*\' ) ]]; then
         value="${value:1:${#value}-2}"
     fi
@@ -109,7 +109,8 @@ omniroute_env_value() {
 # Writes to $2, mode 600, the KEY=value lines of $1 whose key OMNIROUTE_ENV_KEYS names; comments,
 # blank lines and every other key are dropped. Values are never printed.
 omniroute_filter_env() {
-    local staged="$2.tmp.$$"
-    (umask 077 && { grep -E "^(${OMNIROUTE_ENV_KEYS})=" "$1" | tr -d '\r' || true; } > "$staged")
-    mv -f "$staged" "$2"
+    local source_file="$1" target="$2"
+    local staged="$target.tmp.$$"
+    (umask 077 && { grep -E "^(${OMNIROUTE_ENV_KEYS})=" "$source_file" | tr -d '\r' || true; } > "$staged")
+    mv -f "$staged" "$target"
 }

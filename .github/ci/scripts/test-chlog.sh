@@ -79,7 +79,7 @@ installed_version() { "$HOME/.local/bin/chlog" --version 2>/dev/null || true; }
 # then Go installs upstream's module at the pinned tag into ~/.local/bin, stamped with its version
 run_install
 expected="GOBIN=$HOME/.local/bin go install -ldflags -X main.version=$VERSION github.com/luizjhonata/chlog@v$VERSION"
-if [ "$(rc)" -eq 0 ] && grep -qxF "$expected" "$GO_CALLS" && [ "$(installed_version)" == "chlog version: $VERSION" ]; then
+if [[ "$(rc)" -eq 0 ]] && grep -qxF "$expected" "$GO_CALLS" && [[ "$(installed_version)" == "chlog version: $VERSION" ]]; then
     pass "chlog is installed from upstream's pinned tag into ~/.local/bin, stamped with its version"
 else
     fail "a first install: rc=$(rc), calls=$(cat "$GO_CALLS"), $(cat "$TMP/out")"
@@ -89,7 +89,7 @@ fi
 # when install_chlog runs again
 # then Go is not run, and the skip says why
 run_install
-if [ "$(rc)" -eq 0 ] && [ "$(go_calls)" -eq 0 ] && grep -q "already installed, skipping" "$TMP/out"; then
+if [[ "$(rc)" -eq 0 ]] && [[ "$(go_calls)" -eq 0 ]] && grep -q "already installed, skipping" "$TMP/out"; then
     pass "the pinned version is skipped"
 else
     fail "the pinned version was not skipped: rc=$(rc), $(cat "$TMP/out")"
@@ -101,7 +101,7 @@ fi
 for older in 0.3.1 dev; do
     fake_chlog "$older"
     run_install
-    if [ "$(rc)" -eq 0 ] && [ "$(go_calls)" -eq 1 ] && [ "$(installed_version)" == "chlog version: $VERSION" ]; then
+    if [[ "$(rc)" -eq 0 ]] && [[ "$(go_calls)" -eq 1 ]] && [[ "$(installed_version)" == "chlog version: $VERSION" ]]; then
         pass "a chlog reporting '$older' is replaced by the pinned one"
     else
         fail "a chlog reporting '$older' was not replaced: rc=$(rc), $(installed_version)"
@@ -113,7 +113,7 @@ done
 # then it fails, says why and installs nothing
 rm -f "$HOME/.local/bin/chlog"
 run_install "$TMP/no-go"
-if [ "$(rc)" -ne 0 ] && [ ! -e "$HOME/.local/bin/chlog" ] && grep -q "go is not available" "$TMP/out"; then
+if [[ "$(rc)" -ne 0 ]] && [[ ! -e "$HOME/.local/bin/chlog" ]] && grep -q "go is not available" "$TMP/out"; then
     pass "a machine without Go fails the install and says why"
 else
     fail "a machine without Go: rc=$(rc), $(cat "$TMP/out")"
@@ -125,7 +125,7 @@ fi
 export GO_FAIL=1
 run_install
 unset GO_FAIL
-if [ "$(rc)" -ne 0 ] && [ ! -e "$HOME/.local/bin/chlog" ] &&
+if [[ "$(rc)" -ne 0 ]] && [[ ! -e "$HOME/.local/bin/chlog" ]] &&
     grep -qF "go install github.com/luizjhonata/chlog@v$VERSION failed" "$TMP/out"; then
     pass "a failed build fails the install"
 else
@@ -138,7 +138,7 @@ fi
 export GO_STAMP=dev
 run_install
 unset GO_STAMP
-if [ "$(rc)" -ne 0 ] && grep -q "does not report chlog $VERSION" "$TMP/out"; then
+if [[ "$(rc)" -ne 0 ]] && grep -q "does not report chlog $VERSION" "$TMP/out"; then
     pass "a build that does not report the pinned version fails the install"
 else
     fail "a build that does not report the pin: rc=$(rc), $(cat "$TMP/out")"
@@ -169,7 +169,7 @@ else
     fail "the Android installer no longer installs Termux's golang, which install_chlog builds with"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-chlog] all chlog install tests passed" >&2
 fi
 

@@ -78,15 +78,16 @@ export OP_LOG="$TMP/op.log" CHEZMOI_ID="$TMP/chezmoi.id" BACKUP_ID="$TMP/backup.
 # unless asked otherwise, aisync's key already in place, so the cases about the other two keys see
 # only those.
 reset() {
+    local kernel="$1" option="${2:-}"
     rm -rf "${TMP:?}/home" "$OP_LOG"
     mkdir -p "$TMP/home/.ssh"
     : >"$TMP/home/.ssh/agent.sock"
-    if [[ "${2:-}" != no-aisync ]]; then
+    if [[ "$option" != no-aisync ]]; then
         mkdir -p "$TMP/home/.config/aisync"
         cp "$AISYNC_ID" "$TMP/home/.config/aisync/key.txt"
     fi
     : >"$OP_LOG"
-    if [[ "$1" == wsl ]]; then
+    if [[ "$kernel" == wsl ]]; then
         echo "Linux version 6.6.87.2-microsoft-standard-WSL2" >"$TMP/proc-version"
     else
         echo "Linux version 6.11.0-generic" >"$TMP/proc-version"
@@ -100,7 +101,10 @@ run() {
     echo "$rc"
 }
 reads() { grep -c '^read' "$OP_LOG" || true; }
-same() { cmp -s "$1" "$2"; }
+same() {
+    local first="$1" second="$2"
+    cmp -s "$first" "$second"
+}
 strays() { find "$TMP/home/.ssh" -name '*.??????' | wc -l; }
 
 # given a WSL machine with neither key
@@ -248,7 +252,7 @@ else
     fail "failed aisync key: rc=$rc/$rc2, $(cat "$TMP/out")"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-export-keys] all key export tests passed" >&2
 fi
 exit "$EXIT_CODE"

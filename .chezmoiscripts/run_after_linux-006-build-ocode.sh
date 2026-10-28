@@ -60,10 +60,10 @@ bun_releases="https://github.com/oven-sh/bun/releases/download"
 # has the old PATH, and this script runs with the apply's environment. That gap is how the
 # build came to be skipped on a machine whose bun was installed all along.
 bun="$(command -v bun || true)"
-if [ -z "$bun" ] && [ -x "$HOME/.bun/bin/bun" ]; then
+if [[ -z "$bun" ]] && [[ -x "$HOME/.bun/bin/bun" ]]; then
     bun="$HOME/.bun/bin/bun"
 fi
-if [ -z "$bun" ]; then
+if [[ -z "$bun" ]]; then
     echo "[ocode] skipped: bun is not installed (not on PATH, no ~/.bun/bin/bun)" >&2
     exit 0
 fi
@@ -72,8 +72,8 @@ fi
 # its first apply. `--origin fork` names the remote the way the hand-made checkouts on this
 # machine do, and sst upstream becomes `origin`, so a command typed on one machine means the
 # same on another. `-e` rather than `-d`: a worktree's `.git` is a file.
-if [ ! -e "$source_dir/.git" ]; then
-    if [ -e "$source_dir" ]; then
+if [[ ! -e "$source_dir/.git" ]]; then
+    if [[ -e "$source_dir" ]]; then
         echo "[ocode] skipped: $source_dir exists but is not a git checkout, so it is not cloned into (remove it, or set OCODE_SOURCE to another path)" >&2
         exit 0
     fi
@@ -93,7 +93,7 @@ fi
 # then the fork's remote-tracking one (which the clone above has), and otherwise nothing: no
 # network fetch of the branch, because an apply that cannot reach GitHub must still finish.
 current_branch="$(git -C "$source_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
-if [ "$current_branch" != "$branch" ]; then
+if [[ "$current_branch" != "$branch" ]]; then
     echo "[ocode] checkout is on ${current_branch:-an unknown branch}, switching to $branch" >&2
     if git -C "$source_dir" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null; then
         git -C "$source_dir" checkout "$branch" >&2
@@ -106,7 +106,7 @@ if [ "$current_branch" != "$branch" ]; then
 fi
 
 head="$(git -C "$source_dir" rev-parse HEAD)"
-if [ "$(cat "$marker" 2>/dev/null || true)" = "$head" ] && [ -x "$target" ]; then
+if [[ "$(cat "$marker" 2>/dev/null || true)" = "$head" ]] && [[ -x "$target" ]]; then
     exit 0
 fi
 
@@ -207,9 +207,10 @@ fetch_bun() {
 
     base="$bun_releases/bun-v$version"
     workdir="$(mktemp -d)"
+    local -a https_only=(--proto '=https' --proto-redir '=https')
     echo "[ocode] downloading $asset.zip from $base..." >&2
-    if ! curl --proto '=https' --proto-redir '=https' -fsSL --connect-timeout 20 --retry 2 -o "$workdir/$asset.zip" "$base/$asset.zip" ||
-        ! curl --proto '=https' --proto-redir '=https' -fsSL --connect-timeout 20 --retry 2 -o "$workdir/SHASUMS256.txt" "$base/SHASUMS256.txt"; then
+    if ! curl "${https_only[@]}" -fsSL --connect-timeout 20 --retry 2 -o "$workdir/$asset.zip" "$base/$asset.zip" ||
+        ! curl "${https_only[@]}" -fsSL --connect-timeout 20 --retry 2 -o "$workdir/SHASUMS256.txt" "$base/SHASUMS256.txt"; then
         echo "[ocode] WARN: failed to download bun $version from $base" >&2
         rm -rf "$workdir"
         return 1
@@ -228,7 +229,7 @@ fetch_bun() {
         rm -rf "$workdir"
         return 1
     fi
-    if ! unzip -oq "$workdir/$asset.zip" "$asset/bun" -d "$workdir" || [ ! -f "$workdir/$asset/bun" ]; then
+    if ! unzip -oq "$workdir/$asset.zip" "$asset/bun" -d "$workdir" || [[ ! -f "$workdir/$asset/bun" ]]; then
         echo "[ocode] WARN: $asset.zip of bun $version holds no $asset/bun" >&2
         rm -rf "$workdir"
         return 1
@@ -248,7 +249,7 @@ fetch_bun() {
     fi
     rm -rf "$workdir"
     reported="$("$staged" --version 2>/dev/null || true)"
-    if [ "$reported" != "$version" ]; then
+    if [[ "$reported" != "$version" ]]; then
         echo "[ocode] WARN: the downloaded bun reports ${reported:-no version} rather than $version, so it is not used" >&2
         rm -f "$staged"
         rmdir "$dest" 2>/dev/null || true
@@ -276,11 +277,11 @@ elif [[ "$package_manager" =~ ^bun@([0-9]+\.[0-9]+\.[0-9]+)$ ]]; then
 else
     echo "[ocode] WARN: $manifest pins no bun release (packageManager is ${package_manager:-missing}), so the build uses $bun, which reports ${bun_version:-no version}" >&2
 fi
-if [ -n "$pinned" ]; then
+if [[ -n "$pinned" ]]; then
     cached="$bun_cache/$pinned/bun"
-    if [ "$bun_version" = "$pinned" ]; then
+    if [[ "$bun_version" = "$pinned" ]]; then
         echo "[ocode] $bun is bun $pinned, the version the checkout pins" >&2
-    elif [ -x "$cached" ] && [ "$("$cached" --version 2>/dev/null || true)" = "$pinned" ]; then
+    elif [[ -x "$cached" ]] && [[ "$("$cached" --version 2>/dev/null || true)" = "$pinned" ]]; then
         echo "[ocode] the checkout pins bun $pinned and $bun reports ${bun_version:-no version}; using the cached $cached" >&2
         bun="$cached"
         bun_version="$pinned"
@@ -344,7 +345,7 @@ echo "[ocode] stamping the build as $OPENCODE_CHANNEL $OPENCODE_VERSION" >&2
 "$bun" run --cwd "$source_dir/packages/cli" build --single --skip-install --skip-web-ui --outdir="$outdir"
 
 built="$(find "$outdir" -path '*/bin/opencode' -type f | head -n 1)"
-if [ -z "$built" ]; then
+if [[ -z "$built" ]]; then
     echo "[ocode] ERROR: the fork build produced no binary under $outdir" >&2
     exit 1
 fi

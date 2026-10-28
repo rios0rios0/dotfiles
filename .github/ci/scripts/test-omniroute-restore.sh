@@ -11,6 +11,8 @@ set -euo pipefail
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 EXIT_CODE=0
+# The stub's record of the container's entrypoint shell: the restore started the gateway.
+ENTRYPOINT_CALL='entrypoint sh'
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -75,15 +77,15 @@ console.log("enc:v1:" + iv.toString("hex") + ":" + data + ":" + cipher.getAuthTa
 
 # make_db <file> <schema> <credential>
 make_db() {
-    local versions="" i
-    for ((i = 1; i <= $2; i++)); do
+    local file="$1" schema="$2" credential="$3" versions="" i
+    for ((i = 1; i <= schema; i++)); do
         versions+="('$(printf '%03d' "$i")','m$i'),"
     done
-    sqlite3 "$1" "
+    sqlite3 "$file" "
 CREATE TABLE _omniroute_migrations (version TEXT PRIMARY KEY, name TEXT NOT NULL, applied_at TEXT NOT NULL DEFAULT (datetime('now')));
 INSERT INTO _omniroute_migrations (version, name) VALUES ${versions%,};
 CREATE TABLE provider_connections (id TEXT PRIMARY KEY, provider TEXT, api_key TEXT, access_token TEXT, refresh_token TEXT, id_token TEXT);
-INSERT INTO provider_connections VALUES ('c1', 'nvidia', NULL, '$3', NULL, NULL);
+INSERT INTO provider_connections VALUES ('c1', 'nvidia', NULL, '$credential', NULL, NULL);
 CREATE TABLE api_keys (id TEXT PRIMARY KEY, name TEXT NOT NULL, key TEXT NOT NULL UNIQUE, machine_id TEXT, created_at TEXT NOT NULL);
 INSERT INTO api_keys VALUES ('k1', 'opencode', 'hashed', NULL, '2026-10-27');"
 }
@@ -246,16 +248,22 @@ restore() {
 
 # Whether the file $1 carries any of the fake secrets.
 leaks() {
-    local secret
+    local file="$1" secret
     for secret in "${SECRETS[@]}"; do
-        grep -qF -- "$secret" "$1" && return 0
+        grep -qF -- "$secret" "$file" && return 0
     done
     return 1
 }
 
-called() { grep -qE "$1" "$FAKE/calls.log"; }
+called() {
+    local pattern="$1"
+    grep -qE "$pattern" "$FAKE/calls.log"
+}
 # The line number of the first call matching $1, or 0.
-call_at() { grep -nE "$1" "$FAKE/calls.log" | head -n 1 | cut -d: -f1 || echo 0; }
+call_at() {
+    local pattern="$1"
+    grep -nE "$pattern" "$FAKE/calls.log" | head -n 1 | cut -d: -f1 || echo 0
+}
 
 # --- Usage ----------------------------------------------------------------------
 
@@ -427,7 +435,7 @@ if $HAVE_NODE; then
         fail "a .env whose key does not open the credentials restores"
     else
         if grep -q "key check says 'mismatch'" "$TMP/mismatch.log" && ! called 'compose (create|stop)' &&
-            ! called 'entrypoint sh' && grep -qx "STORAGE_ENCRYPTION_KEY=$WRONG_KEY" "$ENV_FILE"; then
+            ! called "$ENTRYPOINT_CALL" && grep -qx "STORAGE_ENCRYPTION_KEY=$WRONG_KEY" "$ENV_FILE"; then
             pass "a key that does not open the credentials stops the restore before anything changes, .env kept"
         else
             fail "a mismatching key: $(cat "$TMP/mismatch.log")"
@@ -435,7 +443,7 @@ if $HAVE_NODE; then
     fi
     reset
     printf 'STORAGE_ENCRYPTION_KEY=%s\n' "$WRONG_KEY" > "$ENV_FILE"
-    if restore mismatch-allowed --yes --allow-key-mismatch "$F/v2.tar.age" && called 'entrypoint sh' &&
+    if restore mismatch-allowed --yes --allow-key-mismatch "$F/v2.tar.age" && called "$ENTRYPOINT_CALL" &&
         grep -q "WARN: the key check says 'mismatch'" "$TMP/mismatch-allowed.log"; then
         pass "--allow-key-mismatch restores anyway, with a warning"
     else
@@ -535,14 +543,14 @@ reset
 if restore notty "$F/v2.tar.age"; then
     fail "a restore without --yes and without a terminal proceeds"
 else
-    if grep -q "pass --yes" "$TMP/notty.log" && ! called 'compose create' && ! called 'entrypoint sh'; then
+    if grep -q "pass --yes" "$TMP/notty.log" && ! called 'compose create' && ! called "$ENTRYPOINT_CALL"; then
         pass "without a terminal, only --yes confirms, and nothing is replaced"
     else
         fail "no terminal: $(cat "$TMP/notty.log")"
     fi
 fi
 reset
-if restore nostart --yes --no-start "$F/v2.tar.age" && called 'entrypoint sh' && ! called 'compose up'; then
+if restore nostart --yes --no-start "$F/v2.tar.age" && called "$ENTRYPOINT_CALL" && ! called 'compose up'; then
     pass "--no-start restores into the volume and leaves the stack stopped"
 else
     fail "--no-start: $(cat "$TMP/nostart.log")"

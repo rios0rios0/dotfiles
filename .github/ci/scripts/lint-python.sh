@@ -18,7 +18,7 @@ while IFS= read -r -d '' file; do
         tmpfile="$TMPDIR/$(basename "$file" .tmpl).py"
         sed -n '/<<.*PYEOF/,/^PYEOF/{ /<<.*PYEOF/d; /^PYEOF/d; p; }' "$file" > "$tmpfile"
 
-        if [ -s "$tmpfile" ]; then
+        if [[ -s "$tmpfile" ]]; then
             count=$((count + 1))
             if ! ruff check --select=E,W,F "$tmpfile" 2>&1 | sed "s|$tmpfile|$rel|g"; then
                 echo "[lint-python] FAIL: $rel" >&2
@@ -30,7 +30,7 @@ done < <(find "$REPO_ROOT" -name 'modify_*' -not -path '*/.git/*' -print0)
 
 echo "[lint-python] checked $count files with embedded Python" >&2
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[lint-python] all embedded Python passed" >&2
 fi
 

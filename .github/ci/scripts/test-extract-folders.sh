@@ -16,7 +16,7 @@ CASE_INDEX=0
 
 echo "[test-extract-folders] testing the restore of archived folders..." >&2
 
-if [ ! -f "$SCRIPT" ]; then
+if [[ ! -f "$SCRIPT" ]]; then
     echo "[test-extract-folders] FAIL: script not found at $SCRIPT" >&2
     exit 1
 fi
@@ -31,7 +31,7 @@ check() {
     local description="$1"
     local condition="$2"
 
-    if [ "$condition" = "true" ]; then
+    if [[ "$condition" = "true" ]]; then
         pass "$description"
     else
         fail "$description"
@@ -69,16 +69,16 @@ archive_folder() {
 }
 
 staging_left() {
-    [ -n "$(find "$CASE_HOME" -name '*.extract.*' -print -quit)" ] && echo true || echo false
+    [[ -n "$(find "$CASE_HOME" -name '*.extract.*' -print -quit)" ]] && echo true || echo false
 }
 
 # --- nothing to restore: no output, which is what every first apply printed four warnings for --
 new_case
 mkdir -p "$CASE_HOME/.histdb" "$CASE_HOME/.john" "$CASE_HOME/.sqlmap" "$CASE_HOME/.kube"
 run_script
-check "exits 0 when no folder has an archive" "$([ "$RC" -eq 0 ] && echo true || echo false)"
-check "stays silent when no folder has an archive" "$([ -z "$OUTPUT" ] && echo true || echo false)"
-check "leaves the watcher running when nothing was restored" "$([ ! -s "$PKILL_LOG" ] && echo true || echo false)"
+check "exits 0 when no folder has an archive" "$([[ "$RC" -eq 0 ]] && echo true || echo false)"
+check "stays silent when no folder has an archive" "$([[ -z "$OUTPUT" ]] && echo true || echo false)"
+check "leaves the watcher running when nothing was restored" "$([[ ! -s "$PKILL_LOG" ]] && echo true || echo false)"
 
 # --- the repository's archive: gzipped, ~/.kube/config-files.tar ------------------------------
 new_case
@@ -87,16 +87,16 @@ echo "cluster-a" > "$CASE_HOME/.kube/config-files/cluster-a"
 echo "cluster-b" > "$CASE_HOME/.kube/config-files/nested/cluster-b"
 archive_folder "$CASE_HOME/.kube/config-files" z
 run_script
-check "exits 0 after restoring from a gzipped archive" "$([ "$RC" -eq 0 ] && echo true || echo false)"
+check "exits 0 after restoring from a gzipped archive" "$([[ "$RC" -eq 0 ]] && echo true || echo false)"
 check "restores ~/.kube/config-files beside its archive" \
-      "$([ "$(cat "$CASE_HOME/.kube/config-files/cluster-a" 2>/dev/null)" = "cluster-a" ] && echo true || echo false)"
+      "$([[ "$(cat "$CASE_HOME/.kube/config-files/cluster-a" 2>/dev/null)" = "cluster-a" ]] && echo true || echo false)"
 check "restores nested files too" \
-      "$([ "$(cat "$CASE_HOME/.kube/config-files/nested/cluster-b" 2>/dev/null)" = "cluster-b" ] && echo true || echo false)"
+      "$([[ "$(cat "$CASE_HOME/.kube/config-files/nested/cluster-b" 2>/dev/null)" = "cluster-b" ]] && echo true || echo false)"
 check "does not nest the folder inside itself" \
-      "$([ ! -e "$CASE_HOME/.kube/config-files/config-files" ] && echo true || echo false)"
+      "$([[ ! -e "$CASE_HOME/.kube/config-files/config-files" ]] && echo true || echo false)"
 check "says which folder it restored" \
       "$(grep -q "restored \"$CASE_HOME/.kube/config-files\"" <<<"$OUTPUT" && echo true || echo false)"
-check "leaves no staging directory behind" "$([ "$(staging_left)" = false ] && echo true || echo false)"
+check "leaves no staging directory behind" "$([[ "$(staging_left)" = false ]] && echo true || echo false)"
 check "stops the running watcher so the next shell watches the restored folder" \
       "$(grep -q "$CASE_HOME/.scripts/linux-toolbox-watch-compress-folders.sh" "$PKILL_LOG" 2>/dev/null && echo true || echo false)"
 
@@ -107,7 +107,7 @@ echo "pot" > "$CASE_HOME/.john/john.pot"
 archive_folder "$CASE_HOME/.john"
 run_script
 check "restores from an uncompressed archive" \
-      "$([ "$RC" -eq 0 ] && [ "$(cat "$CASE_HOME/.john/john.pot" 2>/dev/null)" = "pot" ] && echo true || echo false)"
+      "$([[ "$RC" -eq 0 ]] && [[ "$(cat "$CASE_HOME/.john/john.pot" 2>/dev/null)" == "pot" ]] && echo true || echo false)"
 
 # ~/.histdb is no longer one of the watched folders: Atuin keeps the shell history. An archive an
 # older watcher left behind is not unpacked.
@@ -117,7 +117,7 @@ echo "history" > "$CASE_HOME/.histdb/zsh-history.db"
 archive_folder "$CASE_HOME/.histdb"
 run_script
 check "leaves an old ~/.histdb.tar alone" \
-      "$([ "$RC" -eq 0 ] && [ ! -e "$CASE_HOME/.histdb" ] && [ -z "$OUTPUT" ] && echo true || echo false)"
+      "$([[ "$RC" -eq 0 ]] && [[ ! -e "$CASE_HOME/.histdb" ]] && [[ -z "$OUTPUT" ]] && echo true || echo false)"
 
 # --- a folder that already exists is left as it is ---------------------------------------------
 new_case
@@ -128,12 +128,12 @@ archive_folder "$CASE_HOME/.kube/config-files"
 mkdir -p "$CASE_HOME/.kube/config-files"
 echo "newer" > "$CASE_HOME/.kube/config-files/cluster-a"
 run_script
-check "exits 0 when the folder already exists" "$([ "$RC" -eq 0 ] && echo true || echo false)"
+check "exits 0 when the folder already exists" "$([[ "$RC" -eq 0 ]] && echo true || echo false)"
 check "keeps a file newer than the archive" \
-      "$([ "$(cat "$CASE_HOME/.kube/config-files/cluster-a")" = "newer" ] && echo true || echo false)"
+      "$([[ "$(cat "$CASE_HOME/.kube/config-files/cluster-a")" = "newer" ]] && echo true || echo false)"
 check "adds nothing from the archive to an existing folder" \
-      "$([ ! -e "$CASE_HOME/.kube/config-files/cluster-b" ] && echo true || echo false)"
-check "stays silent when the folder already exists" "$([ -z "$OUTPUT" ] && echo true || echo false)"
+      "$([[ ! -e "$CASE_HOME/.kube/config-files/cluster-b" ]] && echo true || echo false)"
+check "stays silent when the folder already exists" "$([[ -z "$OUTPUT" ]] && echo true || echo false)"
 
 # --- a damaged archive fails the run and leaves nothing behind --------------------------------
 new_case
@@ -141,11 +141,11 @@ mkdir -p "$CASE_HOME/.kube"
 echo "not an archive" > "$CASE_HOME/.kube/config-files.tar"
 run_script
 check "exits non-zero when an archive cannot be extracted, so the next apply retries" \
-      "$([ "$RC" -ne 0 ] && echo true || echo false)"
+      "$([[ "$RC" -ne 0 ]] && echo true || echo false)"
 check "warns about the archive it could not extract" \
       "$(grep -q "WARN: could not restore \"$CASE_HOME/.kube/config-files\"" <<<"$OUTPUT" && echo true || echo false)"
-check "creates no folder from a damaged archive" "$([ ! -e "$CASE_HOME/.kube/config-files" ] && echo true || echo false)"
-check "leaves no staging directory behind a damaged archive" "$([ "$(staging_left)" = false ] && echo true || echo false)"
+check "creates no folder from a damaged archive" "$([[ ! -e "$CASE_HOME/.kube/config-files" ]] && echo true || echo false)"
+check "leaves no staging directory behind a damaged archive" "$([[ "$(staging_left)" = false ]] && echo true || echo false)"
 
 # An archive of the folder's contents rather than of the folder (the 2025 watcher's `-C dir .`)
 # has no top-level folder to move into place.
@@ -155,9 +155,9 @@ echo "pot" > "$CASE_HOME/.john/john.pot"
 tar -cf "$CASE_HOME/.john.tar" -C "$CASE_HOME/.john" .
 rm -rf "$CASE_HOME/.john"
 run_script
-check "exits non-zero when the archive does not hold the folder" "$([ "$RC" -ne 0 ] && echo true || echo false)"
-check "creates no folder from an archive that does not hold it" "$([ ! -e "$CASE_HOME/.john" ] && echo true || echo false)"
-check "leaves no staging directory behind such an archive" "$([ "$(staging_left)" = false ] && echo true || echo false)"
+check "exits non-zero when the archive does not hold the folder" "$([[ "$RC" -ne 0 ]] && echo true || echo false)"
+check "creates no folder from an archive that does not hold it" "$([[ ! -e "$CASE_HOME/.john" ]] && echo true || echo false)"
+check "leaves no staging directory behind such an archive" "$([[ "$(staging_left)" = false ]] && echo true || echo false)"
 
 # --- one failure does not stop the folders after it --------------------------------------------
 new_case
@@ -167,10 +167,10 @@ echo "session" > "$CASE_HOME/.sqlmap/output/session"
 archive_folder "$CASE_HOME/.sqlmap"
 run_script
 check "restores the folders after a failed one" \
-      "$([ "$(cat "$CASE_HOME/.sqlmap/output/session" 2>/dev/null)" = "session" ] && echo true || echo false)"
-check "still exits non-zero for the failed one" "$([ "$RC" -ne 0 ] && echo true || echo false)"
+      "$([[ "$(cat "$CASE_HOME/.sqlmap/output/session" 2>/dev/null)" = "session" ]] && echo true || echo false)"
+check "still exits non-zero for the failed one" "$([[ "$RC" -ne 0 ]] && echo true || echo false)"
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-extract-folders] all archived folder tests passed" >&2
 fi
 

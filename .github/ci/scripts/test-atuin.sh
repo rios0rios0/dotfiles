@@ -47,15 +47,15 @@ esac
 # fake_release <version it reports> <archive>: a release tarball laid out as upstream's, with an
 # `atuin` that answers `-V` the way the real one does. Without a version it holds no binary.
 fake_release() {
-    local dir
+    local version="$1" archive="$2" dir
     dir="$(mktemp -d -p "$TMP")"
     mkdir -p "$dir/atuin-$TRIPLE"
     echo "release notes" >"$dir/atuin-$TRIPLE/README.md"
-    if [[ -n "$1" ]]; then
-        printf '#!/bin/bash\n[[ "$1" == -V ]] && echo "atuin %s"\n' "$1" >"$dir/atuin-$TRIPLE/atuin"
+    if [[ -n "$version" ]]; then
+        printf '#!/bin/bash\n[[ "$1" == -V ]] && echo "atuin %s"\n' "$version" >"$dir/atuin-$TRIPLE/atuin"
         chmod +x "$dir/atuin-$TRIPLE/atuin"
     fi
-    tar -czf "$2" -C "$dir" "atuin-$TRIPLE"
+    tar -czf "$archive" -C "$dir" "atuin-$TRIPLE"
 }
 fake_release "$VERSION" "$TMP/release.tar.gz"
 fake_release "$VERSION-tampered" "$TMP/tampered.tar.gz"
@@ -112,7 +112,7 @@ installed_version() { "$HOME/.local/bin/atuin" -V 2>/dev/null; }
 # when install_atuin runs
 # then the pinned release for this architecture is downloaded, verified and installed
 run_install "$TMP/release.tar.gz"
-if [ "$(rc)" -eq 0 ] && [ "$(curl_calls)" -eq 1 ] &&
+if [[ "$(rc)" -eq 0 ]] && [[ "$(curl_calls)" -eq 1 ]] &&
     grep -qF "atuinsh/atuin/releases/download/v$VERSION/atuin-$TRIPLE.tar.gz" "$CURL_CALLS" &&
     [[ "$(installed_version)" == "atuin $VERSION" ]]; then
     pass "installs the pinned release $VERSION"
@@ -124,7 +124,7 @@ fi
 # when install_atuin runs again
 # then nothing is downloaded and the skip says why
 run_install "$TMP/release.tar.gz"
-if [ "$(rc)" -eq 0 ] && [ "$(curl_calls)" -eq 0 ] && grep -q "already installed, skipping" "$TMP/out"; then
+if [[ "$(rc)" -eq 0 ]] && [[ "$(curl_calls)" -eq 0 ]] && grep -q "already installed, skipping" "$TMP/out"; then
     pass "the pinned version is skipped"
 else
     fail "the pinned version was not skipped: rc=$(rc), $(cat "$TMP/out")"
@@ -135,7 +135,7 @@ fi
 # then it is replaced
 cp "$TMP/older" "$HOME/.local/bin/atuin"
 run_install "$TMP/release.tar.gz"
-if [ "$(rc)" -eq 0 ] && [ "$(curl_calls)" -eq 1 ] && [[ "$(installed_version)" == "atuin $VERSION" ]]; then
+if [[ "$(rc)" -eq 0 ]] && [[ "$(curl_calls)" -eq 1 ]] && [[ "$(installed_version)" == "atuin $VERSION" ]]; then
     pass "an older atuin is replaced by the pinned one"
 else
     fail "an older atuin was not replaced: rc=$(rc), $(installed_version)"
@@ -146,7 +146,7 @@ fi
 # then it fails and installs nothing
 rm -f "$HOME/.local/bin/atuin"
 run_install "$TMP/tampered.tar.gz"
-if [ "$(rc)" -ne 0 ] && [ ! -e "$HOME/.local/bin/atuin" ] && grep -q "does not match its pinned SHA-256" "$TMP/out"; then
+if [[ "$(rc)" -ne 0 ]] && [[ ! -e "$HOME/.local/bin/atuin" ]] && grep -q "does not match its pinned SHA-256" "$TMP/out"; then
     pass "a download that does not match the pin fails and installs nothing"
 else
     fail "a mismatched download: rc=$(rc), $(cat "$TMP/out")"
@@ -158,7 +158,7 @@ fi
 export CURL_FAIL=1
 run_install "$TMP/release.tar.gz"
 unset CURL_FAIL
-if [ "$(rc)" -ne 0 ] && [ ! -e "$HOME/.local/bin/atuin" ] && grep -q "failed to download Atuin" "$TMP/out"; then
+if [[ "$(rc)" -ne 0 ]] && [[ ! -e "$HOME/.local/bin/atuin" ]] && grep -q "failed to download Atuin" "$TMP/out"; then
     pass "a failed download fails the install"
 else
     fail "a failed download: rc=$(rc), $(cat "$TMP/out")"
@@ -169,7 +169,7 @@ fi
 # then it fails and installs nothing
 pin_to "$TMP/empty.tar.gz"
 run_install "$TMP/empty.tar.gz"
-if [ "$(rc)" -ne 0 ] && [ ! -e "$HOME/.local/bin/atuin" ] && grep -q "archive holds no atuin-$TRIPLE/atuin" "$TMP/out"; then
+if [[ "$(rc)" -ne 0 ]] && [[ ! -e "$HOME/.local/bin/atuin" ]] && grep -q "archive holds no atuin-$TRIPLE/atuin" "$TMP/out"; then
     pass "an archive without the binary fails the install"
 else
     fail "an archive without the binary: rc=$(rc), $(cat "$TMP/out")"
@@ -206,12 +206,16 @@ EOF
 # render <os> <template> [override data]: the OS is set for every render, so the host running the
 # suite decides nothing; chezmoi merges the override into the data key by key.
 render() {
-    local data="{\"chezmoi\":{\"os\":\"$1\"}}"
-    [[ -z "${3:-}" ]] || data="$(jq -c --argjson extra "$3" '. * $extra' <<<"$data")"
-    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "$data" <"$2"
+    local os="$1" template="$2" extra="${3:-}"
+    local data="{\"chezmoi\":{\"os\":\"$os\"}}"
+    [[ -z "$extra" ]] || data="$(jq -c --argjson extra "$extra" '. * $extra' <<<"$data")"
+    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "$data" <"$template"
 }
 
-data() { chezmoi execute-template --config "$TMP/chezmoi.yaml" "{{ .atuin.$1 }}"; }
+data() {
+    local key="$1"
+    chezmoi execute-template --config "$TMP/chezmoi.yaml" "{{ .atuin.$key }}"
+}
 SERVER="$(data serverDevice)"
 SERVER_HOST="$(data serverHost)"
 PORT="$(data port)"
@@ -220,23 +224,28 @@ if [[ -z "$SERVER" || -z "$SERVER_HOST" || ! "$PORT" =~ ^[0-9]+$ ]]; then
     exit 1
 fi
 
+# Every sync address is plain HTTP by design: the server listens on loopback, every other device
+# reaches it through the tailnet, whose WireGuard tunnel encrypts the hop, and Atuin encrypts each
+# record end to end before it leaves the client.
+SCHEME="http"
+
 server_config="$(render linux "$CONFIG_TEMPLATE" "{\"deviceName\":\"$SERVER\"}")"
 client_config="$(render linux "$CONFIG_TEMPLATE")"
 phone_config="$(render android "$CONFIG_TEMPLATE")"
 override_config="$(render linux "$CONFIG_TEMPLATE" '{"atuin":{"devices":{"testdevice":{"serverHost":"100.64.0.9"}}}}')"
 
-if grep -qx "sync_address = \"http://127.0.0.1:$PORT\"" <<<"$server_config"; then
+if grep -qx "sync_address = \"$SCHEME://127.0.0.1:$PORT\"" <<<"$server_config"; then
     pass "the server device ($SERVER) syncs with its own server on loopback"
 else
     fail "the server device's sync_address: $(grep sync_address <<<"$server_config")"
 fi
-if grep -qx "sync_address = \"http://$SERVER_HOST:$PORT\"" <<<"$client_config" &&
-    grep -qx "sync_address = \"http://$SERVER_HOST:$PORT\"" <<<"$phone_config"; then
+if grep -qx "sync_address = \"$SCHEME://$SERVER_HOST:$PORT\"" <<<"$client_config" &&
+    grep -qx "sync_address = \"$SCHEME://$SERVER_HOST:$PORT\"" <<<"$phone_config"; then
     pass "every other device, Termux included, syncs with $SERVER_HOST:$PORT"
 else
     fail "another device's sync_address: $(grep sync_address <<<"$client_config"), phone: $(grep sync_address <<<"$phone_config")"
 fi
-if grep -qx "sync_address = \"http://100.64.0.9:$PORT\"" <<<"$override_config"; then
+if grep -qx "sync_address = \"$SCHEME://100.64.0.9:$PORT\"" <<<"$override_config"; then
     pass "a device override names the server by its tailnet address"
 else
     fail "a device override was not applied: $(grep sync_address <<<"$override_config")"
@@ -317,7 +326,7 @@ for removal in "$LINUX_REMOVAL" "$ANDROID_REMOVAL"; do
     fi
 done
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-atuin] all Atuin tests passed" >&2
 fi
 exit "$EXIT_CODE"

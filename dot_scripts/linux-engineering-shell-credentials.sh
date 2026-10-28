@@ -23,8 +23,9 @@ reload-credentials() {
   # Deliberately not exported: both scripts are sourced into this same shell, so
   # nothing else needs to see it, and an interrupted reload would otherwise leave
   # every child shell bypassing the cache and calling 1Password on each start.
+  local option="${1:-}"
   _OP_RELOAD=1
-  if [[ "$1" == "--force" ]]; then
+  if [[ "$option" == "--force" ]]; then
     export _OP_FORCE_RELOAD=1
   fi
   source "$HOME/.scripts/linux-engineering-shell-credentials.sh"
@@ -64,13 +65,15 @@ _on_credential() {
   # .zshenv without calling 1Password. Skipping the write when the var is already
   # set leaks across shells: the var is inherited, the cache stays empty, and
   # the next shell has to re-fetch from 1Password.
-  printf 'export %s=%q\n' "$1" "$2" >> "$_cred_cache"
-  _cred_names="${_cred_names:+$_cred_names }$1"
-  if [[ -v $1 ]] && [[ -z "$_OP_FORCE_RELOAD" ]]; then
-    printf '[credentials] SKIP: "%s" (already set)\n' "$1" >&2
+  # Prefixed locals: a credential named like one of them would otherwise be exported into it.
+  local _cred_name="$1" _cred_value="$2"
+  printf 'export %s=%q\n' "$_cred_name" "$_cred_value" >> "$_cred_cache"
+  _cred_names="${_cred_names:+$_cred_names }$_cred_name"
+  if [[ -v $_cred_name ]] && [[ -z "$_OP_FORCE_RELOAD" ]]; then
+    printf '[credentials] SKIP: "%s" (already set)\n' "$_cred_name" >&2
   else
-    printf '[credentials] exporting "%s"\n' "$1" >&2
-    export "${1}=${2}"
+    printf '[credentials] exporting "%s"\n' "$_cred_name" >&2
+    export "${_cred_name}=${_cred_value}"
   fi
 }
 

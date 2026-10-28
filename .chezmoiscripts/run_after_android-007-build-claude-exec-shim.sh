@@ -113,14 +113,14 @@ int main(int argc, char *argv[]) {
 }
 SHIM_EOF
 
-if [ ! -f "$SHIM_SOURCE" ] || ! cmp -s "$SHIM_SOURCE.tmp" "$SHIM_SOURCE"; then
+if [[ ! -f "$SHIM_SOURCE" ]] || ! cmp -s "$SHIM_SOURCE.tmp" "$SHIM_SOURCE"; then
     mv -f "$SHIM_SOURCE.tmp" "$SHIM_SOURCE"
 else
     rm -f "$SHIM_SOURCE.tmp"
 fi
 
 # Nothing to do when the binary is already built from this exact source.
-if [ -x "$SHIM_BINARY" ] && [ "$SHIM_BINARY" -nt "$SHIM_SOURCE" ]; then
+if [[ -x "$SHIM_BINARY" ]] && [[ "$SHIM_BINARY" -nt "$SHIM_SOURCE" ]]; then
     exit 0
 fi
 
@@ -136,7 +136,7 @@ done
 # on a machine whose apply has not reached it yet. Leaving the shim unbuilt is safe:
 # ~/.zshenv skips the repoint when the binary is missing, which is the behaviour
 # from before this shim existed.
-if [ -z "$compiler" ]; then
+if [[ -z "$compiler" ]]; then
     echo "[claude-exec-shim] WARN: no C compiler found; skipping build" >&2
     echo "[claude-exec-shim]       install one with 'pkg install clang' and re-run 'chezmoi apply'" >&2
     exit 0

@@ -175,9 +175,9 @@ ARCHIVE_GLOB='omniroute-*.tar.age'
 
 # Whether the file $1 carries any of the fake secrets.
 leaks() {
-    local secret
+    local file="$1" secret
     for secret in "${SECRETS[@]}"; do
-        grep -qF -- "$secret" "$1" && return 0
+        grep -qF -- "$secret" "$file" && return 0
     done
     return 1
 }

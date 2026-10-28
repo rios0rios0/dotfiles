@@ -17,6 +17,7 @@ set -euo pipefail
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 ZSHENV_TMPL="$REPO_ROOT/dot_zshenv.tmpl"
 EXIT_CODE=0
+LTS_ALIAS='lts/krypton'
 CASE_INDEX=0
 
 echo "[test-nvm-resolution] testing NVM version resolution in dot_zshenv.tmpl..." >&2
@@ -106,8 +107,8 @@ new_home() {
 new_home
 make_nvm "$HOME_DIR" v24.21.0 v26.7.0
 set_alias "$HOME_DIR" default 'lts/*'
-set_alias "$HOME_DIR" 'lts/*' 'lts/krypton'
-set_alias "$HOME_DIR" 'lts/krypton' v24.21.0
+set_alias "$HOME_DIR" 'lts/*' "$LTS_ALIAS"
+set_alias "$HOME_DIR" "$LTS_ALIAS" v24.21.0
 # when / then the chain wins over the higher version number
 run_case "follows the lts/* alias chain past a newer Current release" \
     "v24.21.0" "$(resolve "$HOME_DIR")"
@@ -124,8 +125,8 @@ run_case "resolves a default alias written as a bare version number" \
 new_home
 make_nvm "$HOME_DIR" v24.21.0
 set_alias "$HOME_DIR" default 'lts/*'
-set_alias "$HOME_DIR" 'lts/*' 'lts/krypton'
-set_alias "$HOME_DIR" 'lts/krypton' v22.0.0
+set_alias "$HOME_DIR" 'lts/*' "$LTS_ALIAS"
+set_alias "$HOME_DIR" "$LTS_ALIAS" v22.0.0
 # when / then the shell still gets a Node rather than none
 run_case "falls back to the newest installed version when the alias target is gone" \
     "v24.21.0" "$(resolve "$HOME_DIR")"
