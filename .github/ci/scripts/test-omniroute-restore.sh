@@ -13,6 +13,8 @@ REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 EXIT_CODE=0
 # The stub's record of the container's entrypoint shell: the restore started the gateway.
 ENTRYPOINT_CALL='entrypoint sh'
+# The stub's record of `docker compose create`: the restore began to change the stack.
+COMPOSE_CREATE='compose create'
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -524,7 +526,7 @@ if restore newer --yes "$F/newer.tar.age"; then
     fail "a database newer than the pinned image restores"
 else
     if grep -q "at migration 9, and the image this checkout pins knows up to 7" "$TMP/newer.log" &&
-        grep -q "ghcr.io/rios0rios0/omniroute@sha256:3333" "$TMP/newer.log" && ! called 'compose create'; then
+        grep -q "ghcr.io/rios0rios0/omniroute@sha256:3333" "$TMP/newer.log" && ! called "$COMPOSE_CREATE"; then
         pass "a database newer than the pinned image is refused, naming the image that wrote it"
     else
         fail "a newer database: $(cat "$TMP/newer.log")"
@@ -564,7 +566,7 @@ reset
 if restore notty "$F/v2.tar.age"; then
     fail "a restore without --yes and without a terminal proceeds"
 else
-    if grep -q "pass --yes" "$TMP/notty.log" && ! called 'compose create' && ! called "$ENTRYPOINT_CALL"; then
+    if grep -q "pass --yes" "$TMP/notty.log" && ! called "$COMPOSE_CREATE" && ! called "$ENTRYPOINT_CALL"; then
         pass "without a terminal, only --yes confirms, and nothing is replaced"
     else
         fail "no terminal: $(cat "$TMP/notty.log")"
@@ -593,7 +595,7 @@ export FAKE_PULL_FAIL=true FAKE_NO_IMAGE=true
 if restore offline --yes "$F/v2.tar.age"; then
     fail "an offline restore without the image proceeds"
 else
-    if grep -q "could not pull" "$TMP/offline.log" && ! called 'compose create'; then
+    if grep -q "could not pull" "$TMP/offline.log" && ! called "$COMPOSE_CREATE"; then
         pass "an image that can be neither pulled nor found stops the restore"
     else
         fail "offline: $(cat "$TMP/offline.log")"
@@ -613,7 +615,7 @@ if restore denied --yes "$F/v2.tar.age"; then
     fail "a refused pull without the image proceeds"
 else
     if grep -q "the registry refused the login Docker sent" "$TMP/denied.log" && ! grep -qF 'offline?' "$TMP/denied.log" &&
-        ! called 'compose create'; then
+        ! called "$COMPOSE_CREATE"; then
         pass "a pull the registry refuses is named as that, not as being offline"
     else
         fail "a refused pull: $(cat "$TMP/denied.log")"
