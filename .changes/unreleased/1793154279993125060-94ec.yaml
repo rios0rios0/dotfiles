@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed `omniroute-restore` writing the Markdown code fence that 1Password''s `OmniRouter` note wraps the `.env` in, which Compose refused (`unexpected character "`" in variable name`), by dropping lines that start with three backticks; and fixed the restore and the start on apply blaming a pull the registry refused on being offline: a stale `ghcr.io` login in `~/.docker/config.json` fails even the public image with `denied`, and both now name the refused login'
+time: '2026-10-28T02:24:39.993866021Z'

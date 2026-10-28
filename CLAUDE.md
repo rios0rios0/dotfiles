@@ -962,7 +962,11 @@ stack is run from the checkout, and the digest in `compose.yaml` is what decides
    the data, so the archive, put back with `omniroute-restore`, is the rollback.
 6. **The package is public; a private one needs a login.** The fork is public, so GHCR serves the
    image anonymously. If its visibility changes, `docker login ghcr.io` with `read:packages` must
-   run before `docker compose pull`, or the pull fails while the previous image keeps running.
+   run before `docker compose pull`, or the pull fails while the previous image keeps running. A
+   stale login fails the other way: Docker sends the one `~/.docker/config.json` keeps with every
+   pull from `ghcr.io`, and GHCR refuses it with `denied` even for this public image. The restore and
+   the start on apply then name a refused login rather than `offline?` (`omniroute_pull_failure` in
+   `lib-omniroute.sh`); on 2026-10-28 it was a device note's `docker:` entry for an expired token.
 
 `make test-omniroute-image` covers 1 and the failures -- the first switch away from the official
 image, `--check` in both directions, `--tag`, a file with no recognised digest, and every failed
@@ -1001,7 +1005,8 @@ An archive, `omniroute-<UTC stamp>.tar.age`, is age-encrypted to the backup key 
    keeps one more copy (`env:` in `omniroute.yaml`, the `OmniRouter` item). The restore takes the
    checkout's `.env` when there is one, then the archive's, then 1Password's -- never new values,
    which start a gateway that looks healthy while every cloud provider fails. Keep the 1Password
-   copy in step when `.env` changes.
+   copy in step when `.env` changes. The note may keep it in a Markdown code block, which 1Password
+   renders; the restore drops the fence lines, which Compose would refuse.
 2. **The mirror is the personal OneDrive -- `%OneDriveConsumer%`, never `%OneDrive%`.** On a machine
    also signed in to a work account, `%OneDrive%` names that one, and the archives would land in the
    employer's storage. Each device gets a folder under `Backup/omniroute`, named by its `deviceName`,
@@ -1034,7 +1039,8 @@ Restoring another device's archive makes it this machine's database: `omniroute-
 <name>` reads that device's folder, and the first backup afterwards goes to this device's own.
 `make test-omniroute-backup` covers the members, the allowlist, the mirror and its retention, 2 and
 3, and the installer; `make test-omniroute-restore` covers 1 and 5 against real `age`, `tar` and
-`sqlite3`, with the key check run under the host's `node`; `make test-omniroute-stack` covers 4 and 6.
+`sqlite3`, with the key check run under the host's `node`, plus a fenced `.env` and a refused pull;
+`make test-omniroute-stack` covers 4 and 6, and a refused pull.
 
 ## OpenCode V2 Through OmniRoute
 

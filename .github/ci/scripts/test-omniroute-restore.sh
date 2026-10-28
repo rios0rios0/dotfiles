@@ -13,6 +13,8 @@ REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 EXIT_CODE=0
 # The stub's record of the container's entrypoint shell: the restore started the gateway.
 ENTRYPOINT_CALL='entrypoint sh'
+# The stub's record of `docker compose create`: the restore began to change the stack.
+COMPOSE_CREATE='compose create'
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -175,7 +177,13 @@ case "${1:-}" in
         case "$*" in
             "config --quiet") [[ -f .env ]] || { echo "env file .env not found" >&2; exit 1; } ;;
             "config --images") printf 'docker.io/library/redis:8.6.5-alpine\nghcr.io/rios0rios0/omniroute@sha256:2222\n' ;;
-            "pull --quiet") [[ "${FAKE_PULL_FAIL:-}" != true ]] || exit 1 ;;
+            "pull --quiet")
+                if [[ "${FAKE_PULL_DENIED:-}" == true ]]; then
+                    echo "Error response from daemon: error from registry: denied" >&2
+                    exit 1
+                fi
+                [[ "${FAKE_PULL_FAIL:-}" != true ]] || exit 1
+                ;;
             logs*) printf '%s\n' "${FAKE_LOGS:-[bootstrap] ready}" ;;
             *) ;;
         esac
@@ -205,8 +213,10 @@ printf 'op %s\n' "$*" >> "$FAKE/op.log"
 [[ "${FAKE_OP_FAIL:-}" != true ]] || exit 1
 case "$2" in
     op://Private/OmniRouter/notesPlain)
+        [[ "${FAKE_OP_FENCED:-}" != true ]] || printf '```dotenv\r\n'
         printf '# from 1Password\r\nJWT_SECRET=fake-jwt-secret-value\r\nSTORAGE_ENCRYPTION_KEY=%s\r\nOMNIROUTE_CA_BUNDLE=%s\r\n' \
             "${FAKE_OP_KEY:-fake-storage-key-value}" "${FAKE_OP_CA:-$HOME/.local/share/omniroute/ca-bundle.pem}"
+        [[ "${FAKE_OP_FENCED:-}" != true ]] || printf '```\r\n'
         ;;
     op://Private/OmniRouter/ca-bundle.pem)
         printf -- '-----BEGIN CERTIFICATE-----\n1password root\n-----END CERTIFICATE-----\n'
@@ -236,7 +246,8 @@ reset() {
     : > "$FAKE/calls.log"
     : > "$FAKE/op.log"
     printf 'name: dotfiles\n' > "$OMNIROUTE_COMPOSE_DIR/compose.yaml"
-    unset FAKE_RUNNING FAKE_DOCKER_DOWN FAKE_PULL_FAIL FAKE_NO_IMAGE FAKE_LOGS FAKE_IMAGE_SCHEMA FAKE_OP_FAIL FAKE_OP_CA FAKE_OP_KEY
+    unset FAKE_RUNNING FAKE_DOCKER_DOWN FAKE_PULL_FAIL FAKE_NO_IMAGE FAKE_LOGS FAKE_IMAGE_SCHEMA FAKE_OP_FAIL FAKE_OP_CA FAKE_OP_KEY \
+        FAKE_OP_FENCED FAKE_PULL_DENIED
 }
 
 # restore <case> [args]: runs it without a terminal, stdout and stderr in $TMP/<case>.log.
@@ -396,6 +407,18 @@ else
     fail "the summary does not show the manifest"
 fi
 
+# --- 1Password's note keeps the .env in a Markdown code block ---------------------------
+
+reset
+export FAKE_OP_FENCED=true
+if restore fenced --yes "$F/v1.tar.age" && ! grep -q '^[[:space:]]*```' "$ENV_FILE" &&
+    grep -qx '# from 1Password' "$ENV_FILE" && [[ "$(grep -c '=' "$ENV_FILE")" -eq 3 ]]; then
+    pass "1Password's .env loses the fence lines of a Markdown code block, and nothing else"
+else
+    fail "a fenced .env: $(cat "$TMP/fenced.log")"
+fi
+unset FAKE_OP_FENCED
+
 # --- An archive from before the manifest, .env from 1Password ------------------------
 
 reset
@@ -503,7 +526,7 @@ if restore newer --yes "$F/newer.tar.age"; then
     fail "a database newer than the pinned image restores"
 else
     if grep -q "at migration 9, and the image this checkout pins knows up to 7" "$TMP/newer.log" &&
-        grep -q "ghcr.io/rios0rios0/omniroute@sha256:3333" "$TMP/newer.log" && ! called 'compose create'; then
+        grep -q "ghcr.io/rios0rios0/omniroute@sha256:3333" "$TMP/newer.log" && ! called "$COMPOSE_CREATE"; then
         pass "a database newer than the pinned image is refused, naming the image that wrote it"
     else
         fail "a newer database: $(cat "$TMP/newer.log")"
@@ -543,7 +566,7 @@ reset
 if restore notty "$F/v2.tar.age"; then
     fail "a restore without --yes and without a terminal proceeds"
 else
-    if grep -q "pass --yes" "$TMP/notty.log" && ! called 'compose create' && ! called "$ENTRYPOINT_CALL"; then
+    if grep -q "pass --yes" "$TMP/notty.log" && ! called "$COMPOSE_CREATE" && ! called "$ENTRYPOINT_CALL"; then
         pass "without a terminal, only --yes confirms, and nothing is replaced"
     else
         fail "no terminal: $(cat "$TMP/notty.log")"
@@ -572,7 +595,7 @@ export FAKE_PULL_FAIL=true FAKE_NO_IMAGE=true
 if restore offline --yes "$F/v2.tar.age"; then
     fail "an offline restore without the image proceeds"
 else
-    if grep -q "could not pull" "$TMP/offline.log" && ! called 'compose create'; then
+    if grep -q "could not pull" "$TMP/offline.log" && ! called "$COMPOSE_CREATE"; then
         pass "an image that can be neither pulled nor found stops the restore"
     else
         fail "offline: $(cat "$TMP/offline.log")"
@@ -586,6 +609,19 @@ else
     fail "offline with the images here: $(cat "$TMP/offline-cached.log")"
 fi
 unset FAKE_PULL_FAIL
+reset
+export FAKE_PULL_DENIED=true FAKE_NO_IMAGE=true
+if restore denied --yes "$F/v2.tar.age"; then
+    fail "a refused pull without the image proceeds"
+else
+    if grep -q "the registry refused the login Docker sent" "$TMP/denied.log" && ! grep -qF 'offline?' "$TMP/denied.log" &&
+        ! called "$COMPOSE_CREATE"; then
+        pass "a pull the registry refuses is named as that, not as being offline"
+    else
+        fail "a refused pull: $(cat "$TMP/denied.log")"
+    fi
+fi
+unset FAKE_PULL_DENIED FAKE_NO_IMAGE
 
 # --- Preconditions ------------------------------------------------------------------
 

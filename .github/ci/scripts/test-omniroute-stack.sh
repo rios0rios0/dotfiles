@@ -82,7 +82,13 @@ case "$*" in
         printf '[{"State":{"Status":"%s"},"Config":{"Image":"%s"}}]\n' "$FAKE_STATE" "${FAKE_IMAGE:-ghcr.io/rios0rios0/omniroute@sha256:2222}"
         ;;
     "volume inspect dotfiles_omniroute-data") [[ "${FAKE_VOLUME:-}" == true ]] ;;
-    "compose pull --quiet") [[ "${FAKE_PULL_FAIL:-}" != true ]] ;;
+    "compose pull --quiet")
+        if [[ "${FAKE_PULL_DENIED:-}" == true ]]; then
+            echo "Error response from daemon: error from registry: denied" >&2
+            exit 1
+        fi
+        [[ "${FAKE_PULL_FAIL:-}" != true ]]
+        ;;
     "compose up -d --no-recreate --wait --wait-timeout 300") [[ "${FAKE_UP_FAIL:-}" != true ]] ;;
     *) echo "stub docker: unhandled: $*" >&2; exit 2 ;;
 esac
@@ -119,7 +125,7 @@ reset() {
     : > "$FAKE/calls.log"
     printf 'name: dotfiles\n' > "$OMNIROUTE_COMPOSE_DIR/compose.yaml"
     printf 'STORAGE_ENCRYPTION_KEY=x\n' > "$OMNIROUTE_COMPOSE_DIR/.env"
-    unset FAKE_DOCKER_DOWN FAKE_CONFIG_FAIL FAKE_STATE FAKE_IMAGE FAKE_VOLUME FAKE_PULL_FAIL FAKE_UP_FAIL \
+    unset FAKE_DOCKER_DOWN FAKE_CONFIG_FAIL FAKE_STATE FAKE_IMAGE FAKE_VOLUME FAKE_PULL_FAIL FAKE_PULL_DENIED FAKE_UP_FAIL \
         FAKE_WIN_ONEDRIVECONSUMER FAKE_WIN_APPDATA OMNIROUTE_DOCKER_SETTINGS
 }
 
@@ -284,6 +290,14 @@ if start pullfail && grep -q "could not pull" "$TMP/pullfail.log" && ! called 'c
     pass "offline: a warning, exit 0, and nothing started"
 else
     fail "pull failure: $(cat "$TMP/pullfail.log")"
+fi
+reset
+export FAKE_VOLUME=true FAKE_PULL_DENIED=true
+if start denied && grep -q "the registry refused the login Docker sent" "$TMP/denied.log" &&
+    ! grep -qF 'offline?' "$TMP/denied.log" && ! called 'compose up'; then
+    pass "a pull the registry refuses: named as that, exit 0, and nothing started"
+else
+    fail "a refused pull: $(cat "$TMP/denied.log")"
 fi
 reset
 export FAKE_VOLUME=true FAKE_UP_FAIL=true
