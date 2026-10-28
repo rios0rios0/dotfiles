@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'refreshed `AGENTS.md`, `.github/copilot-instructions.md`, the code-review skill, `README.md` and `CONTRIBUTING.md` to point at `AGENTS.md`, list the home-secrets backup key and its systemd installer, install the Azure CLI through pipx, and drop rules for Python code the repository does not have'
+time: '2026-10-28T23:23:21.1307619Z'

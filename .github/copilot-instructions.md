@@ -68,15 +68,15 @@ Scripts execute in this order per platform (numbers = execution priority):
 |-------|--------------------------------------------------------|----------------------------------|----------------------------------------|
 | 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-wrapper.sh` → `001a-e` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`) |
 | 002   | `install-dependencies.sh.tmpl` *(also baremetal variant)* | `configure-dependencies.ps1`     | `install-dependencies.sh.tmpl`         |
-| 003   | `configure-dependencies.sh`                            | `install-fonts.ps1`              | `install-fonts.sh.tmpl`                |
-| 004   | `install-fonts.sh.tmpl`                                | `export-private-key.ps1`         | —                                      |
-| 005   | `export-private-key.sh`                                | —                                | —                                      |
+| 003   | `configure-dependencies.sh`                            | `install-fonts.ps1` *(run_before, every apply)* | `install-fonts.sh.tmpl` |
+| 004   | `install-fonts.sh.tmpl`                                | `export-private-key.ps1.tmpl` *(run_before, every apply)* | —             |
+| 005   | `export-private-key.sh.tmpl` *(run_before, every apply)* | —                              | —                                      |
 
-On WSL, `run_before_linux-000-enable-wsl-systemd.sh.tmpl` runs ahead of all of them while systemd is off: it sets `systemd=true` under `[boot]` in `/etc/wsl.conf` and says to restart WSL, and renders to nothing once systemd is PID 1. The `run_onchange_` installers that call `systemctl` (`008` bridge, `009` Ollama, and `010` Tailscale on bare metal, since WSL's tailnet client is Windows') render whether systemd was running into a comment, so the first apply after the restart runs them again; see "systemd on WSL" in `CLAUDE.md`.
+On WSL, `run_before_linux-000-enable-wsl-systemd.sh.tmpl` runs ahead of all of them while systemd is off: it sets `systemd=true` under `[boot]` in `/etc/wsl.conf` and says to restart WSL, and renders to nothing once systemd is PID 1. The `run_onchange_` installers that call `systemctl` (`008` bridge, `009` Ollama, `013` OmniRoute backups, `018` home-secrets backups, and `010` Tailscale on bare metal, since WSL's tailnet client is Windows') render whether systemd was running into a comment, so the first apply after the restart runs them again; see "systemd on WSL" in `AGENTS.md`.
 
-After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, then `run_after_*` scripts execute on every `chezmoi apply`. `run_onchange_after_*-remove-dependencies.*` scripts (Linux `006`, Windows `005`, Android `004`) re-run whenever their tombstone list changes. `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl` and `run_onchange_after_android-006-setup-sentry-cli.sh.tmpl` raise a CLI older than `0.47.0`, the floor `sentry-ds` needs, with `sentry cli upgrade` (`SENTRY_CLI_MIN_VERSION` in `.chezmoitemplates/lib-sentry-cli.sh`; they fail until it holds), then run `sentry cli setup --no-modify-path` (zsh completion into `~/.local/share/zsh/site-functions`, agent skill into `~/.claude/skills/sentry-cli/`) after the managed files, so the CLI finds the `fpath` line `dot_zshrc.tmpl` renders as an absolute path and does not append its own to `~/.zshrc`. `run_onchange_after_linux-011-setup-chrome.sh` installs Google Chrome from Google's apt repository (key pinned by fingerprint, trusted for that repository only) for the Chrome DevTools MCP server. `run_onchange_after_linux-012-setup-claude-lsp.sh` installs the pinned language servers (`gopls` into `~/.local/bin`; `typescript-language-server`, `typescript` 6.x and `pyright` through npm) and the official `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins that start them, at user scope; see "Claude Code Language Servers" in CLAUDE.md.
+After all `run_once_before_*` scripts, `run_once_after_*` scripts execute once, then `run_after_*` scripts execute on every `chezmoi apply`. `run_onchange_after_*-remove-dependencies.*` scripts (Linux `006`, Windows `005`, Android `004`) re-run whenever their tombstone list changes. `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl` and `run_onchange_after_android-006-setup-sentry-cli.sh.tmpl` raise a CLI older than `0.47.0`, the floor `sentry-ds` needs, with `sentry cli upgrade` (`SENTRY_CLI_MIN_VERSION` in `.chezmoitemplates/lib-sentry-cli.sh`; they fail until it holds), then run `sentry cli setup --no-modify-path` (zsh completion into `~/.local/share/zsh/site-functions`, agent skill into `~/.claude/skills/sentry-cli/`) after the managed files, so the CLI finds the `fpath` line `dot_zshrc.tmpl` renders as an absolute path and does not append its own to `~/.zshrc`. `run_onchange_after_linux-011-setup-chrome.sh` installs Google Chrome from Google's apt repository (key pinned by fingerprint, trusted for that repository only) for the Chrome DevTools MCP server. `run_onchange_after_linux-012-setup-claude-lsp.sh` installs the pinned language servers (`gopls` into `~/.local/bin`; `typescript-language-server`, `typescript` 6.x and `pyright` through npm) and the official `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins that start them, at user scope; see "Claude Code Language Servers" in `AGENTS.md`.
 
-On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-managed files under `dot_local/bin/`): the install-dependencies script calls `op`/`gh` during setup, before chezmoi applies managed files. Order: `001-create-wrapper` (generic `termux-etc-seccomp` wrapper) → `001a` `op` → `001b` `gh` → `001c` `golangci-lint` → `001d` `acli` → `001e` `claude` → `002-install-dependencies`. `001e` also writes `~/.local/bin/claude-zsh`, the `CLAUDE_CODE_SHELL` launcher that restores the parked `LD_PRELOAD` before each of Claude Code's tool-call shells starts, so npm-installed CLIs (`sentry`, any `#!/usr/bin/env node` bin) can be exec'd directly from tool calls. See the `LD_PRELOAD` contract in `CLAUDE.md`.
+On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-managed files under `dot_local/bin/`): the install-dependencies script calls `op`/`gh` during setup, before chezmoi applies managed files. Order: `001-create-wrapper` (generic `termux-etc-seccomp` wrapper) → `001a` `op` → `001b` `gh` → `001c` `golangci-lint` → `001d` `acli` → `001e` `claude` → `002-install-dependencies`. `001e` also writes `~/.local/bin/claude-zsh`, the `CLAUDE_CODE_SHELL` launcher that restores the parked `LD_PRELOAD` before each of Claude Code's tool-call shells starts, so npm-installed CLIs (`sentry`, any `#!/usr/bin/env node` bin) can be exec'd directly from tool calls. See the `LD_PRELOAD` contract in `AGENTS.md`.
 
 #### Linux Dependencies (`.chezmoiscripts/run_once_before_linux-002-install-dependencies.sh.tmpl`)
 - **TIMING**: Takes 45-90 minutes to complete. NEVER CANCEL - Set timeout to 120+ minutes.
@@ -96,9 +96,9 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **Sentry CLI** (`sentry` npm package from `getsentry/cli`, through the shared `install_sentry_cli`; the official `cli.sentry.dev/install` script is not used because its Bun-compiled glibc binary cannot run on Termux, and npm gives both platforms the same JavaScript bundle; completions and the agent skill come from `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl`)
   - **Neon CLI** (`neon` npm package from `neondatabase/neon-pkgs`, through the shared `install_neon_cli`; fresh installs take `neon`, not the legacy `neonctl` compatibility shim, and the plain JavaScript bundle needs no wrapper on Termux — its `--keyring` native addon has no android-arm64 build and the CLI falls back to file-based credentials)
   - **GitHub CLI** (gh, via apt repository)
-  - **Azure CLI** (via pip, installed into pyenv Python)
+  - **Azure CLI** and **OCI CLI** (via pipx through `install_pipx_app`, one venv each; see "One Interpreter Per Python CLI" in `AGENTS.md`)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
-  - **ruff** (Python linter, via Astral install script) — used by `make lint-python` to lint embedded Python in `modify_*` templates
+  - **ruff** (Python linter, via Astral install script) — `make lint-python` runs it over any `PYEOF` heredoc in a `modify_*` file (none at present: the JSON merges are modify-templates)
   - **yq** (mikefarah's, the one `make lint-syntax` and CI call as `yq eval`) — a pinned release binary, checked against its SHA-256, into `~/.local/bin`. Kali's apt `yq` is a different tool (kislyuk's Python wrapper around jq, with no `eval`) and is tombstoned; `install_yq` checks `~/.local/bin/yq`'s version rather than `command -v yq`, which would find the apt one and skip the install
   - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via upstream install script) — syncs AI assistant rules/agents/skills into `~/.claude/` and other AI assistant home directories; replaces the legacy `run_after_*-install-ai-rules.*` scripts. `run_after_linux-014-sync-aifiles.sh.tmpl` (and `run_after_android-008` on Termux) clones the private aifiles repository and pulls it after every apply -- pull only, never prompting, never failing the apply; on a device's first sync aifiles' copy wins after a backup to `$TMPDIR`. Never run a bare `aisync init` (it generates a new key) or `aisync source add` (it rewrites aifiles' committed `config.yaml`)
   - **ccswitch** ([`rios0rios0/ccswitch`](https://github.com/rios0rios0/ccswitch), Linux/WSL only) — monitors Claude Code usage and rotates between enrolled backup accounts when limits are exhausted; `dot_zshrc.tmpl` starts its monitor daemon and both `claude`/`claudex` run `ccswitch ensure` before launch
@@ -147,7 +147,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Shared font library: `.chezmoitemplates/lib-install-fonts.sh`
 
 #### Private Key Export
-- Linux: `run_before_linux-005-export-private-key.sh.tmpl` — before every apply, writes `op://Private/chezmoi.age/private key` to `~/.ssh/chezmoi` when that file is missing or holds another key, and on WSL `op://Private/omniroute-backup.age/private key` to `~/.ssh/omniroute-backup-key`; `.chezmoidata/age-keys.yaml` names both items and both public keys (see "Age Keys" in CLAUDE.md)
+- Linux: `run_before_linux-005-export-private-key.sh.tmpl` — before every apply, writes each key `.chezmoidata/age-keys.yaml` names when its file is missing or holds another key: the chezmoi key to `~/.ssh/chezmoi`, the aisync key to `~/.config/aisync/key.txt` (only when missing), and on WSL the OmniRoute and home-secrets backup keys to `~/.ssh/omniroute-backup-key` and `~/.ssh/secrets-backup-key` (see "Age Keys" in `AGENTS.md`)
 - Windows: `run_before_windows-004-export-private-key.ps1.tmpl` — the same for the chezmoi key, to `~\.ssh\chezmoi`, with `--account my`; a failed read stops the apply
 - Android: Key is retrieved by the `op` wrapper during chezmoi template rendering
 
@@ -184,7 +184,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `.chezmoiignore`: Platform-conditional file exclusion (uses Go templates with `.chezmoi.os`)
 - `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
-- `.chezmoitemplates/`: Shared template fragments (`lib-claude-look.tmpl`, `lib-install-deps.sh`, `lib-install-fonts.sh`, `lib-modify-mcp-servers.tmpl`, `lib-remove-dependencies.sh`, `lib-sentry-cli.sh`, `username.tmpl`)
+- `.chezmoitemplates/`: Shared template fragments (the `lib-*` libraries, `allowed-signers.tmpl`, `username.tmpl`)
 - `dot_local/bin/`: Executable user commands deployed through chezmoi (platform-filtered by `.chezmoiignore`)
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
@@ -196,19 +196,19 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_oh-my-posh.json` → `~/.oh-my-posh.json`: Oh My Posh theme (Windows only), loaded by `~/.config/powershell/profile.ps1`
 - `dot_config/powershell/profile.ps1` → `~/.config/powershell/profile.ps1`: PowerShell 7's profile (Windows only), kept in the user folder because PowerShell's own profile path is in Documents, which OneDrive moves; Windows Terminal's PowerShell profile dot-sources it (`pwsh.exe -NoExit -Command`)
 - `modify_dot_wslconfig` → `~/.wslconfig` (Windows only): merges `.chezmoidata/wsl.yaml`'s WSL settings (gradual memory reclaim, sparse VHDs, keep WSL running) into the file the WSL Settings app writes, keeping every other line
-- `AppData/Roaming/Docker/modify_settings-store.json` → `%APPDATA%\Docker\settings-store.json` (Windows only): merges `.chezmoidata/docker-desktop.yaml` into Docker Desktop's settings -- the WSL integration for `kali-linux`, and the start at sign-in -- keeping every other key; Docker Desktop reads it at its next start. See "Docker Desktop Settings" in CLAUDE.md
-- `run_after_{linux-016,android-009}-login-atuin.sh.tmpl` and `run_after_{linux-017,android-010}-import-atuin-history.sh.tmpl`: log a device's Atuin client in with the account in the 1Password item `Atuin` when it has no session, then, once logged in, import its zsh-histdb history once and sync it until a sync succeeds (two markers in `~/.atuin/data/`); see "Shell History (Atuin)" in CLAUDE.md
+- `AppData/Roaming/Docker/modify_settings-store.json` → `%APPDATA%\Docker\settings-store.json` (Windows only): merges `.chezmoidata/docker-desktop.yaml` into Docker Desktop's settings -- the WSL integration for `kali-linux`, and the start at sign-in -- keeping every other key; Docker Desktop reads it at its next start. See "Docker Desktop Settings" in `AGENTS.md`
+- `run_after_{linux-016,android-009}-login-atuin.sh.tmpl` and `run_after_{linux-017,android-010}-import-atuin-history.sh.tmpl`: log a device's Atuin client in with the account in the 1Password item `Atuin` when it has no session, then, once logged in, import its zsh-histdb history once and sync it until a sync succeeds (two markers in `~/.atuin/data/`); see "Shell History (Atuin)" in `AGENTS.md`
 - `dot_age_recipients.tmpl` → `~/.age_recipients`: Age encryption recipients
-- `modify_dot_claude.json` → `~/.claude.json`: MCP servers for Claude Code on Linux and Android (Context7 over HTTP on both, Chrome DevTools on Linux; servers it no longer manages are deleted from existing files through a per-platform retired list); a modify-template, see "MCP Servers" in CLAUDE.md. Windows gets no `~/.claude.json`: Claude Code is not installed there
+- `modify_dot_claude.json` → `~/.claude.json`: MCP servers for Claude Code on Linux and Android (Context7 over HTTP on both, Chrome DevTools on Linux; servers it no longer manages are deleted from existing files through a per-platform retired list); a modify-template, see "MCP Servers" in `AGENTS.md`. Windows gets no `~/.claude.json`: Claude Code is not installed there
 - `dot_config/mcphub/modify_servers.json` → `~/.config/mcphub/servers.json`: MCP servers for mcphub (Android only; same list and merge as `~/.claude.json`, from `.chezmoitemplates/lib-modify-mcp-servers.tmpl`)
-- `dot_claude/modify_settings.json` → `~/.claude/settings.json`: on Linux, Claude Code's look (`dark-ansi` theme, fullscreen renderer, status line) from `.chezmoitemplates/lib-claude-look.tmpl`; on Android, permission rules and `effortLevel`. A modify-template; see "Claude Code Look" in CLAUDE.md
+- `dot_claude/modify_settings.json` → `~/.claude/settings.json`: on Linux, Claude Code's look (`dark-ansi` theme, fullscreen renderer, status line) from `.chezmoitemplates/lib-claude-look.tmpl`; on Android, permission rules and `effortLevel`. A modify-template; see "Claude Code Look" in `AGENTS.md`
 - `dot_claude/executable_statusline-command.sh` → `~/.claude/statusline-command.sh`: the two-line status line styled after p10k, run by Claude Code (Linux only)
 - `dot_config/nvim/` → `~/.config/nvim/`: NeoVim config (Android only, AstroVim-based)
 - `dot_config/systemd/user/ssh-agent-bridge.socket` + `ssh-agent-bridge@.service` → `~/.config/systemd/user/`: WSL-only SSH agent bridge (see below)
 - `.chezmoiscripts/run_before_linux-000-enable-wsl-systemd.sh.tmpl`: turns systemd on in `/etc/wsl.conf` on a WSL distribution that boots without it (Kali's image ships no such file), merging into the existing file through `sudo`; renders to nothing once systemd is PID 1
-- `dot_config/systemd/user/ollama.service.tmpl` → `~/.config/systemd/user/ollama.service`: the local model server (Ollama), one of OmniRoute's providers, as a user unit on Linux with an NVIDIA driver; its model, context window (`contextTokens`, rendered as `OLLAMA_CONTEXT_LENGTH`), KV cache type and keep-alive come from `.chezmoidata/local-llm.yaml` through `.chezmoitemplates/lib-local-llm.tmpl`, and `run_onchange_after_linux-009-setup-ollama.sh.tmpl` installs the binary and restarts the unit when it changes. See "Local Model Server (Ollama)" in CLAUDE.md
-- `dot_config/opencode/opencode.json.tmpl` → `~/.config/opencode/opencode.json`: OpenCode's global config, with OmniRoute (`local-services/omniroute/`, run from the checkout) as the primary provider at `.chezmoidata/omniroute.yaml`'s `baseUrl` and `omniroute/auto/coding` as the default model; the key is read at load time as `{env:OMNIROUTE_API_KEY}`, which the credential loader exports from the `cred:OMNIROUTE_API_KEY` field. The CLI that reads it is `ocode`, the fork build `run_after_linux-006-build-ocode.sh` installs into `~/.local/bin/ocode` (Linux only). See "OpenCode V2 Through OmniRoute" in CLAUDE.md
-- `dot_local/bin/executable_tailscale-up.tmpl` → `~/.local/bin/tailscale-up`: renders per kind of machine. On bare metal it logs the machine in to the tailnet (waiting for the browser), sets `--operator=$USER` and `--accept-dns=false`, and shares the local model's server with `tailscale serve`; `tailscale-up --no-login` is the quiet pass every interactive zsh runs. On WSL the client is Windows', logged in through its app: it shares the server through Windows' `tailscale serve`, and `--no-login` is what the apply runs. `run_onchange_after_linux-010-setup-tailscale.sh.tmpl` installs `tailscaled` on bare metal and only runs that pass on WSL; see "Tailscale" in `CLAUDE.md`
+- `dot_config/systemd/user/ollama.service.tmpl` → `~/.config/systemd/user/ollama.service`: the local model server (Ollama), one of OmniRoute's providers, as a user unit on Linux with an NVIDIA driver; its model, context window (`contextTokens`, rendered as `OLLAMA_CONTEXT_LENGTH`), KV cache type and keep-alive come from `.chezmoidata/local-llm.yaml` through `.chezmoitemplates/lib-local-llm.tmpl`, and `run_onchange_after_linux-009-setup-ollama.sh.tmpl` installs the binary and restarts the unit when it changes. See "Local Model Server (Ollama)" in `AGENTS.md`
+- `dot_config/opencode/opencode.json.tmpl` → `~/.config/opencode/opencode.json`: OpenCode's global config, with OmniRoute (`local-services/omniroute/`, run from the checkout) as the primary provider at `.chezmoidata/omniroute.yaml`'s `baseUrl` and `omniroute/auto/coding` as the default model; the key is read at load time as `{env:OMNIROUTE_API_KEY}`, which the credential loader exports from the `cred:OMNIROUTE_API_KEY` field. The CLI that reads it is `ocode`, the fork build `run_after_linux-006-build-ocode.sh` installs into `~/.local/bin/ocode` (Linux only). See "OpenCode V2 Through OmniRoute" in `AGENTS.md`
+- `dot_local/bin/executable_tailscale-up.tmpl` → `~/.local/bin/tailscale-up`: renders per kind of machine. On bare metal it logs the machine in to the tailnet (waiting for the browser), sets `--operator=$USER` and `--accept-dns=false`, and shares the local model's server with `tailscale serve`; `tailscale-up --no-login` is the quiet pass every interactive zsh runs. On WSL the client is Windows', logged in through its app: it shares the server through Windows' `tailscale serve`, and `--no-login` is what the apply runs. `run_onchange_after_linux-010-setup-tailscale.sh.tmpl` installs `tailscaled` on bare metal and only runs that pass on WSL; see "Tailscale" in `AGENTS.md`
 - `dot_local/bin/executable_tailscale` → `~/.local/bin/tailscale` (WSL only): a wrapper for Windows' `tailscale.exe`, so `tailscale status` and `tailscale-up` reach Windows' client under the usual name
 - `dot_scripts/` → `~/.scripts/`: User utility scripts
 
@@ -247,7 +247,7 @@ only the pointer belongs there — systemd binds the socket at login, so spawnin
 profile would start one per shell; (3) the installer is `run_onchange_after_`, since machines
 that predate it already ran every `run_once_` script; (4) the npiperelay download is checksum-pinned
 and refuses to install on a mismatch. Verify with `/usr/bin/ssh-add -l` — the bare `ssh-add` is the
-`.exe` wrapper and proves nothing about the bridge. Requires systemd, which `run_before_linux-000-enable-wsl-systemd.sh.tmpl` turns on in `/etc/wsl.conf`; the installer runs again by itself on the first apply after WSL restarts with it (see "systemd on WSL" in `CLAUDE.md`).
+`.exe` wrapper and proves nothing about the bridge. Requires systemd, which `run_before_linux-000-enable-wsl-systemd.sh.tmpl` turns on in `/etc/wsl.conf`; the installer runs again by itself on the first apply after WSL restarts with it (see "systemd on WSL" in `AGENTS.md`).
 
 ### Platform Matrix
 
@@ -266,7 +266,7 @@ and refuses to install on a mismatch. Verify with `/usr/bin/ssh-add -l` — the 
 ## Validation Scenarios
 
 ### Essential Validation Steps
-**ALWAYS** perform these validations after making changes:
+On a machine where the dotfiles are applied (with a 1Password session and the installed tools), these checks confirm a change end to end. A repository change in CI or a sandbox is validated by the `make` targets above instead.
 
 1. **Configuration Application Test**:
    ```bash
@@ -387,7 +387,7 @@ because `$PYENV_ROOT/shims` precedes `~/.local/bin` on PATH. Remove only the dis
 console scripts; the rest of the old dependency tree stays as orphans. Call verified installers through
 `verify` so a `return 1` reaches the script's exit status — there is no `set -e`. Android still uses `pip install` — its
 `crc32c`/`psutil`/PyNaCl build workarounds live in the shared environment. See "One Interpreter Per
-Python CLI" in `CLAUDE.md`.
+Python CLI" in `AGENTS.md`.
 
 ### Installing a CLI from npm
 Global npm packages live inside the *active* Node version's tree, so anything `npm install -g` places
@@ -396,7 +396,7 @@ disappears from PATH when NVM moves to a new LTS major, with no error anywhere. 
 `dot_zshenv.tmpl` must resolve NVM's `default` alias chain to the same version the real `nvm` would —
 "newest installed" is wrong on any machine that also has a non-LTS Current release. Verify the binary
 is on PATH after installing rather than trusting the exit status. `make test-nvm-resolution` covers the
-resolver; see "NVM Resolution Must Agree With NVM" in `CLAUDE.md`.
+resolver; see "NVM Resolution Must Agree With NVM" in `AGENTS.md`.
 
 ### Working with Encrypted Files
 1. Use age encryption for sensitive files
@@ -513,7 +513,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `top-size`, `ocode`, `rebuild-ocode`
+Each script or template uses one prefix of its own; grep for `[<prefix>]` before choosing a new one (the full list is under "Logging Convention" in `AGENTS.md`).
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
@@ -556,8 +556,6 @@ Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-key
 - Chezmoi errors about missing encryption keys or 1Password not signed in
 - Tools like kubectl, terraform not found in PATH
 - SSH signing failures or `op` wrapper not found
-
-Always run validation scenarios after any changes to ensure the dotfiles apply correctly across target platforms.
 
 <!-- chlog:start -->
 ## Changelog (chlog) — MANDATORY
