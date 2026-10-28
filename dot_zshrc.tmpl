@@ -226,13 +226,6 @@ alias speed1="$SPEEDTEST/speedtest"
 alias speed2="python $SPEEDTEST/speedtest-cli --bytes"
 alias cydx="$CYCLONEDX/cyclonedx-cli"
 
-###### Files #######################################################################
-{{- if ne .chezmoi.os "android" }}
-# only run background script in interactive shells (script handles single-instance check internally)
-if [[ -o interactive ]]; then
-  (nohup "$HOME/.scripts/linux-toolbox-watch-compress-folders.sh" &>/dev/null &)
-fi
-{{- end }}
 # The biggest entries under a directory, largest first, hidden ones included:
 # `top-size [count] [depth: 1-3] [dir]`, by default 5 entries one level below the current directory.
 # Sizes are read as root wherever sudo exists, so what only root can read counts too (Termux has none).

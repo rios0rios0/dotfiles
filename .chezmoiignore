@@ -98,11 +98,8 @@ AppData
 .local/share/jetbrains-themes
 .config/ggshield
 .docker
-.john
-.kube
 .local/bin/ssh
 .local/bin/ssh-add
-.sqlmap
 .freterc
 .hushlogin
 .npmrc

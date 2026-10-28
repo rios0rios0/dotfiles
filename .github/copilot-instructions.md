@@ -152,7 +152,6 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Android: Key is retrieved by the `op` wrapper during chezmoi template rendering
 
 #### Post-Apply Scripts (`run_once_after_*` and `run_after_*`)
-- `run_once_after_linux-001-extract-compressed-folders.sh` — restores each watched folder (`~/.john`, `~/.kube/config-files`, `~/.sqlmap`) that is missing from the `<folder>.tar` beside it, which the folder watcher writes and the apply decrypts (today only `~/.kube/config-files.tar`); existing folders are left alone
 - `run_once_after_linux-002-clone-pentesting-tools.sh` — clones pentesting tools (VHostScan, dirsearch, StegCracker, stegbrute) to `~/Development/Tools/`
 - `run_once_after_windows-001-create-ssh-known-hosts.ps1` — pre-populates `~/.ssh/known_hosts` for GitHub, GitLab, Azure DevOps, Bitbucket (avoids SSH freeze in WSL)
 - `run_after_linux-002-import-gpg-keys.sh.tmpl` — imports GPG keys from 1Password (device note, `gpg:` entries)
@@ -221,7 +220,6 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - `linux-engineering-op-loader.sh`: Centralized 1Password credential and workspace loader with 24h TTL cache, plus the prune helpers that remove entries deleted from the device note. **Invariants when editing:** (1) never prune on a failed fetch — a locked vault, missing `op`/`jq`, and a deleted field all look identical, so `_op_load_references` returns non-zero and callers must leave the environment untouched, or a brief outage would unset every credential; (2) `reload-credentials` bypasses the TTL with `_OP_RELOAD=1` rather than deleting the caches, because the fetch reads the outgoing cache to recognise credentials it exported; (3) the `dot_zshenv.tmpl` prune runs on every shell, so it stays guarded on a changed manifest (Termux's phantom-process budget makes forks costly). `make test-shell-credentials` covers all of this
   - `linux-engineering-shell-credentials.sh`: Exports `cred:` fields from 1Password device note as env vars, records the names in the `_OP_CRED_NAMES` manifest, and unsets ones a later successful load no longer returns
   - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note, records `_OP_WS_NAMES`, and removes ones a later successful load no longer returns
-  - `linux-toolbox-watch-compress-folders.sh`: Background script watching and compressing `~/.john`, `~/.kube/config-files` and `~/.sqlmap` (not `~/.histdb`: Atuin syncs the shell history)
   - `android-patch-claude-code-tmpdir.sh`: Patches Claude Code for Termux compatibility (replaces hardcoded `/tmp` paths, symlinks system ripgrep)
 
 ### SSH Agent Bridge (WSL Only)
@@ -405,7 +403,6 @@ resolver; see "NVM Resolution Must Agree With NVM" in `CLAUDE.md`.
 2. Add encrypted files with: `chezmoi add --encrypt ~/.sensitive-file`
 3. **Critical**: Verify private key exists at `~/.ssh/chezmoi`
 4. Test decryption: `chezmoi cat ~/.sensitive-file`
-5. `private_dot_kube/` deploys `~/.kube` as `0700` and `~/.kube/config` as `0600` (Helm warns at every shell start otherwise), but its `encrypted_config-files.tar.age` deliberately stays non-private: the headless folder watcher re-adds that tarball from a `0644` file, and chezmoi's "would remove private attribute" prompt, which nothing can answer, would silently stop the backup; see "Kubeconfig Permissions (the Tarball Stays Non-Private)" in `CLAUDE.md`
 
 ### Debugging Installation Issues
 - Check chezmoi status: `chezmoi doctor`
@@ -516,7 +513,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `top-size`, `ocode`, `rebuild-ocode`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `top-size`, `ocode`, `rebuild-ocode`
 
 ## Security and Encryption
 - Private key location: `~/.ssh/chezmoi` (Linux/Windows) or via `op` wrapper (Android)
