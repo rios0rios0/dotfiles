@@ -114,3 +114,16 @@ omniroute_filter_env() {
     (umask 077 && { grep -E "^(${OMNIROUTE_ENV_KEYS})=" "$source_file" | tr -d '\r' || true; } > "$staged")
     mv -f "$staged" "$target"
 }
+
+# Prints why `docker compose pull` failed, from the error output saved in $1, for the message that
+# reports it. Docker sends the login ~/.docker/config.json keeps for a registry with every pull from
+# it, and the registry refuses a stale one even for a public image: an error that says "denied" or
+# "unauthorized" is that, not the network, which "offline?" alone would suggest.
+omniroute_pull_failure() {
+    local error_log="$1"
+    if grep -qiwE 'denied|unauthorized' "$error_log" 2>/dev/null; then
+        printf '%s' "the registry refused the login Docker sent with the pull: renew or remove that registry's entry in ~/.docker/config.json, a device note's docker: line, since a public image needs none"
+    else
+        printf '%s' "offline?"
+    fi
+}

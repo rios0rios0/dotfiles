@@ -124,10 +124,14 @@ if ! docker volume inspect "$volume" >/dev/null 2>&1; then
 fi
 
 log "the data volume $volume exists without its containers; starting the stack"
-if ! docker compose pull --quiet; then
-    warn "could not pull the stack's images (offline?), so it is not started; the next apply tries again"
+pull_log="$(mktemp)"
+if ! docker compose pull --quiet 2>"$pull_log"; then
+    cat "$pull_log" >&2
+    warn "could not pull the stack's images ($(omniroute_pull_failure "$pull_log")), so it is not started; the next apply tries again"
+    rm -f "$pull_log"
     exit 0
 fi
+rm -f "$pull_log"
 if ! docker compose up -d --no-recreate --wait --wait-timeout 300; then
     echo "[$prefix] ERROR: the stack did not become healthy; see 'docker compose logs omniroute' in $compose_dir" >&2
     exit 1

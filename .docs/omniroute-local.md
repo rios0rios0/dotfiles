@@ -80,6 +80,8 @@ Rolling the image reference back is not enough once migrations have run; put the
 
 The fork repository is public, so the GHCR package is public and Compose pulls it without credentials. If the package is made private, run `docker login ghcr.io` with a token carrying `read:packages` before `docker compose pull`; otherwise the pull fails while the last pulled image keeps running.
 
+A stale login breaks even the public pull. Docker sends the `ghcr.io` login `~/.docker/config.json` keeps with every pull from it, and GHCR answers an expired token with `denied`, whatever the package's visibility; `omniroute-restore` and the start on apply say so instead of `offline?`. On these machines that file is rendered from the device note's `docker:` lines, so remove the line, or renew the token behind it (a classic token: GitHub Packages accepts no fine-grained one), and apply again. For a single pull, `DOCKER_CONFIG="$(mktemp -d)" docker pull <image>` goes without any login.
+
 ## Connect the GPUs' Ollama
 
 OmniRoute runs in a Docker container while Ollama runs directly in WSL, on this machine and on any other
@@ -253,7 +255,8 @@ takes the first backup. It never runs `docker compose down -v`, and Redis keeps 
 only counters and caches.
 
 `.env` is never generated: the checkout's own stays, a missing one comes from the archive's
-`compose.env`, and an archive from before that member gets the copy in 1Password. The CA bundle
+`compose.env`, and an archive from before that member gets the copy in 1Password -- whose note may
+keep it in a Markdown code block: the fence lines are dropped. The CA bundle
 `.env` names comes from the archive or 1Password the same way, written where `.env` says when that is
 under your home directory. `omniroute-restore --env-only` does only that, without touching Docker --
 what `chezmoi apply` suggests on a machine with no `.env`. When the checkout's `.env` does not open the
@@ -265,6 +268,70 @@ device's folder. The Ollama provider addresses and API keys are the other device
 the dashboard, and that `cred:OMNIROUTE_API_KEY` on this device's 1Password note is a key the restored
 database knows. `make test-omniroute-backup`, `make test-omniroute-restore` and
 `make test-omniroute-stack` cover the archive and its mirror, the restore, and the start on apply.
+
+### Recover from an old Docker Desktop disk
+
+With no archive anywhere but the old Windows installation's disk still at hand -- after a reinstall,
+say -- the database can come out of Docker Desktop's own data disk, as it did on `alien-a51` on
+2026-10-28. The old disk is only ever read; everything else works on a copy, in a folder private to
+you, since it holds the database and `server.env`.
+
+1. Attach the old disk so that it gets a drive letter (unlock it first if BitLocker protects it). Docker
+   Desktop's data disk is `<drive>:\Users\<user>\AppData\Local\Docker\wsl\disk\docker_data.vhdx`
+   (`wsl\data\ext4.vhdx` in older versions); the small `wsl\main\ext4.vhdx` beside it holds no volumes.
+2. Copy it with a Windows tool, from a Windows directory (WSL sees a drive attached after it started
+   only after a restart):
+
+   ```bash
+   cd /mnt/c && robocopy.exe '<drive>:\Users\<user>\AppData\Local\Docker\wsl\disk' 'D:\recovery' docker_data.vhdx /J
+   ```
+
+3. Install `qemu-img` (`sudo apt install qemu-utils`). A disk Docker never detached cleanly still
+   holds a VHDX journal, which has to be replayed -- on the copy, since that writes -- before anything
+   reads it. Then convert it to a raw image on WSL's own disk, where it stays sparse: on a Windows
+   drive it would be written out to its whole virtual size, up to 1 TiB.
+
+   ```bash
+   mkdir -m 700 ~/recovery
+   qemu-img check -r all /mnt/d/recovery/docker_data.vhdx
+   qemu-img convert -f vhdx -O raw /mnt/d/recovery/docker_data.vhdx ~/recovery/docker_data.raw
+   ```
+
+4. Copy the volume's files out with `debugfs` in read-only mode, mounting nothing. The write-ahead
+   log comes too: it holds the last writes, which an unclean stop leaves outside the database file.
+   `db_backups/` in the same folder keeps OmniRoute's own pre-migration snapshots, as a fallback.
+
+   ```bash
+   volume=/data/docker/volumes/dotfiles_omniroute-data/_data
+   for name in storage.sqlite storage.sqlite-wal server.env; do
+       debugfs -c -R "dump $volume/$name $HOME/recovery/$name" ~/recovery/docker_data.raw
+   done
+   ```
+
+5. Fold the log into one consistent file -- opening the database with its `-wal` beside it applies the
+   log -- and check it:
+
+   ```bash
+   sqlite3 ~/recovery/storage.sqlite "VACUUM INTO '$HOME/recovery/snapshot.sqlite'"
+   sqlite3 ~/recovery/snapshot.sqlite 'PRAGMA integrity_check;'
+   ```
+
+6. Pack the snapshot and `server.env` as an archive from before the manifest, encrypted with the
+   backup key, and restore it. With no `compose.env` in it, `.env` comes from 1Password, and every
+   check above runs before the volume is touched:
+
+   ```bash
+   mkdir -m 700 ~/recovery/stage
+   cp ~/recovery/snapshot.sqlite ~/recovery/stage/storage.sqlite
+   cp ~/recovery/server.env ~/recovery/stage/
+   tar -C ~/recovery/stage -cf - storage.sqlite server.env |
+       age -e -i ~/.ssh/omniroute-backup-key -o ~/recovery/omniroute-recovered.tar.age
+   omniroute-restore ~/recovery/omniroute-recovered.tar.age
+   ```
+
+The restore takes a backup as soon as the stack is healthy and mirrors it, so delete the copies
+afterwards: `D:\recovery`, `~/recovery`, and `qemu-utils` if nothing else needs it. WSL's own disk
+does not give the space back to Windows while WSL runs.
 
 ## Privacy boundary
 

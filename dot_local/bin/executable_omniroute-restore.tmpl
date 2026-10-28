@@ -176,7 +176,9 @@ read_from_1password() {
     local op_command
     op_command="$(command -v op 2>/dev/null)" || op_command="$(command -v op.exe 2>/dev/null)" || return 1
     if [[ "${3:-}" == text ]]; then
-        "$op_command" read "$1" --account my | tr -d '\r' > "$2" || return 1
+        # A 1Password note renders Markdown, so the .env may sit in a code block: its fence lines are
+        # no part of the file, and Compose refuses it with `unexpected character "`" in variable name`.
+        "$op_command" read "$1" --account my | tr -d '\r' | sed '/^[[:space:]]*```/d' > "$2" || return 1
     else
         "$op_command" read "$1" --account my > "$2" || return 1
     fi
@@ -287,9 +289,11 @@ cd "$compose_dir"
 docker compose config --quiet || fail "the Compose project in $compose_dir does not load"
 images="$(docker compose config --images)" || fail "the Compose project in $compose_dir names no images"
 image="$(grep -m1 omniroute <<<"$images")" || fail "the Compose project in $compose_dir runs no omniroute image"
-if ! docker compose pull --quiet; then
-    docker image inspect "$image" >/dev/null 2>&1 || fail "could not pull $image (offline?)"
-    warn "could not pull the stack's images (offline?); using the ones already here"
+if ! docker compose pull --quiet 2>"$stage/pull.log"; then
+    cat "$stage/pull.log" >&2
+    reason="$(omniroute_pull_failure "$stage/pull.log")"
+    docker image inspect "$image" >/dev/null 2>&1 || fail "could not pull $image ($reason)"
+    warn "could not pull the stack's images ($reason); using the ones already here"
 fi
 
 # Migrations only go forward: a database the pinned image has never heard of stays unrestored.
