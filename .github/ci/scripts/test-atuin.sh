@@ -377,7 +377,10 @@ case "$1" in
         fi
         echo "Import complete!"
         ;;
-    sync) printf '%s' "${ATUIN_SESSION:-}" >"$state/sync-session" ;;
+    sync)
+        printf '%s' "${ATUIN_SESSION:-}" >"$state/sync-session"
+        [[ -z "${STUB_SYNC_FAIL:-}" ]] || exit 1
+        ;;
     *) ;;
 esac
 STUB
@@ -562,6 +565,8 @@ SQL
         sqlite3 "$ATUIN_STATE/imported.db" "$query"
     }
     marker() { echo "$ATUIN_HOME/data/.dotfiles-histdb-imported"; }
+    synced_marker() { echo "$ATUIN_HOME/data/.dotfiles-histdb-synced"; }
+    HISTORY_HOSTS='SELECT DISTINCT p.host FROM history h JOIN places p ON p.id = h.place_id;'
 
     render linux "$IMPORT_LINUX" '{"chezmoi":{"hostname":"alien-a51"}}' >"$TMP/import-laptop.sh"
     render linux "$IMPORT_LINUX" '{"chezmoi":{"hostname":"mxhero-z790"},"deviceName":"mxhero-z790"}' >"$TMP/import-desktop.sh"
@@ -571,25 +576,60 @@ SQL
     new_state
     # when the import runs
     run_rendered "$TMP/import-laptop.sh"
+    # then it waits for the login: a marker written now would leave nothing to run the sync that
+    # uploads the commands, since the shell's background sync never does
+    if [[ "$(state_rc)" -eq 0 && "$(calls import)" -eq 0 && "$(calls sync)" -eq 0 && ! -e "$(marker)" ]] &&
+        grep -q "not logged in yet, so zsh-histdb's history waits for the apply after the login" "$ATUIN_STATE/out"; then
+        pass "the import waits for the login, and leaves no marker before it"
+    else
+        fail "the import before the login: rc=$(state_rc), imports: $(calls import), $(state_out)"
+    fi
+
+    # given the same laptop, now logged in
+    : >"$ATUIN_STATE/logged-in"
+    # when the import runs
+    run_rendered "$TMP/import-laptop.sh"
     # then Atuin gets a copy with the laptop's own two commands, the database itself is untouched,
-    # the copy is gone, the marker is written, and nothing syncs before the login
+    # the copy is gone, the sync that uploads them gets a session of its own, and both markers exist
     if [[ "$(state_rc)" -eq 0 && "$(imported "$HISTORY_COUNT")" -eq 2 ]] &&
-        [[ "$(imported 'SELECT DISTINCT p.host FROM history h JOIN places p ON p.id = h.place_id;')" == "alien-a51" ]] &&
-        [[ "$(sqlite3 "$HISTDB" "$HISTORY_COUNT")" -eq 7 ]] &&
-        [[ ! -e "$(cat "$ATUIN_STATE/histdb-path")" && -e "$(marker)" && "$(calls sync)" -eq 0 ]] &&
-        grep -q "imported 2 commands from zsh-histdb, recorded under alien-a51" "$ATUIN_STATE/out"; then
-        pass "the laptop imports its own commands from a private copy, and writes the marker"
+        [[ "$(imported "$HISTORY_HOSTS")" == "alien-a51" && "$(sqlite3 "$HISTDB" "$HISTORY_COUNT")" -eq 7 ]] &&
+        [[ ! -e "$(cat "$ATUIN_STATE/histdb-path")" && -e "$(marker)" && -e "$(synced_marker)" ]] &&
+        [[ -n "$(cat "$ATUIN_STATE/sync-session" 2>/dev/null)" ]] &&
+        grep -q "imported 2 commands from zsh-histdb, recorded under alien-a51" "$ATUIN_STATE/out" &&
+        grep -q "synced zsh-histdb's history with the server" "$ATUIN_STATE/out"; then
+        pass "the laptop imports its own commands from a private copy, syncs them, and writes both markers"
     else
         fail "the laptop's import: rc=$(state_rc), $(state_out)"
     fi
 
     # when it runs again
     run_rendered "$TMP/import-laptop.sh"
-    # then the marker stops it: atuin import does not deduplicate
-    if [[ "$(state_rc)" -eq 0 && "$(calls import)" -eq 1 ]]; then
-        pass "the marker keeps a second apply from importing the same commands again"
+    # then the markers stop it: atuin import does not deduplicate, and the sync is done
+    if [[ "$(state_rc)" -eq 0 && "$(calls import)" -eq 1 && "$(calls sync)" -eq 1 ]]; then
+        pass "the markers keep a later apply from importing or syncing again"
     else
-        fail "a second import ran: $(calls import) imports"
+        fail "a later apply ran again: $(calls import) imports, $(calls sync) syncs"
+    fi
+
+    # given a logged-in laptop whose sync fails
+    new_state
+    : >"$ATUIN_STATE/logged-in"
+    # when the import runs
+    run_rendered "$TMP/import-laptop.sh" STUB_SYNC_FAIL=1
+    # then the import is recorded, the sync is not, and it warns
+    first_run_ok=false
+    if [[ "$(state_rc)" -eq 0 && -e "$(marker)" && ! -e "$(synced_marker)" ]] &&
+        grep -q "WARN: atuin sync failed" "$ATUIN_STATE/out"; then
+        first_run_ok=true
+    fi
+    # when the next apply runs with the server back
+    run_rendered "$TMP/import-laptop.sh"
+    # then it syncs, without importing the same commands again
+    if [[ "$first_run_ok" == "true" && "$(state_rc)" -eq 0 && -e "$(synced_marker)" ]] &&
+        [[ "$(calls import)" -eq 1 && "$(calls sync)" -eq 2 ]]; then
+        pass "a failed sync is retried by the next apply, without importing again"
+    else
+        fail "the sync retry: first run ok: $first_run_ok, $(calls import) imports, $(calls sync) syncs, $(state_out)"
     fi
 
     # given the desktop, logged in, whose history carries both of its names
@@ -597,45 +637,46 @@ SQL
     : >"$ATUIN_STATE/logged-in"
     # when the import runs
     run_rendered "$TMP/import-desktop.sh"
-    # then both names are imported, and the sync that uploads them gets a session of its own
-    if [[ "$(state_rc)" -eq 0 && "$(imported "$HISTORY_COUNT")" -eq 4 ]] &&
-        [[ -n "$(cat "$ATUIN_STATE/sync-session" 2>/dev/null)" ]] && grep -q "synced them with the server" "$ATUIN_STATE/out"; then
-        pass "the desktop imports both of its names, and syncs with an ATUIN_SESSION of its own"
+    # then both names are imported and synced
+    if [[ "$(state_rc)" -eq 0 && "$(imported "$HISTORY_COUNT")" -eq 4 && -e "$(synced_marker)" ]]; then
+        pass "the desktop imports both of its names"
     else
-        fail "the desktop's import: rc=$(state_rc), session: $(cat "$ATUIN_STATE/sync-session" 2>/dev/null), $(state_out)"
+        fail "the desktop's import: rc=$(state_rc), $(state_out)"
     fi
 
-    # given a phone, whose commands zsh-histdb recorded under localhost
+    # given a phone, logged in, whose commands zsh-histdb recorded under localhost
     new_state
+    : >"$ATUIN_STATE/logged-in"
     # when the import runs
     run_rendered "$TMP/import-phone.sh"
     # then they are imported under the device's name, as the shell now records them
-    if [[ "$(state_rc)" -eq 0 && "$(imported "$HISTORY_COUNT")" -eq 1 ]] &&
-        [[ "$(imported 'SELECT DISTINCT p.host FROM history h JOIN places p ON p.id = h.place_id;')" == "testdevice" ]]; then
+    if [[ "$(state_rc)" -eq 0 && "$(imported "$HISTORY_COUNT")" -eq 1 && "$(imported "$HISTORY_HOSTS")" == "testdevice" ]]; then
         pass "Termux imports the commands recorded under localhost, named after the device"
     else
         fail "the phone's import: rc=$(state_rc), $(state_out)"
     fi
 
-    # given an import Atuin refuses
+    # given a logged-in device whose import Atuin refuses
     new_state
+    : >"$ATUIN_STATE/logged-in"
     # when the import runs
     run_rendered "$TMP/import-laptop.sh" STUB_IMPORT_FAIL=1
     # then it warns and writes no marker, so the next apply tries again
-    if [[ "$(state_rc)" -eq 0 && ! -e "$(marker)" ]] &&
+    if [[ "$(state_rc)" -eq 0 && ! -e "$(marker)" && "$(calls sync)" -eq 0 ]] &&
         grep -q "WARN: atuin import failed (Error: the database is locked)" "$ATUIN_STATE/out"; then
         pass "a failed import is a warning that leaves no marker"
     else
         fail "a failed import: rc=$(state_rc), marker: $(ls "$(marker)" 2>&1), $(state_out)"
     fi
 
-    # given a device that never ran zsh-histdb
+    # given a device that never ran zsh-histdb, not even logged in yet
     new_state
     # when the import runs
     run_rendered "$TMP/import-laptop.sh" HOME="$ATUIN_STATE/empty-home"
-    # then there is nothing to import, and the marker says so
-    if [[ "$(state_rc)" -eq 0 && "$(calls import)" -eq 0 ]] && grep -q '^nothing to import' "$(marker)"; then
-        pass "a device without zsh-histdb writes the marker and imports nothing"
+    # then there is nothing to import or sync, and both markers say so
+    if [[ "$(state_rc)" -eq 0 && "$(calls import)" -eq 0 && "$(calls sync)" -eq 0 ]] &&
+        grep -q '^nothing to import' "$(marker)" && grep -q '^nothing to sync' "$(synced_marker)"; then
+        pass "a device without zsh-histdb writes both markers and imports nothing"
     else
         fail "no zsh-histdb: rc=$(state_rc), $(state_out)"
     fi

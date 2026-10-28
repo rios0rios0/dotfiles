@@ -102,13 +102,15 @@ The apply after the login imports it: the commands zsh-histdb recorded under the
 hosts, taken from a private copy of `~/.histdb/zsh-history.db`, then a sync that uploads them. The
 hosts are the device's hostname, both of the desktop's names (`devices.mxhero-z790.histdbHosts`
 in `.chezmoidata/atuin.yaml`), and on Termux `localhost`, renamed to the device's name as the shell
-now records it. `atuin import` does not deduplicate, so a marker,
-`~/.atuin/data/.dotfiles-histdb-imported`, makes the import once; a device that never ran
-zsh-histdb gets the marker and imports nothing.
+now records it. It waits for the login, since only the sync after it uploads the imported commands.
+Two markers in `~/.atuin/data/` make it once: `.dotfiles-histdb-imported` after the import, which
+`atuin import` needs because it does not deduplicate, and `.dotfiles-histdb-synced` after the sync,
+which every apply retries until it succeeds. A device that never ran zsh-histdb gets both markers
+and imports nothing.
 
-**A device imported by hand needs the marker created by hand**, or its next apply imports the same
-commands again: `touch ~/.atuin/data/.dotfiles-histdb-imported`. `alien-a51` was imported by hand
-on 2026-10-28.
+**A device imported by hand needs the first marker created by hand**, or its next apply imports
+the same commands again: `touch ~/.atuin/data/.dotfiles-histdb-imported`. Its next apply then
+syncs once and writes the second. `alien-a51` was imported by hand on 2026-10-28.
 
 The commands below do it by hand. `atuin import` fills only the local database; the explicit
 `atuin sync` after it is what adds the imported commands to the record store that sync sends, and

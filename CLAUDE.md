@@ -1309,11 +1309,15 @@ database the repository carried as encrypted files that nothing ever committed a
     warned about if it has no session); every other device logs in on its next apply.
 13. **Neither script fails the apply.** No `op`, a locked 1Password, an unreachable server, a failed
     import: each is an `[atuin] WARN:` line and exit 0, and the next apply tries again.
-14. **The import is once per Atuin database, by marker.** `atuin import` does not deduplicate, so
-    `~/.atuin/data/.dotfiles-histdb-imported` -- not chezmoi's state, which `chezmoi state reset` and
-    an edit of the script would undo -- records it. A device imported by hand needs the marker
-    created by hand (`alien-a51`, on 2026-10-28). The rows come from a private `VACUUM INTO` copy,
-    so the import never reads a database zsh-histdb is still writing.
+14. **The import is once per Atuin database, by two markers, and only once logged in.** `atuin
+    import` does not deduplicate, so `~/.atuin/data/.dotfiles-histdb-imported` -- not chezmoi's
+    state, which `chezmoi state reset` and an edit of the script would undo -- records it. Only the
+    explicit sync after it uploads the imported commands (9), so `.dotfiles-histdb-synced` is
+    written once that sync succeeded, and every apply before then syncs again. The import waits for
+    a session: a marker written before the login would leave nothing to run that sync. A device
+    imported by hand needs the markers created by hand (`alien-a51` has the first, on 2026-10-28,
+    and its next apply syncs and writes the second). The rows come from a private `VACUUM INTO`
+    copy, so the import never reads a database zsh-histdb is still writing.
 15. **A script's `atuin sync` needs `ATUIN_SESSION`.** Atuin's shell hook exports it; without it the
     sync's history-store initialisation fails with `Failed to find $ATUIN_SESSION in the
     environment`, so the import syncs as `ATUIN_SESSION="$(atuin uuid)" atuin sync`.

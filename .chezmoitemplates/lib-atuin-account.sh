@@ -13,7 +13,8 @@
 #       logs in when Atuin reports no session; the caller defines `atuin_secret <password|key>`,
 #       which prints that field of the account's 1Password item, or fails
 #   atuin_import_histdb <name for localhost, or ''> <host>...
-#       imports the rows zsh-histdb recorded under those hosts, once per Atuin database
+#       imports the rows zsh-histdb recorded under those hosts, once per Atuin database and only
+#       once logged in, then syncs them, on every apply until a sync succeeds
 
 _atuin_prefix="atuin"
 
@@ -59,72 +60,87 @@ atuin_ensure_login() {
 # The import runs in a subshell, so that its trap removes the private copy of the database however
 # it ends. Every step that can fail is guarded: the callers run under errexit, which the subshell
 # inherits, and a failure here must not fail the apply.
+#
+# Two markers make it once, in two steps. `atuin import` fills the local database alone and does not
+# deduplicate, so `.dotfiles-histdb-imported` keeps it from running twice. Only an explicit `atuin
+# sync` then adds the imported commands to the record store and uploads them -- the shell's
+# background sync never does -- so `.dotfiles-histdb-synced` is written once that sync succeeded,
+# and every apply before then tries it again. The import itself waits for a session: a marker
+# written before the login would leave nothing to run the sync that uploads its commands. A device
+# imported and synced by hand needs both markers created by hand.
 atuin_import_histdb() (
     rename="$1"
     shift
     db="$HOME/.histdb/zsh-history.db"
     data="${ATUIN_HOME:-$HOME/.atuin}/data"
-    marker="$data/.dotfiles-histdb-imported"
+    imported="$data/.dotfiles-histdb-imported"
+    synced="$data/.dotfiles-histdb-synced"
 
     command -v atuin >/dev/null 2>&1 || exit 0
-    # `atuin import` does not deduplicate, so a second import would double every command: the marker
-    # is what makes this once. A device imported by hand needs it created by hand.
-    [[ ! -e "$marker" ]] || exit 0
-    if [[ ! -s "$db" ]]; then
-        { mkdir -p "$data" && printf 'nothing to import: no %s\n' "$db" >"$marker"; } 2>/dev/null ||
-            _atuin_warn "could not write $marker"
+    [[ ! -e "$synced" ]] || exit 0
+    if [[ ! -e "$imported" && ! -s "$db" ]]; then
+        { mkdir -p "$data" && printf 'nothing to import: no %s\n' "$db" >"$imported" &&
+            printf 'nothing to sync: no %s\n' "$db" >"$synced"; } 2>/dev/null ||
+            _atuin_warn "could not write $synced"
         exit 0
     fi
-    if ! command -v sqlite3 >/dev/null 2>&1; then
-        _atuin_warn "sqlite3 is not installed, so zsh-histdb's history waits for the next apply"
-        exit 0
-    fi
-
-    # mktemp -d creates the directory private to this user, as the copy of the history needs.
-    if ! work="$(mktemp -d)"; then
-        _atuin_warn "could not create a private directory for the copy of $db; the next apply tries again"
-        exit 0
-    fi
-    trap 'rm -rf "$work"' EXIT
-    copy="$work/zsh-history.db"
-
-    # A consistent copy, including what is still in the write-ahead log, in which the other hosts'
-    # rows are deleted and Termux's `localhost` gets the device's name, as the shell now records it.
-    hosts=""
-    for host in "$@"; do
-        hosts+="${hosts:+, }'${host//\'/\'\'}'"
-    done
-    if ! sqlite3 "$db" "VACUUM INTO '${copy//\'/\'\'}'" ||
-        ! sqlite3 "$copy" "DELETE FROM history WHERE place_id NOT IN (SELECT id FROM places WHERE host IN ($hosts));"; then
-        _atuin_warn "could not copy $db; the next apply tries again"
-        exit 0
-    fi
-    if [[ -n "$rename" ]] &&
-        ! sqlite3 "$copy" "UPDATE places SET host = '${rename//\'/\'\'}' WHERE host = 'localhost';"; then
-        _atuin_warn "could not name localhost's commands after this device; the next apply tries again"
-        exit 0
-    fi
-    count="$(sqlite3 "$copy" "SELECT COUNT(*) FROM history;" 2>/dev/null)" || count="the"
-
-    if ! output="$(HISTDB_FILE="$copy" atuin import zsh-hist-db </dev/null 2>&1)"; then
-        _atuin_warn "atuin import failed ($(tail -n 1 <<<"$output")); the next apply tries again"
-        exit 0
-    fi
-    if ! { mkdir -p "$data" &&
-        printf 'imported %s commands recorded under %s, %s\n' "$count" "$*" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$marker"; } 2>/dev/null; then
-        _atuin_warn "imported, but could not write $marker: create it by hand, or the next apply imports the same commands again"
-        exit 0
-    fi
-    _atuin_info "imported $count commands from zsh-histdb, recorded under $*"
-
-    # `atuin import` fills the local database alone; a sync adds the imported commands to the record
-    # store and uploads them. Atuin's shell hook exports ATUIN_SESSION, which a non-interactive shell
-    # lacks, and without it the sync's history-store initialisation fails.
     if _atuin_not_logged_in; then
-        _atuin_info "they reach the server with this device's first sync after its login"
-    elif ATUIN_SESSION="$(atuin uuid)" atuin sync </dev/null >/dev/null 2>&1; then
-        _atuin_info "synced them with the server"
-    else
-        _atuin_warn "atuin sync failed; the shell's background sync uploads them later"
+        _atuin_info "not logged in yet, so zsh-histdb's history waits for the apply after the login"
+        exit 0
     fi
+
+    if [[ ! -e "$imported" ]]; then
+        if ! command -v sqlite3 >/dev/null 2>&1; then
+            _atuin_warn "sqlite3 is not installed, so zsh-histdb's history waits for the next apply"
+            exit 0
+        fi
+
+        # mktemp -d creates the directory private to this user, as the copy of the history needs.
+        if ! work="$(mktemp -d)"; then
+            _atuin_warn "could not create a private directory for the copy of $db; the next apply tries again"
+            exit 0
+        fi
+        trap 'rm -rf "$work"' EXIT
+        copy="$work/zsh-history.db"
+
+        # A consistent copy, including what is still in the write-ahead log, in which the other hosts'
+        # rows are deleted and Termux's `localhost` gets the device's name, as the shell now records it.
+        hosts=""
+        for host in "$@"; do
+            hosts+="${hosts:+, }'${host//\'/\'\'}'"
+        done
+        if ! sqlite3 "$db" "VACUUM INTO '${copy//\'/\'\'}'" ||
+            ! sqlite3 "$copy" "DELETE FROM history WHERE place_id NOT IN (SELECT id FROM places WHERE host IN ($hosts));"; then
+            _atuin_warn "could not copy $db; the next apply tries again"
+            exit 0
+        fi
+        if [[ -n "$rename" ]] &&
+            ! sqlite3 "$copy" "UPDATE places SET host = '${rename//\'/\'\'}' WHERE host = 'localhost';"; then
+            _atuin_warn "could not name localhost's commands after this device; the next apply tries again"
+            exit 0
+        fi
+        count="$(sqlite3 "$copy" "SELECT COUNT(*) FROM history;" 2>/dev/null)" || count="the"
+
+        if ! output="$(HISTDB_FILE="$copy" atuin import zsh-hist-db </dev/null 2>&1)"; then
+            _atuin_warn "atuin import failed ($(tail -n 1 <<<"$output")); the next apply tries again"
+            exit 0
+        fi
+        if ! { mkdir -p "$data" &&
+            printf 'imported %s commands recorded under %s, %s\n' "$count" "$*" "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$imported"; } 2>/dev/null; then
+            _atuin_warn "imported, but could not write $imported: create it by hand, or the next apply imports the same commands again"
+            exit 0
+        fi
+        _atuin_info "imported $count commands from zsh-histdb, recorded under $*"
+    fi
+
+    # The explicit sync that adds the imported commands to the record store and uploads them. Atuin's
+    # shell hook exports ATUIN_SESSION, which a non-interactive shell lacks, and without it the sync's
+    # history-store initialisation fails.
+    if ! ATUIN_SESSION="$(atuin uuid)" atuin sync </dev/null >/dev/null 2>&1; then
+        _atuin_warn "atuin sync failed, so zsh-histdb's history reaches the server with a later apply's sync"
+        exit 0
+    fi
+    { printf 'synced %s\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" >"$synced"; } 2>/dev/null ||
+        _atuin_warn "synced, but could not write $synced; the next apply syncs once more"
+    _atuin_info "synced zsh-histdb's history with the server"
 )
