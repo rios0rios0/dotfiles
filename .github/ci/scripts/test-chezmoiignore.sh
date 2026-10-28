@@ -160,8 +160,7 @@ check_platform "$LINUX_OS" \
     --ignore "android-*.sh" \
     --ignore "windows-*.ps1" \
     --ignore ".termux" \
-    --include ".docker" \
-    --include ".kube"
+    --include ".docker"
 
 # Windows assertions
 check_platform "$WINDOWS_OS" \

@@ -139,12 +139,11 @@ dot_scripts/             # Utility scripts (version manager, credential loader, 
 dot_ssh/                 # SSH config, keys, signing (1Password-backed) -> ~/.ssh/
 dot_aws/                 # Encrypted AWS credentials -> ~/.aws/
 dot_azure/               # Encrypted Azure profile -> ~/.azure/
-private_dot_kube/        # Encrypted Kubernetes configs -> ~/.kube/ (owner-only)
 AppData/                 # Windows Terminal settings, and Docker Desktop's WSL integration and start at sign-in, merged into its own settings (Windows only)
 modify_dot_claude.json   # MCP server config for Claude Code (Linux, Android) -> ~/.claude.json
 ```
 
-Chezmoi translates `dot_` prefixes to `.` in the target path (e.g., `dot_zshrc.tmpl` becomes `~/.zshrc`), and `private_` strips group and world permissions from the target (e.g., `private_dot_kube/` becomes `~/.kube` with mode `0700`).
+Chezmoi translates `dot_` prefixes to `.` in the target path (e.g., `dot_zshrc.tmpl` becomes `~/.zshrc`), and `private_` strips group and world permissions from the target (e.g., `dot_config/private_aisync/` becomes `~/.config/aisync` with mode `0700`).
 
 ## Secrets and Encryption
 

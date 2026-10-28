@@ -314,19 +314,11 @@ else
 fi
 
 # =================================================================================================
-# zsh-histdb's removal: no source files, no watcher or extractor entry, and tombstones for the
-# plugin where it was loaded
+# zsh-histdb's removal: no source files, and tombstones for the plugin where it was loaded
 if [[ ! -e "$REPO_ROOT/dot_histdb" ]]; then
     pass "the repository no longer carries ~/.histdb"
 else
     fail "dot_histdb is still in the source"
-fi
-if sed -n '/^WATCH_DIRS=($/,/^)$/p' "$REPO_ROOT/dot_scripts/executable_linux-toolbox-watch-compress-folders.sh" |
-    grep -q '\.histdb' ||
-    grep -q '^WATCH_DIRS=.*\.histdb' "$REPO_ROOT/.chezmoiscripts/run_once_after_linux-001-extract-compressed-folders.sh"; then
-    fail "the folder watcher or the extractor still lists ~/.histdb"
-else
-    pass "neither the folder watcher nor the extractor lists ~/.histdb"
 fi
 for removal in "$LINUX_REMOVAL" "$ANDROID_REMOVAL"; do
     if grep -qF '"path:$HOME/.local/share/zinit/plugins/larkery---zsh-histdb"' "$removal" &&

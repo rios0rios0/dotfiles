@@ -24,7 +24,6 @@ make test-remove-dependencies       # dependency removal library (tombstones, $H
 make test-remove-dependencies-windows # Windows removal script, failed removals reported (needs pwsh)
 make test-install-dependencies-windows # Windows installer: detection by exact ID, failed installs reported (needs pwsh)
 make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
-make test-extract-folders           # the watcher's archived folders restored on a first apply: names, layouts, existing folders, failures
 make test-shell-credentials         # 1Password credential/workspace loading and removal
 make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
@@ -232,7 +231,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -1302,8 +1301,7 @@ database the repository carried as encrypted files that nothing ever committed a
    the device's name. The laptop's database also held the desktop's March 2025 snapshot, which the
    desktop imports.
 10. **zsh-histdb is gone; its data is not.** Its zinit checkout and its link into Oh My Zsh are
-    tombstoned on Linux and Android. `~/.histdb` stays as a fallback, and the folder watcher no
-    longer archives it into the chezmoi source after every command.
+    tombstoned on Linux and Android. `~/.histdb` stays as a fallback.
 11. **The login reads 1Password only when Atuin reports no session.** `atuin status` reports it from
     the local meta store before it reaches the network; logged in, it asks the server, with its
     timeouts cut to seconds so an offline apply does not wait half a minute. Linux reads the item's
@@ -1691,31 +1689,6 @@ decrypts to the same SHA-256. The next apply on each machine replaces the key fi
 
 `make test-export-keys` covers the Linux script against a stubbed `op.exe`, and
 `make test-export-key-windows` the Windows one under pwsh.
-
-## Kubeconfig Permissions (the Tarball Stays Non-Private)
-
-`private_dot_kube/` deploys `~/.kube` as `0700`, and `encrypted_private_config.age` deploys
-`~/.kube/config` as `0600`. Helm checks the kubeconfig's mode on every invocation, and the Oh My
-Zsh `helm` plugin runs `helm completion zsh` at every shell start, so a group- or world-readable
-kubeconfig prints two `WARNING: Kubernetes configuration file is ... insecure` lines in every new
-terminal. Keep the fix in the source attribute: chezmoi manages the mode, so a `chmod` on the
-target is reverted by the next apply.
-
-**`encrypted_config-files.tar.age` deliberately carries no `private_`; do not add one to match its
-sibling.** The folder watcher (`dot_scripts/executable_linux-toolbox-watch-compress-folders.sh`)
-rebuilds that tarball from `~/.kube/config-files` on every change and re-adds it with
-`chezmoi add --encrypt`. `tar` writes it `0644` under the default umask, and re-adding a `0644`
-file over a `private_` entry makes chezmoi ask
-`adding .kube/config-files.tar would remove private attribute, continue?`. The watcher runs
-headless (`nohup … &>/dev/null &` from `dot_zshrc.tmpl`), so nothing can answer: the add fails,
-`archive_dir` deletes the archive anyway, and the source keeps the stale tarball. The
-`~/.kube/config-files` backup silently stops; the only trace is
-`/tmp/linux-toolbox-watch-compress-folders.log`, and no apply, lint or test fails.
-
-The `0700` directory is what protects the tarball: other users cannot traverse into `~/.kube`,
-whatever the file's own mode. To make the tarball private anyway, change the watcher first (wrap
-its `tar -cf` in `umask 077`); the next re-add then gains `private_` by itself, because chezmoi
-adds the attribute without prompting. Renaming the source file alone springs the trap above.
 
 <!-- chlog:start -->
 ## Changelog (chlog) — MANDATORY
