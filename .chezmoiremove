@@ -39,6 +39,12 @@
 # where its `.env` lives, and this copy only drifted from it.
 local-services/omniroute/compose.yaml
 
+# The folder watcher itself -- removed in PR #276 (2026-10-27). chezmoi no longer ships
+# `dot_scripts/executable_linux-toolbox-watch-compress-folders.sh`, so the deployed copy is
+# orphaned in `$HOME`; `run_onchange_after_linux-001-stop-folder-watcher.sh` stops any
+# instance still running, which would otherwise re-add the removed files to the source.
+.scripts/linux-toolbox-watch-compress-folders.sh
+
 # The kube-contexts archive -- orphaned in PR #276 (2026-10-27), which retired the folder
 # watcher and stopped syncing `~/.kube`. The old `encrypted_config-files.tar.age` deployed
 # this tarball beside the extracted `~/.kube/config-files/`; the folder is what the shell
