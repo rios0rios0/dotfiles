@@ -3,6 +3,7 @@
 # Puts the age keys this machine needs in place, from 1Password, before any file is applied:
 #   ~/.ssh/chezmoi                decrypts every encrypted_*.age file (.kube, .john, .npmrc...)
 #   ~/.ssh/omniroute-backup-key   encrypts the OmniRoute backups; WSL only, where they run
+#   ~/.ssh/secrets-backup-key     encrypts the home-secrets backups; WSL only, where they run
 #   ~/.config/aisync/key.txt      decrypts aifiles, which run_after_linux-014 syncs through aisync
 # .chezmoidata/age-keys.yaml names each item and each key's public half; see CLAUDE.md, "Age Keys".
 #
@@ -29,6 +30,9 @@ chezmoi_reference={{ .ageKeys.chezmoi.privateKey | squote }}
 backup_key="$ssh_dir/omniroute-backup-key"
 backup_recipient={{ .ageKeys.omnirouteBackup.recipient | squote }}
 backup_reference={{ .ageKeys.omnirouteBackup.privateKey | squote }}
+secrets_backup_key="$ssh_dir/secrets-backup-key"
+secrets_backup_recipient={{ .ageKeys.secretsBackup.recipient | squote }}
+secrets_backup_reference={{ .ageKeys.secretsBackup.privateKey | squote }}
 aisync_key="$HOME/.config/aisync/key.txt"
 aisync_recipient={{ .ageKeys.aisync.recipient | squote }}
 aisync_reference={{ .ageKeys.aisync.privateKey | squote }}
@@ -66,6 +70,7 @@ fetch_key() {
 
 need_chezmoi=false
 need_backup=false
+need_secrets_backup=false
 need_aisync=false
 if key_matches "$chezmoi_key" "$chezmoi_recipient"; then
     echo "[$prefix] the chezmoi age key at $chezmoi_key is already in place" >&2
@@ -78,6 +83,11 @@ if grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null; then
     else
         need_backup=true
     fi
+    if key_matches "$secrets_backup_key" "$secrets_backup_recipient"; then
+        echo "[$prefix] the home-secrets backup key at $secrets_backup_key is already in place" >&2
+    else
+        need_secrets_backup=true
+    fi
 fi
 if key_matches "$aisync_key" "$aisync_recipient"; then
     echo "[$prefix] the aisync age key at $aisync_key is already in place" >&2
@@ -86,11 +96,11 @@ elif [[ -e "$aisync_key" ]]; then
 else
     need_aisync=true
 fi
-if ! $need_chezmoi && ! $need_backup && ! $need_aisync; then
+if ! $need_chezmoi && ! $need_backup && ! $need_secrets_backup && ! $need_aisync; then
     exit 0
 fi
 
-if $need_chezmoi || $need_backup; then
+if $need_chezmoi || $need_backup || $need_secrets_backup; then
     mkdir -p "$ssh_dir"
     chmod 700 "$ssh_dir"
 fi
@@ -115,6 +125,9 @@ else
     if $need_backup; then
         echo "[$prefix] WARN: $backup_key was not fetched; the next apply tries again" >&2
     fi
+    if $need_secrets_backup; then
+        echo "[$prefix] WARN: $secrets_backup_key was not fetched; the next apply tries again" >&2
+    fi
     if $need_aisync; then
         echo "[$prefix] WARN: $aisync_key was not fetched; the next apply tries again" >&2
     fi
@@ -127,6 +140,9 @@ if $need_chezmoi && ! fetch_key "$chezmoi_key" "$chezmoi_recipient" "$chezmoi_re
 fi
 if $need_backup && ! fetch_key "$backup_key" "$backup_recipient" "$backup_reference"; then
     echo "[$prefix] WARN: 1Password did not return the OmniRoute backup key, so backups fail until it arrives; the next apply tries again ('op read \"$backup_reference\" --account my')" >&2
+fi
+if $need_secrets_backup && ! fetch_key "$secrets_backup_key" "$secrets_backup_recipient" "$secrets_backup_reference"; then
+    echo "[$prefix] WARN: 1Password did not return the home-secrets backup key, so those backups fail until it arrives; the next apply tries again ('op read \"$secrets_backup_reference\" --account my')" >&2
 fi
 if $need_aisync && ! fetch_key "$aisync_key" "$aisync_recipient" "$aisync_reference"; then
     echo "[$prefix] WARN: 1Password did not return the aisync age key, so aifiles is not synced until it arrives; the next apply tries again ('op read \"$aisync_reference\" --account my')" >&2

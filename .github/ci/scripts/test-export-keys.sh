@@ -34,15 +34,18 @@ trap 'rm -rf "$TMP"' EXIT
 # serves them under.
 age-keygen -o "$TMP/chezmoi.id" 2>/dev/null
 age-keygen -o "$TMP/backup.id" 2>/dev/null
+age-keygen -o "$TMP/secretsbackup.id" 2>/dev/null
 age-keygen -o "$TMP/other.id" 2>/dev/null
 age-keygen -o "$TMP/aisync.id" 2>/dev/null
 CHEZMOI_REF="op://Private/test-chezmoi/private key"
 BACKUP_REF="op://Private/test-backup/private key"
+SECRETSBACKUP_REF="op://Private/test-secretsbackup/private key"
 AISYNC_REF="op://Private/test-aisync/private key"
 override="$(jq -nc --arg c "$(age-keygen -y "$TMP/chezmoi.id")" --arg b "$(age-keygen -y "$TMP/backup.id")" \
-    --arg a "$(age-keygen -y "$TMP/aisync.id")" --arg cr "$CHEZMOI_REF" --arg br "$BACKUP_REF" --arg ar "$AISYNC_REF" \
+    --arg s "$(age-keygen -y "$TMP/secretsbackup.id")" --arg a "$(age-keygen -y "$TMP/aisync.id")" \
+    --arg cr "$CHEZMOI_REF" --arg br "$BACKUP_REF" --arg sr "$SECRETSBACKUP_REF" --arg ar "$AISYNC_REF" \
     '{ageKeys: {chezmoi: {recipient: $c, privateKey: $cr}, omnirouteBackup: {recipient: $b, privateKey: $br},
-      aisync: {recipient: $a, privateKey: $ar}}}')"
+      secretsBackup: {recipient: $s, privateKey: $sr}, aisync: {recipient: $a, privateKey: $ar}}}')"
 printf 'sourceDir: "%s"\n' "$REPO_ROOT" >"$TMP/chezmoi.yaml"
 chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "$override" <"$TEMPLATE" |
     sed "s|/proc/version|$TMP/proc-version|" >"$TMP/export.sh"
@@ -65,6 +68,7 @@ case "$1" in
         case "$ref" in
             *test-chezmoi*) cat "${OP_SERVE_CHEZMOI:-$CHEZMOI_ID}" ;;
             *test-backup*) cat "${OP_SERVE_BACKUP:-$BACKUP_ID}" ;;
+            *test-secretsbackup*) cat "${OP_SERVE_SECRETSBACKUP:-$SECRETSBACKUP_ID}" ;;
             *test-aisync*) cat "${OP_SERVE_AISYNC:-$AISYNC_ID}" ;;
             *) exit 1 ;;
         esac
@@ -72,7 +76,7 @@ case "$1" in
 esac
 STUB
 chmod +x "$TMP/bin/op.exe"
-export OP_LOG="$TMP/op.log" CHEZMOI_ID="$TMP/chezmoi.id" BACKUP_ID="$TMP/backup.id" AISYNC_ID="$TMP/aisync.id"
+export OP_LOG="$TMP/op.log" CHEZMOI_ID="$TMP/chezmoi.id" BACKUP_ID="$TMP/backup.id" SECRETSBACKUP_ID="$TMP/secretsbackup.id" AISYNC_ID="$TMP/aisync.id"
 
 # reset <wsl|metal> [no-aisync]: a fresh home, with the bridge's socket standing in ~/.ssh and,
 # unless asked otherwise, aisync's key already in place, so the cases about the other two keys see
@@ -112,9 +116,11 @@ reset wsl
 # when / then: both are fetched, private, and exactly the identities 1Password holds
 rc="$(run)"
 if [[ "$rc" == 0 ]] && same "$TMP/home/.ssh/chezmoi" "$CHEZMOI_ID" && same "$TMP/home/.ssh/omniroute-backup-key" "$BACKUP_ID" &&
-    [[ "$(stat -c '%a' "$TMP/home/.ssh/chezmoi")" == 600 && "$(stat -c '%a' "$TMP/home/.ssh/omniroute-backup-key")" == 600 ]] &&
+    same "$TMP/home/.ssh/secrets-backup-key" "$SECRETSBACKUP_ID" &&
+    [[ "$(stat -c '%a' "$TMP/home/.ssh/chezmoi")" == 600 && "$(stat -c '%a' "$TMP/home/.ssh/omniroute-backup-key")" == 600 &&
+       "$(stat -c '%a' "$TMP/home/.ssh/secrets-backup-key")" == 600 ]] &&
     [[ "$(stat -c '%a' "$TMP/home/.ssh")" == 700 ]] && grep -q -- '--account my' "$OP_LOG"; then
-    pass "a WSL machine without keys gets both, 0600 in a 0700 ~/.ssh"
+    pass "a WSL machine without keys gets all three, 0600 in a 0700 ~/.ssh"
 else
     fail "first fetch on WSL: rc=$rc, $(cat "$TMP/out")"
 fi
@@ -128,7 +134,7 @@ fi
 # when / then: nothing reaches 1Password, not even a sign-in, and each key is reported as in place
 : >"$OP_LOG"
 rc="$(run)"
-if [[ "$rc" == 0 && ! -s "$OP_LOG" && "$(grep -c 'is already in place' "$TMP/out")" == 3 ]]; then
+if [[ "$rc" == 0 && ! -s "$OP_LOG" && "$(grep -c 'is already in place' "$TMP/out")" == 4 ]]; then
     pass "matching keys are left alone without 1Password, each reported as already in place"
 else
     fail "matching keys: rc=$rc, op calls: $(cat "$OP_LOG")"
@@ -137,8 +143,9 @@ fi
 # given the older key -- an OpenSSH private key, as the repository used before
 reset wsl
 cp "$BACKUP_ID" "$TMP/home/.ssh/omniroute-backup-key"
+cp "$SECRETSBACKUP_ID" "$TMP/home/.ssh/secrets-backup-key"
 printf -- '-----BEGIN OPENSSH PRIVATE KEY-----\nAAAA\n-----END OPENSSH PRIVATE KEY-----\n' >"$TMP/home/.ssh/chezmoi"
-# when / then: it is replaced, and the matching backup key is not fetched again
+# when / then: it is replaced, and the matching backup keys are not fetched again
 rc="$(run)"
 if [[ "$rc" == 0 ]] && same "$TMP/home/.ssh/chezmoi" "$CHEZMOI_ID" && [[ "$(reads)" == 1 ]]; then
     pass "an older chezmoi key is replaced, and only it is fetched"

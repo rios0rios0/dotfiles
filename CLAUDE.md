@@ -42,6 +42,8 @@ make test-omniroute-backup          # the OmniRoute stack's encrypted backups: t
 make test-omniroute-restore         # omniroute-restore: the archive allowlist, integrity and schema checks, .env from the archive or 1Password, the key check, the volume
 make test-omniroute-stack           # the OmniRoute start on apply: every state it finds, never creating the database, the render gate
 make test-omniroute-image           # the custom OmniRoute image pin: the switch from upstream, --check, --tag, and failed lookups leaving the pin untouched
+make test-secrets-backup            # the home-secrets backups: the archive and its round trip, the source allowlist, retention, the personal OneDrive mirror, the installer's gate
+make test-secrets-restore           # secrets-restore: a planted archive refused (outside the sources, an absolute path), the no-overwrite default, --force, per-source extraction, --device
 make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the dependency install, the pinned bun (cache, verified download, fallbacks), the ~/.bun/bin fallback, the bun installer and its PATH block
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
 make test-yq                        # mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring
@@ -231,7 +233,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -1041,6 +1043,50 @@ Restoring another device's archive makes it this machine's database: `omniroute-
 3, and the installer; `make test-omniroute-restore` covers 1 and 5 against real `age`, `tar` and
 `sqlite3`, with the key check run under the host's `node`, plus a fenced `.env` and a refused pull;
 `make test-omniroute-stack` covers 4 and 6, and a refused pull.
+
+## Home-Secrets Backups
+
+`~/.john`, `~/.sqlmap` and `~/.kube` (`config` and `config-files`) stopped syncing through chezmoi
+in #276 -- security-tool state and cluster config, not good to commit to the repository, and the
+inotify folder watcher that used to archive them was flaky. `secrets-backup` backs them up off the
+machine instead, as a smaller twin of the OmniRoute backups: one age-encrypted archive per run,
+kept here and copied to the personal OneDrive. Setup and usage are in `.docs/secrets-backup.md`.
+
+| Part | Where |
+|------|-------|
+| What to back up, retention, the mirror | `.chezmoidata/secrets-backup.yaml` (the backup and restore read it directly) |
+| The daily archive and its copy off the machine | `dot_local/bin/executable_secrets-backup.tmpl`, run by `secrets-backup.timer` |
+| The restore | `dot_local/bin/executable_secrets-restore.tmpl` |
+| The OneDrive finder, the archive listing, the allowlist | `.chezmoitemplates/lib-secrets-backup.sh` |
+| The key | `~/.ssh/secrets-backup-key`, from 1Password's `secrets-backup.age` (run_before_linux-005); a key for these backups alone |
+| The timer | `.chezmoiscripts/run_onchange_after_linux-018-setup-secrets-backup.sh.tmpl` enables it (WSL, systemd) |
+| Gate | `.chezmoiignore`: WSL only, where the personal OneDrive is reachable |
+
+**Keep these:**
+
+1. **A key of its own.** `secrets-backup.age` encrypts these backups alone -- never the chezmoi key,
+   nor the OmniRoute one -- so no key's loss or rotation strands another's archives. Its only copy
+   off the machine is the 1Password item, which `chezmoi apply` fetches; a lost key means lost
+   backups, so a generated-new one is never substituted.
+2. **chezmoi never deletes unmanaged files, and this never re-adds them.** #276 left the folders on
+   each machine but out of the repository; the backup only reads them. It is not the watcher reborn:
+   no inotify, no `chezmoi add`, nothing written back into the source.
+3. **The archive carries only the configured sources, and the restore refuses anything else.** The
+   age recipient is public (`.chezmoidata/age-keys.yaml`), so a planted archive is possible;
+   `secrets_entry_allowed` runs every tar entry -- on write and again on restore -- through the
+   source list and refuses an absolute path, a `..` component, or a name outside the sources before
+   a file is written.
+4. **The restore never clobbers live state.** A source whose folder already exists is left alone
+   unless `--force`; files come back with their stored permissions, so `~/.kube/config` stays 600.
+5. **Only `.kube/config` and `.kube/config-files`, not `.kube` whole**, so the regenerable discovery
+   caches (`~/.kube/cache`, `~/.kube/http-cache`) stay out of the archive.
+6. **The mirror is the personal OneDrive** (`%OneDriveConsumer%`, never `%OneDrive%` -- the work
+   account's on a machine signed in to both), a folder per device, with the same `keep` /
+   `mirrorKeep` / `mirrorMonthly` retention as the OmniRoute mirror. WSL only, so the units and the
+   `~/.local/bin` scripts are gated to WSL beside the OmniRoute ones in `.chezmoiignore`.
+
+`make test-secrets-backup` and `make test-secrets-restore` cover all of it against real `age` and a
+throwaway key, with Windows and the OneDrive stubbed; `make test-chezmoiignore` covers the gate.
 
 ## OpenCode V2 Through OmniRoute
 
