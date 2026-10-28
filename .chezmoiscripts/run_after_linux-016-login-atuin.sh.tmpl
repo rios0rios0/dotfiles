@@ -1,0 +1,31 @@
+#!/bin/bash
+
+# Logs this machine's Atuin client in to the sync server once the account exists: a device already
+# logged in costs one `atuin status`, and one that is not reads the password and the key from the
+# account's 1Password item (.chezmoidata/atuin.yaml) through `op`, at run time, and hands them to
+# `atuin login` in its environment and on its stdin. The body is .chezmoitemplates/lib-atuin-account.sh,
+# which Android shares; "Shell History (Atuin)" in CLAUDE.md lists the rules it keeps.
+#
+# `run_after_`, not `run_onchange_`: a login fails for reasons this repository never sees change --
+# no network, 1Password locked, the server down -- and the next apply has to try again. After the
+# files, which write ~/.config/atuin/config.toml and with it the server's address, and after the
+# installer, which installs atuin. The server's own device registers the account by hand, once, and
+# is only warned about here.
+
+set -euo pipefail
+{{ $atuin := includeTemplate "lib-atuin.tmpl" . | fromJson -}}
+
+{{ template "lib-atuin-account.sh" }}
+
+# atuin_secret <password|key>: that field of the account's 1Password item, through the op wrapper
+# (Windows' op.exe and its desktop app on WSL), without the carriage return op.exe may leave.
+atuin_secret() {
+    local field="$1" op="$HOME/.local/bin/op" value
+    if [[ ! -x "$op" ]]; then
+        op="$(command -v op)" || return 1
+    fi
+    value="$("$op" read --account {{ $atuin.account.onePasswordAccount | squote }} {{ printf "op://%s/%s/" $atuin.account.vault $atuin.account.item | squote }}"$field" </dev/null 2>/dev/null)" || return 1
+    printf '%s' "${value%$'\r'}"
+}
+
+atuin_ensure_login {{ $atuin.account.username | squote }} {{ $atuin.isServer }}

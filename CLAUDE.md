@@ -35,7 +35,7 @@ make test-sentry-setup              # the Sentry CLI setup scripts: the version 
 make test-local-llm                 # the local model server: its settings, the window its unit allocates, the installer's gate
 make test-opencode                  # OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference
 make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server, the ocode web UI and the Atuin server
-make test-atuin                     # Atuin: the pinned install, the client config per device, zsh after Oh My Zsh, the server's pin and port, zsh-histdb's removal
+make test-atuin                     # Atuin: the pinned install, the client config per device, zsh after Oh My Zsh, the server's pin and port, zsh-histdb's removal, the login and the one-time history import on apply
 make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
 make test-statusline                # Claude Code status line: with and without a login, no refresh without one, the token off argv
 make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
@@ -232,7 +232,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `extract-folders`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -275,7 +275,9 @@ from the file extension (`.json` has none), Windows has no `#!`, and the apply a
 | Compare with `toJson`, never `eq` on decoded values | A missing key decodes to `""`, and `eq` between a string and a bool is an error rather than `false` |
 | Invalid JSON fails the template | The old scripts started from `{}` and replaced the file; failing leaves it for a person to repair |
 
-`modify_dot_wslconfig` applies the same rules to an INI file, line by line (see "WSL Settings").
+`modify_dot_wslconfig` applies the same rules to an INI file, line by line (see "WSL Settings"), and
+`AppData/Roaming/Docker/modify_settings-store.json` to Docker Desktop's settings on Windows (see
+"Docker Desktop Settings").
 
 `make test-modify-scripts` runs each one through `chezmoi cat` in a sandbox, and fails when
 any `modify_` file that chezmoi resolves for Windows is not a modify-template.
@@ -1259,6 +1261,10 @@ database the repository carried as encrypted files that nothing ever committed a
 | Shell | `dot_zshrc.tmpl`, after Oh My Zsh |
 | Server | `local-services/atuin/compose.yaml`, run by hand on the server's device, as OmniRoute is |
 | Tailnet share | `tailscale-up`, on the server's device alone |
+| The account's secrets | the 1Password item `account:` names (`Atuin` in `Private`), fields `password` and `key` |
+| Login, on every apply | `run_after_linux-016-login-atuin.sh.tmpl`, `run_after_android-009-login-atuin.sh.tmpl` |
+| zsh-histdb's history, once | `run_after_linux-017-import-atuin-history.sh.tmpl`, `run_after_android-010-import-atuin-history.sh.tmpl` |
+| What the four share | `.chezmoitemplates/lib-atuin-account.sh` (`[atuin]` prefix) |
 
 **Keep these:**
 
@@ -1285,15 +1291,44 @@ database the repository carried as encrypted files that nothing ever committed a
    `ATUIN_HOST_NAME` as the chezmoi `deviceName` there.
 9. **`atuin import` is not synced by itself.** It fills the local database alone; the explicit
    `atuin sync` after it adds the imported commands to the record store and uploads them, which the
-   background sync does not. The laptop imports only its own `alien-a51` rows: its database also
-   held the desktop's March 2025 snapshot, which the desktop imports.
+   background sync does not. Each device imports only the rows recorded under its `histdbHosts`
+   (`lib-atuin.tmpl`): its hostname, both of the desktop's names, Termux's `localhost` renamed to
+   the device's name. The laptop's database also held the desktop's March 2025 snapshot, which the
+   desktop imports.
 10. **zsh-histdb is gone; its data is not.** Its zinit checkout and its link into Oh My Zsh are
     tombstoned on Linux and Android. `~/.histdb` stays as a fallback, and the folder watcher no
     longer archives it into the chezmoi source after every command.
+11. **The login reads 1Password only when Atuin reports no session.** `atuin status` reports it from
+    the local meta store before it reaches the network; logged in, it asks the server, with its
+    timeouts cut to seconds so an offline apply does not wait half a minute. Linux reads the item's
+    two fields through `op` at run time. Termux has no `op` a script can call, so chezmoi renders
+    them into the script from its own session, the way aisync's key reaches the phone, and only when
+    the render's own `atuin status` reports no session. The password reaches `atuin login` in
+    `ATUIN_PASSWORD` and the key on its stdin, never on a command line or the terminal.
+12. **Registration stays by hand.** The server's own device registers the account once (and is only
+    warned about if it has no session); every other device logs in on its next apply.
+13. **Neither script fails the apply.** No `op`, a locked 1Password, an unreachable server, a failed
+    import: each is an `[atuin] WARN:` line and exit 0, and the next apply tries again.
+14. **The import is once per Atuin database, by two markers, and only once logged in.** `atuin
+    import` does not deduplicate, so `~/.atuin/data/.dotfiles-histdb-imported` -- not chezmoi's
+    state, which `chezmoi state reset` and an edit of the script would undo -- records it. Only the
+    explicit sync after it uploads the imported commands (9), so `.dotfiles-histdb-synced` is
+    written once that sync succeeded, and every apply before then syncs again. The import waits for
+    a session: a marker written before the login would leave nothing to run that sync. A device
+    imported by hand needs the markers created by hand (`alien-a51` has the first, on 2026-10-28,
+    and its next apply syncs and writes the second). The rows come from a private `VACUUM INTO`
+    copy, so the import never reads a database zsh-histdb is still writing.
+15. **A script's `atuin sync` needs `ATUIN_SESSION`.** Atuin's shell hook exports it; without it the
+    sync's history-store initialisation fails with `Failed to find $ATUIN_SESSION in the
+    environment`, so the import syncs as `ATUIN_SESSION="$(atuin uuid)" atuin sync`.
+16. **Atuin 18.24.2 keeps its data in `~/.atuin/data/`** (`history.db`, `key`, `meta.db`), not in
+    `~/.local/share/atuin` as older releases did.
 
-`make test-atuin` covers 2, 4 to 8 and 10, and the pinned install against a stubbed `curl`;
-`make test-tailscale` covers the share on the server's device alone; `make test-chezmoiignore` the
-platforms.
+`make test-atuin` covers 2 and 4 to 16, and the pinned install against a stubbed `curl`, with
+the login and the import run against stubbed `atuin` and `op` and a zsh-histdb database built with
+`sqlite3`; `make test-tailscale` covers the share on the server's device alone;
+`make test-chezmoiignore` the platforms; `make test-script-order` that the login comes before the
+import.
 
 ## systemd on WSL (Turned On by chezmoi)
 
@@ -1535,6 +1570,44 @@ and a machine without Oh My Posh starts with no error.
 `make test-modify-scripts` covers the merge (a new file, the app's file passing through, a value
 set back with every other line kept, a BOM kept, a UTF-16 file left alone); `make test-chezmoiignore`
 covers that only Windows gets it.
+
+## Docker Desktop Settings (Windows)
+
+`AppData/Roaming/Docker/modify_settings-store.json` keeps the Docker Desktop settings
+`.chezmoidata/docker-desktop.yaml` names in Windows' `%APPDATA%\Docker\settings-store.json`:
+
+| Setting | Value | Docker Desktop calls it |
+|---------|-------|-------------------------|
+| `IntegratedWslDistros` | gains `kali-linux` | Resources → WSL integration, per distribution |
+| `EnableIntegrationWithDefaultWslDistro` | `true` | Enable integration with my default WSL distro |
+| `AutoStart` | `true` | Start Docker Desktop when you sign in to your computer |
+
+The WSL integration is what puts `docker` in WSL, which the OmniRoute start on apply and every
+`docker compose` command in the docs run, and makes the containers' published ports reach WSL.
+`AutoStart` is what brings the Atuin sync server and the OmniRoute stack back after a reboot; while it
+was off, the OmniRoute start script could only print a hint. Both were off on `alien-a51` after its
+reinstall in October 2026.
+
+**Keep these:**
+
+1. **Merged, never written whole.** Every other key is Docker Desktop's. A managed setting whose
+   value differs is set back, a distribution joins `IntegratedWslDistros` after the ones listed and
+   never replaces them, and when nothing differs the file passes through byte for byte. Invalid JSON
+   fails the template, as every JSON merge here does (see "JSON Patching").
+2. **It takes effect at Docker Desktop's next start.** Docker Desktop reads the file when it starts
+   and writes it back from memory whenever a setting changes in its UI, so a change made there while
+   it runs can drop the merge; the next apply merges again, with a `[docker-settings]` line naming
+   what it set.
+3. **A missing file is created with just these keys.** Docker Desktop is in the Windows installer's
+   list, so a first apply may run before its first start; that start reads the file and fills in
+   its defaults around it.
+4. **Windows only, through `AppData`.** `.chezmoiignore` ignores `AppData` on every other platform
+   and keeps it on Windows, where Windows Terminal's settings deploy from it too, so the file needs
+   no rule of its own.
+
+`make test-modify-scripts` covers the merge (a new file, a file passing through byte for byte, the
+other keys and distributions kept, invalid JSON failing); `make test-chezmoiignore` resolves the
+whole source state per platform with `chezmoi managed` and finds the file on Windows alone.
 
 ## RustDesk on Windows (GitHub Release, Not winget)
 

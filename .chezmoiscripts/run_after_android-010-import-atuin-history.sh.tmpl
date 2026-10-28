@@ -1,0 +1,14 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# Imports the zsh-histdb history Atuin replaced, once per Atuin database, as run_after_linux-017 does
+# on Linux and with the same body (.chezmoitemplates/lib-atuin-account.sh): the commands Termux
+# recorded under `localhost`, which every phone reports, renamed to this device's name as the shell
+# now records it (ATUIN_HOST_NAME in .zshrc), then a sync that uploads them. After the login
+# (android-009), so that the sync can upload what was imported.
+
+set -euo pipefail
+{{ $atuin := includeTemplate "lib-atuin.tmpl" . | fromJson -}}
+
+{{ template "lib-atuin-account.sh" }}
+
+atuin_import_histdb {{ get . "deviceName" | squote }} {{ range $i, $host := $atuin.histdbHosts }}{{ if $i }} {{ end }}{{ $host | squote }}{{ end }}

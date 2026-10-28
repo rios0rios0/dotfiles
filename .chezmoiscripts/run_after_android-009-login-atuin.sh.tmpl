@@ -1,0 +1,38 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# Logs Termux's Atuin client in to the sync server once the account exists, as run_after_linux-016
+# does on Linux and with the same body (.chezmoitemplates/lib-atuin-account.sh), except for where the
+# secrets come from. No `op` is signed in for a script to call on Termux, so they are rendered into
+# this script from chezmoi's own 1Password session, the way run_after_android-008 brings aisync's
+# key -- and only when the render finds Atuin reporting no session, so that a phone already logged
+# in reads nothing from 1Password. A login that fails is retried by the next apply, which renders
+# the secrets again.
+
+set -euo pipefail
+{{ $atuin := includeTemplate "lib-atuin.tmpl" . | fromJson -}}
+{{- $status := "" -}}
+{{- if lookPath "atuin" -}}
+{{-   $status = output "sh" "-c" "ATUIN_NETWORK_CONNECT_TIMEOUT=3 ATUIN_NETWORK_TIMEOUT=5 atuin status </dev/null 2>&1 || true" -}}
+{{- end }}
+
+{{ template "lib-atuin-account.sh" }}
+{{ if contains "You are not logged in to a sync server" $status }}
+IFS= read -r -d '' _atuin_password <<'END_OF_ATUIN_PASSWORD' || true
+{{ onepasswordRead (printf "op://%s/%s/password" $atuin.account.vault $atuin.account.item) $atuin.account.onePasswordAccount | trim }}
+END_OF_ATUIN_PASSWORD
+IFS= read -r -d '' _atuin_key <<'END_OF_ATUIN_KEY' || true
+{{ onepasswordRead (printf "op://%s/%s/key" $atuin.account.vault $atuin.account.item) $atuin.account.onePasswordAccount | trim }}
+END_OF_ATUIN_KEY
+{{ end }}
+# atuin_secret <password|key>: that field as rendered above, or nothing when the render found a session.
+atuin_secret() {
+    local value
+    case "$1" in
+        password) value="${_atuin_password:-}" ;;
+        key) value="${_atuin_key:-}" ;;
+        *) return 1 ;;
+    esac
+    printf '%s' "${value%$'\n'}"
+}
+
+atuin_ensure_login {{ $atuin.account.username | squote }} {{ $atuin.isServer }}

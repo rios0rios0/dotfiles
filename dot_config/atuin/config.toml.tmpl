@@ -3,7 +3,7 @@
 # reverted by the next apply. See .docs/atuin-sync.md and CLAUDE.md, "Shell History (Atuin)".
 
 # The sync server, in {{ $atuin.serverDevice }}'s Docker and shared on the tailnet. History is encrypted on this
-# machine, with the key in ~/.local/share/atuin/key, before anything is sent; the server sees only
+# machine, with the key in ~/.atuin/data/key, before anything is sent; the server sees only
 # ciphertext and what each record carries in the clear: when the command ran, roughly how long its
 # text is, and a random ID for the device.
 sync_address = "{{ $atuin.syncAddress }}"

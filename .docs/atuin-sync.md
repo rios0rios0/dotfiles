@@ -17,9 +17,13 @@ two devices' history anyway.
 | Settings: the server's device, how others reach it, the port | `.chezmoidata/atuin.yaml`, read through `.chezmoitemplates/lib-atuin.tmpl` |
 | Client | `atuin` `18.24.2`: `install_atuin` in the Linux installer (pinned, SHA-256 checked) and Termux's `atuin` package |
 | Client settings | `~/.config/atuin/config.toml`, from `dot_config/atuin/config.toml.tmpl` |
+| Client data | `~/.atuin/data/`: the history (`history.db`), the key (`key`) and the session (`meta.db`) |
 | Shell | `.zshrc` runs `atuin init zsh --disable-ai` after Oh My Zsh |
 | Server | `local-services/atuin/compose.yaml`, in Docker on the server's device, with SQLite in a volume |
 | On the tailnet | that device's `tailscale-up` shares port 8888 with `tailscale serve` |
+| The account's secrets | the 1Password item `Atuin` in `Private`, fields `password` and `key` (`account:` in `.chezmoidata/atuin.yaml`) |
+| Login, on every apply | `run_after_linux-016-login-atuin.sh.tmpl` and `run_after_android-009-login-atuin.sh.tmpl` |
+| The old history, once | `run_after_linux-017-import-atuin-history.sh.tmpl` and `run_after_android-010-import-atuin-history.sh.tmpl` |
 
 The server runs on the laptop, `alien-a51`. Its own client syncs on loopback; every other device
 syncs with `http://alien-a51:8888`, a MagicDNS name that WSL resolves through Windows' Tailscale
@@ -33,9 +37,9 @@ the server to a machine that is always on is
 
 ## Setting it up
 
-Do it in this order: the server first, then the account, then each device. Every device needs a
-`chezmoi apply` from a revision that has Atuin, which installs it, writes its settings and switches
-zsh over.
+Do it in this order: the server first, then the account; after that, every other device needs
+nothing but a `chezmoi apply` from a revision that has Atuin, which installs it, writes its
+settings, switches zsh over, logs it in and imports its old history once.
 
 ### 1. The server, on `alien-a51`
 
@@ -56,16 +60,19 @@ tailscale serve status            # lists tcp 8888 forwarding to localhost:8888
 
 ### 2. The account
 
-On `alien-a51`, which logs in as it registers:
+By hand, once, on `alien-a51`, which logs in as it registers. The secrets go where every other
+device's apply reads them: a login item named `Atuin` in the personal account's `Private` vault,
+the password in its `password` field and the encryption key in a concealed field named `key`
+(`account:` in `.chezmoidata/atuin.yaml` names the account, vault, item and username). Let
+1Password generate the password, then hand it to Atuin in its environment, which it reads when no
+`--password` is given, so it never reaches the screen or a command line:
 
 ```sh
-atuin register -u <username> -e <email>   # asks for a password
-atuin key                                 # prints the encryption key
+ATUIN_PASSWORD="$(op read --account my 'op://Private/Atuin/password')" atuin register -u <username> -e <email>
+atuin key                                 # the encryption key, for the item's `key` field
 ```
 
-Keep the password and the key together in 1Password, say a login item named `Atuin` in `Private`
-with the key in a concealed field. The key cannot be recovered, and every other device needs it.
-Then close registration:
+The key cannot be recovered, and every other device needs it. Then close registration:
 
 ```sh
 docker compose -f local-services/atuin/compose.yaml up -d
@@ -73,16 +80,43 @@ docker compose -f local-services/atuin/compose.yaml up -d
 
 ### 3. The other devices
 
-On `mxhero-z790` and in Termux:
+Nothing to do: every `chezmoi apply` logs in a device that is not logged in yet. A device that is
+costs one `atuin status`, which reports the missing session from the local database before it
+reaches the network. On Linux the login reads the item's two fields at run time through `op`; on
+Termux, where no script can call `op`, chezmoi renders them into the script from its own 1Password
+session, and only on an apply whose render finds no session. Either way the password reaches
+`atuin login` in its environment and the key on its stdin. Anything that stops it -- no network,
+1Password locked, the server down -- is an `[atuin] WARN:` line, and the next apply tries again.
+The server's own device is only warned about: it registered in step 2.
+
+By hand, on a device where the apply cannot reach 1Password:
 
 ```sh
-atuin login -u <username>                 # asks for the password and the key
+op read --account my 'op://Private/Atuin/key' |
+    ATUIN_PASSWORD="$(op read --account my 'op://Private/Atuin/password')" atuin login -u <username>
 ```
 
 ### 4. The old history, once per device
 
-`atuin import` fills only the local database. The explicit `atuin sync` after it is what adds the
-imported commands to the record store that sync sends, and uploads them.
+The apply after the login imports it: the commands zsh-histdb recorded under the device's own
+hosts, taken from a private copy of `~/.histdb/zsh-history.db`, then a sync that uploads them. The
+hosts are the device's hostname, both of the desktop's names (`devices.mxhero-z790.histdbHosts`
+in `.chezmoidata/atuin.yaml`), and on Termux `localhost`, renamed to the device's name as the shell
+now records it. It waits for the login, since only the sync after it uploads the imported commands.
+Two markers in `~/.atuin/data/` make it once: `.dotfiles-histdb-imported` after the import, which
+`atuin import` needs because it does not deduplicate, and `.dotfiles-histdb-synced` after the sync,
+which every apply retries until it succeeds. A device that never ran zsh-histdb gets both markers
+and imports nothing.
+
+**A device imported by hand needs the first marker created by hand**, or its next apply imports
+the same commands again: `touch ~/.atuin/data/.dotfiles-histdb-imported`. Its next apply then
+syncs once and writes the second. `alien-a51` was imported by hand on 2026-10-28.
+
+The commands below do it by hand. `atuin import` fills only the local database; the explicit
+`atuin sync` after it is what adds the imported commands to the record store that sync sends, and
+uploads them. Atuin's shell hook exports `ATUIN_SESSION`, which that sync needs: in a script or any
+other non-interactive shell it fails with `Failed to find $ATUIN_SESSION in the environment` unless
+it runs as `ATUIN_SESSION="$(atuin uuid)" atuin sync`.
 
 **`mxhero-z790`**, the desktop, imports all of its history, under both of its names
 (`rios0rios0-z790` until March 2025, `mxhero-z790` since):
@@ -129,8 +163,9 @@ the last sync. `atuin sync` syncs now, and `atuin status` shows the account and 
 The command, its directory, host, exit code and duration are encrypted on the device. The server
 sees what each record carries in the clear: when the command ran, roughly how long its text is,
 and a random ID per device. Deleting a command adds a deletion record and leaves the encrypted
-original on the server, which only deleting the account removes. The key is what protects all of
-it: anyone with the key and a copy of the server's database can read everything ever synced.
+original on the server, which only deleting the account removes. The key, `~/.atuin/data/key` on
+each device and the `key` field of the 1Password item, is what protects all of it: anyone with the
+key and a copy of the server's database can read everything ever synced.
 
 Atuin refuses to record a command that carries a recognisable credential (`secrets_filter`). Add
 patterns of your own with `history_filter` in `~/.config/atuin/config.toml`, through
@@ -158,5 +193,7 @@ To an always-on machine, once there is one:
 | `atuin sync` cannot connect from another device | The laptop is on and Docker Desktop runs there, which starts the container by itself (`restart: always`): `docker compose -f local-services/atuin/compose.yaml ps`. Then `tailscale serve status` on the laptop |
 | The name `alien-a51` does not resolve on a device | Give that device the laptop's tailnet address: `tailscale ip -4 alien-a51`, as `devices.<deviceName>.serverHost` in `.chezmoidata/atuin.yaml` |
 | `atuin register` fails with registration closed | Start the container with `ATUIN_OPEN_REGISTRATION=true`, as in step 1 |
+| A device is still not logged in after an apply | The apply's `[atuin] WARN:` line says why; `atuin status` says whether a session exists, and step 3 has the login by hand |
+| `atuin sync` fails with `Failed to find $ATUIN_SESSION in the environment` | It ran outside an interactive zsh: `ATUIN_SESSION="$(atuin uuid)" atuin sync` |
 | Ctrl-R opens Oh My Zsh's search, not Atuin's | `atuin` is not on `PATH` in that shell: `command -v atuin`; on Linux the dependency installer installs it into `~/.local/bin` |
 | Anything else | `atuin doctor` |

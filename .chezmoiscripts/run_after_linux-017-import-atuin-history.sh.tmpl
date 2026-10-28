@@ -1,0 +1,18 @@
+#!/bin/bash
+
+# Imports the zsh-histdb history Atuin replaced, once per Atuin database: the commands recorded under
+# this device's histdb hosts (.chezmoidata/atuin.yaml), then a sync that uploads them. The body is
+# .chezmoitemplates/lib-atuin-account.sh, which Android shares; "Shell History (Atuin)" in CLAUDE.md
+# lists the rules it keeps.
+#
+# `run_after_`, not `run_once_`: a marker in Atuin's data directory, not chezmoi's state, records the
+# import, so neither `chezmoi state reset` nor an edit of this script can import the same commands a
+# second time -- `atuin import` does not deduplicate. After the login (linux-016), so that the sync
+# can upload what was imported.
+
+set -euo pipefail
+{{ $atuin := includeTemplate "lib-atuin.tmpl" . | fromJson -}}
+
+{{ template "lib-atuin-account.sh" }}
+
+atuin_import_histdb '' {{ range $i, $host := $atuin.histdbHosts }}{{ if $i }} {{ end }}{{ $host | squote }}{{ end }}

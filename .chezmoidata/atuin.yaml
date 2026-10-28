@@ -19,8 +19,22 @@ atuin:
   serverHost: 'alien-a51'
   # The port the server listens on, and the tailnet port tailscale-up shares it on.
   port: 8888
+  # The account every device logs in with, and the 1Password item that holds its secrets in two
+  # fields, `password` and `key` (the encryption key `atuin key` prints). It is registered once, by
+  # hand, on the server's device (.docs/atuin-sync.md); after that, an apply logs in any other
+  # device that is not logged in yet.
+  account:
+    username: 'rios0rios0'
+    onePasswordAccount: 'my'
+    vault: 'Private'
+    item: 'Atuin'
   # Overrides for one device, keyed by its chezmoi `deviceName`; any key above may be set, e.g.
   #   devices:
   #     some-bare-metal-box:
   #       serverHost: '100.64.0.1'
-  devices: {}
+  # and `histdbHosts`, the zsh-histdb hosts whose commands the device imports once: by default the
+  # name it records under, its hostname (`localhost` on Termux). The desktop was renamed in March
+  # 2025, and its history carries both names.
+  devices:
+    mxhero-z790:
+      histdbHosts: ['mxhero-z790', 'rios0rios0-z790']

@@ -131,6 +131,30 @@ check_platform() {
     echo "[test-chezmoiignore] PASS: $label" >&2
 }
 
+# check_managed <os> <target> <yes|no>: whether chezmoi, resolving this checkout for <os>, manages
+# <target>. The whole source state answers, not the rendered ignore list alone, which cannot show
+# that a file inside a directory only one platform keeps is deployed there.
+check_managed() {
+    local os="$1" target="$2" expected="$3" managed="no" out
+    if ! out="$(PATH="$BIN_DIRS/nogpu" chezmoi --config "$BIN_DIRS/chezmoi.yaml" \
+        --destination "$BIN_DIRS/home-$os" --persistent-state "$BIN_DIRS/$os.boltdb" \
+        --override-data "{\"chezmoi\": {\"os\": \"$os\"}}" \
+        managed --include files --path-style relative 2>&1)"; then
+        echo "[test-chezmoiignore] FAIL (os=$os): chezmoi could not resolve the source state: $(tail -n 1 <<<"$out")" >&2
+        EXIT_CODE=1
+        return
+    fi
+    if grep -qxF "$target" <<<"$out"; then
+        managed="yes"
+    fi
+    if [[ "$managed" == "$expected" ]]; then
+        echo "[test-chezmoiignore] PASS (os=$os): $target managed: $managed" >&2
+    else
+        echo "[test-chezmoiignore] FAIL (os=$os): expected $target managed: $expected, but it is: $managed" >&2
+        EXIT_CODE=1
+    fi
+}
+
 # Linux assertions
 check_platform "$LINUX_OS" \
     --ignore "android-*.sh" \
@@ -310,6 +334,13 @@ check_platform "$ANDROID_OS" \
     --ignore-line "$BACKUP_SERVICE" \
     --ignore-line "$BACKUP_TIMER" \
     --ignore-line "$RESTORE_SCRIPT"
+
+# Docker Desktop's settings-store.json, merged by AppData/Roaming/Docker/modify_settings-store.json,
+# sits inside AppData, which only Windows keeps: deployed on Windows and nowhere else.
+DOCKER_SETTINGS="AppData/Roaming/Docker/settings-store.json"
+check_managed "$WINDOWS_OS" "$DOCKER_SETTINGS" yes
+check_managed "$LINUX_OS" "$DOCKER_SETTINGS" no
+check_managed "$ANDROID_OS" "$DOCKER_SETTINGS" no
 
 if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-chezmoiignore] all platform logic tests passed" >&2
