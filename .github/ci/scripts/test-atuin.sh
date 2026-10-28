@@ -226,26 +226,25 @@ fi
 
 # Every sync address is plain HTTP by design: the server listens on loopback, every other device
 # reaches it through the tailnet, whose WireGuard tunnel encrypts the hop, and Atuin encrypts each
-# record end to end before it leaves the client.
-SCHEME="http"
-
+# record end to end before it leaves the client. SonarCloud's clear-text protocol rule (S5332)
+# exempts only loopback, so the assertions on the other addresses carry NOSONAR for that reason.
 server_config="$(render linux "$CONFIG_TEMPLATE" "{\"deviceName\":\"$SERVER\"}")"
 client_config="$(render linux "$CONFIG_TEMPLATE")"
 phone_config="$(render android "$CONFIG_TEMPLATE")"
 override_config="$(render linux "$CONFIG_TEMPLATE" '{"atuin":{"devices":{"testdevice":{"serverHost":"100.64.0.9"}}}}')"
 
-if grep -qx "sync_address = \"$SCHEME://127.0.0.1:$PORT\"" <<<"$server_config"; then
+if grep -qx "sync_address = \"http://127.0.0.1:$PORT\"" <<<"$server_config"; then
     pass "the server device ($SERVER) syncs with its own server on loopback"
 else
     fail "the server device's sync_address: $(grep sync_address <<<"$server_config")"
 fi
-if grep -qx "sync_address = \"$SCHEME://$SERVER_HOST:$PORT\"" <<<"$client_config" &&
-    grep -qx "sync_address = \"$SCHEME://$SERVER_HOST:$PORT\"" <<<"$phone_config"; then
+if grep -qx "sync_address = \"http://$SERVER_HOST:$PORT\"" <<<"$client_config" && # NOSONAR
+    grep -qx "sync_address = \"http://$SERVER_HOST:$PORT\"" <<<"$phone_config"; then # NOSONAR
     pass "every other device, Termux included, syncs with $SERVER_HOST:$PORT"
 else
     fail "another device's sync_address: $(grep sync_address <<<"$client_config"), phone: $(grep sync_address <<<"$phone_config")"
 fi
-if grep -qx "sync_address = \"$SCHEME://100.64.0.9:$PORT\"" <<<"$override_config"; then
+if grep -qx "sync_address = \"http://100.64.0.9:$PORT\"" <<<"$override_config"; then # NOSONAR
     pass "a device override names the server by its tailnet address"
 else
     fail "a device override was not applied: $(grep sync_address <<<"$override_config")"

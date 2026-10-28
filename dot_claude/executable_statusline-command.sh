@@ -166,7 +166,7 @@ input=$(cat)
 
 usage_fetched=0 usage_scoped="" usage_account=""
 usage_five=-1 usage_five_at=0 usage_seven=-1 usage_seven_at=0
-if [ -r "$USAGE_CACHE" ]; then
+if [[ -r "$USAGE_CACHE" ]]; then
     while IFS='=' read -r _k _v; do
         case $_k in
             fetched)  usage_fetched=$_v   ;;

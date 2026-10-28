@@ -294,7 +294,7 @@ grep -qF "clone --origin fork --branch reworked https://github.com/rios0rios0/op
 [[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake0001" ]] || fail "marker must hold the built head"
 [[ "$(calls)" -eq 1 ]] || fail "the first build must invoke bun once"
 identity="$(tail -n 1 "$BUN_ENV")"
-[ "${identity%%/*}" = "feat-provider-omniroute" ] || fail "the build must carry the fork's channel: $identity"
+[[ "${identity%%/*}" = "feat-provider-omniroute" ]] || fail "the build must carry the fork's channel: $identity"
 [[ "${identity##*/}" =~ ^2\.1\.4-reworked\.[0-9]{10}$ ]] ||
     fail "the build must carry the checkout's release marked as the fork's build, <release>-reworked.<build time>: $identity"
 grep -qF "stamping the build as ${identity%%/*} ${identity##*/}" "$TMP/out" || fail "the build identity must be reported: $identity"
@@ -307,17 +307,17 @@ pass "a missing checkout is cloned onto the fork's branch with the fork/upstream
 #     fixes node-pty's spawn-helper), and the build keeps `--skip-install`. The resolved bun is
 #     the version the clone pins, so it runs both, first on PATH, and nothing is downloaded.
 install_entry="$(last_entry install)"
-[ "$(installs)" -eq 1 ] || fail "the first build must install the checkout's dependencies once"
-[ "$(tail -n 2 "$BUN_LOG" | cut -d'|' -f1 | paste -sd' ')" = "install build" ] ||
+[[ "$(installs)" -eq 1 ]] || fail "the first build must install the checkout's dependencies once"
+[[ "$(tail -n 2 "$BUN_LOG" | cut -d'|' -f1 | paste -sd' ')" = "install build" ]] ||
     fail "the dependencies must be installed before the build: $(cat "$BUN_LOG")"
-[ "$(cut -d'|' -f3 <<<"$install_entry")" = "$CHECKOUT" ] || fail "the install must run in the checkout: $install_entry"
-[ "$(cut -d'|' -f5 <<<"$install_entry")" = "install --frozen-lockfile" ] ||
+[[ "$(cut -d'|' -f3 <<<"$install_entry")" = "$CHECKOUT" ]] || fail "the install must run in the checkout: $install_entry"
+[[ "$(cut -d'|' -f5 <<<"$install_entry")" = "install --frozen-lockfile" ]] ||
     fail "the install must be 'install --frozen-lockfile' alone, lifecycle scripts on: $install_entry"
 grep -q -- '--skip-install' "$BUN_CALLS" || fail "the build must keep --skip-install"
 ran_with "$BUN_STUB/bun" || fail "a resolved bun at the pinned version must run the install and the build: $(tail -n 2 "$BUN_LOG")"
 grep -qF "is bun $PIN, the version the checkout pins" "$TMP/out" || fail "a resolved bun at the pinned version must be named as such"
-[ ! -s "$RELEASE_CALLS" ] || fail "a resolved bun at the pinned version must not download another: $(cat "$RELEASE_CALLS")"
-[ ! -e "$HOME/.cache/ocode-bun" ] || fail "a resolved bun at the pinned version must cache nothing"
+[[ ! -s "$RELEASE_CALLS" ]] || fail "a resolved bun at the pinned version must not download another: $(cat "$RELEASE_CALLS")"
+[[ ! -e "$HOME/.cache/ocode-bun" ]] || fail "a resolved bun at the pinned version must cache nothing"
 pass "a fresh clone's dependencies are installed before the build, by the resolved bun when it is the pinned version"
 
 # 2) A checkout left on another branch is switched to the fork's: the channel below is stamped
@@ -327,7 +327,7 @@ printf 'main\n' >"$CHECKOUT/.git/HEAD_REF"
 before="$(calls)"
 : >"$GIT_CALLS"
 run_script
-[ "$(rc)" -eq 0 ] || fail "a branch switch must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "a branch switch must exit 0"
 grep -q "checkout is on main, switching to reworked" "$TMP/out" || fail "the switch must say which branch it came from"
 [[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the checkout must end on the fork's branch"
 [[ "$(calls)" -eq "$before" ]] || fail "an unchanged head must not rebuild after a branch switch"
@@ -339,7 +339,7 @@ rm -f "$CHECKOUT/.git/refs/heads/reworked"
 printf 'main\n' >"$CHECKOUT/.git/HEAD_REF"
 : >"$GIT_CALLS"
 run_script
-[ "$(rc)" -eq 0 ] || fail "tracking the fork's branch must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "tracking the fork's branch must exit 0"
 grep -qF "checkout -b reworked --track fork/reworked" "$GIT_CALLS" ||
     fail "a missing local branch must be created from fork/<branch>"
 [[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the tracked branch must be checked out"
@@ -355,7 +355,7 @@ run_script
 [[ "$(rc)" -eq 0 ]] || fail "a checkout without the fork's branch must skip"
 grep -q "has no reworked branch" "$TMP/out" || fail "the missing branch must be reported"
 [[ "$(calls)" -eq "$before" ]] || fail "a checkout without the fork's branch must not build"
-[ ! -e "$HOME/.local/bin/ocode" ] || fail "a checkout without the fork's branch must not install a binary"
+[[ ! -e "$HOME/.local/bin/ocode" ]] || fail "a checkout without the fork's branch must not install a binary"
 pass "a checkout with no fork branch warns and builds nothing"
 
 # 5) A directory that is not a checkout is not cloned into: it may hold somebody's work, and a
@@ -364,9 +364,9 @@ rm -rf "$CHECKOUT"
 mkdir -p "$CHECKOUT"
 before="$(wc -l <"$GIT_CALLS")"
 run_script
-[ "$(rc)" -eq 0 ] || fail "a non-checkout directory must skip"
+[[ "$(rc)" -eq 0 ]] || fail "a non-checkout directory must skip"
 grep -q "exists but is not a git checkout" "$TMP/out" || fail "a non-checkout directory must say why it is left alone"
-[ "$(wc -l <"$GIT_CALLS")" -eq "$before" ] || fail "a non-checkout directory must not be cloned into"
+[[ "$(wc -l <"$GIT_CALLS")" -eq "$before" ]] || fail "a non-checkout directory must not be cloned into"
 pass "a directory that is not a checkout is left alone"
 
 # 6) A clone that fails -- no network, for instance -- is a warning, not a failed apply: there
@@ -375,9 +375,9 @@ rm -rf "$CHECKOUT"
 export CLONE_FAIL=1
 run_script
 unset CLONE_FAIL
-[ "$(rc)" -eq 0 ] || fail "a failed clone must not fail the apply"
+[[ "$(rc)" -eq 0 ]] || fail "a failed clone must not fail the apply"
 grep -q "WARN: failed to clone" "$TMP/out" || fail "a failed clone must say what failed"
-[ ! -e "$HOME/.local/bin/ocode" ] || fail "a failed clone must not install a binary"
+[[ ! -e "$HOME/.local/bin/ocode" ]] || fail "a failed clone must not install a binary"
 pass "a failed clone warns and skips"
 
 # Restore the checkout the remaining cases build from: the head test 1 built, on the fork's
@@ -394,7 +394,7 @@ printf '#!/bin/bash\necho fake ocode\n' >"$HOME/.local/bin/ocode"
 chmod +x "$HOME/.local/bin/ocode"
 # 7) Unchanged head: no rebuild, and no install either -- an unchanged apply stays a no-op.
 run_script
-[ "$(rc)" -eq 0 ] || fail "unchanged apply must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "unchanged apply must exit 0"
 [[ "$(calls)" -eq 1 ]] || fail "unchanged head must not rebuild"
 [[ "$(installs)" -eq 1 ]] || fail "unchanged head must not install the dependencies"
 pass "unchanged head does not rebuild"
@@ -403,7 +403,7 @@ pass "unchanged head does not rebuild"
 #    not only to a clone's.
 printf 'fake4567\n' >"$CHECKOUT/.git/HEAD"
 run_script
-[ "$(rc)" -eq 0 ] || fail "rebuild must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "rebuild must exit 0"
 [[ "$(calls)" -eq 2 ]] || fail "new head must rebuild"
 [[ "$(installs)" -eq 2 ]] || fail "a rebuild must install the dependencies first"
 [[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake4567" ]] || fail "marker must move with the head"
@@ -604,7 +604,7 @@ run_script
 grep -q "ocode is running" "$TMP/out" || fail "a running ocode must be reported"
 grep -q "leaving PID" "$TMP/out" || fail "an unanswered prompt must say the session is left alone"
 [[ "$(calls)" -eq $((before + 1)) ]] || fail "an unanswered prompt must build anyway"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake7890" ] || fail "an unanswered prompt must move the marker"
+[[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fake7890" ]] || fail "an unanswered prompt must move the marker"
 grep -q "$FAKE_OCODE" "$HOME/.local/bin/ocode" || fail "an unanswered prompt must install the new binary"
 kill -0 "$unanswered_pid" 2>/dev/null || fail "the running ocode must survive the build"
 kill "$unanswered_pid" 2>/dev/null || true
@@ -618,10 +618,10 @@ declined_pid=$!
 before="$(calls)"
 printf 'n\n' >"$TMP/answer"
 run_script "$TMP/answer"
-[ "$(rc)" -eq 0 ] || fail "a declined prompt must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "a declined prompt must exit 0"
 grep -q "leaving PID" "$TMP/out" || fail "a declined prompt must say the session is left alone"
 [[ "$(calls)" -eq $((before + 1)) ]] || fail "a declined prompt must build anyway"
-[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fakeabcd" ] || fail "a declined prompt must move the marker"
+[[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fakeabcd" ]] || fail "a declined prompt must move the marker"
 grep -q "$FAKE_OCODE" "$HOME/.local/bin/ocode" || fail "a declined prompt must install the new binary"
 kill -0 "$declined_pid" 2>/dev/null || fail "the running ocode must survive a declined prompt"
 kill "$declined_pid" 2>/dev/null || true
@@ -635,7 +635,7 @@ accepted_pid=$!
 printf 'y\n' >"$TMP/answer"
 before="$(calls)"
 run_script "$TMP/answer"
-[ "$(rc)" -eq 0 ] || fail "an accepted prompt must exit 0"
+[[ "$(rc)" -eq 0 ]] || fail "an accepted prompt must exit 0"
 grep -q "killed PID" "$TMP/out" || fail "an accepted prompt must report the kill"
 [[ "$(calls)" -eq $((before + 1)) ]] || fail "an accepted prompt must build"
 [[ "$(cat "$HOME/.cache/ocode-built-commit")" = "fakefade" ]] || fail "an accepted prompt must move the marker"
@@ -807,9 +807,9 @@ cp "$TMP/good.zip" "$RELEASE/$x64_asset.zip"
 [[ "$(rc)" -eq 0 ]] || fail "a checksum mismatch must not fail the apply"
 grep -qF "WARN: $x64_asset.zip does not match the checksum in the SHASUMS256.txt of bun $PIN" "$TMP/out" ||
     fail "a checksum mismatch must be reported"
-[ ! -e "$cache" ] || fail "a zip that fails its checksum must not reach the cache"
+[[ ! -e "$cache" ]] || fail "a zip that fails its checksum must not reach the cache"
 ran_with "$BUN_STUB/bun" || fail "a checksum mismatch must fall back to the resolved bun"
-[ -z "$(leftovers)" ] || fail "a checksum mismatch must leave nothing behind: $(leftovers)"
+[[ -z "$(leftovers)" ]] || fail "a checksum mismatch must leave nothing behind: $(leftovers)"
 pass "a zip that does not match the release's SHASUMS256.txt is not used"
 
 # 29) A verified binary that cannot report the pinned version -- one this CPU cannot start, say --
@@ -819,7 +819,7 @@ build_release "$TMP/broken-bun"
 new_head
 run_script
 build_release "$TMP/pinned-bun"
-[ "$(rc)" -eq 0 ] || fail "a bun that cannot start must not fail the apply"
+[[ "$(rc)" -eq 0 ]] || fail "a bun that cannot start must not fail the apply"
 grep -qF "WARN: the downloaded bun reports no version rather than $PIN" "$TMP/out" || fail "a bun that cannot start must be reported"
 [[ ! -e "$cache" ]] || fail "a bun that cannot start must not be cached, nor leave its directory"
 ran_with "$BUN_STUB/bun" || fail "a bun that cannot start must fall back to the resolved one"
@@ -834,7 +834,7 @@ run_script
 export FAKE_UNAME_M="x86_64"
 [[ "$(rc)" -eq 0 ]] || fail "an unsupported architecture must not fail the apply"
 grep -qF "WARN: bun publishes no Linux build for riscv64" "$TMP/out" || fail "an unsupported architecture must be reported"
-[ ! -s "$RELEASE_CALLS" ] || fail "an unsupported architecture must download nothing: $(cat "$RELEASE_CALLS")"
+[[ ! -s "$RELEASE_CALLS" ]] || fail "an unsupported architecture must download nothing: $(cat "$RELEASE_CALLS")"
 ran_with "$BUN_STUB/bun" || fail "an unsupported architecture must fall back to the resolved bun"
 pass "an architecture without a bun build falls back without a download"
 
@@ -842,7 +842,7 @@ pass "an architecture without a bun build falls back without a download"
 printf '{\n  "name": "opencode"\n}\n' >"$CHECKOUT/package.json"
 new_head
 run_script
-[ "$(rc)" -eq 0 ] || fail "a missing pin must not fail the apply"
+[[ "$(rc)" -eq 0 ]] || fail "a missing pin must not fail the apply"
 grep -qF "WARN: $CHECKOUT/package.json pins no bun release (packageManager is missing)" "$TMP/out" || fail "a missing pin must be reported"
 [[ ! -s "$RELEASE_CALLS" ]] || fail "a missing pin must download nothing"
 ran_with "$BUN_STUB/bun" || fail "a missing pin must fall back to the resolved bun"

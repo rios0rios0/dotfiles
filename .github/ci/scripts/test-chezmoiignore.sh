@@ -57,7 +57,8 @@ check_platform() {
     local label
 
     while [[ $# -gt 0 ]]; do
-        case "$1" in
+        local option="$1"
+        case "$option" in
             --ignore) shift; must_ignore+=("$1") ;;
             --include) shift; must_include+=("$1") ;;
             --ignore-line) shift; must_ignore_line+=("$1") ;;
@@ -65,7 +66,7 @@ check_platform() {
             --kernel) shift; kernel="$1" ;;
             --gpu) gpu="gpu" ;;
             *)
-                echo "[test-chezmoiignore] FAIL: check_platform does not know the option '$1'" >&2
+                echo "[test-chezmoiignore] FAIL: check_platform does not know the option '$option'" >&2
                 EXIT_CODE=1
                 ;;
         esac

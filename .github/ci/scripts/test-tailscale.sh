@@ -616,7 +616,7 @@ else
     fail "zshrc does not run tailscale-up --no-login as expected"
 fi
 
-if [ "$EXIT_CODE" -eq 0 ]; then
+if [[ "$EXIT_CODE" -eq 0 ]]; then
     echo "[test-tailscale] all tailnet tests passed" >&2
 fi
 
