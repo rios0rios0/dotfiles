@@ -9,10 +9,11 @@ chmod 700 "$sshFolder"
 # TODO: Try to find a way to use 1Password authentication to fetch SSH keys directly!
 
 {{- $deviceName := .deviceName -}}
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
 
 {{- warnf "[android-ssh-keys] fetching Device: %s..." $deviceName -}}
 {{- $deviceNotes := "" -}}
-{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" $op.account).fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $deviceNotes = .value -}}
   {{- end -}}
@@ -25,7 +26,7 @@ chmod 700 "$sshFolder"
     {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
 
     {{- if eq $type "ssh" -}}
-      {{- $item := onepassword $name "Private" "my" -}}
+      {{- $item := onepassword $name "Private" $op.account -}}
       {{- $sshName := $item.title | trim -}}
       {{- warnf "[android-ssh-keys] creating keys for \"%s\"" $sshName -}}
 

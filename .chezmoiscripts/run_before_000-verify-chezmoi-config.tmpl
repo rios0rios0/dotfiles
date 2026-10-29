@@ -8,10 +8,11 @@
   `map has no entry for key "deviceName"`. `chezmoi apply --force` silences that
   warning without regenerating the config; this check is not fooled by it.
 
-  The same goes for a Windows config from before op-retry.cmd: it runs op.exe
-  directly, so the apply would die at its first 1Password template with "cannot
+  The same goes for a Windows config that does not run op.exe with OP_ACCOUNT set:
+  one from before OP_ACCOUNT dies at its first 1Password template with "cannot
   connect to 1Password app, make sure it is running", which points at the app
-  rather than at the config (see "1Password CLI Retry" in AGENTS.md).
+  rather than at the config, and one that runs the op-retry.cmd shim asks for an
+  approval for every item (see "1Password CLI Retry" in AGENTS.md).
 
   It renders to nothing when the config is current, so chezmoi never runs it, and
   its name sorts before every platform's installers. Add each new data key from
@@ -24,7 +25,12 @@
 {{- end -}}
 {{- if eq .chezmoi.os "windows" -}}
 {{-   $command := toString .chezmoi.config.onepassword.command -}}
-{{-   if not (hasSuffix "op-retry.cmd" $command) -}}
-{{-     fail (printf "[chezmoi-config] ERROR: the chezmoi config runs 1Password's CLI as %q rather than through op-retry.cmd because it was generated from an older .chezmoi.yaml.tmpl; run `chezmoi init` to regenerate it, then apply again" $command) -}}
+{{- /* env is a map only when the config sets it; `get` reads a missing key as "". */ -}}
+{{-   $opAccount := "" -}}
+{{-   with .chezmoi.config.env -}}
+{{-     $opAccount = toString (get . "OP_ACCOUNT") -}}
+{{-   end -}}
+{{-   if or (hasSuffix "op-retry.cmd" $command) (eq $opAccount "") -}}
+{{-     fail (printf "[chezmoi-config] ERROR: the chezmoi config runs 1Password's CLI as %q, not as op.exe with OP_ACCOUNT set, because it was generated from an older .chezmoi.yaml.tmpl; run `chezmoi init` to regenerate it, then apply again" $command) -}}
 {{-   end -}}
 {{- end -}}

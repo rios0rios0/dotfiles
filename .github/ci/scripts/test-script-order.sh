@@ -71,9 +71,8 @@ check_order "linux" \
     "004-install-fonts" \
     "005-export-private-key"
 
-# Windows: op retry shim → install deps → configure deps → fonts → export key
+# Windows: install deps → configure deps → fonts → export key
 check_order "windows" \
-    "000-create-op-wrapper" \
     "001-install-dependencies" \
     "002-configure-dependencies" \
     "003-install-fonts" \

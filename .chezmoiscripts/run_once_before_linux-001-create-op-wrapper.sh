@@ -7,9 +7,9 @@
 # .local/bin/op is created, causing the initialization to fail.
 #
 # The wrapper also retries the call the 1Password app turns away: it removes the pipe op connects
-# to for about 0.9 s after every CLI call, and chezmoi makes its calls back to back. See
-# "1Password CLI Retry" in AGENTS.md; run_before_windows-000-create-op-wrapper.ps1 does the same
-# for chezmoi on Windows.
+# to for about 0.9 s after an `op account list`, and chezmoi runs `op signin` straight after it.
+# On Windows chezmoi runs op.exe itself and runs no `account list` instead. See "1Password CLI
+# Retry" in AGENTS.md.
 
 set -e
 

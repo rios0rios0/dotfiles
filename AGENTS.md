@@ -51,8 +51,7 @@ make test-chlog                     # chlog from upstream's pinned tag: the go i
 make test-aifiles-sync              # the aisync hook: the first sync's backup, pull only, the unchanged no-op, failures only warning, both platforms
 make test-export-keys               # the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key, aisync's
 make test-export-key-windows        # the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh)
-make test-op-wrapper                # the retry in front of op.exe: the WSL wrapper, only the turned-away failure, a terminal's op untouched, the Windows config's command
-make test-op-wrapper-windows        # the Windows op-retry.cmd shim: written as CRLF ASCII, kept while current, rewritten when not (needs pwsh)
+make test-op-wrapper                # how chezmoi reaches op: the WSL wrapper's retry, a terminal's op untouched, each platform's config, no account list on Windows
 make test-install-fonts-windows     # the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh)
 make test-powershell-profile-windows # PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh)
 ```
@@ -74,7 +73,7 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 | Scripts    | `.sh`                        | `.ps1`                  | `.sh`                            |
 | Docker     | Native                       | N/A                     | `termux-etc-seccomp` wrapper     |
 | MCP config | `modify_dot_claude.json` (Context7 over HTTP, Chrome DevTools through npx) | N/A (no Claude Code) | `modify_dot_claude.json` and `dot_config/mcphub/` (Context7 over HTTP) |
-| 1Password  | `.local/bin/op` → `op.exe`, retried (see "1Password CLI Retry") | Native `op` CLI; chezmoi runs it through `op-retry.cmd` | `termux-etc-seccomp` wrapper at `.local/bin/op` |
+| 1Password  | `.local/bin/op` → `op.exe`, retried (see "1Password CLI Retry") | Native `op` CLI, run by chezmoi itself with `OP_ACCOUNT` | `termux-etc-seccomp` wrapper at `.local/bin/op` |
 
 ## Key Files
 
@@ -106,9 +105,8 @@ behind the `.claude.json` failure that aborted every apply earlier in the same r
 to nothing when every data key is present, so chezmoi never executes it, and otherwise
 fails the apply before any installer with an instruction to run `chezmoi init`. **When adding
 a key under `data:` in `.chezmoi.yaml.tmpl`, add it to that guard's list too.**
-`make test-template-render` covers both directions. On Windows the guard also fails a config whose
-`onePassword.command` is not `op-retry.cmd`, which every Windows config from before that shim is
-(see "1Password CLI Retry").
+`make test-template-render` covers both directions. On Windows the guard also fails a config that
+sets no `OP_ACCOUNT` or runs the old `op-retry.cmd` shim (see "1Password CLI Retry").
 
 ## 1Password Template Pattern
 
@@ -130,10 +128,12 @@ Templates fetch this note (cached by chezmoi across all template files) and filt
 | `cred`   | Field on device note (`cred:NAME` label, concealed value) | Runtime `op-loader` |
 | `ws`     | Field on device note (`ws:NAME` label, text value) | Runtime `op-loader` |
 
-**Device-note pattern with type filtering:**
+**Device-note pattern with type filtering** (every call takes its account from
+`lib-onepassword.tmpl`, never `"my"`: see "1Password CLI Retry"):
 ```go
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
 {{- $deviceNotes := "" -}}
-{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" $op.account).fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $deviceNotes = .value -}}
   {{- end -}}
@@ -144,7 +144,7 @@ Templates fetch this note (cached by chezmoi across all template files) and filt
     {{- $type := index (split ":" $entry) "_0" -}}
     {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "ssh" -}}
-      {{- $item := onepassword $name "Private" "my" -}}
+      {{- $item := onepassword $name "Private" $op.account -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}
@@ -190,54 +190,61 @@ Each successful load therefore writes the names it returned into `_OP_CRED_NAMES
 ## 1Password CLI Retry (the Desktop App's Pipe Gap)
 
 `op` reaches the Windows 1Password app through the named pipe
-`\\.\pipe\1Password-<session>-1Password-BrowserSupport`, and the app removes that pipe after every
-CLI call and recreates it about 0.9 s later (measured on 2026-10-29 with the Microsoft Store build
-of 1Password for Windows 8.12.42 and op 2.41.0). An `op` started in that gap finds no pipe and exits
-within 50 ms with `connecting to desktop app: cannot connect to 1Password app, make sure it is
-running`, though the app is running, and never retries; the app logs nothing about it. A person
-typing `op` commands never meets it, but chezmoi did on every apply, on Windows and on WSL alike:
-its first 1Password template runs `op account list --format=json` and then
-`op signin --account <uuid> --raw` back to back.
+`\\.\pipe\1Password-<session>-1Password-BrowserSupport`. After an `op account list` the app
+removes that pipe and recreates it about 0.9 s later (measured on 2026-10-29 with the Microsoft
+Store build of 1Password for Windows 8.12.42 and op 2.41.0). An `op` started in that gap finds no
+pipe and exits within 50 ms with `connecting to desktop app: cannot connect to 1Password app, make
+sure it is running`, though the app is running, and never retries; the app logs nothing about it.
+chezmoi's first 1Password template runs `op account list --format=json` and then `op signin` back
+to back, so every apply failed there, on Windows and on WSL alike. Calls after an approved one meet
+no gap: five back to back from one process all went through.
 
-So `op` is retried a second after exactly that failure, in the one place each platform runs it:
+The approval is the other half. On Windows 1Password ties it to "the PID of the process that
+invokes 1Password CLI, plus the start time", and "commands executed in a sub-shell require separate
+authorization" ([its security model](https://www.1password.dev/cli/app-integration-security)), so
+one approval covers an apply only while one process runs every `op` call. #281 put a batch shim in
+front of `op.exe` on Windows, and every item then asked for an approval of its own.
 
-| Platform | What chezmoi runs | Written by |
-|----------|-------------------|------------|
-| WSL | `~/.local/bin/op`, which runs `op.exe` | `run_once_before_linux-001-create-op-wrapper.sh` |
-| Windows | `~\.local\bin\op-retry.cmd`, which runs `op.exe`; `.chezmoi.yaml.tmpl` points `onePassword.command` at it | `run_before_windows-000-create-op-wrapper.ps1` |
+| Platform | What chezmoi runs | Past the gap |
+|----------|-------------------|--------------|
+| WSL | `~/.local/bin/op`, which runs `op.exe`, written by `run_once_before_linux-001-create-op-wrapper.sh` | The wrapper retries the turned-away call a second later |
+| Windows | `op.exe` itself, so one approval covers the apply | No `account list` at all: the templates name no account there, and `OP_ACCOUNT` in chezmoi's `env` names it for op |
 
 **Keep these:**
 
-1. **Only that message is retried**, at most three times, a second or two apart. Any other failure
-   -- a missing item, a refused authorization -- is passed on at once with its own exit code and
-   message, and only the last attempt's stderr reaches the caller, so a call that needed a retry
-   prints nothing extra.
-2. **A terminal's `op` stays untouched.** On WSL the wrapper `exec`s `op.exe` when stdout is a
-   terminal: the retry holds stderr until `op` exits, which only callers that capture stdout can
-   live with, so `op run` and anything interactive keep live streams. On Windows the shim is not on
-   `PATH`, so `op` in PowerShell still runs `op.exe`.
-3. **The shim is a batch file.** chezmoi can only execute a program or a batch file, and cmd.exe
-   hands `op.exe`'s stdout to chezmoi untouched, where a PowerShell shim would decode and re-encode
-   it. cmd.exe parses `%*` again, which is safe for what chezmoi passes (Go quotes an argument that
-   holds a space) but not for an unquoted argument holding `&`, `|`, `<`, `>` or `%`. It is ASCII
-   with CRLF line endings and no byte order mark, which cmd.exe would read as part of the first
-   command.
-4. **A script writes it, before every apply.** Templates call `op` before chezmoi writes any file
-   (the reason the Android wrappers are scripts, see "Android Wrapper Timing"), and a `run_before_`
-   script also puts back a shim that went missing or was edited. One that cannot be written fails
-   the apply, since every 1Password template would fail after it.
-5. **A Windows config from before the shim runs `op.exe` directly** until `chezmoi init` (see
-   "Config Data Comes From `chezmoi init`"), so `run_before_000-verify-chezmoi-config.tmpl` fails a
-   Windows apply whose `onePassword.command` is not `op-retry.cmd`, naming `chezmoi init`.
+1. **Every 1Password call takes its account from `lib-onepassword.tmpl`** (`$op.account`), never
+   `"my"`: the account on Linux and Android, none on Windows, since any account argument makes
+   chezmoi run `account list` first. `onepasswordRead` is given it only when there is one: an
+   empty argument still goes through `account list`, which then matches no account.
+2. **On Windows chezmoi runs `op.exe` itself, never a wrapper.** A wrapper is a new process, and so
+   a new approval, for every call. `OP_ACCOUNT` comes from `env:` in `.chezmoi.yaml.tmpl`, which
+   chezmoi sets in its own process, so `op` in PowerShell keeps its own default account.
+3. **WSL's wrapper retries only that message**, at most three times, a second or two apart, and
+   only when stdout is captured. Any other failure is passed on at once with its own exit code and
+   message, and only the last attempt's stderr reaches the caller. A terminal's `op` is `exec`ed
+   untouched, so `op run` and anything interactive keep live streams. bash is no Windows process, so
+   the wrapper costs no approvals.
+4. **A Windows config without `OP_ACCOUNT`, or one that runs `op-retry.cmd`, needs `chezmoi init`**
+   (see "Config Data Comes From `chezmoi init`"), and `run_before_000-verify-chezmoi-config.tmpl`
+   fails the apply until it runs. `.chezmoiremove` deletes the shim.
 
-In the apply that confirmed the fix, only the first `signin` needed a retry, so an apply pays about
-a second. The retry can go once 1Password keeps the pipe listening between calls: two
-`op account list` calls back to back in one PowerShell both succeeding is the sign.
+The retry and the missing account can go once 1Password keeps the pipe listening after
+`account list`: two `op account list` calls back to back in one PowerShell both succeeding is the
+sign.
 
-`make test-op-wrapper` covers the WSL wrapper against a stubbed `op.exe` and `sleep`, and the
-command `.chezmoi.yaml.tmpl` gives each platform; `make test-op-wrapper-windows` covers the shim's
-writer under pwsh, and `make test-template-render` the guard. The batch file itself runs only on
-Windows, so CI checks its lines, not its behaviour.
+`make test-op-wrapper` covers the WSL wrapper against stubbed `op.exe` and `sleep`, the config each
+platform renders, the `op` calls the templates deployed on Windows make on each platform (no
+`account list` and no `--account` on Windows), and that no template names the account itself;
+`make test-template-render` covers the guard.
+
+## No Submodule Recursion on `chezmoi update`
+
+The repository has no submodules, and `.chezmoi.yaml.tmpl` sets `update.recurseSubmodules: false`.
+With chezmoi's default of `true`, every `chezmoi update` that pulled commits ran
+`git pull --recurse-submodules`, and git then ran `git submodule update`: a `#!/bin/sh` script in
+Git for Windows, whose first fork failed there with `child_copy: cygheap read copy failed ... Win32
+error 299` and `fork: retry: Resource temporarily unavailable` before bash's retry went through.
+Turn it back on together with the first submodule.
 
 ## Logging Convention
 

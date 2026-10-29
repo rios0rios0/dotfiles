@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed the `cygheap read copy failed` and `fork: retry: Resource temporarily unavailable` lines Git for Windows printed on every `chezmoi update` that pulled commits: chezmoi recursed into submodules by default, which made git run `git submodule update`, a shell script there, and the repository has none, so `update.recurseSubmodules` is now off'
+time: '2026-10-29T21:54:27.711532679Z'

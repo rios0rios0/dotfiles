@@ -9,10 +9,11 @@ gpgFolderPath="$HOME/.gpg"
 mkdir -p "$gpgFolderPath"
 
 {{- $deviceName := .deviceName -}}
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
 
 {{- warnf "[linux-gpg-keys] fetching Device: %s..." $deviceName -}}
 {{- $deviceNotes := "" -}}
-{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" $op.account).fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $deviceNotes = .value -}}
   {{- end -}}
@@ -25,7 +26,7 @@ mkdir -p "$gpgFolderPath"
 {{-        if eq $type "gpg" }}
 
 # read the GPG name and private key from 1Password
-{{- $item := onepassword $name "Private" "my" -}}
+{{- $item := onepassword $name "Private" $op.account -}}
 {{- warnf "[linux-gpg-keys] importing GPG key \"%s\"" $item.title -}}
 {{- $f := dict -}}
 {{- range $item.fields -}}
@@ -37,7 +38,7 @@ mkdir -p "$gpgFolderPath"
 {{- if hasKey $f "password" -}}
   {{- $gpgPassword = trimAll "`" (index $f "password") -}}
 {{- end -}}
-{{- $gpgPrivateKey := onepasswordRead (printf "op://Private/%s/private.key" $item.id) "my" }}
+{{- $gpgPrivateKey := onepasswordRead (printf "op://Private/%s/private.key" $item.id) $op.account }}
 gpgName="{{ $item.title }}"
 gpgPassword="{{ $gpgPassword }}"
 gpgPrivateKey="{{ trimAll "`" $gpgPrivateKey }}"

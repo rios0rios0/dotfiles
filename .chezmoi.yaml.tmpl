@@ -1,14 +1,22 @@
 # TODO: it's not possible to use 1password commands on this file, because it's linked with Windows .exe not installed on WSL
 {{- if eq .chezmoi.os "windows" }}
 onePassword:
-  # Through op-retry.cmd (run_before_windows-000-create-op-wrapper.ps1), which retries a call the
-  # 1Password app turned away: it removes its CLI pipe for about 0.9 s after every call, and chezmoi
-  # makes its calls back to back. The YAML is single-quoted, so the backslashes stay as they are.
-  command: '{{ .chezmoi.homeDir | replace "/" "\\" | replace "'" "''" }}\.local\bin\op-retry.cmd'
+  # op.exe itself, never a wrapper: 1Password for Windows ties an approval to the process that runs
+  # op, so a wrapper would be a new process, and a new prompt, for every call. OP_ACCOUNT names the
+  # account the templates leave out (.chezmoitemplates/lib-onepassword.tmpl), so chezmoi never
+  # runs `op account list`, the call that breaks the one after it (see "1Password CLI Retry" in
+  # AGENTS.md).
+  command: "op.exe"
+env:
+  OP_ACCOUNT: "my"
 {{- else }}
 onePassword:
   command: "{{ .chezmoi.homeDir }}/.local/bin/op"
 {{- end }}
+# The repository has no submodules. Recursing into them made every `chezmoi update` that pulled
+# commits run `git submodule update`, a shell script in Git for Windows whose `sh` fork fails there.
+update:
+  recurseSubmodules: false
 encryption: "age"
 # The chezmoi age key, which the export-private-key scripts fetch from 1Password before every
 # apply that needs it (.chezmoidata/age-keys.yaml). recipientsFile is what `chezmoi add
