@@ -179,6 +179,42 @@ else
     EXIT_CODE=1
 fi
 
+# On Windows the config must run 1Password's CLI through op-retry.cmd, which retries a call the
+# desktop app turned away; a config from before it runs op.exe directly, and every apply would fail
+# at its first 1Password template with "cannot connect to 1Password app".
+windows='{"chezmoi":{"os":"windows"}}'
+
+# given a Windows config from before op-retry.cmd
+printf 'onePassword:\n  command: "op.exe"\ndata:\n  deviceName: "testdevice"\n' > "$TMPDIR/windows-stale.yaml"
+# when
+if output=$(chezmoi execute-template --config="$TMPDIR/windows-stale.yaml" --override-data "$windows" < "$guard" 2>&1); then
+    echo "[test-template-render] FAIL: config guard let a Windows config that runs op.exe directly through" >&2
+    EXIT_CODE=1
+# then
+elif grep -q 'op-retry.cmd' <<<"$output" && grep -q 'run `chezmoi init`' <<<"$output"; then
+    echo "[test-template-render] PASS: config guard stops a Windows config that runs op.exe directly and names chezmoi init" >&2
+else
+    echo "[test-template-render] FAIL: config guard failed a Windows config without naming op-retry.cmd and chezmoi init: $output" >&2
+    EXIT_CODE=1
+fi
+
+# given a current Windows config
+cat > "$TMPDIR/windows-current.yaml" <<'EOF'
+onePassword:
+  command: 'C:\Users\test\.local\bin\op-retry.cmd'
+data:
+  deviceName: "testdevice"
+EOF
+# when
+if output=$(chezmoi execute-template --config="$TMPDIR/windows-current.yaml" --override-data "$windows" < "$guard" 2>&1) &&
+    # then
+    [[ -z "${output//[[:space:]]/}" ]]; then
+    echo "[test-template-render] PASS: config guard renders to nothing for a Windows config that runs op through op-retry.cmd" >&2
+else
+    echo "[test-template-render] FAIL: config guard is not silent for a current Windows config: $output" >&2
+    EXIT_CODE=1
+fi
+
 # Commit signing, per platform: the program git signs and verifies with, and the allowed-signers
 # file it verifies against. WSL signs with Linux's ssh-keygen through the SSH agent bridge rather
 # than a Windows path that depends on how 1Password was installed; Linux reads the copy in

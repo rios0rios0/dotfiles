@@ -696,6 +696,47 @@ jobs:
       - name: 'Test the Windows age key export'
         run: 'make test-export-key-windows'
 
+  test-op-wrapper:
+    name: 'Test (op retry, WSL)'
+    runs-on: 'ubuntu-latest'
+    permissions:
+      contents: 'read'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Install chezmoi'
+        run: |
+          cd "$(mktemp -d)"
+          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive" chezmoi
+          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
+      - name: 'Test the retry in front of op.exe'
+        run: 'make test-op-wrapper'
+
+  test-op-wrapper-windows:
+    name: 'Test (op retry shim, Windows)'
+    # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
+    # install step fails with 'Unable to locate package powershell' there.
+    runs-on: 'ubuntu-24.04'
+    permissions:
+      contents: 'read'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Install PowerShell'
+        run: |
+          sudo apt-get install -y wget apt-transport-https software-properties-common
+          source /etc/os-release
+          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          rm packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
+      - name: 'Test the Windows op retry shim'
+        run: 'make test-op-wrapper-windows'
+
   test-install-fonts-windows:
     name: 'Test (font install, Windows)'
     # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
