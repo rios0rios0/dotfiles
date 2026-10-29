@@ -1,4 +1,5 @@
 {{- $deviceName := .deviceName -}}
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
 {{- $username := (trimPrefix (upper .chezmoi.hostname) .chezmoi.username) | replace "\\" "" }}
 
 {{- /* OS-dependent paths and executables */ -}}
@@ -46,7 +47,7 @@
 {{- /* Fetch device credential list (cached by chezmoi) */ -}}
 {{- warnf "[gitconfig] fetching Device: %s..." $deviceName -}}
 {{- $deviceNotes := "" -}}
-{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" $op.account).fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $deviceNotes = .value -}}
   {{- end -}}
@@ -63,7 +64,7 @@
     {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "ssh" -}}
       {{- warnf "[gitconfig] matched \"%s\" for SSH defaults" $name -}}
-      {{- $item := onepassword $name "Private" "my" -}}
+      {{- $item := onepassword $name "Private" $op.account -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}
@@ -116,7 +117,7 @@
     {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "gpg" -}}
       {{- warnf "[gitconfig] matched \"%s\" for GPG alias" $name -}}
-      {{- $item := onepassword $name "Private" "my" -}}
+      {{- $item := onepassword $name "Private" $op.account -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}
@@ -140,7 +141,7 @@
     {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "ssh" -}}
       {{- warnf "[gitconfig] matched \"%s\" for SSH alias" $name -}}
-      {{- $item := onepassword $name "Private" "my" -}}
+      {{- $item := onepassword $name "Private" $op.account -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}

@@ -1,8 +1,9 @@
 {{- $deviceName := .deviceName -}}
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
 
 {{- warnf "[authorized-keys] fetching Device: %s..." $deviceName -}}
 {{- $deviceNotes := "" -}}
-{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" $op.account).fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $deviceNotes = .value -}}
   {{- end -}}
@@ -14,7 +15,7 @@
     {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "ssh" -}}
       {{- warnf "[authorized-keys] matched \"%s\"" $name -}}
-      {{- $item := onepassword $name "Private" "my" -}}
+      {{- $item := onepassword $name "Private" $op.account -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
         {{- if hasKey . "value" -}}

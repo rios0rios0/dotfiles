@@ -19,7 +19,7 @@ set -euo pipefail
 aifiles_sync {{ .ageKeys.aisync.recipient | squote }} '1.7.0' rebuild
 {{- else }}
 IFS= read -r -d '' identity <<'AISYNC_IDENTITY' || true
-{{ onepasswordRead .ageKeys.aisync.privateKey "my" | trim }}
+{{ onepasswordRead .ageKeys.aisync.privateKey (includeTemplate "lib-onepassword.tmpl" . | fromJson).account | trim }}
 AISYNC_IDENTITY
 aifiles_sync {{ .ageKeys.aisync.recipient | squote }} '1.7.0' rebuild "${identity%$'\n'}"
 {{- end }}

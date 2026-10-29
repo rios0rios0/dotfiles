@@ -9,7 +9,7 @@ The "build" is `chezmoi apply`; there is no compilation step. Repo *changes* (te
 
 ```bash
 make lint    # shellcheck, Go template syntax, Python (ruff), PowerShell, YAML/JSON
-make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, the Windows installer, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution, zshrc functions, Sentry CLI setup, local model server, OpenCode config, Tailscale, systemd on WSL, status line, Claude Code language servers, OmniRoute backups and image pin, ocode build, terra update, yq install, age key export (Linux and Windows), op retry (WSL wrapper and Windows shim)
+make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, the Windows installer, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution, zshrc functions, Sentry CLI setup, local model server, OpenCode config, Tailscale, systemd on WSL, status line, Claude Code language servers, OmniRoute backups and image pin, ocode build, terra update, yq install, age key export (Linux and Windows), how chezmoi reaches op (WSL wrapper retry, no account list on Windows)
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
@@ -66,7 +66,6 @@ Scripts execute in this order per platform (numbers = execution priority):
 
 | Order | Linux (WSL)                                            | Windows                          | Android (Termux)                       |
 |-------|--------------------------------------------------------|----------------------------------|----------------------------------------|
-| 000   | —                                                      | `create-op-wrapper.ps1` *(run_before, every apply)* | —                     |
 | 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-wrapper.sh` → `001a-e` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`) |
 | 002   | `install-dependencies.sh.tmpl` *(also baremetal variant)* | `configure-dependencies.ps1`     | `install-dependencies.sh.tmpl`         |
 | 003   | `configure-dependencies.sh`                            | `install-fonts.ps1` *(run_before, every apply)* | `install-fonts.sh.tmpl` |
@@ -260,7 +259,7 @@ and refuses to install on a mismatch. Verify with `/usr/bin/ssh-add -l` — the 
 | Editor           | (any)                                   | Notepad++                           | NeoVim (AstroVim, `~/.config/nvim/`)    |
 | MCP config       | `~/.claude.json` (Context7, Chrome DevTools) | N/A (no Claude Code)           | `~/.claude.json`, `~/.config/mcphub/servers.json` (Context7) |
 | Terraform        | `terra` (same as Android)               | N/A                                 | `termux-etc-seccomp` wrapper (`terra`)  |
-| 1Password CLI    | `~/.local/bin/op` wrapper → `op.exe`, retried when the app turns a call away | Native `op.exe`; chezmoi runs it through `~\.local\bin\op-retry.cmd`, which retries the same way | `~/.local/bin/op` → `termux-etc-seccomp` binary |
+| 1Password CLI    | `~/.local/bin/op` wrapper → `op.exe`, retried when the app turns a call away | Native `op.exe`, run by chezmoi itself (one approval per apply), `OP_ACCOUNT` from chezmoi's `env` | `~/.local/bin/op` → `termux-etc-seccomp` binary |
 | Docker           | Native                                  | Docker Desktop                      | N/A                                     |
 | SSH keys         | `~/.ssh/chezmoi` (age private key)      | `~\.ssh\chezmoi` (age private key)  | Retrieved via `op` wrapper              |
 

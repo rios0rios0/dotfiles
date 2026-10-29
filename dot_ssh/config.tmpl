@@ -3,12 +3,13 @@ TODO: The IdentityFile logic is inverted on Android (uses private key), all othe
 This is because on Android (Termux) only private keys are usable, while other platforms require public keys for SSH config.
 */ -}}
 {{- $deviceName := .deviceName -}}
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
 {{- $isAndroid := eq .chezmoi.os "android" -}}
 {{- $isWindows := eq .chezmoi.os "windows" -}}
 
 {{- warnf "[ssh-config] fetching Device: %s..." $deviceName -}}
 {{- $deviceNotes := "" -}}
-{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" $op.account).fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $deviceNotes = .value -}}
   {{- end -}}
@@ -22,7 +23,7 @@ This is because on Android (Termux) only private keys are usable, while other pl
     {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "ssh" -}}
       {{- warnf "[ssh-config] matched \"%s\" for VCS hosts" $name -}}
-      {{- $item := onepassword $name "Private" "my" -}}
+      {{- $item := onepassword $name "Private" $op.account -}}
       {{- $sshName := $item.title | trim -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}
@@ -106,7 +107,7 @@ Host bitbucket.org-{{ $sshAlias }}
     {{- $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
     {{- if eq $type "pem" -}}
       {{- warnf "[ssh-config] matched \"%s\" for PEM hosts" $name -}}
-      {{- $item := onepassword $name "Private" "my" -}}
+      {{- $item := onepassword $name "Private" $op.account -}}
       {{- $pemName := $item.title | trim -}}
       {{- $f := dict -}}
       {{- range $item.fields -}}

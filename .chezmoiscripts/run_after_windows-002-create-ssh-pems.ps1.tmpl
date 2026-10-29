@@ -7,10 +7,11 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 }
 
 {{- $deviceName := .deviceName -}}
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
 
 {{- warnf "[windows-pem-keys] fetching Device: %s..." $deviceName -}}
 {{- $deviceNotes := "" -}}
-{{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields -}}
+{{- range (onepassword (printf "Device: %s" $deviceName) "personal" $op.account).fields -}}
   {{- if and (eq .label "notesPlain") (hasKey . "value") -}}
     {{- $deviceNotes = .value -}}
   {{- end -}}
@@ -23,7 +24,7 @@ if (-Not (Test-Path -Path $sshFolderPath)) {
 {{-        $name := trimPrefix (printf "%s:" $type) $entry | trim -}}
 
 {{-        if eq $type "pem" }}
-{{-        $item := onepassword $name "Private" "my" -}}
+{{-        $item := onepassword $name "Private" $op.account -}}
 {{-        $pemName := $item.title | trim -}}
 {{-        warnf "[windows-pem-keys] creating PEM key for \"%s\"" $pemName }}
 

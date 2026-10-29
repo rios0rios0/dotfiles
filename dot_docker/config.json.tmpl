@@ -1,9 +1,10 @@
 {{- $deviceName := .deviceName -}}
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
 {
   "auths": {
     {{- warnf "[docker-config] fetching Device: %s..." $deviceName }}
     {{- $deviceNotes := "" }}
-    {{- range (onepassword (printf "Device: %s" $deviceName) "personal" "my").fields }}
+    {{- range (onepassword (printf "Device: %s" $deviceName) "personal" $op.account).fields }}
     {{-   if and (eq .label "notesPlain") (hasKey . "value") }}
     {{-     $deviceNotes = .value }}
     {{-   end }}
@@ -15,7 +16,7 @@
     {{-     $type := index (split ":" $entry) "_0" }}
     {{-     $name := trimPrefix (printf "%s:" $type) $entry | trim }}
     {{-     if eq $type "docker" }}
-    {{-       $opItem := onepassword $name "Private" "my" }}
+    {{-       $opItem := onepassword $name "Private" $op.account }}
     {{-       $f := dict }}
     {{-       range $opItem.fields }}
     {{-         if hasKey . "value" }}

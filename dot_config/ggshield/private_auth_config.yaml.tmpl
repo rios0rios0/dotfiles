@@ -14,8 +14,9 @@
   Rotate the token from https://dashboard.gitguardian.com/api/personal-access-tokens
   and update the 1Password fields — the next `chezmoi apply` propagates it.
 */ -}}
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
 {{- warnf "[ggshield-auth] fetching 1Password item Token: ggshield..." -}}
-{{- $item := onepassword "Token: ggshield" "Private" "my" -}}
+{{- $item := onepassword "Token: ggshield" "Private" $op.account -}}
 {{- $f := dict -}}
 {{- range $item.fields -}}
   {{- if hasKey . "value" -}}

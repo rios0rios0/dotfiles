@@ -1,9 +1,12 @@
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
+{{- /* onepasswordRead is given the account only when there is one: an empty one would still send
+       chezmoi to `op account list` (see lib-onepassword.tmpl). */ -}}
 {{- warnf "[wakatime] fetching API key..." -}}
 [settings]
-api_key = {{ onepasswordRead "op://personal/Wakatime/api key" "my" }}
+api_key = {{ if $op.account }}{{ onepasswordRead "op://personal/Wakatime/api key" $op.account }}{{ else }}{{ onepasswordRead "op://personal/Wakatime/api key" }}{{ end }}
 hide_project_folder = true
 hide_file_names = true
 hide_branch_names = true
 hide_project_names =
 {{- warnf "[wakatime] fetching hidden projects..." }}
-{{ onepasswordRead "op://personal/Wakatime/hidden projects" "my" }}
+{{ if $op.account }}{{ onepasswordRead "op://personal/Wakatime/hidden projects" $op.account }}{{ else }}{{ onepasswordRead "op://personal/Wakatime/hidden projects" }}{{ end }}

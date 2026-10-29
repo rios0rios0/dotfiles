@@ -179,29 +179,36 @@ else
     EXIT_CODE=1
 fi
 
-# On Windows the config must run 1Password's CLI through op-retry.cmd, which retries a call the
-# desktop app turned away; a config from before it runs op.exe directly, and every apply would fail
-# at its first 1Password template with "cannot connect to 1Password app".
+# On Windows the config must run op.exe itself, with OP_ACCOUNT naming the account the templates
+# leave out. A config from before OP_ACCOUNT fails at its first 1Password template with "cannot
+# connect to 1Password app", and one that runs the op-retry.cmd shim asks for an approval per item.
 windows='{"chezmoi":{"os":"windows"}}'
 
-# given a Windows config from before op-retry.cmd
-printf 'onePassword:\n  command: "op.exe"\ndata:\n  deviceName: "testdevice"\n' > "$TMPDIR/windows-stale.yaml"
-# when
-if output=$(chezmoi execute-template --config="$TMPDIR/windows-stale.yaml" --override-data "$windows" < "$guard" 2>&1); then
-    echo "[test-template-render] FAIL: config guard let a Windows config that runs op.exe directly through" >&2
-    EXIT_CODE=1
-# then
-elif grep -q 'op-retry.cmd' <<<"$output" && grep -q 'run `chezmoi init`' <<<"$output"; then
-    echo "[test-template-render] PASS: config guard stops a Windows config that runs op.exe directly and names chezmoi init" >&2
-else
-    echo "[test-template-render] FAIL: config guard failed a Windows config without naming op-retry.cmd and chezmoi init: $output" >&2
-    EXIT_CODE=1
-fi
+# stale_windows_config <label> <onePassword.command line>: the guard must stop it and name chezmoi init.
+stale_windows_config() {
+    # given
+    printf 'onePassword:\n  %s\ndata:\n  deviceName: "testdevice"\n' "$2" > "$TMPDIR/windows-stale.yaml"
+    # when
+    if output=$(chezmoi execute-template --config="$TMPDIR/windows-stale.yaml" --override-data "$windows" < "$guard" 2>&1); then
+        echo "[test-template-render] FAIL: config guard let a Windows config $1 through" >&2
+        EXIT_CODE=1
+    # then
+    elif grep -q 'OP_ACCOUNT' <<<"$output" && grep -q 'run `chezmoi init`' <<<"$output"; then
+        echo "[test-template-render] PASS: config guard stops a Windows config $1 and names chezmoi init" >&2
+    else
+        echo "[test-template-render] FAIL: config guard failed a Windows config $1 without naming OP_ACCOUNT and chezmoi init: $output" >&2
+        EXIT_CODE=1
+    fi
+}
+stale_windows_config "from before OP_ACCOUNT" 'command: "op.exe"'
+stale_windows_config "that runs the op-retry.cmd shim" "command: 'C:\\Users\\test\\.local\\bin\\op-retry.cmd'"
 
 # given a current Windows config
 cat > "$TMPDIR/windows-current.yaml" <<'EOF'
 onePassword:
-  command: 'C:\Users\test\.local\bin\op-retry.cmd'
+  command: "op.exe"
+env:
+  OP_ACCOUNT: "my"
 data:
   deviceName: "testdevice"
 EOF
@@ -209,7 +216,7 @@ EOF
 if output=$(chezmoi execute-template --config="$TMPDIR/windows-current.yaml" --override-data "$windows" < "$guard" 2>&1) &&
     # then
     [[ -z "${output//[[:space:]]/}" ]]; then
-    echo "[test-template-render] PASS: config guard renders to nothing for a Windows config that runs op through op-retry.cmd" >&2
+    echo "[test-template-render] PASS: config guard renders to nothing for a Windows config that runs op.exe with OP_ACCOUNT" >&2
 else
     echo "[test-template-render] FAIL: config guard is not silent for a current Windows config: $output" >&2
     EXIT_CODE=1

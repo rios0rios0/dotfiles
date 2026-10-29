@@ -50,3 +50,9 @@ local-services/omniroute/compose.yaml
 # this tarball beside the extracted `~/.kube/config-files/`; the folder is what the shell
 # actually reads, so the stale archive is removed. The folder itself is left in place.
 .kube/config-files.tar
+
+# The `op-retry.cmd` shim -- added by #281 and removed by #282 (2026-10-29). Run through it, every
+# op call had a new cmd.exe as its parent, and 1Password for Windows ties an approval to the
+# process that runs op, so each item asked for an approval of its own; chezmoi runs `op.exe`
+# itself again. It only ever existed on Windows.
+.local/bin/op-retry.cmd
