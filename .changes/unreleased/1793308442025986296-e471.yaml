@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed every `chezmoi apply` on Windows and WSL failing at its first 1Password template with `cannot connect to 1Password app, make sure it is running`: the 1Password app removes the pipe its CLI connects through for about 0.9 s after every call and `op` gives up at once, while chezmoi runs `op account list` and `op signin` back to back, so the WSL `op` wrapper and a new `op-retry.cmd` shim, which the Windows config now points chezmoi at, retry exactly that failure a second later; a Windows machine picks the shim up with `chezmoi init`, which the config guard now asks for'
+time: '2026-10-29T21:14:02.025926741Z'

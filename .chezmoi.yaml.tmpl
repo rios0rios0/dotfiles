@@ -1,7 +1,10 @@
 # TODO: it's not possible to use 1password commands on this file, because it's linked with Windows .exe not installed on WSL
 {{- if eq .chezmoi.os "windows" }}
 onePassword:
-  command: "op.exe"
+  # Through op-retry.cmd (run_before_windows-000-create-op-wrapper.ps1), which retries a call the
+  # 1Password app turned away: it removes its CLI pipe for about 0.9 s after every call, and chezmoi
+  # makes its calls back to back. The YAML is single-quoted, so the backslashes stay as they are.
+  command: '{{ .chezmoi.homeDir | replace "/" "\\" | replace "'" "''" }}\.local\bin\op-retry.cmd'
 {{- else }}
 onePassword:
   command: "{{ .chezmoi.homeDir }}/.local/bin/op"

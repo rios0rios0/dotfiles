@@ -68,7 +68,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 |--------|------------------|------------|------------------|
 | Shell | Zsh + Oh My Zsh + p10k | PowerShell + Oh My Posh | Zsh + Oh My Zsh + p10k |
 | Scripts | `.sh` (bash) | `.ps1` (PowerShell) | `.sh` (bash) |
-| 1Password | `op` wrapper (calls `op.exe` from WSL) | Native `op.exe` | `op` wrapper (`termux-etc-seccomp`) |
+| 1Password | `op` wrapper (calls `op.exe` from WSL, retrying a call the app turns away) | Native `op.exe` (chezmoi runs it through `op-retry.cmd`, which retries the same way) | `op` wrapper (`termux-etc-seccomp`) |
 | Docker | Native | Docker Desktop | N/A (proot wrappers) |
 | MCP Config | `~/.claude.json` (Context7, Chrome DevTools) | N/A (no Claude Code) | `~/.claude.json` and `~/.config/mcphub/servers.json` (Context7) |
 | Editor | Any | Notepad++ | Neovim (AstroVim) |
