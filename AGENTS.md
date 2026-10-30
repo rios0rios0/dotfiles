@@ -54,6 +54,7 @@ make test-export-key-windows        # the Windows chezmoi key export: the match,
 make test-op-wrapper                # how chezmoi reaches op: the WSL wrapper's retry, a terminal's op untouched, each platform's config, no account list on Windows
 make test-install-fonts-windows     # the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh)
 make test-powershell-profile-windows # PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh)
+make test-home-agents               # the home ~/AGENTS.md: each platform's guide, its own writer, the writers in a sandbox home (Windows' under pwsh, skipped without it)
 ```
 
 ## Platform Targeting
@@ -82,7 +83,8 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 - **`dot_zshrc.tmpl`** — Shell config: ZINIT plugins, version managers (GVM/NVM/Pyenv/SDKMAN/Cargo), Docker aliases, Kubernetes tools
 - **`dot_zshenv.tmpl`** — PATH setup for version managers (critical for IDE integration)
 - **`.chezmoiignore`** — Platform-conditional file exclusion rules
-- **`.chezmoitemplates/`** — Shared template fragments (shared install functions, font installer, dependency removal, the Sentry CLI version floor, MCP server merge logic, username)
+- **`.chezmoitemplates/`** — Shared template fragments (shared install functions, font installer, dependency removal, the Sentry CLI version floor, MCP server merge logic, username, the home `AGENTS.md`)
+- **`AGENTS.md`** — This file, for agents working on the repository; never deployed. `~/AGENTS.md` on each machine is another file (see "The Home AGENTS.md")
 
 ## Template Variables
 
@@ -263,7 +265,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `home-agents`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -875,6 +877,61 @@ pulls. To leave aifiles alone for one apply, set `SKIP_AIFILES_SYNC=1`. `make te
 covers the hook on both platforms against a stubbed aisync and a local bare remote,
 `make test-export-keys` the key, and `make test-script-order` that the hook runs after the Sentry
 CLI's skill and the LSP plugins.
+
+## The Home AGENTS.md
+
+Two files are named `AGENTS.md`, for two audiences:
+
+| File | For | Where it lives |
+|------|-----|----------------|
+| `AGENTS.md` at the repository root (this file) | agents working on the dotfiles | the checkout only: `.chezmoiignore` keeps it out of every home folder |
+| `~/AGENTS.md` | any agent running commands on the machine | rendered for each platform from `.chezmoitemplates/home-agents.md` |
+
+Until it was ignored, chezmoi deployed this file to `~/AGENTS.md` on every platform: 161 KB of
+repository internals. OpenCode V2 reads every `AGENTS.md` from its working directory up to the home
+folder, past the git root (`packages/core/src/config/plugin/instruction.ts` in the fork), so every
+`ocode` session under `~` carried it. Claude Code reads `CLAUDE.md` only, and Codex stops at the
+project root, beside its global `~/.codex/AGENTS.md`, so both see `~/AGENTS.md` only when started in
+the home folder itself.
+
+The guide says what an agent should know before running a command there: the `cp`/`rm`/`mv` guards
+and the `-i` they keep at a terminal, `ls` being eza, zsh's global aliases, quoting through every
+layer, globs under `NO_NOMATCH`, how zsh differs from bash, and secrets; on Termux its paths,
+shebangs, C library and process budget; on Windows reaching WSL (`wsl.exe --exec zsh -c`) and
+PowerShell's aliases, quoting, errors and encodings.
+
+**Keep these:**
+
+1. **A script writes it, because chezmoi cannot manage it.** `.chezmoiignore` matches targets, not
+   source files, so ignoring the repository's `AGENTS.md` ignores every other source of
+   `~/AGENTS.md` too, and two sources for one target fail every apply with `inconsistent state`.
+   `run_onchange_after_linux-019` and `run_onchange_after_android-011`, through
+   `.chezmoitemplates/lib-home-agents.sh`, and `run_onchange_after_windows-006` carry the rendered
+   guide in a here-doc or a here-string and write it. A `run_onchange_` script runs again exactly
+   when the guide changes, so a deleted `~/AGENTS.md` comes back with the next change, not the next
+   apply. Managing it as a file would take `.chezmoiroot`, which moves every source file into a
+   subdirectory.
+2. **Written whole, and only when it differs.** It is staged beside the target and renamed over it
+   (`mv -T`, which refuses a directory there); on Windows through .NET, as UTF-8 without a BOM and
+   with LF endings whatever the checkout's, because Windows PowerShell 5.1 runs it on a machine
+   without pwsh.
+3. **Every fact holds on the platform it renders for.** The template branches on the OS and, for
+   WSL, on the kernel, as `.chezmoiignore` does. Check a new fact there before adding it: the
+   PowerShell aliases, `wsl.exe` re-parsing its arguments without `--exec`, and `bash -c` missing
+   the toolchains were all measured, not recalled.
+4. **Keep it short.** Agents load it into their context, and `make test-home-agents` fails a
+   rendering past 8 KB.
+5. **It overlaps aifiles on purpose.** Claude Code's and OpenCode's global instructions
+   (`~/.claude/CLAUDE.md`, `~/.config/opencode/AGENTS.md`) come from aisync and carry the same kind
+   of facts for Linux/WSL, so an `ocode` session on Linux reads both. aifiles holds one copy for
+   every device, and aisync keeps those off the phone, where this guide is the only one: chezmoi
+   renders it because chezmoi knows the platform.
+
+`make test-home-agents` covers each platform's guide (its facts and none of another platform's, its
+size, no unrendered action, no line that would end its here-doc or here-string), each platform
+running its own writer and no other, and the writers against a sandbox home: the Linux and Termux
+ones under bash, and the Windows one under pwsh from both an LF and a CRLF checkout.
+`make test-chezmoiignore` covers that no platform deploys the repository's `AGENTS.md`.
 
 ## Claude Code Look
 

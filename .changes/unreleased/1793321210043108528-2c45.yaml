@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `~/AGENTS.md` on every platform, an agent guide rendered for WSL, bare-metal Linux, Termux or Windows from `.chezmoitemplates/home-agents.md`: the interactive `cp`/`rm`/`mv` guards, `ls` being `eza`, zsh''s global aliases, quoting through each layer and how zsh differs from Bash, Termux''s paths and limits, and PowerShell''s aliases, error handling and encodings'
+time: '2026-10-30T00:46:50.043063733Z'

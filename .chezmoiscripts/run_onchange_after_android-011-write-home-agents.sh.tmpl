@@ -1,0 +1,13 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# Writes ~/AGENTS.md, the agent guide for this phone, as run_onchange_after_linux-019 does on Linux
+# and with the same body (.chezmoitemplates/lib-home-agents.sh); the guide itself is rendered for
+# Termux. On the phone it is the only such guide an agent gets, since aisync keeps aifiles' Linux
+# copies of CLAUDE.md and OpenCode's AGENTS.md off it. See "The Home AGENTS.md" in AGENTS.md.
+
+set -euo pipefail
+
+{{ template "lib-home-agents.sh" }}
+write_home_agents <<'HOME_AGENTS_MD'
+{{ includeTemplate "home-agents.md" . | trim }}
+HOME_AGENTS_MD

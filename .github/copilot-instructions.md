@@ -9,7 +9,7 @@ The "build" is `chezmoi apply`; there is no compilation step. Repo *changes* (te
 
 ```bash
 make lint    # shellcheck, Go template syntax, Python (ruff), PowerShell, YAML/JSON
-make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, the Windows installer, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution, zshrc functions, Sentry CLI setup, local model server, OpenCode config, Tailscale, systemd on WSL, status line, Claude Code language servers, OmniRoute backups and image pin, ocode build, terra update, yq install, age key export (Linux and Windows), how chezmoi reaches op (WSL wrapper retry, no account list on Windows)
+make test    # template rendering (mock op), .chezmoiignore logic, script order, modify/merge, dependency removal, the Windows installer, $TMPDIR modcache prune, shell credentials, clipboard shim, NVM resolution, zshrc functions, Sentry CLI setup, local model server, OpenCode config, Tailscale, systemd on WSL, status line, Claude Code language servers, OmniRoute backups and image pin, ocode build, home AGENTS.md, terra update, yq install, age key export (Linux and Windows), how chezmoi reaches op (WSL wrapper retry, no account list on Windows)
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
@@ -184,7 +184,8 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `.chezmoiignore`: Platform-conditional file exclusion (uses Go templates with `.chezmoi.os`)
 - `.chezmoiremove`: Target paths deleted from the home directory on every apply (see "Removing a Dependency")
 - `.chezmoiscripts/`: Automated setup and configuration scripts (numbered for execution order)
-- `.chezmoitemplates/`: Shared template fragments (the `lib-*` libraries, `allowed-signers.tmpl`, `username.tmpl`)
+- `.chezmoitemplates/`: Shared template fragments (the `lib-*` libraries, `allowed-signers.tmpl`, `username.tmpl`, and `home-agents.md`, the agent guide written to `~/AGENTS.md`)
+- `AGENTS.md`: Instructions for agents working on this repository; `.chezmoiignore` keeps it out of every home folder. `~/AGENTS.md` is a different file, rendered per platform from `.chezmoitemplates/home-agents.md` by `run_onchange_after_linux-019`, `run_onchange_after_android-011` and `run_onchange_after_windows-006` (see "The Home AGENTS.md" in `AGENTS.md`)
 - `dot_local/bin/`: Executable user commands deployed through chezmoi (platform-filtered by `.chezmoiignore`)
 - `AppData/`: Windows-specific app config files deployed via `run_after_windows-003-copy-app-data-files.ps1.tmpl`
 
