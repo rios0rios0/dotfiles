@@ -1147,9 +1147,14 @@ OpenCode runs on the OmniRoute gateway: `dot_config/opencode/opencode.json.tmpl`
 lacks: the OmniRoute provider plugin and the `OPENCODE_DISABLE_CLAUDE_CODE` gate, both on branch
 `reworked` of `rios0rios0/opencode`. `run_after_linux-006-build-ocode.sh` keeps it
 current, checkout included: a missing one at `~/Development/github.com/rios0rios0/opencode` is cloned
-from the fork straight onto that branch (with the fork named `fork` and sst upstream named
-`origin`, as the hand-made checkouts on these machines have them), and an existing one sitting on
-another branch is switched to it. The branch is not optional bookkeeping -- the build stamps the
+from the fork straight onto that branch (the fork named `fork`, sst upstream `origin`), and an
+existing one sitting on another branch is switched to it -- to its local `reworked`, or to a new one
+tracking the fork's remote-tracking branch. That remote is found by its URL, not by its name: a
+plain `git clone` of the fork, made by hand, calls it `origin`, and a checkout cloned that way, which
+had never fetched `reworked` either, warned `has no reworked branch` on every apply. When the
+fork's remote has never fetched the branch, the builder fetches it first, from the fork's public
+HTTPS URL rather than the remote's own, which may be an SSH alias waiting on a 1Password approval
+that nobody gives an unattended apply. The branch is not optional bookkeeping -- the build stamps the
 channel onto whatever HEAD holds, so a checkout left on `main` would produce a binary labelled as
 the fork and carrying none of its code. It then runs the fork's own single-platform build whenever
 the checkout's HEAD moved past the last one, and
@@ -1162,11 +1167,11 @@ branch build's `0.0.0-<branch>-<time>` preview version is; the stamp also makes 
 replace the background service on the next launch. The marker
 `~/.cache/ocode-built-commit` makes an unchanged apply a no-op, which is why this is a `run_after`
 script that runs on every apply; `OCODE_SOURCE` names another checkout. No `bun`, a failed clone,
-a directory at the checkout's path that is not a checkout, and a checkout holding neither the
-branch nor the fork's remote-tracking one are skips, never failures -- the last two because an
-apply with no network must still finish, and the third because that directory may hold somebody's
-work. A failed build -- a failed dependency install included -- is an error, retried by the next
-apply.
+a failed fetch, a checkout with no remote for the fork, and a directory at the checkout's path that
+is not a checkout are skips, never failures: the clone and the fetch because an apply with no
+network must still finish, the missing remote because adding one is a person's call (the warning
+names the command), and the directory because it may hold somebody's work. A failed build -- a
+failed dependency install included -- is an error, retried by the next apply.
 
 A running `ocode` -- the TUI or the server it spawns -- executes `~/.local/bin/ocode`, the file
 the build replaces. The builder looks for the processes executing **that file** (through
@@ -1219,8 +1224,10 @@ unchanged apply still runs neither.
 
 `make test-ocode` covers the checkout the builder obtains itself (the clone onto the fork's
 branch and the remote layout it leaves, the branch switch, the branch created from the fork's
-remote-tracking one, a checkout holding no fork branch, a directory that is not a checkout, and a
-failed clone that only warns), the skip without bun, the first build (including the channel and
+remote-tracking one under whichever remote's URL is the fork's -- a plain clone's `origin` behind
+`github.com-mine` included -- the fetch over HTTPS when that remote never fetched it, a failed
+fetch, a checkout with no remote for the fork, a directory that is not a checkout, and a failed
+clone that only warns), the skip without bun, the first build (including the channel and
 release-grade version it carries, and the dependency install that precedes it), the no-op and
 the rebuilds against stubbed `git` and `bun`, the running-`ocode` prompt with no answer, a
 decline and an acceptance, the process started mid-build, the pinned bun against a stubbed

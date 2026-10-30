@@ -74,7 +74,9 @@ the tier, such as Codex's `*-high`, keep those rows: they are models, not varian
 `run_after_linux-006-build-ocode.sh` rebuilds `ocode` from the checkout at
 `~/Development/github.com/rios0rios0/opencode` whenever that checkout's HEAD moved, and installs
 it as `~/.local/bin/ocode`; see the "Fork Build (`ocode`)" part of the main `CLAUDE.md` for the
-mechanics. The build pins the client identity the Console reads from the
+mechanics. A checkout on another branch is switched to `reworked` first, through whichever remote
+points at the fork -- a plain `git clone` of the fork calls it `origin` -- and a branch that remote
+never fetched is fetched over the fork's HTTPS URL. The build pins the client identity the Console reads from the
 User-Agent -- `OPENCODE_CHANNEL=feat-provider-omniroute` and a build-stamped
 `OPENCODE_VERSION=<release>-reworked.<%y%m%d%H%M>`, e.g. `2.1.4-reworked.2610241230`, where
 `<release>` is the upstream release the checkout is built on (its `packages/cli/package.json`

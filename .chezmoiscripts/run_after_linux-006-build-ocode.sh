@@ -12,10 +12,11 @@ set -euo pipefail
 # The checkout is the script's to obtain, and it never builds the wrong branch: a missing one is
 # cloned from the fork and left on `reworked`, and an existing one sitting on
 # another branch is switched to it -- the channel below is stamped whatever HEAD happens to hold,
-# so a checkout left on `main` would otherwise produce a binary labelled as the fork. A directory
-# that exists without being a checkout is not cloned into, and both a failed clone and a branch
-# the checkout does not have warn and skip, so an apply without the network still finishes.
-# Set OCODE_SOURCE to name another checkout.
+# so a checkout left on `main` would otherwise produce a binary labelled as the fork. The fork's
+# remote is found by its URL, whatever it is called, and a branch that remote has never fetched is
+# fetched first. A directory that exists without being a checkout is not cloned into, and a failed
+# clone, a failed fetch and a checkout with no remote for the fork all warn and skip, so an apply
+# without the network still finishes. Set OCODE_SOURCE to name another checkout.
 #
 # bun, the runtime the build needs, comes from `install_bun` into ~/.bun with its PATH line in
 # `dot_zshenv.tmpl`; the script also falls back to ~/.bun/bin/bun itself, and skips only when
@@ -53,6 +54,10 @@ bun_cache="$HOME/.cache/ocode-bun"
 branch="reworked"
 fork_url="https://github.com/rios0rios0/opencode.git"
 upstream_url="https://github.com/sst/opencode.git"
+# What a remote URL for the fork looks like: HTTPS, SSH, or an SSH host alias such as the
+# github.com-mine that dot_ssh/config.tmpl defines. Anchored on the repository path, so neither
+# upstream nor another repository whose name starts with `opencode` matches.
+fork_url_pattern='^(https://|ssh://)?([^@/]+@)?github\.com(-[[:alnum:]_-]+)?[:/]rios0rios0/opencode(\.git)?/?$'
 bun_releases="https://github.com/oven-sh/bun/releases/download"
 
 # bun is resolved from PATH first and from ~/.bun/bin second: `install_bun` puts it there
@@ -69,9 +74,10 @@ if [[ -z "$bun" ]]; then
 fi
 
 # Cloned onto the fork's branch directly, so the checkout the build sees is the fork's even on
-# its first apply. `--origin fork` names the remote the way the hand-made checkouts on this
-# machine do, and sst upstream becomes `origin`, so a command typed on one machine means the
-# same on another. `-e` rather than `-d`: a worktree's `.git` is a file.
+# its first apply. `--origin fork` keeps `origin` for sst upstream, so it names the same
+# repository in every clone this script makes. The branch switch below does not rely on that
+# name: a plain `git clone` of the fork, made by hand, calls the fork `origin`.
+# `-e` rather than `-d`: a worktree's `.git` is a file.
 if [[ ! -e "$source_dir/.git" ]]; then
     if [[ -e "$source_dir" ]]; then
         echo "[ocode] skipped: $source_dir exists but is not a git checkout, so it is not cloned into (remove it, or set OCODE_SOURCE to another path)" >&2
@@ -90,18 +96,43 @@ fi
 
 # The build stamps the channel below onto whatever HEAD is, so a checkout left on another branch
 # would produce a binary labelled as the fork and carrying none of its code. Local branch first,
-# then the fork's remote-tracking one (which the clone above has), and otherwise nothing: no
-# network fetch of the branch, because an apply that cannot reach GitHub must still finish.
+# then the fork's remote-tracking one, under whichever remote points at the fork. A branch that
+# remote has never fetched is fetched first, from the fork's public HTTPS URL rather than the
+# remote's own: the remote may be an SSH alias that waits on a 1Password approval, which nobody
+# gives an unattended apply. A failed fetch warns and skips like a failed clone, so an apply that
+# cannot reach GitHub still finishes.
+
+# Prints the first remote whose URL is the fork's, and fails when there is none.
+fork_remote() {
+    local remote url
+    while IFS= read -r remote; do
+        url="$(git -C "$source_dir" remote get-url "$remote" 2>/dev/null || true)"
+        if [[ "$url" =~ $fork_url_pattern ]]; then
+            printf '%s\n' "$remote"
+            return 0
+        fi
+    done < <(git -C "$source_dir" remote 2>/dev/null || true)
+    return 1
+}
+
 current_branch="$(git -C "$source_dir" rev-parse --abbrev-ref HEAD 2>/dev/null || true)"
 if [[ "$current_branch" != "$branch" ]]; then
     echo "[ocode] checkout is on ${current_branch:-an unknown branch}, switching to $branch" >&2
     if git -C "$source_dir" rev-parse --verify --quiet "refs/heads/$branch" >/dev/null; then
         git -C "$source_dir" checkout "$branch" >&2
-    elif git -C "$source_dir" rev-parse --verify --quiet "refs/remotes/fork/$branch" >/dev/null; then
-        git -C "$source_dir" checkout -b "$branch" --track "fork/$branch" >&2
     else
-        echo "[ocode] WARN: $source_dir has no $branch branch and no fork/$branch to track; leaving it alone, so nothing is built" >&2
-        exit 0
+        if ! remote="$(fork_remote)"; then
+            echo "[ocode] WARN: $source_dir has no $branch branch and no remote for $fork_url; leaving it alone, so nothing is built (git -C $source_dir remote add fork $fork_url adds one)" >&2
+            exit 0
+        fi
+        if ! git -C "$source_dir" rev-parse --verify --quiet "refs/remotes/$remote/$branch" >/dev/null; then
+            echo "[ocode] $source_dir has no $remote/$branch yet; fetching it from $fork_url" >&2
+            if ! GIT_TERMINAL_PROMPT=0 git -C "$source_dir" fetch --no-tags "$fork_url" "+refs/heads/$branch:refs/remotes/$remote/$branch" >&2; then
+                echo "[ocode] WARN: failed to fetch $branch from $fork_url, so nothing is built; the next apply tries again" >&2
+                exit 0
+            fi
+        fi
+        git -C "$source_dir" checkout -b "$branch" --track "$remote/$branch" >&2
     fi
 fi
 
