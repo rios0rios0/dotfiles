@@ -26,8 +26,9 @@ ageKeys:
   aisync:
     recipient: 'age1a69w87jjawyun9mxwfhj0lvf7jyg9t7sa4u3a8qhjcukvr04hussnktszn'
     privateKey: 'op://Private/aisync.age/private key'
-  # Encrypts the home-secrets backups (secrets-backup), at ~/.ssh/secrets-backup-key on WSL alone,
-  # where they run. A key for those backups alone -- never the chezmoi key, nor the OmniRoute one.
+  # Encrypts the home-secrets backups (secrets-backup) and their sync (secrets-sync), which also
+  # keys its manifests' MAC from it, at ~/.ssh/secrets-backup-key on WSL alone, where they run. A key
+  # for those folders alone -- never the chezmoi key, nor the OmniRoute one.
   secretsBackup:
     recipient: 'age1j7lgwndd3r9vumhdeqquu9yhsyjxnp9frnguupf2dglwffcatugsx0f83u'
     privateKey: 'op://Private/secrets-backup.age/private key'

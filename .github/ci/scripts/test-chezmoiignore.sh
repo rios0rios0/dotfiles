@@ -21,6 +21,9 @@ BACKUP_SCRIPT=".local/bin/omniroute-backup"
 BACKUP_SERVICE=".config/systemd/user/omniroute-backup.service"
 BACKUP_TIMER=".config/systemd/user/omniroute-backup.timer"
 RESTORE_SCRIPT=".local/bin/omniroute-restore"
+SYNC_SCRIPT=".local/bin/secrets-sync"
+SYNC_SERVICE=".config/systemd/user/secrets-sync.service"
+SYNC_TIMER=".config/systemd/user/secrets-sync.timer"
 
 echo "[test-chezmoiignore] testing platform file inclusion logic..." >&2
 
@@ -333,6 +336,28 @@ check_platform "$ANDROID_OS" \
     --ignore-line "$BACKUP_SERVICE" \
     --ignore-line "$BACKUP_TIMER" \
     --ignore-line "$RESTORE_SCRIPT"
+
+# The home-secrets sync goes through the personal OneDrive, which WSL alone reaches; its script and
+# both units ship there and nowhere else.
+check_platform "$LINUX_OS" --kernel "$METAL_KERNEL" \
+    --ignore-line "$SYNC_SCRIPT" \
+    --ignore-line "$SYNC_SERVICE" \
+    --ignore-line "$SYNC_TIMER"
+
+check_platform "$LINUX_OS" --kernel "$WSL_KERNEL" \
+    --include-line "$SYNC_SCRIPT" \
+    --include-line "$SYNC_SERVICE" \
+    --include-line "$SYNC_TIMER"
+
+check_platform "$WINDOWS_OS" \
+    --ignore-line "$SYNC_SCRIPT" \
+    --ignore-line "$SYNC_SERVICE" \
+    --ignore-line "$SYNC_TIMER"
+
+check_platform "$ANDROID_OS" \
+    --ignore-line "$SYNC_SCRIPT" \
+    --ignore-line "$SYNC_SERVICE" \
+    --ignore-line "$SYNC_TIMER"
 
 # Docker Desktop's settings-store.json, merged by AppData/Roaming/Docker/modify_settings-store.json,
 # sits inside AppData, which only Windows keeps: deployed on Windows and nowhere else.

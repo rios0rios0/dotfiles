@@ -25,17 +25,19 @@ secrets_windows_path() {
 # Resolves the mirror setting $1 (.chezmoidata/secrets-backup.yaml, mirror) into
 # SECRETS_MIRROR_ROOT, the folder that holds one folder of archives per device, or explains in
 # SECRETS_MIRROR_ERROR why there is none. Globals rather than stdout, so a caller keeps the reason.
+# secrets-sync resolves its hub the same way: $2 is the folder under the personal OneDrive
+# (Backup/secrets by default) and $3 the setting the messages name.
 #
 # 'onedrive-personal' reads %OneDriveConsumer%, which only the personal account sets. %OneDrive%
 # names whichever account signed in last -- on a machine also signed in to a work account, that
 # one -- so it is never read: the archives would land in the employer's storage.
 secrets_mirror_resolve() {
-    local onedrive status=0
+    local onedrive status=0 folder="${2:-Backup/secrets}" setting="${3:-secretsBackup.mirror}"
     SECRETS_MIRROR_ROOT=""
     SECRETS_MIRROR_ERROR=""
     case "$1" in
         '')
-            SECRETS_MIRROR_ERROR="no mirror is configured (secretsBackup.mirror is empty)"
+            SECRETS_MIRROR_ERROR="no mirror is configured ($setting is empty)"
             return 1
             ;;
         /*)
@@ -53,10 +55,10 @@ secrets_mirror_resolve() {
                 SECRETS_MIRROR_ERROR="the personal OneDrive folder $onedrive does not exist"
                 return 1
             fi
-            SECRETS_MIRROR_ROOT="$onedrive/Backup/secrets"
+            SECRETS_MIRROR_ROOT="$onedrive/$folder"
             ;;
         *)
-            SECRETS_MIRROR_ERROR="secretsBackup.mirror is '$1', which is neither 'onedrive-personal', an absolute path nor empty"
+            SECRETS_MIRROR_ERROR="$setting is '$1', which is neither 'onedrive-personal', an absolute path nor empty"
             return 1
             ;;
     esac

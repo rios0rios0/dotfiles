@@ -45,6 +45,7 @@ make test-omniroute-stack           # the OmniRoute start on apply: every state 
 make test-omniroute-image           # the custom OmniRoute image pin: the switch from upstream, --check, --tag, and failed lookups leaving the pin untouched
 make test-secrets-backup            # the home-secrets backups: the archive and its round trip, the source allowlist, retention, the personal OneDrive mirror, the installer's gate
 make test-secrets-restore           # secrets-restore: a planted archive refused (outside the sources, an absolute path), the no-overwrite default, --force, per-source extraction, --device
+make test-secrets-sync              # secrets-sync between two devices: the join, changes, deletes, conflicts kept, current-context kept local, both guards, a planted snapshot refused, the MAC against openssl, the hub, the installer's gate
 make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the dependency install, the pinned bun (cache, verified download, fallbacks), the ~/.bun/bin fallback, the bun installer and its PATH block
 make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
 make test-yq                        # mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring
@@ -266,7 +267,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `home-agents`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `secrets-sync`, `home-agents`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -1189,16 +1190,17 @@ kept here and copied to the personal OneDrive. Setup and usage are in `.docs/sec
 | The daily archive and its copy off the machine | `dot_local/bin/executable_secrets-backup.tmpl`, run by `secrets-backup.timer` |
 | The restore | `dot_local/bin/executable_secrets-restore.tmpl` |
 | The OneDrive finder, the archive listing, the allowlist | `.chezmoitemplates/lib-secrets-backup.sh` |
-| The key | `~/.ssh/secrets-backup-key`, from 1Password's `secrets-backup.age` (run_before_linux-005); a key for these backups alone |
+| The key | `~/.ssh/secrets-backup-key`, from 1Password's `secrets-backup.age` (run_before_linux-005); a key for these folders alone, which their sync uses too |
 | The timer | `.chezmoiscripts/run_onchange_after_linux-018-setup-secrets-backup.sh.tmpl` enables it (WSL, systemd) |
 | Gate | `.chezmoiignore`: WSL only, where the personal OneDrive is reachable |
 
 **Keep these:**
 
-1. **A key of its own.** `secrets-backup.age` encrypts these backups alone -- never the chezmoi key,
-   nor the OmniRoute one -- so no key's loss or rotation strands another's archives. Its only copy
-   off the machine is the 1Password item, which `chezmoi apply` fetches; a lost key means lost
-   backups, so a generated-new one is never substituted.
+1. **A key of its own.** `secrets-backup.age` encrypts these folders alone -- these backups and
+   their sync (see "Home-Secrets Sync"), never the chezmoi key, nor the OmniRoute one -- so no key's
+   loss or rotation strands another's archives. Its only copy off the machine is the 1Password item,
+   which `chezmoi apply` fetches; a lost key means lost backups, so a generated-new one is never
+   substituted.
 2. **chezmoi never deletes unmanaged files, and this never re-adds them.** #276 left the folders on
    each machine but out of the repository; the backup only reads them. It is not the watcher reborn:
    no inotify, no `chezmoi add`, nothing written back into the source.
@@ -1218,6 +1220,72 @@ kept here and copied to the personal OneDrive. Setup and usage are in `.docs/sec
 
 `make test-secrets-backup` and `make test-secrets-restore` cover all of it against real `age` and a
 throwaway key, with Windows and the OneDrive stubbed; `make test-chezmoiignore` covers the gate.
+
+## Home-Secrets Sync
+
+The backups above keep each device's history; `secrets-sync` keeps the devices themselves in step.
+Every WSL device that has a tool's folder shares one copy of it -- the kubeconfigs in
+`~/.kube/config-files`, John's cracked hashes in `~/.john/john.pot`, sqlmap's targets in
+`~/.sqlmap/output` -- merged through the personal OneDrive without a server, and a delete on one
+device reaches the others. Usage and recovery are in `.docs/secrets-sync.md`.
+
+| Part | Where |
+|------|-------|
+| The tools, how each merges, the hub, the guards | `.chezmoidata/secrets-sync.yaml` |
+| The merge | `dot_local/bin/executable_secrets-sync.tmpl`, run hourly by `secrets-sync.timer` |
+| The hub | `%OneDriveConsumer%\Backup\sync\<tool>\<device>.tar.age`: one snapshot per tool and device |
+| What each device last synced, and the conflicts it kept | `~/.local/state/secrets-sync/<tool>/` and `~/.local/state/secrets-sync/conflicts/` |
+| The key | the home-secrets backup key, `~/.ssh/secrets-backup-key` |
+| The timer | `.chezmoiscripts/run_onchange_after_linux-020-setup-secrets-sync.sh.tmpl` enables it (WSL, systemd) |
+| Gate | `.chezmoiignore`: WSL only, beside the backups |
+
+**Keep these:**
+
+1. **No device writes another's file.** OneDrive has no locking: two devices rewriting one file
+   before it syncs leave `<name>-<COMPUTER>` behind, a silent fork. Each device writes only
+   `<tool>/<device>.tar.age` and merges on read, so the hub needs no lock and has no conflicts of its
+   own. A single shared file per tool is the one layout that cannot work.
+2. **A delete needs the base.** A union of snapshots brings every delete back. The base -- what this
+   device last synced -- turns "in the base, gone from the folder" into a tombstone, and tells a
+   device joining (no base: delete nothing) from one whose folder vanished (base full, folder gone:
+   refused). Deleting a base is how a device rejoins on purpose, never a fix for a refused run.
+3. **The newest change wins by modification time; a delete is dated just after the deleting device
+   last synced.** A machine restored from an old archive therefore takes the newer copies instead of
+   pushing its old ones out, and a delete beats every copy that existed when the device last saw the
+   entry but loses to a change it never saw. A local change that loses is kept under `conflicts/`, and
+   so is a concurrent change the winning device beat. Records compare by time, then live over delete,
+   then digest: a total order, so every device picks the same winner and they converge. A delete
+   that beat only the version it names would break that, since three records could then beat each
+   other in a circle.
+4. **Every manifest carries an HMAC keyed from the identity's secret half.** The recipient is public
+   (`.chezmoidata/age-keys.yaml`), so encryption alone would let anyone who can write to the OneDrive
+   plant a kubeconfig whose `exec` plugin runs on every device, or tombstones that empty them. A
+   snapshot that fails it is skipped, nothing of it is written, and the unit fails. The HMAC is
+   computed with `printf` and `sha256sum`, so the key never reaches a command line; every entry taken
+   is checked against its manifest's digest.
+5. **Lines a file keeps to itself never sync.** `kubectl config use-context` writes `current-context`
+   into the first file in `KUBECONFIG` that has one, which the shell's loader makes a
+   `config-files` file (verified: it rewrote that file, not `~/.kube/config`). Synced, a context
+   switch on one device would switch every device's cluster. `localLines` keeps those lines out of
+   every comparison and snapshot, and keeps a device's own when a newer copy arrives.
+6. **Both guards count what this device deletes.** A tool folder that vanished, and a run publishing
+   deletes of more than `maxDeletePercent` of a tool, stop until `--allow-deletes`. A delete another
+   device published passed that device's guard and is applied as it is: counting it again would make
+   every device repeat the flag.
+7. **`~/.kube/config`, `john.log` and the rest of `~/.sqlmap` stay per device**, in the backups.
+   `~/.kube/config`'s contexts sit on the machine's own loopback (Docker Desktop, kind). A tool syncs
+   on a device that has its folder (`~/.kube`, `~/.john`, `~/.sqlmap`), so a machine without John
+   never gets a `~/.john`. OmniRoute's database is one gateway's state and is not synced at all;
+   `omniroute-restore --device` moves the gateway.
+8. **The backups stay underneath.** A sync copies mistakes too; the dated archives are the way back.
+   A `secrets-restore --force` on a syncing device is merged by the next run, where newer copies on
+   the other devices win.
+9. **Tombstones are forgotten after `tombstoneDays`** (365): a device that has not synced for longer
+   can bring back what was deleted meanwhile.
+
+`make test-secrets-sync` covers 1 to 7 and 9 with two devices against one hub, real `age`, a
+throwaway key and openssl's HMAC; `make test-chezmoiignore` covers the gate, and
+`make test-wsl-systemd` the installer's systemd line.
 
 ## OpenCode V2 Through OmniRoute
 
@@ -1521,7 +1589,7 @@ import.
 
 ## systemd on WSL (Turned On by chezmoi)
 
-The SSH agent bridge, Ollama, and the OmniRoute and home-secrets backups run as systemd user units, and WSL boots a
+The SSH agent bridge, Ollama, the OmniRoute and home-secrets backups and the home-secrets sync run as systemd user units, and WSL boots a
 distribution with systemd only when `/etc/wsl.conf` has `systemd=true` under `[boot]`. Kali's WSL image ships no
 `/etc/wsl.conf`, so PID 1 is WSL's own `init`. `systemctl --user` then fails with `Failed to connect
 to user scope bus via local transport: No such file or directory` -- the socket it looks for in
@@ -1533,7 +1601,7 @@ Two halves make the fix automatic, and both are needed:
 | Half | Mechanism |
 |------|-----------|
 | Turn it on | `.chezmoiscripts/run_before_linux-000-enable-wsl-systemd.sh.tmpl` sets `systemd=true` under `[boot]` through sudo and says to restart WSL. It renders to nothing unless the kernel is WSL's and systemd is not PID 1, so it runs on every apply until WSL boots with systemd, and never after |
-| Finish what waited | Each installer that calls `systemctl` -- the bridge, Ollama, the OmniRoute and home-secrets backups, and Tailscale's bare-metal half -- renders `systemd running` or `systemd not running` into a comment. Without systemd it stopped early and exited 0, which chezmoi records as done; the line changing is what runs it again on the first apply after the restart |
+| Finish what waited | Each installer that calls `systemctl` -- the bridge, Ollama, the OmniRoute and home-secrets backups, the home-secrets sync, and Tailscale's bare-metal half -- renders `systemd running` or `systemd not running` into a comment. Without systemd it stopped early and exited 0, which chezmoi records as done; the line changing is what runs it again on the first apply after the restart |
 
 On a machine that boots without systemd: `chezmoi apply` writes the file and the installers warn;
 `wsl.exe --shutdown` and a new terminal start systemd; the next `chezmoi apply` sets up the bridge
@@ -1831,7 +1899,7 @@ writes. `.chezmoidata/age-keys.yaml` names each item and each key's public half:
 | chezmoi | `~/.ssh/chezmoi` | `chezmoi.age` | Linux/WSL and Windows: decrypts every `encrypted_*.age` file |
 | OmniRoute backups | `~/.ssh/omniroute-backup-key` | `omniroute-backup.age` | WSL alone, where `omniroute-backup` runs |
 | aisync | `~/.config/aisync/key.txt` | `aisync.age` | Linux/WSL and Android: decrypts aifiles, which the aisync hook pulls (see "AI Rules Sync") |
-| Home-secrets backups | `~/.ssh/secrets-backup-key` | `secrets-backup.age` | WSL alone, where `secrets-backup` runs (see "Home-Secrets Backups") |
+| Home-secrets backups | `~/.ssh/secrets-backup-key` | `secrets-backup.age` | WSL alone, where `secrets-backup` and `secrets-sync` run (see "Home-Secrets Backups" and "Home-Secrets Sync") |
 
 None is the SSH key that signs commits. The chezmoi files were encrypted to that key until
 2026-10-27; they are re-encrypted to `chezmoi.age` now, and that key still opens only the older
