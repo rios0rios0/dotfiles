@@ -1,197 +1,64 @@
-name: Validate Dotfiles
+name: 'Validate Dotfiles'
 
 on:
   pull_request:
-    branches: [main]
+    branches: [ 'main' ]
   push:
-    branches: [main]
+    branches: [ 'main' ]
 
 env:
   # Release installed by the test jobs below. Bump it here; the archive is verified
   # against the checksums file published with that release before it is installed.
   CHEZMOI_VERSION: '2.72.1'
 
-# Every job declares `permissions: contents: 'read'`: none needs more than to check out the
-# repository and run its tools, whatever the repository's default token. Per job, as in
-# checks.yaml, so a broader grant one job may need later never reaches the rest; a new job
-# declares its own, and CodeQL's missing-workflow-permissions check flags one that does not.
+# One pipeline, run as stages in order: code-check, security, tests, delivery. Every job of a
+# stage `needs:` every job of the stage before it, so a stage starts only once the previous
+# one has passed, and the jobs inside a stage run in parallel. It replaces 46 jobs that all
+# started at once (19 of them running together at the peak) and the separate `checks` and
+# `release` workflows, whose jobs now run here as the first and the last stage.
+#
+# `code-check > quality:basic-checks` runs on pull requests only, and GitHub skips every job
+# downstream of a skipped one -- transitively -- unless its `if:` calls a status function. So
+# each later stage is gated on `!cancelled() && !failure()`: it still runs when a job before it
+# was skipped by design, never when one failed, and never on a cancelled run.
+#
+# Each stage's work is one `make` target running one script: `make lint` in code-check, `make test`
+# in tests. Both run every linter or test even after one fails, and fail the job if any did. A new
+# test is a new `.github/ci/scripts/test-<name>.sh` (or `.ps1`), which `make test` finds by itself.
+# Both jobs run on ubuntu-24.04, the image Microsoft publishes a PowerShell package for, so the
+# PowerShell linter and the pwsh tests run beside the rest instead of in jobs of their own.
+#
+# Every job declares its own `permissions:`: none needs more than `contents: read` but the
+# release, so a broader grant one job needs never reaches the rest. CodeQL's
+# missing-workflow-permissions check flags a new job that declares none.
 jobs:
-  lint-shellcheck:
-    name: Lint (shellcheck)
-    runs-on: ubuntu-latest
+  # first stage
+  checks:
+    uses: 'rios0rios0/pipelines/.github/workflows/checks.yaml@main'
     permissions:
       contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install shellcheck
-        run: sudo apt-get install -y shellcheck
-      - name: Run shellcheck
-        run: make lint-shellcheck
 
-  lint-templates:
-    name: Lint (Go templates)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - uses: actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e # v7.0.0
-        with:
-          go-version: '1.26'
-          cache-dependency-path: .github/ci/cmd/tmplcheck/go.sum
-      - name: Download dependencies
-        working-directory: .github/ci/cmd/tmplcheck
-        run: go mod download
-      - name: Validate template syntax
-        run: make lint-templates
-
-  lint-python:
-    name: Lint (Python)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install ruff
-        run: |
-          pip install --only-binary :all: --require-hashes -r .github/ci/requirements.txt
-      - name: Lint embedded Python
-        run: make lint-python
-
-  lint-powershell:
-    name: Lint (PowerShell)
+  code_check-style_lint:
+    name: 'code-check > style:lint'
     # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
     # install step fails with 'Unable to locate package powershell' there.
-    runs-on: ubuntu-24.04
+    runs-on: 'ubuntu-24.04'
     permissions:
       contents: 'read'
     steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install PowerShell
-        run: |
-          sudo apt-get install -y wget apt-transport-https software-properties-common
-          source /etc/os-release
-          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
-          sudo dpkg -i packages-microsoft-prod.deb
-          rm packages-microsoft-prod.deb
-          sudo apt-get update
-          sudo apt-get install -y powershell
-      - name: Install PSScriptAnalyzer
-        run: pwsh -Command "Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser"
-      - name: Lint PowerShell scripts
-        run: make lint-powershell
-
-  lint-syntax:
-    name: Lint (YAML/JSON)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install tools
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - uses: 'actions/setup-go@b7ad1dad31e06c5925ef5d2fc7ad053ef454303e' # v7.0.0
+        with:
+          go-version: '1.26'
+          cache-dependency-path: '.github/ci/cmd/tmplcheck/go.sum'
+      - name: 'Install shellcheck, jq, ruff and yq'
         env:
           YQ_VERSION: '4.45.1'
         run: |
-          sudo apt-get install -y jq
+          sudo apt-get install -y shellcheck jq
+          pip install --only-binary :all: --require-hashes -r .github/ci/requirements.txt
           curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o yq "https://github.com/mikefarah/yq/releases/download/v${YQ_VERSION}/yq_linux_amd64"
           sudo install -m 0755 yq /usr/local/bin/yq
-      - name: Validate YAML/JSON syntax
-        run: make lint-syntax
-
-  test-template-render:
-    name: Test (template rendering)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install jq and zsh
-        run: sudo apt-get install -y jq zsh
-      - name: Test template rendering with mock op
-        run: make test-template-render
-
-  test-chezmoiignore:
-    name: Test (chezmoiignore logic)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Test platform file inclusion
-        run: make test-chezmoiignore
-
-  test-script-order:
-    name: Test (script ordering)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Verify script dependency order
-        run: make test-script-order
-
-  test-modify-scripts:
-    name: Test (modify scripts)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      # The JSON modify_ files are modify-templates, which only run inside chezmoi.
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install tools
-        run: 'sudo apt-get install -y jq'
-      - name: Test modify scripts
-        run: make test-modify-scripts
-
-  test-remove-dependencies:
-    name: Test (dependency removal)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test dependency removal library
-        run: make test-remove-dependencies
-
-  test-remove-dependencies-windows:
-    name: 'Test (dependency removal, Windows)'
-    # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
-    # install step fails with 'Unable to locate package powershell' there.
-    runs-on: 'ubuntu-24.04'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
       - name: 'Install PowerShell'
         run: |
           sudo apt-get install -y wget apt-transport-https software-properties-common
@@ -201,636 +68,27 @@ jobs:
           rm packages-microsoft-prod.deb
           sudo apt-get update
           sudo apt-get install -y powershell
-      - name: 'Test Windows dependency removal script'
-        run: 'make test-remove-dependencies-windows'
+      - name: 'Install PSScriptAnalyzer'
+        run: 'pwsh -Command "Install-Module -Name PSScriptAnalyzer -Force -Scope CurrentUser"'
+      - name: 'Download the template checker''s dependencies'
+        working-directory: '.github/ci/cmd/tmplcheck'
+        run: 'go mod download'
+      - name: 'Run every linter'
+        run: 'make lint'
 
-  test-install-dependencies-windows:
-    name: 'Test (dependency installer, Windows)'
-    # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
-    # install step fails with 'Unable to locate package powershell' there.
-    runs-on: 'ubuntu-24.04'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install PowerShell'
-        run: |
-          sudo apt-get install -y wget apt-transport-https software-properties-common
-          source /etc/os-release
-          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
-          sudo dpkg -i packages-microsoft-prod.deb
-          rm packages-microsoft-prod.deb
-          sudo apt-get update
-          sudo apt-get install -y powershell
-      - name: 'Test Windows dependency installer'
-        run: 'make test-install-dependencies-windows'
-
-  test-prune-tmp-modcache:
-    name: Test (TMPDIR module cache pruning)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test TMPDIR module cache pruning
-        run: make test-prune-tmp-modcache
-
-  test-shell-credentials:
-    name: Test (shell credentials)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install tools
-        run: sudo apt-get install -y jq zsh
-      - name: Test credential loading and removal
-        run: make test-shell-credentials
-
-  test-clipboard-shim:
-    name: Test (clipboard shim)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test the Claude Code clipboard shim
-        run: make test-clipboard-shim
-
-  test-nvm-resolution:
-    name: Test (NVM resolution)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install tools
-        run: sudo apt-get install -y zsh
-      - name: Test NVM version resolution
-        run: make test-nvm-resolution
-
-  test-install-nvm:
-    name: Test (Node.js LTS and npm install)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test the Node.js LTS and npm install
-        run: make test-install-nvm
-
-  test-claude-install:
-    name: Test (Claude Code native install)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test the Claude Code install
-        run: make test-claude-install
-
-  test-aisync-install:
-    name: Test (aisync install and self-update)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Test the aisync install and self-update
-        run: make test-aisync-install
-
-  test-zshrc-functions:
-    name: Test (zshrc functions)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install tools
-        run: sudo apt-get install -y zsh
-      - name: Test top-size, sentry-ds and rebuild-ocode
-        run: make test-zshrc-functions
-
-  test-sentry-setup:
-    name: Test (Sentry CLI setup)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Test the Sentry CLI version floor and setup
-        run: make test-sentry-setup
-
-  test-local-llm:
-    name: Test (local model server)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install jq
-        run: sudo apt-get install -y jq
-      - name: Test the local model server
-        run: make test-local-llm
-
-  test-opencode:
-    name: Test (OpenCode V2 through OmniRoute)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install jq
-        run: sudo apt-get install -y jq
-      - name: Test the OpenCode configuration
-        run: make test-opencode
-
-  test-tailscale:
-    name: Test (Tailscale)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install jq
-        run: sudo apt-get install -y jq
-      - name: Test the tailnet setup (tailscale-up)
-        run: make test-tailscale
-
-  test-atuin:
-    name: Test (Atuin)
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
-      - name: Install chezmoi
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: Install jq and sqlite3
-        run: sudo apt-get install -y jq sqlite3
-      - name: Test the shell history setup (Atuin)
-        run: make test-atuin
-
-  test-wsl-systemd:
-    name: 'Test (systemd on WSL)'
+  # second stage
+  security-sast_gitleaks:
+    name: 'security > sast:gitleaks'
     runs-on: 'ubuntu-latest'
     permissions:
       contents: 'read'
+    needs: [ 'checks', 'code_check-style_lint' ]
+    if: '!cancelled() && !failure()'
     steps:
       - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Test turning systemd on in WSL and the installers that wait for it'
-        run: 'make test-wsl-systemd'
-
-  test-statusline:
-    name: 'Test (Claude Code status line)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install jq'
-        run: 'sudo apt-get install -y jq'
-      - name: 'Test the Claude Code status line with and without a login'
-        run: 'make test-statusline'
-
-  test-claude-lsp:
-    name: 'Test (Claude Code language servers)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Test the language servers and the plugins that start them'
-        run: 'make test-claude-lsp'
-
-  test-omniroute-backup:
-    name: 'Test (OmniRoute encrypted backups)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Install age and jq'
-        run: 'sudo apt-get install -y age jq'
-      - name: 'Test the archive, its retention, the personal OneDrive mirror and the installer gate'
-        run: 'make test-omniroute-backup'
-
-  test-omniroute-restore:
-    name: 'Test (OmniRoute restore)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Install age, jq and sqlite3'
-        run: 'sudo apt-get install -y age jq sqlite3'
-      - name: 'Test the restore: the archive checks, .env and the key check (with the runner''s node), the volume'
-        run: 'make test-omniroute-restore'
-
-  test-omniroute-stack:
-    name: 'Test (OmniRoute start on apply)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Install jq'
-        run: 'sudo apt-get install -y jq'
-      - name: 'Test the start script in every state it can find, and its render gate'
-        run: 'make test-omniroute-stack'
-
-  test-omniroute-image:
-    name: 'Test (OmniRoute fork image pin)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Test the image pin updater and its failure paths'
-        run: 'make test-omniroute-image'
-
-  test-secrets-backup:
-    name: 'Test (home-secrets encrypted backups)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Install age'
-        run: 'sudo apt-get install -y age'
-      - name: 'Test the archive, its allowlist, retention, the personal OneDrive mirror and the installer gate'
-        run: 'make test-secrets-backup'
-
-  test-secrets-restore:
-    name: 'Test (home-secrets restore)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Install age'
-        run: 'sudo apt-get install -y age'
-      - name: 'Test the restore allowlist, the no-overwrite default and the per-source extraction'
-        run: 'make test-secrets-restore'
-
-  test-secrets-sync:
-    name: 'Test (home-secrets sync)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Install age'
-        run: 'sudo apt-get install -y age'
-      - name: 'Test the merge, deletes, conflicts, the guards, the MAC, the personal OneDrive hub and the installer gate'
-        run: 'make test-secrets-sync'
-
-  test-ocode:
-    name: 'Test (ocode fork build)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Test the ocode fork-builder and its bun provisioning'
-        run: 'make test-ocode'
-
-  test-terra-update:
-    name: 'Test (terra update)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Test the unattended terra update calls'
-        run: 'make test-terra-update'
-
-  test-yq:
-    name: 'Test (yq install)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Test the pinned install of mikefarah''s yq'
-        run: 'make test-yq'
-
-  test-chlog:
-    name: 'Test (chlog install)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Test the pinned install of chlog'
-        run: 'make test-chlog'
-
-  test-aifiles-sync:
-    name: 'Test (aisync hook)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Install age and jq'
-        run: 'sudo apt-get install -y age jq'
-      - name: 'Test the aisync hook that fills ~/.claude from aifiles'
-        run: 'make test-aifiles-sync'
-
-  test-export-keys:
-    name: 'Test (age key export, Linux)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Install age and jq'
-        run: 'sudo apt-get install -y age jq'
-      - name: 'Test the age keys fetched before every apply'
-        run: 'make test-export-keys'
-
-  test-export-key-windows:
-    name: 'Test (age key export, Windows)'
-    # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
-    # install step fails with 'Unable to locate package powershell' there.
-    runs-on: 'ubuntu-24.04'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install PowerShell'
-        run: |
-          sudo apt-get install -y wget apt-transport-https software-properties-common
-          source /etc/os-release
-          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
-          sudo dpkg -i packages-microsoft-prod.deb
-          rm packages-microsoft-prod.deb
-          sudo apt-get update
-          sudo apt-get install -y powershell
-      - name: 'Test the Windows age key export'
-        run: 'make test-export-key-windows'
-
-  test-op-wrapper:
-    name: 'Test (op retry, WSL)'
-    runs-on: 'ubuntu-latest'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Test the retry in front of op.exe'
-        run: 'make test-op-wrapper'
-
-  test-install-fonts-windows:
-    name: 'Test (font install, Windows)'
-    # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
-    # install step fails with 'Unable to locate package powershell' there.
-    runs-on: 'ubuntu-24.04'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install PowerShell'
-        run: |
-          sudo apt-get install -y wget apt-transport-https software-properties-common
-          source /etc/os-release
-          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
-          sudo dpkg -i packages-microsoft-prod.deb
-          rm packages-microsoft-prod.deb
-          sudo apt-get update
-          sudo apt-get install -y powershell
-      - name: 'Test the Windows font install'
-        run: 'make test-install-fonts-windows'
-
-  test-powershell-profile-windows:
-    name: 'Test (PowerShell profile, Windows)'
-    # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, so the
-    # install step fails with 'Unable to locate package powershell' there.
-    runs-on: 'ubuntu-24.04'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install PowerShell'
-        run: |
-          sudo apt-get install -y wget apt-transport-https software-properties-common
-          source /etc/os-release
-          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
-          sudo dpkg -i packages-microsoft-prod.deb
-          rm packages-microsoft-prod.deb
-          sudo apt-get update
-          sudo apt-get install -y powershell
-      - name: 'Test PowerShell 7''s profile from Windows Terminal'
-        run: 'make test-powershell-profile-windows'
-
-  test-home-agents:
-    name: 'Test (home AGENTS.md)'
-    # 24.04, not ubuntu-latest: Microsoft publishes no PowerShell package for 26.04 yet, and the
-    # Windows writer runs under pwsh.
-    runs-on: 'ubuntu-24.04'
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
-      - name: 'Install chezmoi'
-        run: |
-          cd "$(mktemp -d)"
-          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
-          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
-          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
-          sha256sum --check --ignore-missing checksums.txt
-          tar -xzf "$archive" chezmoi
-          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
-      - name: 'Install PowerShell'
-        run: |
-          sudo apt-get install -y wget apt-transport-https software-properties-common
-          source /etc/os-release
-          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
-          sudo dpkg -i packages-microsoft-prod.deb
-          rm packages-microsoft-prod.deb
-          sudo apt-get update
-          sudo apt-get install -y powershell
-      - name: 'Test the home AGENTS.md and its writers'
-        run: 'make test-home-agents'
-
-  sast:
-    name: SAST
-    runs-on: ubuntu-latest
-    permissions:
-      contents: 'read'
-    steps:
-      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
         with:
           fetch-depth: 0
-      - name: Install gitleaks
+      - name: 'Install gitleaks'
         env:
           GITLEAKS_VERSION: '8.24.0'
         run: |
@@ -838,5 +96,53 @@ jobs:
           tar -xzf gitleaks.tar.gz gitleaks
           sudo mv gitleaks /usr/local/bin/
           rm gitleaks.tar.gz
-      - name: Run gitleaks
-        run: gitleaks detect --source . --verbose
+      - name: 'Run gitleaks'
+        run: 'gitleaks detect --source . --verbose'
+
+  # third stage
+  tests-test_all:
+    name: 'tests > test:all'
+    # 24.04 for the PowerShell package, as `style:lint`: the `.ps1` tests and the Windows writer of
+    # the home AGENTS.md run under pwsh, and `make test` fails on CI rather than skip them.
+    runs-on: 'ubuntu-24.04'
+    permissions:
+      contents: 'read'
+    needs: [ 'security-sast_gitleaks' ]
+    if: '!cancelled() && !failure()'
+    steps:
+      - uses: 'actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1' # v7.0.1
+      - name: 'Install chezmoi'
+        run: |
+          cd "$(mktemp -d)"
+          archive="chezmoi_${CHEZMOI_VERSION}_linux_amd64.tar.gz"
+          base="https://github.com/twpayne/chezmoi/releases/download/v${CHEZMOI_VERSION}"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o "$archive" "$base/$archive"
+          curl -fsSL --proto '=https' --proto-redir '=https' --max-redirs 1 -o checksums.txt "$base/chezmoi_${CHEZMOI_VERSION}_checksums.txt"
+          sha256sum --check --ignore-missing checksums.txt
+          tar -xzf "$archive" chezmoi
+          sudo install -m 0755 chezmoi /usr/local/bin/chezmoi
+      - name: 'Install age, jq, sqlite3 and zsh'
+        run: 'sudo apt-get install -y age jq sqlite3 zsh'
+      - name: 'Install PowerShell'
+        run: |
+          sudo apt-get install -y wget apt-transport-https software-properties-common
+          source /etc/os-release
+          wget -q --max-redirect=0 "https://packages.microsoft.com/config/ubuntu/$VERSION_ID/packages-microsoft-prod.deb"
+          sudo dpkg -i packages-microsoft-prod.deb
+          rm packages-microsoft-prod.deb
+          sudo apt-get update
+          sudo apt-get install -y powershell
+      # test-omniroute-restore runs its key check under the runner image's own node; nothing
+      # here installs one.
+      - name: 'Run every test'
+        run: 'make test'
+
+  # fourth stage
+  release:
+    uses: 'rios0rios0/pipelines/.github/workflows/release.yaml@main'
+    needs: [ 'tests-test_all' ]
+    if: "!cancelled() && !failure() && github.event_name == 'push' && github.ref == 'refs/heads/main'"
+    # The release creates the tag and the GitHub Release; the called workflow can only narrow
+    # what this job grants.
+    permissions:
+      contents: 'write'

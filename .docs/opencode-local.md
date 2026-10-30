@@ -105,12 +105,12 @@ them, because they are somebody's session. The answer never decides whether the 
 the install stages the new binary beside the target and renames it into place, so the running
 session is not disturbed and keeps the binary it started with until it restarts. Answering no --
 or applying unattended, where nothing answers -- leaves the session alone and builds anyway, and
-an `ocode` started *while* the build runs is safe for the same reason. `make test-ocode` covers
+an `ocode` started *while* the build runs is safe for the same reason. `make test ONLY=ocode` covers
 every path of the prompt and the mid-build race.
 
 The `rebuild-ocode` zsh function runs the same script on demand, resolving it through
 `chezmoi source-path`, so a build can be caught up after pulling the fork checkout -- or when an
-apply found nothing to build -- without a whole apply. `make test-zshrc-functions` covers it.
+apply found nothing to build -- without a whole apply. `make test ONLY=zshrc-functions` covers it.
 
 ## The web UI on the tailnet
 
@@ -132,7 +132,7 @@ and it never uses Funnel. Both settings live in `.chezmoidata/opencode.yaml`, re
 **The port follows the channel.** The fork's service listens on
 `10000 + (<first 8 hex digits of the channel's SHA-1> mod 50000)`, and the build stamps the
 channel (`OPENCODE_CHANNEL=feat-provider-omniroute` in `run_after_linux-006-build-ocode.sh`), which
-gives 41320. Renaming the channel moves the port, so `make test-tailscale` recomputes it from the
+gives 41320. Renaming the channel moves the port, so `make test ONLY=tailscale` recomputes it from the
 build script and fails until `webPort` follows. A port pinned with `ocode service set port` needs a
 device override of `webPort` as well.
 
@@ -185,7 +185,7 @@ Remove it with `tailscale serve --tcp=41320 off`.
   the combo in its dashboard rather than adding anything here.
 - **Nothing at all is loaded.** V1 habits fail silently: the MCP field is `environment`, not
   `env`, and a key written as `${OMNIROUTE_API_KEY}` stays literal and fails authentication.
-  `make test-opencode` guards both by rendering the template on each platform and checking
+  `make test ONLY=opencode` guards both by rendering the template on each platform and checking
   every field, and `ocode debug config` shows what was actually loaded.
 
 ## References

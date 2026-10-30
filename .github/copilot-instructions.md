@@ -13,7 +13,9 @@ make test    # template rendering (mock op), .chezmoiignore logic, script order,
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
-Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-local-llm`, `make test-tailscale`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
+CI runs them as stages, in order, each starting only once the one before it has passed: code-check (`checks` and `style:lint`, which runs `make lint`), security (`sast:gitleaks`), tests (`test:all`, which runs `make test`) and, on pushes to `main`, delivery (`release`). Each task is one target and one script (`.github/ci/scripts/lint.sh`, `.github/ci/scripts/test.sh`); a new test is a new `.github/ci/scripts/test-<name>.sh` or `.ps1`, which `make test` finds by itself. See "The CI Pipeline (Linear Stages)" in `AGENTS.md`.
+
+Run a single check directly, e.g. `make lint ONLY=shellcheck`, `make test ONLY=template-render`, `make test ONLY=local-llm`, `make test ONLY=tailscale`, `make test ONLY=remove-dependencies`, `make test ONLY=remove-dependencies-windows`, `make test ONLY=install-dependencies-windows`, `make test ONLY=shell-credentials`, `make test ONLY=nvm-resolution`. Several run as `make test ONLY="yq chlog"`; the test names are the script names in `.github/ci/scripts` without `test-`.
 
 ## Working Effectively
 
@@ -98,8 +100,8 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** and **OCI CLI** (via pipx through `install_pipx_app`, one venv each; see "One Interpreter Per Python CLI" in `AGENTS.md`)
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
-  - **ruff** (Python linter, via Astral install script) — `make lint-python` runs it over any `PYEOF` heredoc in a `modify_*` file (none at present: the JSON merges are modify-templates)
-  - **yq** (mikefarah's, the one `make lint-syntax` and CI call as `yq eval`) — a pinned release binary, checked against its SHA-256, into `~/.local/bin`. Kali's apt `yq` is a different tool (kislyuk's Python wrapper around jq, with no `eval`) and is tombstoned; `install_yq` checks `~/.local/bin/yq`'s version rather than `command -v yq`, which would find the apt one and skip the install
+  - **ruff** (Python linter, via Astral install script) — `make lint ONLY=python` runs it over any `PYEOF` heredoc in a `modify_*` file (none at present: the JSON merges are modify-templates)
+  - **yq** (mikefarah's, the one `make lint ONLY=syntax` and CI call as `yq eval`) — a pinned release binary, checked against its SHA-256, into `~/.local/bin`. Kali's apt `yq` is a different tool (kislyuk's Python wrapper around jq, with no `eval`) and is tombstoned; `install_yq` checks `~/.local/bin/yq`'s version rather than `command -v yq`, which would find the apt one and skip the install
   - **aisync** ([`rios0rios0/aisync`](https://github.com/rios0rios0/aisync), via upstream install script, then `aisync self-update --force` on every installer run, as terra) — syncs AI assistant rules/agents/skills into `~/.claude/` and other AI assistant home directories; replaces the legacy `run_after_*-install-ai-rules.*` scripts. `run_after_linux-014-sync-aifiles.sh.tmpl` (and `run_after_android-008` on Termux) clones the private aifiles repository and pulls it after every apply -- pull only, never prompting, never failing the apply; on a device's first sync aifiles' copy wins after a backup to `$TMPDIR`. Never run a bare `aisync init` (it generates a new key) or `aisync source add` (it rewrites aifiles' committed `config.yaml`)
   - **ccswitch** ([`rios0rios0/ccswitch`](https://github.com/rios0rios0/ccswitch), Linux/WSL only) — monitors Claude Code usage and rotates between enrolled backup accounts when limits are exhausted; `dot_zshrc.tmpl` starts its monitor daemon and both `claude`/`claudex` run `ccswitch ensure` before launch
   - **Speedtest CLI** (Ookla, via packagecloud)
@@ -218,7 +220,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - `dot_scripts/`: User scripts deployed to `~/.scripts/`:
   - `linux-engineering-version-manager.sh`: Pyenv workarounds and `dev-use` shell wrapper for `dev project use`
   - `linux-engineering-detect-kube-config-files.sh`: Auto-loads kubeconfig files from `~/.kube/config-files/`
-  - `linux-engineering-op-loader.sh`: Centralized 1Password credential and workspace loader with 24h TTL cache, plus the prune helpers that remove entries deleted from the device note. **Invariants when editing:** (1) never prune on a failed fetch — a locked vault, missing `op`/`jq`, and a deleted field all look identical, so `_op_load_references` returns non-zero and callers must leave the environment untouched, or a brief outage would unset every credential; (2) `reload-credentials` bypasses the TTL with `_OP_RELOAD=1` rather than deleting the caches, because the fetch reads the outgoing cache to recognise credentials it exported; (3) the `dot_zshenv.tmpl` prune runs on every shell, so it stays guarded on a changed manifest (Termux's phantom-process budget makes forks costly). `make test-shell-credentials` covers all of this
+  - `linux-engineering-op-loader.sh`: Centralized 1Password credential and workspace loader with 24h TTL cache, plus the prune helpers that remove entries deleted from the device note. **Invariants when editing:** (1) never prune on a failed fetch — a locked vault, missing `op`/`jq`, and a deleted field all look identical, so `_op_load_references` returns non-zero and callers must leave the environment untouched, or a brief outage would unset every credential; (2) `reload-credentials` bypasses the TTL with `_OP_RELOAD=1` rather than deleting the caches, because the fetch reads the outgoing cache to recognise credentials it exported; (3) the `dot_zshenv.tmpl` prune runs on every shell, so it stays guarded on a changed manifest (Termux's phantom-process budget makes forks costly). `make test ONLY=shell-credentials` covers all of this
   - `linux-engineering-shell-credentials.sh`: Exports `cred:` fields from 1Password device note as env vars, records the names in the `_OP_CRED_NAMES` manifest, and unsets ones a later successful load no longer returns
   - `linux-engineering-workspace-aliases.sh`: Creates shell aliases from `ws:` fields on 1Password device note, records `_OP_WS_NAMES`, and removes ones a later successful load no longer returns
   - `android-patch-claude-code-tmpdir.sh`: Patches Claude Code for Termux compatibility (replaces hardcoded `/tmp` paths, symlinks system ripgrep)
@@ -367,7 +369,7 @@ This repository is a sync, not a bootstrapper. Deleting an `install_*()` functio
 1. Delete the `install_*()` function (or package-list entry) from the platform's `run_once_before_*-install-dependencies.*` script
 2. Add a `"<strategy>:<target>"` tombstone to `.chezmoiscripts/run_onchange_after_<platform>-*-remove-dependencies.*` for **every** platform that installed it, commenting the pull request that removed it (a commit hash from the feature branch changes when the branch is rebased)
 3. Add any orphaned config directory to `.chezmoiremove`
-4. Run `make test-remove-dependencies`, and `make test-remove-dependencies-windows` for the Windows script (needs `pwsh`)
+4. Run `make test ONLY=remove-dependencies`, and `make test ONLY=remove-dependencies-windows` for the Windows script (needs `pwsh`)
 
 Strategies: `apt`, `gh_extension`, `npm_global`, `path`, `pipx` (Linux/Android, defined in `.chezmoitemplates/lib-remove-dependencies.sh`); `npm_global`, `path`, `winget` (Windows, inline). `remove_path` refuses targets outside `$HOME` — never widen that guard, these scripts run unattended.
 
@@ -396,7 +398,7 @@ disappears from PATH when NVM moves to a new LTS major, with no error anywhere. 
 `install_nvm` passes `--reinstall-packages-from` the current version on an upgrade, and
 `dot_zshenv.tmpl` must resolve NVM's `default` alias chain to the same version the real `nvm` would —
 "newest installed" is wrong on any machine that also has a non-LTS Current release. Verify the binary
-is on PATH after installing rather than trusting the exit status. `make test-nvm-resolution` covers the
+is on PATH after installing rather than trusting the exit status. `make test ONLY=nvm-resolution` covers the
 resolver; see "NVM Resolution Must Agree With NVM" in `AGENTS.md`.
 
 ### Working with Encrypted Files

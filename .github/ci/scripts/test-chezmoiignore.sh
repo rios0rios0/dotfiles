@@ -368,7 +368,7 @@ check_managed "$ANDROID_OS" "$DOCKER_SETTINGS" no
 
 # The repository's AGENTS.md and CLAUDE.md are for agents working on the dotfiles; the first, 161 KB
 # of it, reached every home folder until it was ignored. ~/AGENTS.md is the agent guide the
-# write-home-agents scripts render instead, which make test-home-agents covers, and no ~/CLAUDE.md
+# write-home-agents scripts render instead, which make test ONLY=home-agents covers, and no ~/CLAUDE.md
 # exists; chezmoi manages neither anywhere.
 for os in "$LINUX_OS" "$WINDOWS_OS" "$ANDROID_OS"; do
     check_platform "$os" --ignore-line "AGENTS.md" --ignore-line "CLAUDE.md"
