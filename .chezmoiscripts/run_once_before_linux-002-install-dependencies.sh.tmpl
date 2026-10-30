@@ -863,24 +863,16 @@ install_atuin() {
 install_aisync() {
     if command -v aisync &>/dev/null; then
         echo "[configure-deps] aisync is already installed, skipping" >&2
-        return
+    else
+        run_remote_installer "aisync" "https://raw.githubusercontent.com/rios0rios0/aisync/main/install.sh" || return
     fi
 
-    local installer
-    local status
-
-    installer="$(mktemp)"
-    if ! curl -fsSL https://raw.githubusercontent.com/rios0rios0/aisync/main/install.sh -o "$installer"; then
-        echo "[configure-deps] ERROR: failed to download aisync installer" >&2
-        rm -f "$installer"
-        return 1
-    fi
-
-    bash "$installer"
-    status=$?
-    rm -f "$installer"
-
-    return "$status"
+    # Keep aisync itself up to date, as install_terra does with terra: the installer above runs
+    # only when aisync is missing, so without this a machine stays on the release it first got.
+    # `--force` skips the interactive prompt. ~/.local/bin, where install.sh puts it, is on PATH
+    # for this call, since a first install runs before any shell put it there.
+    PATH="$HOME/.local/bin:$PATH" aisync self-update --force ||
+        echo "[configure-deps] WARN: aisync self-update failed; continuing" >&2
 }
 
 # https://github.com/rios0rios0/autobump
