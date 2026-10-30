@@ -70,7 +70,7 @@ state, so removals must be declared explicitly:
 
 Available strategies: `apt`, `gh_extension`, `npm_global`, `path`, `pipx` (Linux/Android,
 in `.chezmoitemplates/lib-remove-dependencies.sh`) and `npm_global`, `path`, `winget`
-(Windows). Run `make test-remove-dependencies` after touching the removal library.
+(Windows). Run `make test ONLY=remove-dependencies` after touching the removal library.
 
 See [`.docs/dependency-lifecycle.md`](.docs/dependency-lifecycle.md) for the full
 rationale and the alternatives that were evaluated.

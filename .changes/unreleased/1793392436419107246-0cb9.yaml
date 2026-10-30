@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'changed the `Makefile` to one target per task: `make lint` runs every linter from one script (`.github/ci/scripts/lint.sh`, one function per linter, replacing the four `lint-*.sh` scripts) and `make test` every test from one runner (`.github/ci/scripts/test.sh`, which finds each `test-<name>.sh` and `test-<name>.ps1`), with `ONLY=` to run some of them (`make test ONLY="yq chlog"`), instead of 46 per-linter and per-test targets. Both keep going after a failure and fail at the end, and on CI a missing `pwsh` fails instead of skipping. A new test is a new script and nothing else'
+time: '2026-10-30T20:33:56.419048771Z'

@@ -22,11 +22,11 @@ env:
 # each later stage is gated on `!cancelled() && !failure()`: it still runs when a job before it
 # was skipped by design, never when one failed, and never on a cancelled run.
 #
-# Each stage's work is one `make` target: `make -k lint` in code-check, `make -k test` in tests.
-# `-k` keeps going after a failure, so one failing linter or test does not hide the rest, and the
-# job still fails. Both jobs run on ubuntu-24.04, the image Microsoft publishes a PowerShell package
-# for, so the PowerShell linter and the pwsh tests run beside the rest instead of in jobs of their
-# own.
+# Each stage's work is one `make` target running one script: `make lint` in code-check, `make test`
+# in tests. Both run every linter or test even after one fails, and fail the job if any did. A new
+# test is a new `.github/ci/scripts/test-<name>.sh` (or `.ps1`), which `make test` finds by itself.
+# Both jobs run on ubuntu-24.04, the image Microsoft publishes a PowerShell package for, so the
+# PowerShell linter and the pwsh tests run beside the rest instead of in jobs of their own.
 #
 # Every job declares its own `permissions:`: none needs more than `contents: read` but the
 # release, so a broader grant one job needs never reaches the rest. CodeQL's
@@ -74,7 +74,7 @@ jobs:
         working-directory: '.github/ci/cmd/tmplcheck'
         run: 'go mod download'
       - name: 'Run every linter'
-        run: 'make -k lint'
+        run: 'make lint'
 
   # second stage
   security-sast_gitleaks:
@@ -103,7 +103,7 @@ jobs:
   tests-test_all:
     name: 'tests > test:all'
     # 24.04 for the PowerShell package, as `style:lint`: the `.ps1` tests and the Windows writer of
-    # the home AGENTS.md run under pwsh, and skip without it, so the install proves itself below.
+    # the home AGENTS.md run under pwsh, and `make test` fails on CI rather than skip them.
     runs-on: 'ubuntu-24.04'
     permissions:
       contents: 'read'
@@ -132,11 +132,10 @@ jobs:
           rm packages-microsoft-prod.deb
           sudo apt-get update
           sudo apt-get install -y powershell
-          pwsh --version
       # test-omniroute-restore runs its key check under the runner image's own node; nothing
       # here installs one.
       - name: 'Run every test'
-        run: 'make -k test'
+        run: 'make test'
 
   # fourth stage
   release:

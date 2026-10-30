@@ -13,8 +13,8 @@ set -euo pipefail
 # CLAUDE.md of its own; the Windows one writes UTF-8 without a BOM and LF line endings, whatever
 # line endings its own checkout has. Whether chezmoi deploys the repository's AGENTS.md and
 # CLAUDE.md, that it deletes aisync's global instruction files, and the Claude Code setting that
-# reads AGENTS.md beside CLAUDE.md, are make test-chezmoiignore's, make test-aifiles-sync's and
-# make test-modify-scripts'.
+# reads AGENTS.md beside CLAUDE.md, are covered by the chezmoiignore,
+# aifiles-sync and modify-scripts tests.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPTS="$REPO_ROOT/.chezmoiscripts"

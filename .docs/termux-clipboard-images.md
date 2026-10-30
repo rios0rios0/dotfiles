@@ -146,7 +146,7 @@ file "$TMP"                                               # expect: PNG or JPEG 
 Point `CLAUDE_CLIPBOARD_DIRS` at a scratch directory to test the freshness window without
 touching the gallery.
 
-`make test-clipboard-shim` does all of that in CI, against a scratch directory and a 1x1 PNG
+`make test ONLY=clipboard-shim` does all of that in CI, against a scratch directory and a 1x1 PNG
 fixture, and `CLAUDE_CLIPBOARD_LIB` lets it point the scripts at the repository's copy of the
 library rather than an installed one. The suite covers both directions of the freshness
 window, the consumed marker, the `checkImage`-must-not-consume ordering, the override
@@ -165,5 +165,5 @@ precedence, and the agreement between `clipshot -s` and the shim.
 
 - `CLAUDE.md`, section "Clipboard Images on Termux (Ctrl+V)" for the condensed version
 - `dot_local/bin/executable_xclip`, `dot_local/bin/executable_clipshot`, `dot_local/lib/claude-clipboard.sh`
-- `.github/ci/scripts/test-clipboard-shim.sh`, run by `make test-clipboard-shim`
+- `.github/ci/scripts/test-clipboard-shim.sh`, run by `make test ONLY=clipboard-shim`
 - [Termux:API clipboard documentation](https://wiki.termux.com/wiki/Termux:API)

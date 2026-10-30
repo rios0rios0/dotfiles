@@ -158,7 +158,7 @@ function Invoke-FontInstall {
     }
 }
 
-# Dot-sourcing the script, as `make test-install-fonts-windows` does, stops here with the
+# Dot-sourcing the script, as `make test ONLY=install-fonts-windows` does, stops here with the
 # functions defined; running it installs what is missing.
 if ($MyInvocation.InvocationName -eq ".") { return }
 

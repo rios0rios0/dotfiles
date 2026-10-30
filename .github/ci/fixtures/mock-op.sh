@@ -3,7 +3,7 @@
 # Returns deterministic JSON fixtures based on the command and arguments
 #
 # POSIX `sh` (not `bash`): chezmoi fork/exec's this script during
-# `make test-template-render`, so the kernel reads the shebang directly.
+# `make test ONLY=template-render`, so the kernel reads the shebang directly.
 # Termux has `/bin/sh` (Android's mksh) and `/data/data/com.termux/files/usr/bin/bash`,
 # but no `/bin/bash` or `/usr/bin/env`. CI's Linux runner has `/bin/sh -> dash`.
 # Sticking to POSIX (`[ ]`, `=`, no arrays) keeps this fixture executable on both.

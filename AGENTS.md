@@ -11,53 +11,60 @@ The "build" is `chezmoi apply`. A CI pipeline validates templates, scripts, and 
 ## Quality Commands
 
 ```bash
-make lint                           # shellcheck, Go template syntax, Python, PowerShell, YAML/JSON
-make test                           # template rendering (mock op), .chezmoiignore logic, script order
-make sast                           # gitleaks + semgrep secret/code scanning
-make lint-shellcheck                # shell scripts only
-make lint-templates                 # Go template syntax only
-make test-template-render           # template rendering with mock 1Password
-make test-chezmoiignore             # platform file inclusion logic
-make test-script-order              # script dependency ordering
-make test-modify-scripts            # modify script (merge) behavior
-make test-remove-dependencies       # dependency removal library (tombstones, $HOME safety rail)
-make test-remove-dependencies-windows # Windows removal script, failed removals reported (needs pwsh)
-make test-install-dependencies-windows # Windows installer: detection by exact ID, failed installs reported (needs pwsh)
-make test-prune-tmp-modcache        # $TMPDIR Go module cache pruning ($TMPDIR safety rail)
-make test-shell-credentials         # 1Password credential/workspace loading and removal
-make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image paste)
-make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
-make test-install-nvm               # install_nvm: npm upgraded after the LTS, before the first global install; --reinstall-packages-from
-make test-claude-install            # Claude Code's native build: the launcher check, both failures, the verify and the npm tombstone
-make test-aisync-install            # install_aisync: the install when missing, the self-update on every run (as terra's), its failure only warning, none on Android
-make test-zshrc-functions           # top-size, sentry-ds and rebuild-ocode in dot_zshrc: arguments, sudo, the work store, completion, the resolved build script
-make test-sentry-setup              # the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds
-make test-local-llm                 # the local model server: its settings, the window its unit allocates, the installer's gate
-make test-opencode                  # OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference
-make test-tailscale                 # tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server, the ocode web UI and the Atuin server
-make test-atuin                     # Atuin: the pinned install, the client config per device, zsh after Oh My Zsh, the server's pin and port, zsh-histdb's removal, the login and the one-time history import on apply
-make test-wsl-systemd               # systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it
-make test-statusline                # Claude Code status line: with and without a login, no refresh without one, the token off argv
-make test-claude-lsp                # language servers and their plugins: pins, order, the regular profile, the first apply
-make test-omniroute-backup          # the OmniRoute stack's encrypted backups: the self-contained archive, retention, the personal OneDrive mirror, the empty-gateway guard, the installer's gate
-make test-omniroute-restore         # omniroute-restore: the archive allowlist, integrity and schema checks, .env from the archive or 1Password, the key check, the volume
-make test-omniroute-stack           # the OmniRoute start on apply: every state it finds, never creating the database, the render gate
-make test-omniroute-image           # the custom OmniRoute image pin: the switch from upstream, --check, --tag, and failed lookups leaving the pin untouched
-make test-secrets-backup            # the home-secrets backups: the archive and its round trip, the source allowlist, retention, the personal OneDrive mirror, the installer's gate
-make test-secrets-restore           # secrets-restore: a planted archive refused (outside the sources, an absolute path), the no-overwrite default, --force, per-source extraction, --device
-make test-secrets-sync              # secrets-sync between two devices: the join, changes, deletes, conflicts kept, current-context kept local, both guards, a planted snapshot refused, the MAC against openssl, the hub, the installer's gate
-make test-ocode                     # the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the dependency install, the pinned bun (cache, verified download, fallbacks), the ~/.bun/bin fallback, the bun installer and its PATH block
-make test-terra-update              # terra update in both installers carries TERRA_ASSUME_YES=true
-make test-yq                        # mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring
-make test-chlog                     # chlog from upstream's pinned tag: the go install, the skip, the replacement, the failures, the wiring
-make test-aifiles-sync              # the aisync hook: the first sync's backup, pull only, the unchanged no-op, failures only warning, both platforms
-make test-export-keys               # the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key, aisync's
-make test-export-key-windows        # the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh)
-make test-op-wrapper                # how chezmoi reaches op: the WSL wrapper's retry, a terminal's op untouched, each platform's config, no account list on Windows
-make test-install-fonts-windows     # the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh)
-make test-powershell-profile-windows # PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh)
-make test-home-agents               # the home guide (~/AGENTS.md): each platform's guide, its own writer, the writers in a sandbox home (Windows' under pwsh, skipped without it), no ~/CLAUDE.md
+make lint                       # every linter: shellcheck, Go template syntax, Python, PowerShell, YAML/JSON
+make lint ONLY=shellcheck       # the named linters only: shellcheck, templates, python, powershell, syntax
+make test                       # every test in .github/ci/scripts: test-<name>.sh with bash, test-<name>.ps1 with pwsh
+make test ONLY="yq chlog"       # the named tests only
+make sast                       # gitleaks + semgrep secret/code scanning
 ```
+
+Both runners keep going after a failure and fail at the end if anything did. Without pwsh the
+PowerShell linter and the `.ps1` tests are skipped on a workstation and fail on CI, where a skip
+would pass a job that checked nothing. A new test is a new script; nothing else lists the tests.
+
+| Test (`make test ONLY=<name>`) | What it covers |
+|---|---|
+| `template-render` | template rendering with mock 1Password |
+| `chezmoiignore` | platform file inclusion logic |
+| `script-order` | script dependency ordering |
+| `modify-scripts` | modify script (merge) behavior |
+| `remove-dependencies` | dependency removal library (tombstones, $HOME safety rail) |
+| `remove-dependencies-windows` | Windows removal script, failed removals reported (needs pwsh) |
+| `install-dependencies-windows` | Windows installer: detection by exact ID, failed installs reported (needs pwsh) |
+| `prune-tmp-modcache` | $TMPDIR Go module cache pruning ($TMPDIR safety rail) |
+| `shell-credentials` | 1Password credential/workspace loading and removal |
+| `clipboard-shim` | Claude Code clipboard shim (Ctrl+V image paste) |
+| `nvm-resolution` | NVM default-alias resolution in dot_zshenv |
+| `install-nvm` | install_nvm: npm upgraded after the LTS, before the first global install; --reinstall-packages-from |
+| `claude-install` | Claude Code's native build: the launcher check, both failures, the verify and the npm tombstone |
+| `aisync-install` | install_aisync: the install when missing, the self-update on every run (as terra's), its failure only warning, none on Android |
+| `zshrc-functions` | top-size, sentry-ds and rebuild-ocode in dot_zshrc: arguments, sudo, the work store, completion, the resolved build script |
+| `sentry-setup` | the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds |
+| `local-llm` | the local model server: its settings, the window its unit allocates, the installer's gate |
+| `opencode` | OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference |
+| `tailscale` | tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server, the ocode web UI and the Atuin server |
+| `atuin` | Atuin: the pinned install, the client config per device, zsh after Oh My Zsh, the server's pin and port, zsh-histdb's removal, the login and the one-time history import on apply |
+| `wsl-systemd` | systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it |
+| `statusline` | Claude Code status line: with and without a login, no refresh without one, the token off argv |
+| `claude-lsp` | language servers and their plugins: pins, order, the regular profile, the first apply |
+| `omniroute-backup` | the OmniRoute stack's encrypted backups: the self-contained archive, retention, the personal OneDrive mirror, the empty-gateway guard, the installer's gate |
+| `omniroute-restore` | omniroute-restore: the archive allowlist, integrity and schema checks, .env from the archive or 1Password, the key check, the volume |
+| `omniroute-stack` | the OmniRoute start on apply: every state it finds, never creating the database, the render gate |
+| `omniroute-image` | the custom OmniRoute image pin: the switch from upstream, --check, --tag, and failed lookups leaving the pin untouched |
+| `secrets-backup` | the home-secrets backups: the archive and its round trip, the source allowlist, retention, the personal OneDrive mirror, the installer's gate |
+| `secrets-restore` | secrets-restore: a planted archive refused (outside the sources, an absolute path), the no-overwrite default, --force, per-source extraction, --device |
+| `secrets-sync` | secrets-sync between two devices: the join, changes, deletes, conflicts kept, current-context kept local, both guards, a planted snapshot refused, the MAC against openssl, the hub, the installer's gate |
+| `ocode` | the ocode fork build: skip paths, rebuilds, the running-ocode prompt, the dependency install, the pinned bun (cache, verified download, fallbacks), the ~/.bun/bin fallback, the bun installer and its PATH block |
+| `terra-update` | terra update in both installers carries TERRA_ASSUME_YES=true |
+| `yq` | mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring |
+| `chlog` | chlog from upstream's pinned tag: the go install, the skip, the replacement, the failures, the wiring |
+| `aifiles-sync` | the aisync hook: the first sync's backup, pull only, the unchanged no-op, failures only warning, both platforms |
+| `export-keys` | the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key, aisync's |
+| `export-key-windows` | the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh) |
+| `op-wrapper` | how chezmoi reaches op: the WSL wrapper's retry, a terminal's op untouched, each platform's config, no account list on Windows |
+| `install-fonts-windows` | the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh) |
+| `powershell-profile-windows` | PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh) |
+| `home-agents` | the home guide (~/AGENTS.md): each platform's guide, its own writer, the writers in a sandbox home (Windows' under pwsh, skipped without it), no ~/CLAUDE.md |
 
 ## The CI Pipeline (Linear Stages)
 
@@ -67,19 +74,23 @@ it, so a stage starts only once the previous one has passed:
 
 | Stage | Jobs |
 |-------|------|
-| code-check | `checks / code-check > quality:basic-checks` (pull requests only), `code-check > style:lint` (`make -k lint`) |
+| code-check | `checks / code-check > quality:basic-checks` (pull requests only), `code-check > style:lint` (`make lint`) |
 | security | `security > sast:gitleaks` |
-| tests | `tests > test:all` (`make -k test`) |
+| tests | `tests > test:all` (`make test`) |
 | delivery | `release / delivery > release` (pushes to `main`; it cuts a release only for a bump commit) |
 
 **Keep these:**
 
-1. **One job per stage's work, not per linter or test.** Every test takes seconds -- all of them
+1. **One target and one script per task.** `make lint` runs `.github/ci/scripts/lint.sh`, one
+   function per linter, and `make test` runs `.github/ci/scripts/test.sh`, which finds every
+   `test-<name>.sh` and `test-<name>.ps1` beside it. A new test is a new script and a new linter a
+   new function; never a new `make` target or a list to keep in step.
+2. **One job per stage's work, not per linter or test.** Every test takes seconds -- all of them
    ran in about 40 s in a row on a workstation -- while a job pays for a runner, a checkout and its
    installs again; the 47 jobs this replaced all started at once, 19 of them running together.
    Lint and tests run on ubuntu-24.04, the image Microsoft publishes a PowerShell package for, so
    pwsh needs no job of its own.
-2. **Every later stage is gated on `!cancelled() && !failure()`.** The basic checks run on pull
+3. **Every later stage is gated on `!cancelled() && !failure()`.** The basic checks run on pull
    requests only, and GitHub skips every job downstream of a skipped one, transitively, unless its
    `if:` calls a status function. Never `!failure()` alone (a cancelled run would go on) and never
    `always()` (a failed one would).
@@ -134,7 +145,7 @@ behind the `.claude.json` failure that aborted every apply earlier in the same r
 to nothing when every data key is present, so chezmoi never executes it, and otherwise
 fails the apply before any installer with an instruction to run `chezmoi init`. **When adding
 a key under `data:` in `.chezmoi.yaml.tmpl`, add it to that guard's list too.**
-`make test-template-render` covers both directions. On Windows the guard also fails a config that
+`make test ONLY=template-render` covers both directions. On Windows the guard also fails a config that
 sets no `OP_ACCOUNT` or runs the old `op-retry.cmd` shim (see "1Password CLI Retry").
 
 ## 1Password Template Pattern
@@ -191,7 +202,7 @@ glues that line onto whatever the previous iteration emitted last. In the Window
 scripts, a `-}}` after the `warnf` turned a second `ssh:` entry into
 `Set-Content … -Force# read the SSH public key…`, which PowerShell reads as a parameter named
 `Force#` — only the last key was written. The fixture device note therefore carries **two**
-entries of every type, and `make test-template-render` checks those scripts line by line.
+entries of every type, and `make test ONLY=template-render` checks those scripts line by line.
 
 **Do not use `onepasswordItemFields`** — it only returns section-level fields and misses built-in properties like `"public key"` and `"private key"` on SSH Key items. The `onepassword` + `dict`/`set` pattern accesses all fields and chezmoi caches the underlying `op item get` call across all template files automatically.
 
@@ -214,7 +225,7 @@ Each successful load therefore writes the names it returned into `_OP_CRED_NAMES
 2. **Never delete the caches to force a reload.** `reload-credentials` sets `_OP_RELOAD=1` to bypass the TTL instead, because the fetch reads the outgoing cache to recognise credentials exported by revisions that wrote no manifest.
 3. **Keep the `.zshenv` prune off the hot path.** It runs on every shell, so it is guarded on a manifest that was both inherited *and* changed, and `_op_read_cache_names` returns through a global rather than command substitution — the Termux phantom-process budget makes avoidable forks expensive.
 
-`make test-shell-credentials` covers all of this against a mock `op`.
+`make test ONLY=shell-credentials` covers all of this against a mock `op`.
 
 ## 1Password CLI Retry (the Desktop App's Pipe Gap)
 
@@ -261,10 +272,10 @@ The retry and the missing account can go once 1Password keeps the pipe listening
 `account list`: two `op account list` calls back to back in one PowerShell both succeeding is the
 sign.
 
-`make test-op-wrapper` covers the WSL wrapper against stubbed `op.exe` and `sleep`, the config each
+`make test ONLY=op-wrapper` covers the WSL wrapper against stubbed `op.exe` and `sleep`, the config each
 platform renders, the `op` calls the templates deployed on Windows make on each platform (no
 `account list` and no `--account` on Windows), and that no template names the account itself;
-`make test-template-render` covers the guard.
+`make test ONLY=template-render` covers the guard.
 
 ## No Submodule Recursion on `chezmoi update`
 
@@ -313,7 +324,7 @@ Strategies live in `.chezmoitemplates/lib-remove-dependencies.sh` (shared by Lin
 
 A removal that leaves its target behind is reported (`WARN: failed to remove ...`), never counted as removed. The Windows handlers decide that by checking whether the package or path is still there, not by the uninstaller's exit code, which can be 0 when nothing was removed. The scripts still exit 0, so a failed removal is not retried until the tombstone list changes.
 
-`remove_path` refuses any target outside `$HOME` — these scripts run unattended, so never widen that guard. `make test-remove-dependencies` covers it, and `make test-remove-dependencies-windows` covers the Windows script (it needs `pwsh`, which CI installs).
+`remove_path` refuses any target outside `$HOME` — these scripts run unattended, so never widen that guard. `make test ONLY=remove-dependencies` covers it, and `make test ONLY=remove-dependencies-windows` covers the Windows script (it needs `pwsh`, which CI installs).
 
 See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-manager was evaluated and rejected (it cannot cover Windows-native or Termux).
 
@@ -339,7 +350,7 @@ from the file extension (`.json` has none), Windows has no `#!`, and the apply a
 `AppData/Roaming/Docker/modify_settings-store.json` to Docker Desktop's settings on Windows (see
 "Docker Desktop Settings").
 
-`make test-modify-scripts` runs each one through `chezmoi cat` in a sandbox, and fails when
+`make test ONLY=modify-scripts` runs each one through `chezmoi cat` in a sandbox, and fails when
 any `modify_` file that chezmoi resolves for Windows is not a modify-template.
 
 ## MCP Servers
@@ -420,7 +431,7 @@ choice Claude Code also keeps there, so an apply leaves it alone.
   plugins (`gopls-lsp`, `pyright-lsp`, `typescript-lsp`, `jdtls-lsp`) cover the navigation it
   offers.
 
-`make test-modify-scripts` covers what each platform gets, that mcp-hub receives the same list,
+`make test ONLY=modify-scripts` covers what each platform gets, that mcp-hub receives the same list,
 invariants 1 and 2 across every platform, and the retirements in 6.
 
 ## Claude Code Language Servers
@@ -469,16 +480,16 @@ are `#!/usr/bin/env node` scripts would hit the `bad interpreter` failure descri
 unverified on a device, which is why it is not attempted. Java's `jdtls-lsp` is left out: Eclipse
 JDT LS needs a Java 21 runtime and starts a JVM in every session that opens a `.java` file.
 
-`make test-claude-lsp` covers 1 and 3 to 7 against stubbed `go`, `npm` and `claude`, and the first
+`make test ONLY=claude-lsp` covers 1 and 3 to 7 against stubbed `go`, `npm` and `claude`, and the first
 apply's bash, which has to find GVM's newest Go and NVM's default Node on its own.
 
 ## Shared Install Library
 
 `.chezmoitemplates/lib-install-deps.sh` holds the install functions whose body is correct on both Linux/WSL and Android without a conditional: `command_exists`, `install_oh_my_zsh`, `install_sdkman`, `install_nvm`, `install_fly_cli`, `install_sentry_cli`, `install_neon_cli`, `install_chlog`, plus the `run_remote_installer` helper they use to download an installer script to a temp file and run it (never pipe `curl` into `bash`; without `pipefail` an HTTP error page runs silently). Both dependency installers pull it in with `{{ template "lib-install-deps.sh" }}`, which is the only reason the Linux installer is a `.sh.tmpl`.
 
-Keep platform-specific provisioning in the platform installers: apt repositories versus binary downloads (`gh`, `kubectl`), upstream install scripts versus source builds (`terra`, `dev-toolkit`, `aisync`), pyenv versus Termux's native Python. A function moves into the library only when the same body is right on both platforms. The library is pure bash (no template directives), so `make lint-shellcheck` lints it as a plain `.sh` file, and its messages use the `[install-deps]` prefix.
+Keep platform-specific provisioning in the platform installers: apt repositories versus binary downloads (`gh`, `kubectl`), upstream install scripts versus source builds (`terra`, `dev-toolkit`, `aisync`), pyenv versus Termux's native Python. A function moves into the library only when the same body is right on both platforms. The library is pure bash (no template directives), so `make lint ONLY=shellcheck` lints it as a plain `.sh` file, and its messages use the `[install-deps]` prefix.
 
-`install_chlog` builds chlog with `go install` from upstream's module, `github.com/luizjhonata/chlog`, at a pinned tag, stamping the version upstream's release builds carry so that a later run tells the pinned build from an older one, into `~/.local/bin` (GVM keeps only the newest Go on `PATH`). Not from the `rios0rios0/chlog` fork: it only adds a `.gitignore` change, and its `go.mod` still names upstream, so it cannot be installed under its own name. On Termux the local build is a `GOOS=android` binary, which needs no wrapper. `make test-chlog` covers it against a stubbed `go`.
+`install_chlog` builds chlog with `go install` from upstream's module, `github.com/luizjhonata/chlog`, at a pinned tag, stamping the version upstream's release builds carry so that a later run tells the pinned build from an older one, into `~/.local/bin` (GVM keeps only the newest Go on `PATH`). Not from the `rios0rios0/chlog` fork: it only adds a `.gitignore` change, and its `go.mod` still names upstream, so it cannot be installed under its own name. On Termux the local build is a `GOOS=android` binary, which needs no wrapper. `make test ONLY=chlog` covers it against a stubbed `go`.
 
 Oh My Zsh is installed with `--unattended` on both platforms, so the login shell is switched explicitly right after it, and only when the install succeeded: `usermod` on Linux, Termux's `chsh -s zsh` on Android. Every remote installer in the library (Oh My Zsh, SDKMAN, NVM) goes through `run_remote_installer`, which forwards extra arguments to the script; do not reintroduce `sh -c "$(curl ...)"`, because a failed download becomes an empty command that exits 0. On Termux `install_nvm` keeps the native `nodejs` package and only enables corepack; the check is on Termux's prefix, not on where `npm` resolves from, because WSL exposes Windows' `npm` through PATH interop.
 
@@ -503,7 +514,7 @@ Both dependency installers carry an `install_flutter`, and the two bodies are di
 
 ## yq Is mikefarah's, Not Kali's
 
-`make lint-syntax` and CI validate YAML with `yq eval`, the syntax of
+`make lint ONLY=syntax` and CI validate YAML with `yq eval`, the syntax of
 [mikefarah's yq](https://github.com/mikefarah/yq). Kali's apt package named `yq` is a different
 tool -- kislyuk's Python wrapper around jq (`yq 3.x`, shipping `xq` and `tomlq` too) -- which has
 no `eval`, so on a machine that took `yq` from apt every YAML file failed the lint whatever its
@@ -517,7 +528,7 @@ content.
 **Do not put `yq` back into the Linux apt list.** Termux's `yq` package is mikefarah's, so Android
 keeps it from apt, and Windows installs no yq at all. CI pins its own copy in
 `.github/workflows/validate.yaml`. To bump the installer's pin, take both builds' SHA-256 from the
-release's `checksums` file, whose columns `checksums_hashes_order` names. `make test-yq` covers the
+release's `checksums` file, whose columns `checksums_hashes_order` names. `make test ONLY=yq` covers the
 install against a stubbed `curl`, with the Python yq on PATH.
 
 ## One Interpreter Per Python CLI (pipx, Not pip)
@@ -610,7 +621,7 @@ Two halves keep it fixed, and both are needed:
 | The shell picks what NVM picks | `dot_zshenv.tmpl` follows the alias chain to a concrete version (with a hop budget, since `nvm alias` permits cycles), honours `system` by leaving PATH alone, and falls back to the newest installed version only when resolution genuinely fails |
 | An LTS bump carries the CLIs with it | `install_nvm` passes `--reinstall-packages-from` the current version, since a new major otherwise starts with an empty global tree. It is omitted on a first install, where `nvm current` prints `none`/`system` and nvm aborts on such a source |
 
-`make test-nvm-resolution` covers the resolver, including the exact shape that
+`make test ONLY=nvm-resolution` covers the resolver, including the exact shape that
 produced the bug: an LTS and a newer Current release installed side by side.
 
 ## npm Is the Latest, So Claude Code Is the Native Build (Linux)
@@ -645,8 +656,8 @@ the npm package. The package's postinstall is what copies the native binary over
 Android is unaffected: its Claude Code is the musl build behind the `claude` wrapper (see "Android
 Wrapper Timing"), and its Node is Termux's `nodejs`, whose npm `install_nvm` leaves alone.
 
-`make test-install-nvm` covers the npm upgrade on both branches and its order;
-`make test-claude-install` covers 2 and 3 against a stubbed installer.
+`make test ONLY=install-nvm` covers the npm upgrade on both branches and its order;
+`make test ONLY=claude-install` covers 2 and 3 against a stubbed installer.
 
 ## Important Timing Constraints
 
@@ -761,7 +772,7 @@ of the list would let the two answer differently on the same device, and `-s` wo
 diagnostic. Add a folder there, never in a consumer. The library returns the list through a global
 rather than stdout for the same fork-budget reason as `_op_read_cache_names`.
 
-`make test-clipboard-shim` drives the literal `xclip` command lines against a scratch
+`make test ONLY=clipboard-shim` drives the literal `xclip` command lines against a scratch
 `CLAUDE_CLIPBOARD_DIRS`, covering both directions of the freshness window, the consumed marker
 (including that `checkImage` must *not* consume, or the `saveImage` that always follows it would
 attach nothing), and the agreement between `clipshot -s` and the shim.
@@ -791,7 +802,7 @@ Log in with `sentry auth login`: the OAuth flow is a device code entered at a UR
 - **A token in the environment is dropped** (`SENTRY_AUTH_TOKEN`, `SENTRY_TOKEN`). The CLI prefers a stored login, but falls back to such a token whenever the store holds no valid one, so a fresh or logged-out work store would quietly run as whoever owns the token (verified: against an empty store, `sentry auth token` prints the exported one).
 - **The path is built inside the function, never kept in a variable.** Claude Code's tool calls get `.zshrc`'s functions but not its variables, and an empty `SENTRY_CONFIG_DIR` selects the default store, so a variable would turn `sentry-ds` into the personal account in exactly those calls.
 
-Its completion, `_sentry-ds`, runs Sentry's own `_sentry` with the same store: `_sentry` asks `sentry __complete` for org and project slugs, which would otherwise come from the personal account. `make test-zshrc-functions` covers all three.
+Its completion, `_sentry-ds`, runs Sentry's own `_sentry` with the same store: `_sentry` asks `sentry __complete` for org and project slugs, which would otherwise come from the personal account. `make test ONLY=zshrc-functions` covers all three.
 
 **The setup scripts hold the CLI at the floor `sentry-ds` needs.** An older CLI ignores `SENTRY_CONFIG_DIR` without a word, so `sentry-ds` would run on the personal login and `sentry-ds auth login` would replace it, and the dependency installers install the CLI only where none exists, never upgrading it. Both setup scripts therefore include `.chezmoitemplates/lib-sentry-cli.sh` and, before anything else, raise a CLI older than its `SENTRY_CLI_MIN_VERSION` (`0.47.0`), or one that reports no version, with `sentry cli upgrade`:
 
@@ -799,7 +810,7 @@ Its completion, `_sentry-ds`, runs Sentry's own `_sentry` with the same store: `
 - **A CLI that stays older fails the script**, unlike a failed `cli setup`, so chezmoi runs it again on the next apply instead of recording it as done. A machine with no CLI at all only gets a warning: `sentry-ds` then fails outright, on no account.
 - **Raising the floor is one edit.** It changes both rendered scripts, and that re-runs them on every machine. Do not move the check into `install_sentry_cli`: `lib-install-deps.sh` is rendered into both `run_once_` installers, so any edit there re-runs the whole 45-120 minute install on every machine.
 
-`make test-sentry-setup` covers the comparison, the upgrade and both failures on both platforms, plus the Linux script finding the CLI under NVM.
+`make test ONLY=sentry-setup` covers the comparison, the upgrade and both failures on both platforms, plus the Linux script finding the CLI under NVM.
 
 npm installs ship neither shell completions nor the agent skill, so `run_onchange_after_linux-007-setup-sentry-cli.sh.tmpl` and `run_onchange_after_android-006-setup-sentry-cli.sh.tmpl` run `sentry cli setup --no-modify-path` after the managed files are applied, with `SHELL` pinned to zsh (the CLI installs completions for the shell `SHELL` names, and the first Linux apply runs under bash). Three things about that command are easy to get wrong:
 
@@ -912,13 +923,13 @@ content.
     names a root `CLAUDE.md` or `AGENTS.md` (rios0rios0/aisync#213), and aifiles neither carries them
     nor lets an older aisync sync them, through `/CLAUDE.md` and `/AGENTS.md` in its `.aisyncignore`
     (rios0rios0/aifiles#36). Deleting the copies left behind, and whatever Claude Code's `/memory`
-    writes there, therefore never fights a pull. `make test-aifiles-sync` checks that those two are
+    writes there, therefore never fights a pull. `make test ONLY=aifiles-sync` checks that those two are
     the only such entries.
 
 The first sync on a new machine needs nothing by hand: the apply fetches the key, clones aifiles and
-pulls. To leave aifiles alone for one apply, set `SKIP_AIFILES_SYNC=1`. `make test-aifiles-sync`
+pulls. To leave aifiles alone for one apply, set `SKIP_AIFILES_SYNC=1`. `make test ONLY=aifiles-sync`
 covers the hook on both platforms against a stubbed aisync and a local bare remote,
-`make test-export-keys` the key, and `make test-script-order` that the hook runs after the Sentry
+`make test ONLY=export-keys` the key, and `make test ONLY=script-order` that the hook runs after the Sentry
 CLI's skill and the LSP plugins.
 
 ## The Home AGENTS.md
@@ -980,7 +991,7 @@ secrets; on Termux its paths, shebangs, C library and process budget; on Windows
    WSL, on the kernel, as `.chezmoiignore` does. Check a new fact there before adding it: the
    PowerShell aliases, `wsl.exe` re-parsing its arguments without `--exec`, and `bash -c` missing
    the toolchains were all measured, not recalled.
-4. **Keep it short.** Agents load it into their context, and `make test-home-agents` fails a
+4. **Keep it short.** Agents load it into their context, and `make test ONLY=home-agents` fails a
    rendering past 8 KB.
 5. **One home-level file, so nothing to keep in step.** What an agent should know everywhere goes in
    `.chezmoitemplates/home-agents.md`: never into a `~/CLAUDE.md`, and never back into aisync's
@@ -992,13 +1003,13 @@ secrets; on Termux its paths, shebangs, C library and process budget; on Windows
    entry under `cc-plugin-agents-md@builtin` is ignored there. Both platforms update Claude Code by
    themselves: Linux's native build, and the phone's through its wrapper.
 
-`make test-home-agents` covers each platform's guide (its facts and none of another platform's, its
+`make test ONLY=home-agents` covers each platform's guide (its facts and none of another platform's, its
 size, no unrendered action, no line that would end its here-doc or here-string), each platform
 running its own writer and no other, and the writers against a sandbox home: the Linux and Termux
 ones under bash, and the Windows one under pwsh from both an LF and a CRLF checkout, none of them
-writing a `~/CLAUDE.md`. `make test-modify-scripts` covers the Project instructions setting on both
-platforms, leaving every other plugin's entry alone; `make test-chezmoiignore` that no platform
-deploys the repository's `AGENTS.md` or `CLAUDE.md`; and `make test-aifiles-sync` that
+writing a `~/CLAUDE.md`. `make test ONLY=modify-scripts` covers the Project instructions setting on both
+platforms, leaving every other plugin's entry alone; `make test ONLY=chezmoiignore` that no platform
+deploys the repository's `AGENTS.md` or `CLAUDE.md`; and `make test ONLY=aifiles-sync` that
 `.chezmoiremove` deletes aisync's two global instruction files and nothing else of aisync's.
 
 ## Claude Code Look
@@ -1030,8 +1041,8 @@ the next apply sets them back, with a `[claude-settings]` line naming each one.
    `~/.claude.json`. `dot_claude/modify_settings.json` branches on the platform: the look on
    Linux, the permission rules and `effortLevel` on Android as before -- Linux never had them.
 
-`make test-modify-scripts` covers every merge and the byte-for-byte passthroughs;
-`make test-chezmoiignore` covers which platform gets which file; `make test-statusline`
+`make test ONLY=modify-scripts` covers every merge and the byte-for-byte passthroughs;
+`make test ONLY=chezmoiignore` covers which platform gets which file; `make test ONLY=statusline`
 covers the script with and without a login, including 1 and 2, against stubbed `curl` and
 `mkdir`.
 
@@ -1075,7 +1086,7 @@ Ollama serves `.chezmoidata/local-llm.yaml`'s model from each Linux machine's NV
 5. **Device overrides are laid over key by key.** sprig's `merge` and `mergeOverwrite` both count `false` as empty, so a device's `enabled: false` would lose to the default `true`; `lib-local-llm.tmpl` uses `set` per key instead.
 6. **Ollama binds IPv4 loopback, and the specific address is load-bearing on WSL.** The family of the listening socket decides the family WSL's localhost forwarding publishes on the Windows side: a dual-stack `0.0.0.0` bind appears there on `::1` alone, and Docker Desktop -- which reaches this machine as `host.docker.internal`, dialing Windows' IPv4 loopback -- gets connection refused, surfacing as a 502 on every local GPU request through OmniRoute. `127.0.0.1` publishes Windows' `127.0.0.1`, so the container connects. Tailscale needs no change either way: Windows' client forwards to `localhost:11434`, which names both families. The API has no authentication, so on WSL every Windows-side process can run inference and pull or delete models; keep the tailnet share to devices you trust.
 
-`make test-local-llm` covers 1, 3, 5, the installer's render gate and a stubbed end-to-end run of it (nothing loaded, the invocation filter, the busy-GPU warning, and both failure logs); `make test-chezmoiignore` covers the gate per platform. Ollama and its models live under `$HOME`, so removing the server means `path:` tombstones for `.local/share/ollama` and `.ollama`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service` and `~/.local/bin/ollama`.
+`make test ONLY=local-llm` covers 1, 3, 5, the installer's render gate and a stubbed end-to-end run of it (nothing loaded, the invocation filter, the busy-GPU warning, and both failure logs); `make test ONLY=chezmoiignore` covers the gate per platform. Ollama and its models live under `$HOME`, so removing the server means `path:` tombstones for `.local/share/ollama` and `.ollama`, disabling the user unit, and `.chezmoiremove` entries for `~/.config/systemd/user/ollama.service` and `~/.local/bin/ollama`.
 
 ## The OmniRoute Fork Image
 
@@ -1127,7 +1138,7 @@ stack is run from the checkout, and the digest in `compose.yaml` is what decides
    the start on apply then name a refused login rather than `offline?` (`omniroute_pull_failure` in
    `lib-omniroute.sh`); on 2026-10-28 it was a device note's `docker:` entry for an expired token.
 
-`make test-omniroute-image` covers 1 and the failures -- the first switch away from the official
+`make test ONLY=omniroute-image` covers 1 and the failures -- the first switch away from the official
 image, `--check` in both directions, `--tag`, a file with no recognised digest, and every failed
 lookup leaving the pin untouched -- against stubbed `gh` and `docker`.
 
@@ -1196,10 +1207,10 @@ An archive, `omniroute-<UTC stamp>.tar.age`, is age-encrypted to the backup key 
 
 Restoring another device's archive makes it this machine's database: `omniroute-restore --device
 <name>` reads that device's folder, and the first backup afterwards goes to this device's own.
-`make test-omniroute-backup` covers the members, the allowlist, the mirror and its retention, 2 and
-3, and the installer; `make test-omniroute-restore` covers 1 and 5 against real `age`, `tar` and
+`make test ONLY=omniroute-backup` covers the members, the allowlist, the mirror and its retention, 2 and
+3, and the installer; `make test ONLY=omniroute-restore` covers 1 and 5 against real `age`, `tar` and
 `sqlite3`, with the key check run under the host's `node`, plus a fenced `.env` and a refused pull;
-`make test-omniroute-stack` covers 4 and 6, and a refused pull.
+`make test ONLY=omniroute-stack` covers 4 and 6, and a refused pull.
 
 ## Home-Secrets Backups
 
@@ -1243,8 +1254,8 @@ kept here and copied to the personal OneDrive. Setup and usage are in `.docs/sec
    `mirrorKeep` / `mirrorMonthly` retention as the OmniRoute mirror. WSL only, so the units and the
    `~/.local/bin` scripts are gated to WSL beside the OmniRoute ones in `.chezmoiignore`.
 
-`make test-secrets-backup` and `make test-secrets-restore` cover all of it against real `age` and a
-throwaway key, with Windows and the OneDrive stubbed; `make test-chezmoiignore` covers the gate.
+`make test ONLY=secrets-backup` and `make test ONLY=secrets-restore` cover all of it against real `age` and a
+throwaway key, with Windows and the OneDrive stubbed; `make test ONLY=chezmoiignore` covers the gate.
 
 ## Home-Secrets Sync
 
@@ -1308,9 +1319,9 @@ device reaches the others. Usage and recovery are in `.docs/secrets-sync.md`.
 9. **Tombstones are forgotten after `tombstoneDays`** (365): a device that has not synced for longer
    can bring back what was deleted meanwhile.
 
-`make test-secrets-sync` covers 1 to 7 and 9 with two devices against one hub, real `age`, a
-throwaway key and openssl's HMAC; `make test-chezmoiignore` covers the gate, and
-`make test-wsl-systemd` the installer's systemd line.
+`make test ONLY=secrets-sync` covers 1 to 7 and 9 with two devices against one hub, real `age`, a
+throwaway key and openssl's HMAC; `make test ONLY=chezmoiignore` covers the gate, and
+`make test ONLY=wsl-systemd` the installer's systemd line.
 
 ## OpenCode V2 Through OmniRoute
 
@@ -1329,11 +1340,11 @@ OpenCode runs on the OmniRoute gateway: `dot_config/opencode/opencode.json.tmpl`
 
 1. **`{env:VAR}` is load-time substitution; a `${VAR}` key is a silent 401.** OpenCode expands `{env:...}` and `{file:...}` anywhere in the document when it loads it, and `${...}` only inside a provider's `settings.baseURL`. Measured against the live gateway: with `${OMNIROUTE_API_KEY}` as the apiKey, discovery returns no models at all; with `{env:OMNIROUTE_API_KEY}`, the key's whole catalog.
 2. **The model list is discovered, and the key policy is the source of truth.** `/v1/models` serves the ids the key's rules allow, so the repository holds no list to drift; allow a model in OmniRoute's dashboard, never here. The plugin drops `type: "image"` rows, keeps `context_length` as the window and `capabilities.tool_calling` as tool support; measured: 158 chat models of the key's 162 rows. It also turns `capabilities.effort_tiers` into the model's variants, which is why `local-services/omniroute/compose.yaml` sets `OMNIROUTE_DISABLE_THINKING_LEVEL_VARIANTS`: the `<model>-<tier>` rows OmniRoute adds by default listed every reasoning model once more per tier. A dashboard override of that flag wins over the Compose value.
-3. **The MCP field is `environment`.** V2 reads `environment` on a local MCP server; an `env` key is ignored with no diagnostic, and the variable silently never reaches the server. `make test-opencode` asserts `environment` and the absence of `env` on every server.
+3. **The MCP field is `environment`.** V2 reads `environment` on a local MCP server; an `env` key is ignored with no diagnostic, and the variable silently never reaches the server. `make test ONLY=opencode` asserts `environment` and the absence of `env` on every server.
 4. **The `dotfiles` reference is absolute on purpose.** A local reference path resolves against the config document's directory unless absolute; the template renders `{{ .chezmoi.sourceDir }}`, so a session reads the actual dotfiles checkout (usually `~/.local/share/chezmoi`).
 5. **Permissions are V2 ordered entries** (`{action, resource, effect}`), the same allowances as the Claude Code side; what the list does not allow, the TUI still asks for.
 
-`make test-opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json` and `cli.json` -- not for the directory itself, where OpenCode keeps files of its own, including the aisync-synced rules, agents, commands and skills.
+`make test ONLY=opencode` covers all of it without OpenCode or a gateway running: it renders the template on both platforms, parses the JSONC, and checks the provider, defaults, MCP server shape, reference, instructions and permissions. Removing the feature means `.chezmoiremove` entries for `~/.config/opencode/opencode.json` and `cli.json` -- not for the directory itself, where OpenCode keeps files of its own, including the aisync-synced rules, agents, commands and skills.
 
 ### The Fork Build (`ocode`)
 
@@ -1416,7 +1427,7 @@ does, and fails rather than rewrite the lockfile of somebody's checkout. Lifecyc
 on: the root `postinstall` restores the execute bit on node-pty's prebuilt `spawn-helper`. An
 unchanged apply still runs neither.
 
-`make test-ocode` covers the checkout the builder obtains itself (the clone onto the fork's
+`make test ONLY=ocode` covers the checkout the builder obtains itself (the clone onto the fork's
 branch and the remote layout it leaves, the branch switch, the branch created from the fork's
 remote-tracking one under whichever remote's URL is the fork's -- a plain clone's `origin` behind
 `github.com-mine` included -- the fetch over HTTPS when that remote never fetched it, a failed
@@ -1435,7 +1446,7 @@ wiring and the PATH block per platform.
 `chezmoi apply` is not the only way to run the build: the `rebuild-ocode` zsh function (Linux
 only) resolves the same script through `chezmoi source-path` and runs it, so a build can be
 caught up after pulling the checkout, or when an apply found nothing to build, without a whole
-apply. `make test-zshrc-functions` covers it.
+apply. `make test ONLY=zshrc-functions` covers it.
 
 ## Tailscale
 
@@ -1511,7 +1522,7 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
     Funnel, to `localhost` on WSL and `127.0.0.1` on bare metal -- so the service keeps listening
     on loopback, and `ocode service set hostname 0.0.0.0`, which would open the port to the Wi-Fi
     network, is not needed. The fork derives the service's port from the channel the build stamps,
-    so `webPort` has to follow `OPENCODE_CHANNEL` in the build script, which `make test-tailscale`
+    so `webPort` has to follow `OPENCODE_CHANNEL` in the build script, which `make test ONLY=tailscale`
     checks. A phone pairs with `ocode pair --url http://<machine>.<tailnet>.ts.net:<webPort>`, the
     one way a reachable host gets into the one-time link and its QR code. The 30-day session that
     grants is signed with the service's password, which the service keeps across restarts, so
@@ -1526,8 +1537,8 @@ What the Linux client leaves behind on WSL is root's, so no tombstone reaches it
 drops the repository. Delete that machine in the admin console too, so that Windows' node can
 take its name.
 
-`make test-tailscale` covers 1 to 7, 9 and 11 against stubs of both clients, `systemctl` and `sudo`,
-and the removal on WSL alone; `make test-chezmoiignore` covers the gates.
+`make test ONLY=tailscale` covers 1 to 7, 9 and 11 against stubs of both clients, `systemctl` and `sudo`,
+and the removal on WSL alone; `make test ONLY=chezmoiignore` covers the gates.
 
 ## Shell History (Atuin)
 
@@ -1606,10 +1617,10 @@ database the repository carried as encrypted files that nothing ever committed a
 16. **Atuin 18.24.2 keeps its data in `~/.atuin/data/`** (`history.db`, `key`, `meta.db`), not in
     `~/.local/share/atuin` as older releases did.
 
-`make test-atuin` covers 2 and 4 to 16, and the pinned install against a stubbed `curl`, with
+`make test ONLY=atuin` covers 2 and 4 to 16, and the pinned install against a stubbed `curl`, with
 the login and the import run against stubbed `atuin` and `op` and a zsh-histdb database built with
-`sqlite3`; `make test-tailscale` covers the share on the server's device alone;
-`make test-chezmoiignore` the platforms; `make test-script-order` that the login comes before the
+`sqlite3`; `make test ONLY=tailscale` covers the share on the server's device alone;
+`make test ONLY=chezmoiignore` the platforms; `make test ONLY=script-order` that the login comes before the
 import.
 
 ## systemd on WSL (Turned On by chezmoi)
@@ -1651,7 +1662,7 @@ and Ollama, pulling the model. Tailscale does not wait: on WSL its client is Win
 5. **Expected failures are warnings.** A refused sudo or a distribution without systemd installed
    exits 0: this runs before every installer, where a non-zero exit would stop the whole apply.
 
-`make test-wsl-systemd` covers the render gate, the merge, both restart messages, and the systemd
+`make test ONLY=wsl-systemd` covers the render gate, the merge, both restart messages, and the systemd
 line in every installer that calls `systemctl`, which also catches a new one that lacks it.
 
 ## Claude Code Voice Input (WSL)
@@ -1759,7 +1770,7 @@ know. On a machine with the Store build every commit failed with `cannot exec
 through the bridge. Signing now needs the bridge, so until WSL boots with systemd, `git commit`
 fails with `Couldn't get agent socket`. Windows' own Git keeps 1Password's `op-ssh-sign.exe`,
 found with `lookPath` -- the Store build's alias is on `PATH` -- and otherwise under Program Files
-or in the per-user install, whichever exists. `make test-template-render` covers each
+or in the per-user install, whichever exists. `make test ONLY=template-render` covers each
 platform's signer and allowed-signers file.
 
 ## Windows Package Detection (winget list, Not export)
@@ -1776,7 +1787,7 @@ GIMP, Codex, yq, ShellCheck, the Copilot CLI and the EA app -- so every run inst
 | `msstore:<id>` names a Microsoft Store app | Spotify is `msstore:9NCBCSZSJRSB`: the Store edition is what the machine had, and the `Spotify.Spotify` installer refuses to run beside it (exit code 29, logged as `A Windows Store install of Spotify is already on the system`). winget matches a Store app to its ID only when asked in the `msstore` source |
 | A failed install is a `WARN`, never "installed successfully" | The script prints winget's exit code and ends with the list of everything that failed, RustDesk included. It still exits 0, because a failing `run_once_before_` script aborts the apply before any file is written; the cost is that a failed package is retried only when the script changes |
 
-`make test-install-dependencies-windows` runs `Install-PackageList` against a stubbed `winget`.
+`make test ONLY=install-dependencies-windows` runs `Install-PackageList` against a stubbed `winget`.
 
 ## Windows Fonts (Per User, Before Every Apply)
 
@@ -1792,7 +1803,7 @@ later load without administrator rights.
 | A failed download warns and exits 0 | The next apply retries it anyway, so it never stops an apply |
 | Never `New-Item -Force` on the `HKCU` fonts key | On an existing registry key it recreates the key, dropping every other font registered there |
 
-`make test-install-fonts-windows` covers it under pwsh, with the downloads and the registry stubbed.
+`make test ONLY=install-fonts-windows` covers it under pwsh, with the downloads and the registry stubbed.
 
 ## PowerShell Profile (Oh My Posh)
 
@@ -1815,7 +1826,7 @@ A PowerShell 7 started outside Windows Terminal -- VS Code's terminal, `pwsh` ty
 shell -- reads only the Documents profile and starts without Oh My Posh; give that launcher the
 same arguments.
 
-`make test-powershell-profile-windows` runs the command line from `settings.json` in a child pwsh
+`make test ONLY=powershell-profile-windows` runs the command line from `settings.json` in a child pwsh
 against a scratch home: Oh My Posh's init gets the theme's path and its output lands in the session,
 and a machine without Oh My Posh starts with no error.
 
@@ -1849,8 +1860,8 @@ and a machine without Oh My Posh starts with no error.
    `sparseVhd` applies to distributions created afterwards; an existing one is made sparse with
    `wsl.exe --manage <distro> --set-sparse true` while WSL is stopped.
 
-`make test-modify-scripts` covers the merge (a new file, the app's file passing through, a value
-set back with every other line kept, a BOM kept, a UTF-16 file left alone); `make test-chezmoiignore`
+`make test ONLY=modify-scripts` covers the merge (a new file, the app's file passing through, a value
+set back with every other line kept, a BOM kept, a UTF-16 file left alone); `make test ONLY=chezmoiignore`
 covers that only Windows gets it.
 
 ## Docker Desktop Settings (Windows)
@@ -1887,8 +1898,8 @@ reinstall in October 2026.
    and keeps it on Windows, where Windows Terminal's settings deploy from it too, so the file needs
    no rule of its own.
 
-`make test-modify-scripts` covers the merge (a new file, a file passing through byte for byte, the
-other keys and distributions kept, invalid JSON failing); `make test-chezmoiignore` resolves the
+`make test ONLY=modify-scripts` covers the merge (a new file, a file passing through byte for byte, the
+other keys and distributions kept, invalid JSON failing); `make test ONLY=chezmoiignore` resolves the
 whole source state per platform with `chezmoi managed` and finds the file on Windows alone.
 
 ## RustDesk on Windows (GitHub Release, Not winget)
@@ -1966,8 +1977,8 @@ public key in `age-keys.yaml`, and re-encrypt what the old key protected: for th
 each `encrypted_*.age` through `age -d -i <old> | age -e -a -r <new>` and check the new file
 decrypts to the same SHA-256. The next apply on each machine replaces the key file by itself.
 
-`make test-export-keys` covers the Linux script against a stubbed `op.exe`, and
-`make test-export-key-windows` the Windows one under pwsh.
+`make test ONLY=export-keys` covers the Linux script against a stubbed `op.exe`, and
+`make test ONLY=export-key-windows` the Windows one under pwsh.
 
 <!-- chlog:start -->
 ## Changelog (chlog) — MANDATORY

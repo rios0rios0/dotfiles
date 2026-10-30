@@ -266,8 +266,8 @@ archive's credentials, the restore stops: move that `.env` aside to use the arch
 Restoring another device's archive makes that database this machine's: its next backups go to this
 device's folder. The Ollama provider addresses and API keys are the other device's, so check them in
 the dashboard, and that `cred:OMNIROUTE_API_KEY` on this device's 1Password note is a key the restored
-database knows. `make test-omniroute-backup`, `make test-omniroute-restore` and
-`make test-omniroute-stack` cover the archive and its mirror, the restore, and the start on apply.
+database knows. `make test ONLY=omniroute-backup`, `make test ONLY=omniroute-restore` and
+`make test ONLY=omniroute-stack` cover the archive and its mirror, the restore, and the start on apply.
 
 ### Recover from an old Docker Desktop disk
 

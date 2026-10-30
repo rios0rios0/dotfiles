@@ -78,8 +78,8 @@ them before the generic ones.
 - **`.chezmoiremove` deletes paths from the home directory on every apply.** Adding an entry destroys whatever is at that path — it needs an explicit justification, and a broad or templated path is a Critical finding.
 - **Shared fragments live in `.chezmoitemplates/`** (the `lib-*` libraries, `allowed-signers.tmpl`, `username.tmpl`). Copying one inline instead of including it guarantees drift.
 - **`modify_` files merge, they do not overwrite.** `modify_dot_claude.json` rewrites a file the user also edits — it must preserve unknown keys.
-- **A `modify_` file that deploys on Windows must be a modify-template** (the `chezmoi:modify-template` marker, no `.tmpl` suffix, no `#!` line). Windows cannot start a script, so a bash one fails the whole apply there; `make test-modify-scripts` checks this against the file list chezmoi resolves for Windows.
-- **Shell changes are tested by the matching target**, for example `make test-template-render`, `make test-remove-dependencies`, `make test-shell-credentials`. A change to `dot_zshrc.tmpl` without a rendering test is incomplete.
+- **A `modify_` file that deploys on Windows must be a modify-template** (the `chezmoi:modify-template` marker, no `.tmpl` suffix, no `#!` line). Windows cannot start a script, so a bash one fails the whole apply there; `make test ONLY=modify-scripts` checks this against the file list chezmoi resolves for Windows.
+- **Shell changes are tested by the matching target**, for example `make test ONLY=template-render`, `make test ONLY=remove-dependencies`, `make test ONLY=shell-credentials`. A change to `dot_zshrc.tmpl` without a rendering test is incomplete.
 - **`dot_zshrc.tmpl` keeps the `ccswitch` monitor alive and wraps `claude` on Linux/WSL.** A change there affects the user's account rotation — read it against [`ccswitch`](https://github.com/rios0rios0/ccswitch) before approving.
 - ShellCheck, ruff, PowerShell, and YAML/JSON linting all run under `make lint`; a new disable directive needs a reason.
 
@@ -89,7 +89,7 @@ them before the generic ones.
 make lint     # shellcheck, Go template syntax, ruff, PowerShell, YAML/JSON
 make test     # template rendering with a mock op, .chezmoiignore logic, script order
 make sast     # gitleaks + semgrep
-make lint-shellcheck / make test-template-render / make test-shell-credentials
+make lint ONLY=shellcheck / make test ONLY=template-render / make test ONLY=shell-credentials
 ```
 
 ### Local quality gates
@@ -105,7 +105,7 @@ configuration to make a finding disappear, is itself a finding.
 
 ## Conventions
 
-This repository has no Python modules: the only Python `make lint-python` checks is a `PYEOF`
+This repository has no Python modules: the only Python `make lint ONLY=python` checks is a `PYEOF`
 heredoc inside a `modify_*` file, linted with ruff.
 
 ### Dispatch tables over `switch`
