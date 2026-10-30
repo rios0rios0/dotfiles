@@ -59,6 +59,31 @@ make test-powershell-profile-windows # PowerShell 7's profile from Windows Termi
 make test-home-agents               # the home guide (~/AGENTS.md): each platform's guide, its own writer, the writers in a sandbox home (Windows' under pwsh, skipped without it), no ~/CLAUDE.md
 ```
 
+## The CI Pipeline (Linear Stages)
+
+`.github/workflows/validate.yaml` is the one pipeline, on every pull request and every push to
+`main`. Its stages run in order, and every job of a stage `needs:` every job of the stage before
+it, so a stage starts only once the previous one has passed:
+
+| Stage | Jobs |
+|-------|------|
+| code-check | `checks / code-check > quality:basic-checks` (pull requests only), `code-check > style:lint` (`make -k lint`) |
+| security | `security > sast:gitleaks` |
+| tests | `tests > test:all` (`make -k test`) |
+| delivery | `release / delivery > release` (pushes to `main`; it cuts a release only for a bump commit) |
+
+**Keep these:**
+
+1. **One job per stage's work, not per linter or test.** Every test takes seconds -- all of them
+   ran in about 40 s in a row on a workstation -- while a job pays for a runner, a checkout and its
+   installs again; the 47 jobs this replaced all started at once, 19 of them running together.
+   Lint and tests run on ubuntu-24.04, the image Microsoft publishes a PowerShell package for, so
+   pwsh needs no job of its own.
+2. **Every later stage is gated on `!cancelled() && !failure()`.** The basic checks run on pull
+   requests only, and GitHub skips every job downstream of a skipped one, transitively, unless its
+   `if:` calls a status function. Never `!failure()` alone (a cancelled run would go on) and never
+   `always()` (a failed one would).
+
 ## Platform Targeting
 
 Platform-specific logic is handled in two ways:

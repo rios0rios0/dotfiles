@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'changed the validation workflow to run as linear stages -- code-check, security, tests and delivery -- each starting only once the one before it has passed, instead of 47 jobs that all started at once (19 of them running together on a pull request): the five lint jobs run as one job, `code-check > style:lint`, the 41 test jobs as one, `tests > test:all`, and the separate `checks` and `release` workflows now run in the same pipeline as its first and last stage'
+time: '2026-10-30T20:12:28.291419977Z'

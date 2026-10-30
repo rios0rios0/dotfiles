@@ -13,6 +13,8 @@ make test    # template rendering (mock op), .chezmoiignore logic, script order,
 make sast    # gitleaks + semgrep secret/code scanning
 ```
 
+CI runs them as stages, in order, each starting only once the one before it has passed: code-check (`checks` and `style:lint`, which runs `make -k lint`), security (`sast:gitleaks`), tests (`test:all`, which runs `make -k test`) and, on pushes to `main`, delivery (`release`). See "The CI Pipeline (Linear Stages)" in `AGENTS.md`.
+
 Run a single check directly, e.g. `make lint-shellcheck`, `make test-template-render`, `make test-local-llm`, `make test-tailscale`, `make test-remove-dependencies`, `make test-remove-dependencies-windows`, `make test-install-dependencies-windows`, `make test-shell-credentials`, `make test-nvm-resolution`. See the `Makefile` for the full target list.
 
 ## Working Effectively
