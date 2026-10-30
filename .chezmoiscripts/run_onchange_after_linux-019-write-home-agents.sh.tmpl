@@ -1,9 +1,9 @@
 #!/bin/bash
 
-# Writes the agent guide for this machine, from .chezmoitemplates/home-agents.md, to ~/AGENTS.md for
-# OpenCode and to ~/CLAUDE.md for Claude Code, through .chezmoitemplates/lib-home-agents.sh, which
-# Android shares. Neither is the repository's own file of that name, which .chezmoiignore keeps out
-# of the home folder: see "The Home AGENTS.md" in AGENTS.md.
+# Writes ~/AGENTS.md, the agent guide for this machine that OpenCode and Claude Code both read, from
+# .chezmoitemplates/home-agents.md through .chezmoitemplates/lib-home-agents.sh, which Android
+# shares. It is not the repository's AGENTS.md, which .chezmoiignore keeps out of the home folder:
+# see "The Home AGENTS.md" there.
 #
 # `run_onchange_`: the guide below is part of this script, so the script runs again exactly when the
 # guide changes, and a `chezmoi diff` shows the guide only then.

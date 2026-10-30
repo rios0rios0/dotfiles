@@ -14,6 +14,9 @@
   Windows gets neither: Claude Code is no longer installed there, and .chezmoiignore keeps
   ~/.claude off it.
 
+  Both platforms get one more key: the Project instructions setting that has Claude Code read
+  AGENTS.md beside CLAUDE.md, so the home guide at ~/AGENTS.md reaches every session.
+
   A modify-template for the reasons given in modify_dot_claude.json at the source
   root, which also explain why it has no .tmpl suffix. When nothing differs, the
   current content is returned byte for byte; a real change re-serialises the file,
@@ -81,6 +84,35 @@
 {{-   if $changed -}}
 {{-     warnf "[claude-settings] updated ~/.claude/settings.json (%d permission rules added, %d retired)" (len $missing) (len $retiredFound) -}}
 {{-   end -}}
+{{- end -}}
+{{- /* Both platforms. Claude Code reads AGENTS.md itself (v2.1.277 and later), but by default
+       only where no CLAUDE.md sits in the working directory or above it, so a repository with a
+       CLAUDE.md of its own would hide the home guide at ~/AGENTS.md. claude-md-and-agents-md has
+       it read both, each directory's CLAUDE.md first, and an AGENTS.md that a CLAUDE.md imports
+       is not read twice. Only that one option is set: other plugins' entries and this plugin's
+       other options stay. The ID is the one v2.1.285 introduced; an older Claude Code reads
+       agents-md@builtin and ignores it. See "The Home AGENTS.md" in CLAUDE.md. */ -}}
+{{- $agentsPlugin := "cc-plugin-agents-md@builtin" -}}
+{{- $instructionFiles := "claude-md-and-agents-md" -}}
+{{- $pluginConfigs := dict -}}
+{{- if kindIs "map" (get $settings "pluginConfigs") -}}
+{{-   $pluginConfigs = get $settings "pluginConfigs" -}}
+{{- end -}}
+{{- $agentsConfig := dict -}}
+{{- if kindIs "map" (get $pluginConfigs $agentsPlugin) -}}
+{{-   $agentsConfig = get $pluginConfigs $agentsPlugin -}}
+{{- end -}}
+{{- $agentsOptions := dict -}}
+{{- if kindIs "map" (get $agentsConfig "options") -}}
+{{-   $agentsOptions = get $agentsConfig "options" -}}
+{{- end -}}
+{{- if ne (toJson (get $agentsOptions "instructionFiles")) (toJson $instructionFiles) -}}
+{{-   $_ := set $agentsOptions "instructionFiles" $instructionFiles -}}
+{{-   $_ := set $agentsConfig "options" $agentsOptions -}}
+{{-   $_ := set $pluginConfigs $agentsPlugin $agentsConfig -}}
+{{-   $_ := set $settings "pluginConfigs" $pluginConfigs -}}
+{{-   warnf "[claude-settings] set pluginConfigs.%s.options.instructionFiles to %s in ~/.claude/settings.json" $agentsPlugin $instructionFiles -}}
+{{-   $changed = true -}}
 {{- end -}}
 {{- if $changed -}}
 {{-   toPrettyJson $settings -}}

@@ -1,19 +1,20 @@
 #!/bin/bash
 set -euo pipefail
 
-# Tests the agent guide chezmoi writes to the home folder of every platform in place of the
-# repository's own AGENTS.md: ~/AGENTS.md everywhere, and the same guide as ~/CLAUDE.md on Linux and
-# Termux, where Claude Code runs. Covers the guide rendered for WSL, bare-metal Linux, Termux and
-# Windows -- each with its own platform's facts and none of another's, small, fully rendered, and
-# holding no line that would end the here-doc or here-string carrying it -- each platform getting
-# its own writer and no other, and the writers against a sandbox home: the Linux and Termux scripts
-# under bash, the Windows one under pwsh when it is installed. A writer replaces the repository's
-# 161 KB copy, creates a missing guide, leaves an identical one untouched and nothing behind, and
-# refuses a directory at the target; the Linux and Termux ones write ~/CLAUDE.md identical to
-# ~/AGENTS.md, and the Windows one writes no ~/CLAUDE.md, but UTF-8 without a BOM and LF line
-# endings, whatever line endings its own checkout has. Whether chezmoi deploys the repository's
-# AGENTS.md and CLAUDE.md, and that it deletes aisync's global instruction files, is
-# make test-chezmoiignore's and make test-aifiles-sync's.
+# Tests ~/AGENTS.md, the agent guide chezmoi writes to the home folder of every platform in place of
+# the repository's own AGENTS.md, which OpenCode and Claude Code both read. Covers the guide rendered
+# for WSL, bare-metal Linux, Termux and Windows -- each with its own platform's facts and none of
+# another's, small, fully rendered, and holding no line that would end the here-doc or here-string
+# carrying it -- each platform getting its own writer and no other, and the writers against a
+# sandbox home: the Linux and Termux scripts under bash, the Windows one under pwsh when it is
+# installed. A writer replaces the repository's 161 KB copy, creates a missing guide, leaves an
+# identical one untouched and nothing behind, refuses a directory at the target, and writes no
+# ~/CLAUDE.md, which would stop Claude Code reading the AGENTS.md of every repository without a
+# CLAUDE.md of its own; the Windows one writes UTF-8 without a BOM and LF line endings, whatever
+# line endings its own checkout has. Whether chezmoi deploys the repository's AGENTS.md and
+# CLAUDE.md, that it deletes aisync's global instruction files, and the Claude Code setting that
+# reads AGENTS.md beside CLAUDE.md, are make test-chezmoiignore's, make test-aifiles-sync's and
+# make test-modify-scripts'.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPTS="$REPO_ROOT/.chezmoiscripts"
@@ -115,12 +116,12 @@ done
 pass "every platform's guide renders, names its platform, stays under $MAX_BYTES bytes and is not the repository's AGENTS.md"
 
 # zsh's caveats on the three platforms that run it: the interactive cp/rm/mv guards, eza, global
-# aliases, globs and the differences from bash. The guide is also ~/CLAUDE.md there, and it carries
-# what aisync's deleted ~/.claude/CLAUDE.md held beyond it: the git rules, Claude Code's own
-# directories and the credential loader.
+# aliases, globs and the differences from bash. The guide also carries what aisync's deleted
+# ~/.claude/CLAUDE.md held beyond it: the git rules, Claude Code's own directories and the
+# credential loader.
 for platform in wsl metal android; do
     has "$platform" '`command cp`' "NO_NOMATCH" '`H` is `| head`' "eza -1 --classify" "zsh -c" \
-        '`path` is tied to `PATH`' "<<'EOF'" '/proc/<pid>/cmdline' 'and `~/CLAUDE.md`' \
+        '`path` is tied to `PATH`' "<<'EOF'" '/proc/<pid>/cmdline' \
         "## Git and GitHub" 'rebased on top of `main`' '`~/.claude/rules/`' \
         "linux-engineering-shell-credentials.sh" '`OMNIROUTE_API_KEY`' \
         'cancels the `-i` for `rm` and `mv`, not for'
@@ -198,7 +199,7 @@ run_bash_writer() {
 rc() { cat "$TMP/rc"; }
 staged_leftovers() {
     local dir="$1"
-    find "$dir" -maxdepth 1 \( -name '.AGENTS.md.*' -o -name '.CLAUDE.md.*' -o -name '.home-agents.*' \) 2>/dev/null
+    find "$dir" -maxdepth 1 -name '.AGENTS.md.*' 2>/dev/null
 }
 
 for platform in wsl android; do
@@ -211,39 +212,26 @@ for platform in wsl android; do
     mkdir -p "$home"
     printf '%s\n' "$(cat "$TMP/guide-$platform.md")" >"$TMP/expected-$platform.md"
 
-    # The repository's copies are replaced by the guide, in both files, readable by all, ending in
-    # one newline: ~/AGENTS.md for OpenCode, ~/CLAUDE.md for Claude Code.
+    # The repository's copy is replaced by the guide, readable by all, ending in one newline, and no
+    # ~/CLAUDE.md appears: one there would stop Claude Code reading the AGENTS.md of every
+    # repository without a CLAUDE.md of its own.
     make_old_copy "$home/AGENTS.md"
-    make_old_copy "$home/CLAUDE.md"
     run_bash_writer "$home" "$TMP/writer-$platform.sh"
-    [[ "$(rc)" -eq 0 ]] || fail "$platform: replacing the old copies must succeed: $(cat "$TMP/out")"
-    for name in AGENTS.md CLAUDE.md; do
-        cmp -s "$TMP/expected-$platform.md" "$home/$name" ||
-            fail "$platform: ~/$name must hold the rendered guide and a final newline"
-        [[ "$(stat -c %a "$home/$name")" == "644" ]] || fail "$platform: ~/$name must be mode 644"
-        grep -qF "[home-agents] wrote the agent guide for this machine to $home/$name" "$TMP/out" ||
-            fail "$platform: the write of ~/$name must be reported: $(cat "$TMP/out")"
-    done
+    [[ "$(rc)" -eq 0 ]] || fail "$platform: replacing the old copy must succeed: $(cat "$TMP/out")"
+    cmp -s "$TMP/expected-$platform.md" "$home/AGENTS.md" ||
+        fail "$platform: ~/AGENTS.md must hold the rendered guide and a final newline"
+    [[ "$(stat -c %a "$home/AGENTS.md")" == "644" ]] || fail "$platform: ~/AGENTS.md must be mode 644"
+    grep -qF "[home-agents] wrote the agent guide for this machine to $home/AGENTS.md" "$TMP/out" ||
+        fail "$platform: a write must be reported: $(cat "$TMP/out")"
+    [[ ! -e "$home/CLAUDE.md" ]] || fail "$platform: the writer must write no ~/CLAUDE.md"
 
-    # An identical guide is left alone in both files: no write, so their times stay where they were
-    # put, and no line.
-    touch -d '2001-01-01 00:00' "$home/AGENTS.md" "$home/CLAUDE.md"
+    # An identical guide is left alone: no write, so its time stays where it was put, and no line.
+    touch -d '2001-01-01 00:00' "$home/AGENTS.md"
     run_bash_writer "$home" "$TMP/writer-$platform.sh"
     [[ "$(rc)" -eq 0 ]] || fail "$platform: an unchanged guide must exit 0"
-    for name in AGENTS.md CLAUDE.md; do
-        [[ "$(stat -c %Y "$home/$name")" -eq "$(date -d '2001-01-01 00:00' +%s)" ]] ||
-            fail "$platform: an identical ~/$name must not be rewritten"
-    done
+    [[ "$(stat -c %Y "$home/AGENTS.md")" -eq "$(date -d '2001-01-01 00:00' +%s)" ]] ||
+        fail "$platform: an identical guide must not be rewritten"
     [[ ! -s "$TMP/out" ]] || fail "$platform: an identical guide must be left without a word: $(cat "$TMP/out")"
-
-    # A missing ~/CLAUDE.md -- the state of every machine before this guide -- is created, and the
-    # ~/AGENTS.md beside it, already the guide, is left alone.
-    rm -f "$home/CLAUDE.md"
-    run_bash_writer "$home" "$TMP/writer-$platform.sh"
-    cmp -s "$TMP/expected-$platform.md" "$home/CLAUDE.md" || fail "$platform: a missing ~/CLAUDE.md must be created"
-    if grep -qF "$home/AGENTS.md" "$TMP/out"; then
-        fail "$platform: an ~/AGENTS.md that is already the guide must not be rewritten"
-    fi
 
     # A missing guide is created.
     rm -f "$home/AGENTS.md"
@@ -261,7 +249,7 @@ for platform in wsl android; do
     [[ -z "$(staged_leftovers "$home")" ]] || fail "$platform: a refused write must leave nothing behind"
     rmdir "$home/AGENTS.md"
 done
-pass "the Linux and Termux writers put the guide in ~/AGENTS.md and ~/CLAUDE.md, replace old copies, create missing ones, leave identical ones alone and refuse a directory"
+pass "the Linux and Termux writers replace the old copy, create a missing guide, leave an identical one alone, refuse a directory and write no ~/CLAUDE.md"
 
 # --- The Windows writer, under pwsh -----------------------------------------------------------
 
@@ -292,7 +280,7 @@ else
         [[ "$(head -c 3 "$home/AGENTS.md" | od -An -tx1 | tr -d ' ')" != "efbbbf" ]] || fail "$label: ~/AGENTS.md must have no BOM"
         grep -qF "[home-agents] wrote the agent guide for this machine to" "$TMP/out" || fail "$label: a write must be reported"
         [[ ! -e "$home/AGENTS.md.new" ]] || fail "$label: the writer must leave nothing behind"
-        # Claude Code is not installed on Windows, so no ~/CLAUDE.md is written there.
+        # No writer writes a ~/CLAUDE.md, on Windows either.
         [[ ! -e "$home/CLAUDE.md" ]] || fail "$label: the Windows writer must write no ~/CLAUDE.md"
     done
 

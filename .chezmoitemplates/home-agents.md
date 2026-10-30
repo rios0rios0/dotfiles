@@ -1,11 +1,11 @@
-{{- /* The agent guide chezmoi writes to ~/AGENTS.md on every platform, and to ~/CLAUDE.md where
-     Claude Code runs: what any agent should know about this machine before it runs a command. It
-     is not the repository's AGENTS.md, which is for agents working on the dotfiles and is never
-     deployed; see "The Home AGENTS.md" there. It is the only home-level instruction file: aisync's
-     ~/.claude/CLAUDE.md and ~/.config/opencode/AGENTS.md are deleted, so what they carried lives
-     here. Agents load it into their context -- OpenCode V2 reads every AGENTS.md from its working
-     directory up to the home folder, Claude Code every CLAUDE.md -- so keep it short, and true for
-     the platform it is rendered for: every fact here was checked on that platform. */ -}}
+{{- /* The agent guide chezmoi writes to ~/AGENTS.md on every platform: what any agent should
+     know about this machine before it runs a command. It is not the repository's AGENTS.md, which
+     is for agents working on the dotfiles and is never deployed; see "The Home AGENTS.md" there.
+     It is the only home-level instruction file: aisync's ~/.claude/CLAUDE.md and
+     ~/.config/opencode/AGENTS.md are deleted, so what they carried lives here. Agents load it
+     into their context -- OpenCode V2 and Claude Code both read every AGENTS.md from their working
+     directory up to the home folder -- so keep it short, and true for the platform it is rendered
+     for: every fact here was checked on that platform. */ -}}
 {{- $os := .chezmoi.os -}}
 {{- $wsl := and (eq $os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
 {{- $zsh := or (eq $os "linux") (eq $os "android") -}}
@@ -14,9 +14,8 @@
 # Working on this machine: {{ $platform }}
 
 What any agent should know about this machine before running commands on it. chezmoi writes this
-guide to `~/AGENTS.md`{{ if $zsh }} and `~/CLAUDE.md`{{ end }} from rios0rios0/dotfiles
-(`.chezmoitemplates/home-agents.md`) and replaces it whenever that changes, so edit it there.
-Inside a project, the project's own instructions come first.
+file from rios0rios0/dotfiles (`.chezmoitemplates/home-agents.md`) and replaces it whenever that
+changes, so edit it there. Inside a project, the project's own instructions come first.
 
 ## The machine
 
