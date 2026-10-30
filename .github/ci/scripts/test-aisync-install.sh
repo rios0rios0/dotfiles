@@ -35,15 +35,16 @@ source <(printf '%s\n' "$FUNCTION")
 # write_aisync <dir>: an aisync that records where it ran from and its arguments, and whose
 # `self-update` exits $UPDATE_STATUS.
 write_aisync() {
-    mkdir -p "$1"
-    cat >"$1/aisync" <<'STUB'
+    local dir="$1"
+    mkdir -p "$dir"
+    cat >"$dir/aisync" <<'STUB'
 #!/bin/bash
 echo "$0 $*" >>"$CALLS"
 if [[ "${1:-}" == self-update ]]; then
     exit "${UPDATE_STATUS:-0}"
 fi
 STUB
-    chmod +x "$1/aisync"
+    chmod +x "$dir/aisync"
 }
 
 # Stands in for the library's `run_remote_installer`: records the call, then leaves aisync in

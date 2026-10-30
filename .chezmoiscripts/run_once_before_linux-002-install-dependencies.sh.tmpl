@@ -694,7 +694,7 @@ install_ruff() {
         return
     fi
 
-    # Mirror the `install_dev_toolkit`/`install_aisync` pattern: download to a
+    # Mirror the `install_dev_toolkit` pattern: download to a
     # temp file and check the exit status explicitly. `curl ... | sh` would
     # mask download failures because this file doesn't enable `pipefail`, so
     # a 4xx/5xx from `astral.sh` would silently leave nothing installed while
