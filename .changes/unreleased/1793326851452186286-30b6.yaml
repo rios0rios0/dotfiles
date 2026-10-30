@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'changed `install_aisync` on Linux/WSL to run `aisync self-update --force` after the install, as `install_terra` does with terra, so every run of the dependency installer moves aisync to its latest release instead of leaving a machine on the one it first got; the call finds a first install in `~/.local/bin` before any shell put it on PATH, a failed self-update only warns, and `make test-aisync-install` covers it. Android still builds aisync from source, where releases carry no binary to update to'
+time: '2026-10-30T02:20:51.452108307Z'

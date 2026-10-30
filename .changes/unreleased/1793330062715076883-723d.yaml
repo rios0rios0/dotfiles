@@ -1,0 +1,3 @@
+kind: 'Removed'
+body: 'removed `claude/CLAUDE.md` and `opencode/AGENTS.md` from the phone''s aisync exclude file: aisync no longer syncs a tool''s root `CLAUDE.md` or `AGENTS.md` (rios0rios0/aisync#213), and aifiles dropped its copies and ignores both even for an older aisync (rios0rios0/aifiles#36), so only `settings.json` still needs a line. "AI Rules Sync" and "The Home AGENTS.md" in `AGENTS.md`, the `.chezmoiremove` note, `README.md` and the fresh-machine guide now say so, and that `.chezmoiremove` only clears the copies earlier syncs left behind'
+time: '2026-10-30T03:14:22.71501893Z'

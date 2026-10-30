@@ -6,9 +6,8 @@
 #   - The key comes from chezmoi's own 1Password session, rendered into this script the way
 #     run_after_android-001 brings the SSH keys, and only on an apply that finds no key at all: no
 #     `op` is signed in for a script to call on Termux.
-#   - ~/.config/aisync/exclude keeps aifiles' copies of settings.json, CLAUDE.md and OpenCode's
-#     AGENTS.md off the phone in both directions, since they are written for Linux/WSL; aisync
-#     reads that file from 1.7.0 on, hence the higher minimum.
+#   - ~/.config/aisync/exclude keeps aifiles' settings.json off the phone in both directions, since
+#     it is written for Linux/WSL; aisync reads that file from 1.7.0 on, hence the higher minimum.
 #   - An older aisync is reported with the command that rebuilds it: releases carry no Android
 #     binary, so `aisync self-update` has nothing to install.
 

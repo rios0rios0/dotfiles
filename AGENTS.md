@@ -29,6 +29,7 @@ make test-clipboard-shim            # Claude Code clipboard shim (Ctrl+V image p
 make test-nvm-resolution            # NVM default-alias resolution in dot_zshenv
 make test-install-nvm               # install_nvm: npm upgraded after the LTS, before the first global install; --reinstall-packages-from
 make test-claude-install            # Claude Code's native build: the launcher check, both failures, the verify and the npm tombstone
+make test-aisync-install            # install_aisync: the install when missing, the self-update on every run (as terra's), its failure only warning, none on Android
 make test-zshrc-functions           # top-size, sentry-ds and rebuild-ocode in dot_zshrc: arguments, sudo, the work store, completion, the resolved build script
 make test-sentry-setup              # the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds
 make test-local-llm                 # the local model server: its settings, the window its unit allocates, the installer's gate
@@ -797,26 +798,29 @@ Verified on Linux (the `--ignore-scripts` install, `neon --version`, and esbuild
 
 ## AI Rules Sync
 
-AI content -- Claude Code's and OpenCode's instructions, rules, agents, commands, hooks, scripts and
-skills, Claude's settings, and its project memories and conversations -- is **not** managed by
-chezmoi. It lives in each harness's own directory, and [`aisync`](https://github.com/rios0rios0/aisync)
-syncs it with aifiles, a private repository where every personal file is age-encrypted.
+AI content -- Claude Code's and OpenCode's rules, agents, commands, hooks, scripts and skills,
+Claude's settings, and its project memories and conversations -- is **not** managed by chezmoi. It
+lives in each harness's own directory, and [`aisync`](https://github.com/rios0rios0/aisync) syncs it
+with aifiles, a private repository where every personal file is age-encrypted.
 `install_aisync()` installs aisync in the Linux/WSL and Android dependency scripts (it replaced the
-`run_after_*-install-ai-rules.*` scripts that curled `install-rules.sh` from `rios0rios0/guide`), and
+`run_after_*-install-ai-rules.*` scripts that curled `install-rules.sh` from `rios0rios0/guide`) and,
+on Linux, updates it on every run, as `install_terra` does with terra.
 `run_after_linux-014-sync-aifiles.sh.tmpl` and `run_after_android-008-sync-aifiles.sh.tmpl` pull
 aifiles after every apply, through the body they share, `.chezmoitemplates/lib-aifiles-sync.sh`.
 chezmoi touches only the individual files there that "JSON Patching" and "Claude Code Look" name, plus
-OpenCode's `opencode.json` and `cli.json`, and deletes the two global instruction files,
-`~/.claude/CLAUDE.md` and `~/.config/opencode/AGENTS.md`: the machine's environment reality (WSL
-facts, the interactive `cp`/`rm`/`mv` guards, quoting rules) is the home guide chezmoi writes to
-`~/AGENTS.md`, which both tools read (see "The Home AGENTS.md"). `rules/`, `agents/`, `commands/` and
-`skills/` carry the portable content.
+OpenCode's `opencode.json` and `cli.json`. The home-level instructions are not aisync's at all: the
+machine's environment reality (WSL facts, the interactive `cp`/`rm`/`mv` guards, quoting rules) is the
+home guide chezmoi writes to `~/AGENTS.md`, which both tools read (see "The Home AGENTS.md"); aisync
+syncs no `CLAUDE.md` or `AGENTS.md` at a tool's root (rios0rios0/aisync#213, rios0rios0/aifiles#36);
+and chezmoi deletes the copies older aisync releases left, `~/.claude/CLAUDE.md` and
+`~/.config/opencode/AGENTS.md`. `rules/`, `agents/`, `commands/` and `skills/` carry the portable
+content.
 
 | Part | Where |
 |------|-------|
 | The key aifiles is encrypted to | `~/.config/aisync/key.txt`, from 1Password's `aisync.age` (see "Age Keys"): `run_before_linux-005` on Linux, rendered into the hook on Android |
 | The clone | `~/.config/aisync/repo`, of `git@github.com-mine:rios0rios0/aifiles.git`, through system git |
-| What a pull fills | `~/.claude` (`settings.json`, rules, agents, commands, hooks, scripts, skills), `~/.config/opencode` (rules, agents, commands, skills, plugins), and, from the `transcripts` branch, Claude's project memories and the last 14 days of conversations; the global `CLAUDE.md` and OpenCode `AGENTS.md` it may still bring are deleted by chezmoi |
+| What a pull fills | `~/.claude` (`settings.json`, rules, agents, commands, hooks, scripts, skills), `~/.config/opencode` (rules, agents, commands, skills, plugins), and, from the `transcripts` branch, Claude's project memories and the last 14 days of conversations; never a tool's root `CLAUDE.md` or `AGENTS.md`, which aifiles' `.aisyncignore` keeps out even for an older aisync |
 | The hook's state | `~/.cache/aifiles-sync/`: the refs it last synced, the last pull's log |
 | Android's exclusions | `~/.config/aisync/exclude`, from `dot_config/private_aisync/exclude` |
 
@@ -858,27 +862,32 @@ facts, the interactive `cp`/`rm`/`mv` guards, quoting rules) is the home guide c
 8. **The key is fetched only when missing, never replaced.** aisync's own `init` and `key generate`
    write `~/.config/aisync/key.txt`, so another key there may be one aisync generated, with something
    already encrypted to it; the export warns and keeps it.
-9. **The hook holds the version floor.** 1.6.0 on Linux (conversations, `--prefer` and the
-   `sync.use_system_git` aifiles sets), where an older aisync runs `self-update`; 1.7.0 on Android
-   (the exclusions in 10), where aisync is built from source and releases carry no binary, so an older
-   one is reported with the command that rebuilds it. A floor in `install_aisync` would re-run the
-   whole 45-120 minute installer.
-10. **Android keeps its own `settings.json`, and none of aifiles' instructions.** aifiles holds one
-    copy of each for every device, written for Linux/WSL: the settings start a status line (a bash
-    fork on every redraw, against Android's phantom-process budget) and two hooks by Linux paths, and
-    the instructions describe WSL. `~/.config/aisync/exclude` keeps the settings, `CLAUDE.md` and
-    OpenCode's `AGENTS.md` out of the phone's sync in both directions, so a manual `aisync sync` there
-    cannot publish the phone's copies either; the two instruction files are deleted there as
-    everywhere (11), and the phone's guide is the home guide rendered for Termux.
+9. **The installer keeps aisync current, and the hook holds the version floor.** On Linux,
+   `install_aisync` runs `aisync self-update --force` after the install, as `install_terra` does with
+   terra, so every run of the dependency installer moves aisync to its latest release; a failed
+   update only warns. The hook's floor covers a machine whose installer has not run since a release
+   aifiles needs: 1.6.0 on Linux (conversations, `--prefer` and the `sync.use_system_git` aifiles
+   sets), where an older aisync runs `self-update`; 1.7.0 on Android (the exclusions in 10), where
+   aisync is built from source and releases carry no binary, so an older one is reported with the
+   command that rebuilds it. The floor lives in the hook because raising one in `install_aisync` would
+   re-run the whole 45-120 minute installer.
+10. **Android keeps its own `settings.json`.** aifiles holds one copy for every device, written for
+    Linux/WSL: it starts a status line (a bash fork on every redraw, against Android's phantom-process
+    budget) and two hooks by Linux paths. `~/.config/aisync/exclude` keeps it out of the phone's sync
+    in both directions, so a manual `aisync sync` there cannot publish the phone's copy either.
+    Instructions need no exclusion: aifiles carries none (11), and the phone's guide is the home guide
+    rendered for Termux.
 11. **chezmoi manages nothing in aisync's allowlists, and `.chezmoiremove` lists nothing aisync
-    writes but the two global instruction files.** aifiles syncs only Claude Code and OpenCode
-    (rios0rios0/aifiles#34 dropped Cursor, Codex and Copilot), and chezmoi manages neither tool's
-    directory; the `.cursor` entry in `.chezmoiremove` is the retired Cursor CLI's tombstone
-    (601cbeb), not a path aisync writes. `~/.claude/CLAUDE.md` and `~/.config/opencode/AGENTS.md` are
-    the exception, since the home guide took over their job: aisync leaves a file it synced and that
-    was deleted here deleted, as an outgoing deletion the next `aisync sync` removes from aifiles, so
-    deleting them on every apply never fights a pull. `make test-aifiles-sync` checks that those two
-    are the only such entries.
+    writes.** aifiles syncs only Claude Code and OpenCode (rios0rios0/aifiles#34 dropped Cursor, Codex
+    and Copilot), and chezmoi manages neither tool's directory; the `.cursor` entry in
+    `.chezmoiremove` is the retired Cursor CLI's tombstone (601cbeb), not a path aisync writes.
+    `~/.claude/CLAUDE.md` and `~/.config/opencode/AGENTS.md` are deleted on every apply because aisync
+    wrote them until the home guide took over their job, and writes them no more: no tool's allowlist
+    names a root `CLAUDE.md` or `AGENTS.md` (rios0rios0/aisync#213), and aifiles neither carries them
+    nor lets an older aisync sync them, through `/CLAUDE.md` and `/AGENTS.md` in its `.aisyncignore`
+    (rios0rios0/aifiles#36). Deleting the copies left behind, and whatever Claude Code's `/memory`
+    writes there, therefore never fights a pull. `make test-aifiles-sync` checks that those two are
+    the only such entries.
 
 The first sync on a new machine needs nothing by hand: the apply fetches the key, clones aifiles and
 pulls. To leave aifiles alone for one apply, set `SKIP_AIFILES_SYNC=1`. `make test-aifiles-sync`
@@ -950,9 +959,8 @@ secrets; on Termux its paths, shebangs, C library and process budget; on Windows
 5. **One home-level file, so nothing to keep in step.** What an agent should know everywhere goes in
    `.chezmoitemplates/home-agents.md`: never into a `~/CLAUDE.md`, and never back into aisync's
    global files, which `.chezmoiremove` deletes on every apply -- with anything Claude Code's
-   `/memory` writes to user memory. aisync leaves those deletions alone: a file it synced and that
-   was deleted here is an outgoing deletion, which the next `aisync sync` removes from aifiles for
-   every device (see "AI Rules Sync", 11).
+   `/memory` writes to user memory. aisync no longer syncs either file, and aifiles ignores both for
+   every aisync release, so no pull or sync brings one back (see "AI Rules Sync", 11).
 6. **Claude Code needs v2.1.277 to read it, and v2.1.285 to read the setting.** An older version
    reads `CLAUDE.md` files alone, and before v2.1.285 the plugin's ID was `agents-md@builtin`, so an
    entry under `cc-plugin-agents-md@builtin` is ignored there. Both platforms update Claude Code by

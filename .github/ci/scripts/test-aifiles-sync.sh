@@ -483,8 +483,9 @@ else
 fi
 
 # aisync owns the AI content in ~/.claude and ~/.config/opencode, so chezmoi must manage nothing
-# there that aisync syncs, and delete nothing aisync writes -- except the two global instruction
-# files whose job moved to the home guide chezmoi writes as ~/AGENTS.md (#283).
+# there that aisync syncs, and delete nothing aisync writes. The two global instruction files it
+# does delete are ones aisync wrote until the home guide chezmoi writes as ~/AGENTS.md took their
+# job (#283), and syncs no more (rios0rios0/aisync#213, rios0rios0/aifiles#36).
 claude_entries="$(find "$REPO_ROOT/dot_claude" -mindepth 1 -printf '%f\n' | sort | tr '\n' ' ')"
 opencode_entries="$(find "$REPO_ROOT/dot_config/opencode" -mindepth 1 -printf '%f\n' | sort | tr '\n' ' ')"
 removed_entries="$(grep -E '^\.(claude|config/opencode)(/|$)' "$REPO_ROOT/.chezmoiremove" | sort | tr '\n' ' ' || true)"

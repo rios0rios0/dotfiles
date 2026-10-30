@@ -26,9 +26,9 @@ lint-syntax:
 
 # === Test targets ===
 
-.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-nvm-resolution test-install-nvm test-claude-install test-zshrc-functions test-sentry-setup test-local-llm test-opencode test-tailscale test-atuin test-wsl-systemd test-statusline test-claude-lsp test-omniroute-backup test-omniroute-restore test-omniroute-stack test-omniroute-image test-secrets-backup test-secrets-restore test-ocode test-terra-update test-yq test-chlog test-aifiles-sync test-export-keys test-export-key-windows test-op-wrapper test-install-fonts-windows test-powershell-profile-windows test-home-agents
+.PHONY: test test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-nvm-resolution test-install-nvm test-claude-install test-aisync-install test-zshrc-functions test-sentry-setup test-local-llm test-opencode test-tailscale test-atuin test-wsl-systemd test-statusline test-claude-lsp test-omniroute-backup test-omniroute-restore test-omniroute-stack test-omniroute-image test-secrets-backup test-secrets-restore test-ocode test-terra-update test-yq test-chlog test-aifiles-sync test-export-keys test-export-key-windows test-op-wrapper test-install-fonts-windows test-powershell-profile-windows test-home-agents
 
-test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-clipboard-shim test-nvm-resolution test-install-nvm test-claude-install test-zshrc-functions test-sentry-setup test-local-llm test-opencode test-tailscale test-atuin test-wsl-systemd test-statusline test-claude-lsp test-omniroute-backup test-omniroute-restore test-omniroute-stack test-omniroute-image test-secrets-backup test-secrets-restore test-ocode test-terra-update test-yq test-chlog test-aifiles-sync test-export-keys test-export-key-windows test-op-wrapper test-install-fonts-windows test-powershell-profile-windows test-home-agents
+test: test-template-render test-chezmoiignore test-script-order test-modify-scripts test-remove-dependencies test-remove-dependencies-windows test-install-dependencies-windows test-prune-tmp-modcache test-shell-credentials test-clipboard-shim test-nvm-resolution test-install-nvm test-claude-install test-aisync-install test-zshrc-functions test-sentry-setup test-local-llm test-opencode test-tailscale test-atuin test-wsl-systemd test-statusline test-claude-lsp test-omniroute-backup test-omniroute-restore test-omniroute-stack test-omniroute-image test-secrets-backup test-secrets-restore test-ocode test-terra-update test-yq test-chlog test-aifiles-sync test-export-keys test-export-key-windows test-op-wrapper test-install-fonts-windows test-powershell-profile-windows test-home-agents
 
 test-template-render:
 	@bash $(CI_DIR)/scripts/test-template-render.sh
@@ -76,6 +76,9 @@ test-install-nvm:
 
 test-claude-install:
 	@bash $(CI_DIR)/scripts/test-claude-install.sh
+
+test-aisync-install:
+	@bash $(CI_DIR)/scripts/test-aisync-install.sh
 
 test-zshrc-functions:
 	@bash $(CI_DIR)/scripts/test-zshrc-functions.sh
