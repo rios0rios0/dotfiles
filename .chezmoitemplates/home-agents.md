@@ -63,9 +63,10 @@ Inside a project, the project's own instructions come first.
   reads neither file, so run toolchain commands through `zsh -c`.
 - `cp`, `rm` and `mv` are functions that add `-i` whenever stdin is a terminal, so a command run in
   a terminal nobody answers can stop at an overwrite prompt. In anything automated, write
-  `command cp`, `command rm` and `command mv`, or pass `-f`. Where Oh My Zsh's plain aliases are
-  still loaded, `-i` reads end-of-file from a closed stdin, skips the operation and still exits 0:
-  check that the file is there rather than trusting the exit code.
+  `command cp`, `command rm` and `command mv` (`-f` cancels the `-i` for `rm` and `mv`, not for
+  `cp`). Where Oh My Zsh's plain aliases are still loaded, `-i` reads end-of-file from a closed
+  stdin, skips the operation and still exits 0: check that the file is there rather than trusting
+  the exit code.
 - `ls` is `eza -1 --classify --group-directories-first`: it marks names (`dir/`, `tool*`), quotes
   names that hold spaces, and takes eza's flags rather than GNU ls's. Use `command ls`, `find` or a
   glob when the output is parsed.

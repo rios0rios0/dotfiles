@@ -61,11 +61,13 @@ declare -A TITLE=(
 
 # The guide as the writers embed it, and a template file, rendered for a platform.
 render_guide() {
-    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "${DATA[$1]}" \
+    local platform="$1"
+    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "${DATA[$platform]}" \
         '{{ includeTemplate "home-agents.md" . | trim }}'
 }
 render_file() {
-    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "${DATA[$1]}" <"$2"
+    local platform="$1" template="$2"
+    chezmoi execute-template --config "$TMP/chezmoi.yaml" --override-data "${DATA[$platform]}" <"$template"
 }
 
 # has / lacks <platform> <text>...: whether the platform's guide says each text.
@@ -120,8 +122,11 @@ for platform in wsl metal android; do
     has "$platform" '`command cp`' "NO_NOMATCH" '`H` is `| head`' "eza -1 --classify" "zsh -c" \
         '`path` is tied to `PATH`' "<<'EOF'" '/proc/<pid>/cmdline' 'and `~/CLAUDE.md`' \
         "## Git and GitHub" 'rebased on top of `main`' '`~/.claude/rules/`' \
-        "linux-engineering-shell-credentials.sh" '`OMNIROUTE_API_KEY`'
-    lacks "$platform" '$LASTEXITCODE' "Remove-Item"
+        "linux-engineering-shell-credentials.sh" '`OMNIROUTE_API_KEY`' \
+        'cancels the `-i` for `rm` and `mv`, not for'
+    # GNU `cp -i -f` still asks before overwriting: `-f` cancels the guard's `-i` for rm and mv
+    # alone, so the guide must never offer it as the way around the prompt for cp.
+    lacks "$platform" '$LASTEXITCODE' "Remove-Item" 'or pass `-f`'
 done
 pass "the zsh platforms get the cp/rm/mv guards, eza, global aliases, globs, quoting, the git rules and Claude Code's notes"
 
@@ -153,8 +158,9 @@ pass "the Windows guide covers PowerShell, reaching WSL and its 1Password, and n
 
 # The scripts chezmoi resolves for an OS, from the whole source state.
 scripts_for() {
-    chezmoi --config "$TMP/chezmoi.yaml" --destination "$TMP/dest-$1" --persistent-state "$TMP/$1.boltdb" \
-        --override-data "{\"chezmoi\":{\"os\":\"$1\"}}" managed --include scripts --path-style relative
+    local os="$1"
+    chezmoi --config "$TMP/chezmoi.yaml" --destination "$TMP/dest-$os" --persistent-state "$TMP/$os.boltdb" \
+        --override-data "{\"chezmoi\":{\"os\":\"$os\"}}" managed --include scripts --path-style relative
 }
 declare -A WRITER=(
     [linux]=".chezmoiscripts/linux-019-write-home-agents.sh"
@@ -179,16 +185,20 @@ pass "each platform runs its own writer and no other"
 # --- The Linux and Termux writers, under bash -------------------------------------------------
 
 # A stand-in for the repository's AGENTS.md, which every home folder held before: 161 KB of it.
-make_old_copy() { head -c 164864 /dev/zero | tr '\0' 'x' >"$1"; }
+make_old_copy() {
+    local target="$1"
+    head -c 164864 /dev/zero | tr '\0' 'x' >"$target"
+}
 
 run_bash_writer() {
-    local status=0
-    HOME="$1" bash "$2" >"$TMP/out" 2>&1 || status=$?
+    local home="$1" script="$2" status=0
+    HOME="$home" bash "$script" >"$TMP/out" 2>&1 || status=$?
     echo "$status" >"$TMP/rc"
 }
 rc() { cat "$TMP/rc"; }
 staged_leftovers() {
-    find "$1" -maxdepth 1 \( -name '.AGENTS.md.*' -o -name '.CLAUDE.md.*' -o -name '.home-agents.*' \) 2>/dev/null
+    local dir="$1"
+    find "$dir" -maxdepth 1 \( -name '.AGENTS.md.*' -o -name '.CLAUDE.md.*' -o -name '.home-agents.*' \) 2>/dev/null
 }
 
 for platform in wsl android; do
@@ -267,8 +277,8 @@ else
     mkdir -p "$home"
     printf '%s\n' "$(cat "$TMP/guide-windows.md")" >"$TMP/expected-windows.md"
     run_pwsh_writer() {
-        local status=0
-        HOME="$home" pwsh -NoProfile -NonInteractive -File "$1" >"$TMP/out" 2>&1 || status=$?
+        local script="$1" status=0
+        HOME="$home" pwsh -NoProfile -NonInteractive -File "$script" >"$TMP/out" 2>&1 || status=$?
         echo "$status" >"$TMP/rc"
     }
 

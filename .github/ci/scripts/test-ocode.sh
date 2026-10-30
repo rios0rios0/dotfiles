@@ -37,6 +37,8 @@ ANDROID_INSTALLER="$REPO_ROOT/.chezmoiscripts/run_once_before_android-002-instal
 EXIT_CODE=0
 # What the fake ocode the builds install says, so a check can tell it from the one it replaced.
 FAKE_OCODE="fake ocode"
+# The fork's branch, which every checkout the builder touches must end on.
+FORK_BRANCH="reworked"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -298,7 +300,7 @@ run_script
 [[ "$(rc)" -eq 0 ]] || fail "the clone must exit 0"
 grep -qF "clone --origin fork --branch reworked https://github.com/rios0rios0/opencode.git $CHECKOUT" "$GIT_CALLS" ||
     fail "a missing checkout must be cloned from the fork on its branch"
-[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the clone must land on the fork's branch"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "the clone must land on the fork's branch"
 [[ "$(cat "$CHECKOUT/.git/remotes/fork")" = "https://github.com/rios0rios0/opencode.git" ]] ||
     fail "the clone must keep the fork as fork"
 [[ "$(cat "$CHECKOUT/.git/remotes/origin")" = "https://github.com/sst/opencode.git" ]] ||
@@ -342,7 +344,7 @@ before="$(calls)"
 run_script
 [[ "$(rc)" -eq 0 ]] || fail "a branch switch must exit 0"
 grep -q "checkout is on main, switching to reworked" "$TMP/out" || fail "the switch must say which branch it came from"
-[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the checkout must end on the fork's branch"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "the checkout must end on the fork's branch"
 [[ "$(calls)" -eq "$before" ]] || fail "an unchanged head must not rebuild after a branch switch"
 pass "a checkout on another branch is switched to the fork's without rebuilding"
 
@@ -355,7 +357,7 @@ run_script
 [[ "$(rc)" -eq 0 ]] || fail "tracking the fork's branch must exit 0"
 grep -qF "checkout -b reworked --track fork/reworked" "$GIT_CALLS" ||
     fail "a missing local branch must be created from fork/<branch>"
-[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the tracked branch must be checked out"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "the tracked branch must be checked out"
 pass "a missing local branch is created from the fork's remote-tracking one"
 
 # Points the fake checkout at the given remotes, `<name>=<url>` each, with no local fork branch
@@ -372,8 +374,9 @@ set_remotes() {
 }
 # Gives remote $1 a remote-tracking reworked, as a fetch of the fork would.
 fetched() {
-    mkdir -p "$CHECKOUT/.git/refs/remotes/$1"
-    : >"$CHECKOUT/.git/refs/remotes/$1/reworked"
+    local remote="$1"
+    mkdir -p "$CHECKOUT/.git/refs/remotes/$remote"
+    : >"$CHECKOUT/.git/refs/remotes/$remote/$FORK_BRANCH"
 }
 fetches() { grep -c ' fetch --no-tags ' "$GIT_CALLS" || true; }
 
@@ -388,7 +391,7 @@ run_script
 grep -qF "checkout -b reworked --track origin/reworked" "$GIT_CALLS" ||
     fail "a plain clone's branch must be created from origin/reworked: $(cat "$GIT_CALLS")"
 [[ "$(fetches)" -eq 0 ]] || fail "a fetched branch must not be fetched again"
-[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "a plain clone must end on the fork's branch"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "a plain clone must end on the fork's branch"
 pass "a plain clone, whose fork is origin, gets the branch from origin/reworked"
 
 # 3c) The fork's other URL forms count too, under a remote of any name.
@@ -411,7 +414,7 @@ grep -qF "fetch --no-tags https://github.com/rios0rios0/opencode.git +refs/heads
     fail "the branch must be fetched over the fork's HTTPS URL into origin's namespace: $(cat "$GIT_CALLS")"
 grep -qxF "fetch-env GIT_TERMINAL_PROMPT=0" "$GIT_CALLS" || fail "the fetch must run with git's prompts off"
 grep -qF "checkout -b reworked --track origin/reworked" "$GIT_CALLS" || fail "the fetched branch must be tracked"
-[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the checkout must end on the fetched branch"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "the checkout must end on the fetched branch"
 pass "a branch the fork's remote never fetched is fetched over HTTPS, then tracked"
 
 # 4) The fetch fails -- no network, or the branch is gone: the checkout is left alone and nothing
