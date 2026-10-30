@@ -341,12 +341,14 @@ check_managed "$WINDOWS_OS" "$DOCKER_SETTINGS" yes
 check_managed "$LINUX_OS" "$DOCKER_SETTINGS" no
 check_managed "$ANDROID_OS" "$DOCKER_SETTINGS" no
 
-# The repository's AGENTS.md is for agents working on the dotfiles, 161 KB of it, and reached every
-# home folder until it was ignored. ~/AGENTS.md is the agent guide the write-home-agents scripts
-# render instead, which make test-home-agents covers; chezmoi manages it nowhere.
+# The repository's AGENTS.md and CLAUDE.md are for agents working on the dotfiles; the first, 161 KB
+# of it, reached every home folder until it was ignored. ~/AGENTS.md and ~/CLAUDE.md are the agent
+# guide the write-home-agents scripts render instead, which make test-home-agents covers; chezmoi
+# manages neither anywhere.
 for os in "$LINUX_OS" "$WINDOWS_OS" "$ANDROID_OS"; do
-    check_platform "$os" --ignore-line "AGENTS.md"
+    check_platform "$os" --ignore-line "AGENTS.md" --ignore-line "CLAUDE.md"
     check_managed "$os" "AGENTS.md" no
+    check_managed "$os" "CLAUDE.md" no
 done
 
 if [[ "$EXIT_CODE" -eq 0 ]]; then

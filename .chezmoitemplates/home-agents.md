@@ -1,9 +1,11 @@
-{{- /* The agent guide chezmoi writes to ~/AGENTS.md on every platform: what any agent should
-     know about this machine before it runs a command. It is not the repository's AGENTS.md, which
-     is for agents working on the dotfiles and is never deployed; see "The Home AGENTS.md" there.
-     Agents load this file into their context -- OpenCode V2 reads every AGENTS.md from its working
-     directory up to the home folder -- so keep it short, and true for the platform it is rendered
-     for: every fact here was checked on that platform. */ -}}
+{{- /* The agent guide chezmoi writes to ~/AGENTS.md on every platform, and to ~/CLAUDE.md where
+     Claude Code runs: what any agent should know about this machine before it runs a command. It
+     is not the repository's AGENTS.md, which is for agents working on the dotfiles and is never
+     deployed; see "The Home AGENTS.md" there. It is the only home-level instruction file: aisync's
+     ~/.claude/CLAUDE.md and ~/.config/opencode/AGENTS.md are deleted, so what they carried lives
+     here. Agents load it into their context -- OpenCode V2 reads every AGENTS.md from its working
+     directory up to the home folder, Claude Code every CLAUDE.md -- so keep it short, and true for
+     the platform it is rendered for: every fact here was checked on that platform. */ -}}
 {{- $os := .chezmoi.os -}}
 {{- $wsl := and (eq $os "linux") (contains "microsoft" (.chezmoi.kernel | toString)) -}}
 {{- $zsh := or (eq $os "linux") (eq $os "android") -}}
@@ -12,8 +14,9 @@
 # Working on this machine: {{ $platform }}
 
 What any agent should know about this machine before running commands on it. chezmoi writes this
-file from rios0rios0/dotfiles (`.chezmoitemplates/home-agents.md`) and replaces it whenever that
-changes, so edit it there. Inside a project, the project's own instructions come first.
+guide to `~/AGENTS.md`{{ if $zsh }} and `~/CLAUDE.md`{{ end }} from rios0rios0/dotfiles
+(`.chezmoitemplates/home-agents.md`) and replaces it whenever that changes, so edit it there.
+Inside a project, the project's own instructions come first.
 
 ## The machine
 
@@ -112,13 +115,57 @@ changes, so edit it there. Inside a project, the project's own instructions come
   double quotes inside the arguments it passes on.
 - `--%` passes the rest of a native command's line on unparsed.
 {{- end }}
+{{- if $zsh }}
+
+## Git and GitHub
+
+{{ if $wsl -}}
+- Push and fetch over HTTPS through gh's credential helper, not SSH, whose agent path through
+  1Password is unreliable here. Name the HTTPS URL, since `push origin` still goes over SSH when
+  `origin` is an alias such as `git@github.com-mine:...`:
+  `git -c credential.helper='!gh auth git-credential' push https://github.com/<owner>/<repo>.git HEAD:<branch>`.
+- When commit signing fails because 1Password does not answer, commit with `--no-gpg-sign` and say
+  so.
+{{ end -}}
+- CI requires a branch rebased on top of `main` before it is pushed: rebase first.
+- Changes to the dotfiles go through a branch and a pull request on
+  `github.com/rios0rios0/dotfiles`.
+- The rules, agents, commands and skills under `~/.claude` and `~/.config/opencode` are synced by
+  aisync: edit them in place, never in `~/.config/aisync/repo`, and never commit them to the
+  dotfiles.
+
+## Agent tools
+
+- Claude Code loads the standards in `~/.claude/rules/` by itself, scoped by their frontmatter, and
+  keeps subagents in `~/.claude/agents/`, slash commands in `~/.claude/commands/` and skills in
+  `~/.claude/skills/`: use them rather than improvising. `/memory` lists the instruction files a
+  session loaded, and `/context` what is in its context.
+{{- if eq $os "linux" }}
+- OpenCode is `ocode` (`~/.local/bin/ocode`, built from the `rios0rios0/opencode` fork), on the
+  OmniRoute gateway at `{{ .omniroute.baseUrl }}`
+{{- if $wsl }}, which runs from the dotfiles checkout
+  (`local-services/omniroute/`)
+{{- end }}. Models are `omniroute/<id>`, by default `omniroute/auto/coding`, with the tiers
+  `auto/claude-opus`, `auto/claude-sonnet` and `auto/claude-haiku`. It loads no standards by
+  itself: before starting, read the matching ones in `~/.config/opencode/rules/`, on demand --
+  documentation and git-flow for every change; code-style, architecture, security and testing for
+  code; the language's own rule; ci-cd before validating, committing or pushing. Its subagents are
+  in `~/.config/opencode/agents/`, its commands in `~/.config/opencode/commands/`, and its skills
+  only in `~/.config/opencode/skills/`.
+{{- end }}
+{{- end }}
 
 ## Secrets
 
 - Secrets live in 1Password. Never print them, `.env` files, keys or tokens, and never put one on a
   command line, which other processes can read
-{{- if ne $os "windows" }} in `/proc/<pid>/cmdline`{{ end }}: pass it through stdin or the
-  environment.
+{{- if ne $os "windows" }} in `/proc/<pid>/cmdline`{{ end }}:
+  pass it through stdin or the environment.
+{{- if $zsh }}
+- Shells load them with `~/.scripts/linux-engineering-shell-credentials.sh`, cached at
+  `~/.cache/op-credentials.env` (`OMNIROUTE_API_KEY` among them): read a credential from the
+  environment, and never print the cache, age keys, `auth.json` or `service.json`.
+{{- end }}
 {{- if or $wsl (eq $os "windows") }}
 - SSH keys stay in 1Password on Windows, so an SSH connection, a `git push` over SSH and a signed
   commit can each wait on an approval in the 1Password app. When one fails with

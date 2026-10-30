@@ -54,7 +54,7 @@ make test-export-key-windows        # the Windows chezmoi key export: the match,
 make test-op-wrapper                # how chezmoi reaches op: the WSL wrapper's retry, a terminal's op untouched, each platform's config, no account list on Windows
 make test-install-fonts-windows     # the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh)
 make test-powershell-profile-windows # PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh)
-make test-home-agents               # the home ~/AGENTS.md: each platform's guide, its own writer, the writers in a sandbox home (Windows' under pwsh, skipped without it)
+make test-home-agents               # the home guide (~/AGENTS.md, and ~/CLAUDE.md on Linux and Termux): each platform's guide, its own writer, the writers in a sandbox home (Windows' under pwsh, skipped without it)
 ```
 
 ## Platform Targeting
@@ -84,7 +84,7 @@ Platform-specific scripts in `.chezmoiscripts/` are prefixed: `linux-*`, `window
 - **`dot_zshenv.tmpl`** — PATH setup for version managers (critical for IDE integration)
 - **`.chezmoiignore`** — Platform-conditional file exclusion rules
 - **`.chezmoitemplates/`** — Shared template fragments (shared install functions, font installer, dependency removal, the Sentry CLI version floor, MCP server merge logic, username, the home `AGENTS.md`)
-- **`AGENTS.md`** — This file, for agents working on the repository; never deployed. `~/AGENTS.md` on each machine is another file (see "The Home AGENTS.md")
+- **`AGENTS.md`** — This file, for agents working on the repository; never deployed. `~/AGENTS.md` and `~/CLAUDE.md` on each machine are another file, the home guide (see "The Home AGENTS.md")
 
 ## Template Variables
 
@@ -806,16 +806,17 @@ syncs it with aifiles, a private repository where every personal file is age-enc
 `run_after_linux-014-sync-aifiles.sh.tmpl` and `run_after_android-008-sync-aifiles.sh.tmpl` pull
 aifiles after every apply, through the body they share, `.chezmoitemplates/lib-aifiles-sync.sh`.
 chezmoi touches only the individual files there that "JSON Patching" and "Claude Code Look" name, plus
-OpenCode's `opencode.json` and `cli.json`. aifiles' `~/.claude/CLAUDE.md` and
-`~/.config/opencode/AGENTS.md` carry the machine's environment reality (WSL facts, the interactive
-`cp`/`rm`/`mv` guards, quoting rules); `rules/`, `agents/`, `commands/` and `skills/` carry the
-portable content.
+OpenCode's `opencode.json` and `cli.json`, and deletes the two global instruction files,
+`~/.claude/CLAUDE.md` and `~/.config/opencode/AGENTS.md`: the machine's environment reality (WSL
+facts, the interactive `cp`/`rm`/`mv` guards, quoting rules) is the home guide chezmoi writes as
+`~/CLAUDE.md` and `~/AGENTS.md` (see "The Home AGENTS.md"). `rules/`, `agents/`, `commands/` and
+`skills/` carry the portable content.
 
 | Part | Where |
 |------|-------|
 | The key aifiles is encrypted to | `~/.config/aisync/key.txt`, from 1Password's `aisync.age` (see "Age Keys"): `run_before_linux-005` on Linux, rendered into the hook on Android |
 | The clone | `~/.config/aisync/repo`, of `git@github.com-mine:rios0rios0/aifiles.git`, through system git |
-| What a pull fills | `~/.claude` (`CLAUDE.md`, `settings.json`, rules, agents, commands, hooks, scripts, skills), `~/.config/opencode` (`AGENTS.md`, rules, agents, commands, skills, plugins), and, from the `transcripts` branch, Claude's project memories and the last 14 days of conversations |
+| What a pull fills | `~/.claude` (`settings.json`, rules, agents, commands, hooks, scripts, skills), `~/.config/opencode` (rules, agents, commands, skills, plugins), and, from the `transcripts` branch, Claude's project memories and the last 14 days of conversations; the global `CLAUDE.md` and OpenCode `AGENTS.md` it may still bring are deleted by chezmoi |
 | The hook's state | `~/.cache/aifiles-sync/`: the refs it last synced, the last pull's log |
 | Android's exclusions | `~/.config/aisync/exclude`, from `dot_config/private_aisync/exclude` |
 
@@ -862,15 +863,22 @@ portable content.
    (the exclusions in 10), where aisync is built from source and releases carry no binary, so an older
    one is reported with the command that rebuilds it. A floor in `install_aisync` would re-run the
    whole 45-120 minute installer.
-10. **Android keeps its own `settings.json`, `CLAUDE.md` and OpenCode `AGENTS.md`.** aifiles holds one
+10. **Android keeps its own `settings.json`, and none of aifiles' instructions.** aifiles holds one
     copy of each for every device, written for Linux/WSL: the settings start a status line (a bash
     fork on every redraw, against Android's phantom-process budget) and two hooks by Linux paths, and
-    the instructions describe WSL. `~/.config/aisync/exclude` keeps the three out of the phone's sync
-    in both directions, so a manual `aisync sync` there cannot publish the phone's copies either.
+    the instructions describe WSL. `~/.config/aisync/exclude` keeps the settings, `CLAUDE.md` and
+    OpenCode's `AGENTS.md` out of the phone's sync in both directions, so a manual `aisync sync` there
+    cannot publish the phone's copies either; the two instruction files are deleted there as
+    everywhere (11), and the phone's guide is the home guide rendered for Termux.
 11. **chezmoi manages nothing in aisync's allowlists, and `.chezmoiremove` lists nothing aisync
-    writes.** aifiles syncs only Claude Code and OpenCode (rios0rios0/aifiles#34 dropped Cursor,
-    Codex and Copilot), and chezmoi manages neither tool's directory; the `.cursor` entry in
-    `.chezmoiremove` is the retired Cursor CLI's tombstone (601cbeb), not a path aisync writes.
+    writes but the two global instruction files.** aifiles syncs only Claude Code and OpenCode
+    (rios0rios0/aifiles#34 dropped Cursor, Codex and Copilot), and chezmoi manages neither tool's
+    directory; the `.cursor` entry in `.chezmoiremove` is the retired Cursor CLI's tombstone
+    (601cbeb), not a path aisync writes. `~/.claude/CLAUDE.md` and `~/.config/opencode/AGENTS.md` are
+    the exception, since the home guide took over their job: aisync leaves a file it synced and that
+    was deleted here deleted, as an outgoing deletion the next `aisync sync` removes from aifiles, so
+    deleting them on every apply never fights a pull. `make test-aifiles-sync` checks that those two
+    are the only such entries.
 
 The first sync on a new machine needs nothing by hand: the apply fetches the key, clones aifiles and
 pulls. To leave aifiles alone for one apply, set `SKIP_AIFILES_SYNC=1`. `make test-aifiles-sync`
@@ -880,40 +888,50 @@ CLI's skill and the LSP plugins.
 
 ## The Home AGENTS.md
 
-Two files are named `AGENTS.md`, for two audiences:
+The repository's `AGENTS.md` and `CLAUDE.md` are for agents working on the dotfiles. The home folder
+gets something else: one guide for every agent on the machine, to which each project adds its own.
 
 | File | For | Where it lives |
 |------|-----|----------------|
-| `AGENTS.md` at the repository root (this file) | agents working on the dotfiles | the checkout only: `.chezmoiignore` keeps it out of every home folder |
-| `~/AGENTS.md` | any agent running commands on the machine | rendered for each platform from `.chezmoitemplates/home-agents.md` |
+| `AGENTS.md` at the repository root (this file), and the `CLAUDE.md` that imports it | agents working on the dotfiles | the checkout only: `.chezmoiignore` keeps both out of every home folder |
+| `~/AGENTS.md` | OpenCode, and any agent that reads `AGENTS.md` | rendered for each platform from `.chezmoitemplates/home-agents.md` |
+| `~/CLAUDE.md` | Claude Code, on Linux and Termux | the same rendering, written beside it |
 
-Until it was ignored, chezmoi deployed this file to `~/AGENTS.md` on every platform: 161 KB of
-repository internals. OpenCode V2 reads every `AGENTS.md` from its working directory up to the home
-folder, past the git root (`packages/core/src/config/plugin/instruction.ts` in the fork), so every
-`ocode` session under `~` carried it. Claude Code reads `CLAUDE.md` only, and Codex stops at the
-project root, beside its global `~/.codex/AGENTS.md`, so both see `~/AGENTS.md` only when started in
-the home folder itself.
+Each agent reads the guide once. Claude Code reads every `CLAUDE.md` from its working directory up to
+the home folder, and never `AGENTS.md`. OpenCode V2 reads every `AGENTS.md` up to the home folder, past
+the git root -- the walk in the fork's `packages/core/src/config/plugin/instruction.ts` searches the
+home folder itself -- and no home-level `CLAUDE.md`, because its `instructions` patterns stop at the
+project root. Codex stops at the project root, beside its global `~/.codex/AGENTS.md`, and sees the
+guide only when started in the home folder.
+
+It is the only home-level instruction file. `.chezmoiremove` deletes aisync's `~/.claude/CLAUDE.md`
+and `~/.config/opencode/AGENTS.md`, and the guide carries what they held beyond the machine facts: the
+git rules (pushing over HTTPS and signing on WSL, rebasing, the dotfiles' pull requests, editing
+aisync's files in place), the credential loader, Claude Code's and OpenCode's own directories, and
+OpenCode's pointer to its standards, which it loads no other way. Until it was ignored, chezmoi also
+deployed this file to `~/AGENTS.md` on every platform: 161 KB of repository internals in every `ocode`
+session under `~`.
 
 The guide says what an agent should know before running a command there: the `cp`/`rm`/`mv` guards
 and the `-i` they keep at a terminal, `ls` being eza, zsh's global aliases, quoting through every
-layer, globs under `NO_NOMATCH`, how zsh differs from bash, and secrets; on Termux its paths,
-shebangs, C library and process budget; on Windows reaching WSL (`wsl.exe --exec zsh -c`) and
-PowerShell's aliases, quoting, errors and encodings.
+layer, globs under `NO_NOMATCH`, how zsh differs from bash, the git rules, the agent tools and
+secrets; on Termux its paths, shebangs, C library and process budget; on Windows reaching WSL
+(`wsl.exe --exec zsh -c`) and PowerShell's aliases, quoting, errors and encodings.
 
 **Keep these:**
 
 1. **A script writes it, because chezmoi cannot manage it.** `.chezmoiignore` matches targets, not
-   source files, so ignoring the repository's `AGENTS.md` ignores every other source of
-   `~/AGENTS.md` too, and two sources for one target fail every apply with `inconsistent state`.
-   `run_onchange_after_linux-019` and `run_onchange_after_android-011`, through
-   `.chezmoitemplates/lib-home-agents.sh`, and `run_onchange_after_windows-006` carry the rendered
-   guide in a here-doc or a here-string and write it. A `run_onchange_` script runs again exactly
-   when the guide changes, so a deleted `~/AGENTS.md` comes back with the next change, not the next
-   apply. Managing it as a file would take `.chezmoiroot`, which moves every source file into a
+   source files, so ignoring the repository's `AGENTS.md` and `CLAUDE.md` ignores every other source
+   of `~/AGENTS.md` and `~/CLAUDE.md` too, and two sources for one target fail every apply with
+   `inconsistent state`. `run_onchange_after_linux-019` and `run_onchange_after_android-011`, through
+   `.chezmoitemplates/lib-home-agents.sh`, write both files; `run_onchange_after_windows-006` writes
+   `~/AGENTS.md` alone, since Claude Code is not installed there. A `run_onchange_` script runs again
+   exactly when the guide changes, so a deleted file comes back with the next change, not the next
+   apply. Managing them as files would take `.chezmoiroot`, which moves every source file into a
    subdirectory.
-2. **Written whole, and only when it differs.** It is staged beside the target and renamed over it
-   (`mv -T`, which refuses a directory there); on Windows through .NET, as UTF-8 without a BOM and
-   with LF endings whatever the checkout's, because Windows PowerShell 5.1 runs it on a machine
+2. **Written whole, and only when it differs.** Each file is staged beside its target and renamed
+   over it (`mv -T`, which refuses a directory there); on Windows through .NET, as UTF-8 without a BOM
+   and with LF endings whatever the checkout's, because Windows PowerShell 5.1 runs it on a machine
    without pwsh.
 3. **Every fact holds on the platform it renders for.** The template branches on the OS and, for
    WSL, on the kernel, as `.chezmoiignore` does. Check a new fact there before adding it: the
@@ -921,17 +939,19 @@ PowerShell's aliases, quoting, errors and encodings.
    the toolchains were all measured, not recalled.
 4. **Keep it short.** Agents load it into their context, and `make test-home-agents` fails a
    rendering past 8 KB.
-5. **It overlaps aifiles on purpose.** Claude Code's and OpenCode's global instructions
-   (`~/.claude/CLAUDE.md`, `~/.config/opencode/AGENTS.md`) come from aisync and carry the same kind
-   of facts for Linux/WSL, so an `ocode` session on Linux reads both. aifiles holds one copy for
-   every device, and aisync keeps those off the phone, where this guide is the only one: chezmoi
-   renders it because chezmoi knows the platform.
+5. **One home-level file, so nothing to keep in step.** What an agent should know everywhere goes in
+   `.chezmoitemplates/home-agents.md`, never back into aisync's global files, which `.chezmoiremove`
+   deletes on every apply -- with anything Claude Code's `/memory` writes to user memory. aisync
+   leaves those deletions alone: a file it synced and that was deleted here is an outgoing deletion,
+   which the next `aisync sync` removes from aifiles for every device (see "AI Rules Sync", 11).
 
 `make test-home-agents` covers each platform's guide (its facts and none of another platform's, its
 size, no unrendered action, no line that would end its here-doc or here-string), each platform
 running its own writer and no other, and the writers against a sandbox home: the Linux and Termux
-ones under bash, and the Windows one under pwsh from both an LF and a CRLF checkout.
-`make test-chezmoiignore` covers that no platform deploys the repository's `AGENTS.md`.
+ones under bash, writing `~/CLAUDE.md` identical to `~/AGENTS.md`, and the Windows one under pwsh
+from both an LF and a CRLF checkout, writing no `~/CLAUDE.md`. `make test-chezmoiignore` covers that
+no platform deploys the repository's `AGENTS.md` or `CLAUDE.md`, and `make test-aifiles-sync` that
+`.chezmoiremove` deletes aisync's two global instruction files and nothing else of aisync's.
 
 ## Claude Code Look
 
@@ -1184,7 +1204,7 @@ OpenCode runs on the OmniRoute gateway: `dot_config/opencode/opencode.json.tmpl`
 | Global config | `dot_config/opencode/opencode.json.tmpl`, applied on every platform that gets a shell |
 | CLI | `ocode`, built into `~/.local/bin/ocode` by `run_after_linux-006-build-ocode.sh` (see "The Fork Build" below), Linux only |
 | Look | `dot_config/opencode/cli.json` |
-| Rules | `~/.config/opencode/AGENTS.md` and `rules/`, synced by aisync, not chezmoi; a project's `AGENTS.md` arrives by discovery, and its `CLAUDE.md` through `instructions` |
+| Rules | `~/AGENTS.md`, the home guide chezmoi writes (see "The Home AGENTS.md"), which points at `rules/`, synced by aisync; a project's `AGENTS.md` arrives by discovery, and its `CLAUDE.md` through `instructions` |
 | Key | the `cred:OMNIROUTE_API_KEY` field of the device note, exported by the credential loader and read at config load as `{env:OMNIROUTE_API_KEY}` |
 | Web UI on the tailnet | `.chezmoidata/opencode.yaml` (port, share switch) read through `lib-opencode.tmpl`; `tailscale-up` forwards it as a plain-TCP `serve` entry, on loopback. Pair with `ocode pair --url http://<machine>.<tailnet>.ts.net:<webPort>`; see `.docs/opencode-local.md` |
 

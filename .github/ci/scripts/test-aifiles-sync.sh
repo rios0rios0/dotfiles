@@ -483,15 +483,17 @@ else
 fi
 
 # aisync owns the AI content in ~/.claude and ~/.config/opencode, so chezmoi must manage nothing
-# there that aisync syncs, and delete nothing aisync writes.
+# there that aisync syncs, and delete nothing aisync writes -- except the two global instruction
+# files whose job moved to the home guide chezmoi writes as ~/CLAUDE.md and ~/AGENTS.md (#283).
 claude_entries="$(find "$REPO_ROOT/dot_claude" -mindepth 1 -printf '%f\n' | sort | tr '\n' ' ')"
 opencode_entries="$(find "$REPO_ROOT/dot_config/opencode" -mindepth 1 -printf '%f\n' | sort | tr '\n' ' ')"
+removed_entries="$(grep -E '^\.(claude|config/opencode)(/|$)' "$REPO_ROOT/.chezmoiremove" | sort | tr '\n' ' ' || true)"
 if [[ "$claude_entries" == "executable_statusline-command.sh modify_dot_claude.json modify_settings.json " &&
-    "$opencode_entries" == "cli.json opencode.json.tmpl " ]] &&
-    ! grep -qE '^\.(claude|config/opencode)(/|$)' "$REPO_ROOT/.chezmoiremove"; then
-    pass "chezmoi manages only settings.json's merge, the status line and OpenCode's two configs there"
+    "$opencode_entries" == "cli.json opencode.json.tmpl " &&
+    "$removed_entries" == ".claude/CLAUDE.md .config/opencode/AGENTS.md " ]]; then
+    pass "chezmoi manages only settings.json's merge, the status line and OpenCode's two configs there, and deletes only the two global instruction files"
 else
-    fail "chezmoi's entries in aisync's directories: dot_claude: $claude_entries; dot_config/opencode: $opencode_entries"
+    fail "chezmoi's entries in aisync's directories: dot_claude: $claude_entries; dot_config/opencode: $opencode_entries; .chezmoiremove: $removed_entries"
 fi
 
 if [[ "$EXIT_CODE" -eq 0 ]]; then
