@@ -72,9 +72,9 @@ AppData
      point at an npiperelay.exe that is never installed. The tailscale wrapper runs Windows'
      Tailscale CLI, which is WSL's tailnet client; on bare metal it would shadow tailscaled's own
      CLI. The OmniRoute backups and their restore serve the local stack, which runs from a checkout
-     on WSL alone, and the home-secrets backups copy to the personal OneDrive, reachable from WSL
-     alone. Gated on the kernel rather than the OS because "linux" alone does not distinguish WSL
-     from bare metal. */ -}}
+     on WSL alone, and the home-secrets backups and sync go through the personal OneDrive, reachable
+     from WSL alone. Gated on the kernel rather than the OS because "linux" alone does not
+     distinguish WSL from bare metal. */ -}}
 {{- if not $wsl }}
 .config/systemd/user/ssh-agent-bridge.socket
 .config/systemd/user/ssh-agent-bridge@.service
@@ -82,11 +82,14 @@ AppData
 .config/systemd/user/omniroute-backup.timer
 .config/systemd/user/secrets-backup.service
 .config/systemd/user/secrets-backup.timer
+.config/systemd/user/secrets-sync.service
+.config/systemd/user/secrets-sync.timer
 .local/bin/tailscale
 .local/bin/omniroute-backup
 .local/bin/omniroute-restore
 .local/bin/secrets-backup
 .local/bin/secrets-restore
+.local/bin/secrets-sync
 {{- end }}
 
 {{- /* The local model server (Ollama): Linux with an NVIDIA driver, unless

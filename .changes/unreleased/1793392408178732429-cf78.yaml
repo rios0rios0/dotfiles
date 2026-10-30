@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added `secrets-sync`, which keeps `~/.kube/config-files`, `~/.john/john.pot` and `~/.sqlmap/output` the same on every WSL device through the personal OneDrive, without a server: each device publishes one age-encrypted, HMAC-authenticated snapshot per tool to `Backup\sync\<tool>\<device>.tar.age` and merges the other devices'' snapshots on read, so the newest change wins, a delete on one device reaches the others, and a losing change is kept in `~/.local/state/secrets-sync/conflicts`; each kubeconfig keeps its `current-context` on its own device, a vanished folder or a mass delete stops until `--allow-deletes`, and a systemd user timer runs it hourly'
+time: '2026-10-30T20:33:28.178662064Z'

@@ -47,10 +47,19 @@ recipient is public, so a planted archive is possible — that allowlist is what
 whose folder already exists is left alone unless `--force`, so a restore never silently clobbers
 live state.
 
+## The sync
+
+`secrets-sync` (`.docs/secrets-sync.md`) keeps `~/.kube/config-files`, `~/.john/john.pot` and
+`~/.sqlmap/output` the same on every WSL device, through `Backup\sync` in the same OneDrive and with
+the same key. These backups stay underneath it, per device: a sync copies mistakes too, and the dated
+archives are the way back. On a device that syncs, the next sync merges what a restore put back:
+newer copies on the other devices win, and the restored versions they replace are kept in
+`~/.local/state/secrets-sync/conflicts/`.
+
 ## The key
 
-The backups are encrypted to a dedicated age key — never the chezmoi identity, nor the OmniRoute
-one — so no key's loss or rotation strands another's archives:
+The backups, and the sync's snapshots, are encrypted to a dedicated age key — never the chezmoi
+identity, nor the OmniRoute one — so no key's loss or rotation strands another's archives:
 
 - on disk: `~/.ssh/secrets-backup-key`
 - in 1Password: `op://Private/secrets-backup.age/private key` (public recipient in
