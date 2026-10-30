@@ -203,7 +203,7 @@ This repository manages four Claude Code configuration files. Each targets a dif
 
 The `modify_*` files are chezmoi [modify-templates](https://www.chezmoi.io/user-guide/manage-different-types-of-file/#manage-part-but-not-all-of-a-file): chezmoi evaluates them itself, with the file's current content in `.chezmoi.stdin`, and writes back the merged result, so they need neither bash nor Python. This preserves any user-added configuration while ensuring defaults are always present, and a file that already holds every default is left byte for byte untouched.
 
-> **Note**: Linux gets only `settings.json` and the status line script from `dot_claude/`. The rest of it is deployed only on **Android**, which gets no status line, and Windows, where Claude Code is not installed, gets neither `~/.claude` nor `~/.claude.json` (see `.chezmoiignore`). The global instructions (`~/.claude/CLAUDE.md`) and the rest of the AI content in `~/.claude` are synced by [aisync](https://github.com/rios0rios0/aisync), not by chezmoi.
+> **Note**: Linux gets only `settings.json` and the status line script from `dot_claude/`. The rest of it is deployed only on **Android**, which gets no status line, and Windows, where Claude Code is not installed, gets neither `~/.claude` nor `~/.claude.json` (see `.chezmoiignore`). The rest of the AI content in `~/.claude` is synced by [aisync](https://github.com/rios0rios0/aisync), not by chezmoi, except the home-level instructions: those are the guide chezmoi writes to `~/AGENTS.md`, and aisync syncs no `~/.claude/CLAUDE.md`.
 
 ### Claude Code Look
 
