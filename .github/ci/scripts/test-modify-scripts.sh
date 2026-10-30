@@ -280,7 +280,8 @@ trust_passes_a_trusted_file_through() {
 }
 
 # ~/.claude/settings.json carries the permission rules on Android and the look on Linux, which
-# is why these cases pass the platform arrays defined above the MCP cases.
+# is why these cases pass the platform arrays defined above the MCP cases, and on both the Project
+# instructions setting that has Claude Code read AGENTS.md beside CLAUDE.md.
 
 settings_fills_a_missing_file() {
     # given no ~/.claude/settings.json on Android
@@ -289,8 +290,8 @@ settings_fills_a_missing_file() {
     local out
     out=$(apply_modify_template dot_claude/modify_settings.json .claude/settings.json "" "${ANDROID[@]}") || return 1
 
-    # then: the rules and effortLevel, and none of Linux's look
-    [[ "$(jq -c 'keys' <<<"$out")" = '["effortLevel","permissions"]' ]] &&
+    # then: the rules, effortLevel and the Project instructions setting, and none of Linux's look
+    [[ "$(jq -c 'keys' <<<"$out")" = '["effortLevel","permissions","pluginConfigs"]' ]] &&
         [[ "$(jq -r '.effortLevel' <<<"$out")" = "high" ]] &&
         [[ "$(jq -r '.permissions.allow | length' <<<"$out")" = "22" ]]
 }
@@ -330,7 +331,8 @@ settings_retires_the_github_mcp_rule() {
 settings_passes_a_complete_file_through() {
     # given a file that already holds every managed setting
     apply_modify_template dot_claude/modify_settings.json .claude/settings.json "" "${ANDROID[@]}" \
-        | jq --indent 2 '{permissions: .permissions, effortLevel: .effortLevel}' > "$SANDBOX/complete.json"
+        | jq --indent 2 '{permissions: .permissions, effortLevel: .effortLevel, pluginConfigs: .pluginConfigs}' \
+        > "$SANDBOX/complete.json"
 
     # when
     apply_modify_template dot_claude/modify_settings.json .claude/settings.json "$(cat "$SANDBOX/complete.json")"$'\n' \
@@ -366,7 +368,8 @@ settings_passes_a_linux_file_with_the_look_through() {
     local home="$SANDBOX/look-through-home"
     mkdir -p "$home"
     CASE_HOME="$home" apply_modify_template dot_claude/modify_settings.json .claude/settings.json "" "${LINUX[@]}" \
-        | jq --indent 2 '{model: "opus", statusLine: .statusLine, tui: .tui, theme: .theme, voiceEnabled: true}' \
+        | jq --indent 2 '{model: "opus", statusLine: .statusLine, tui: .tui, theme: .theme, voiceEnabled: true,
+            pluginConfigs: .pluginConfigs}' \
         > "$SANDBOX/look.json"
 
     # when
@@ -375,6 +378,50 @@ settings_passes_a_linux_file_with_the_look_through() {
 
     # then
     cmp -s "$SANDBOX/look.json" "$SANDBOX/look.out"
+}
+
+# Claude Code reads AGENTS.md itself, but by default not where a CLAUDE.md sits in the working
+# directory or above it, which would hide the home guide at ~/AGENTS.md from every repository with
+# a CLAUDE.md of its own; claude-md-and-agents-md reads both.
+AGENTS_PLUGIN="cc-plugin-agents-md@builtin"
+
+settings_reads_agents_md_on_both_platforms() {
+    # given no ~/.claude/settings.json, on Linux and on Android
+    local home="$SANDBOX/agents-md-home" platform out
+    mkdir -p "$home"
+    for platform in linux android; do
+        # when
+        if [[ "$platform" == "linux" ]]; then
+            out=$(CASE_HOME="$home" apply_modify_template dot_claude/modify_settings.json .claude/settings.json "" \
+                "${LINUX[@]}") || return 1
+        else
+            out=$(apply_modify_template dot_claude/modify_settings.json .claude/settings.json "" "${ANDROID[@]}") ||
+                return 1
+        fi
+
+        # then: Claude Code reads CLAUDE.md and AGENTS.md together
+        [[ "$(jq -r --arg id "$AGENTS_PLUGIN" '.pluginConfigs[$id].options.instructionFiles' <<<"$out")" = \
+            "claude-md-and-agents-md" ]] || return 1
+    done
+}
+
+settings_keeps_other_plugin_configs() {
+    # given another plugin's entry, and this plugin's own with another value and an option beside it
+    local input
+    input=$(jq -cn --arg id "$AGENTS_PLUGIN" '{pluginConfigs: {"other@market": {options: {level: 2}},
+        ($id): {options: {instructionFiles: "claude-md", extra: true}, enabled: true}}}')
+
+    # when
+    local out
+    out=$(apply_modify_template dot_claude/modify_settings.json .claude/settings.json "$input" "${ANDROID[@]}") ||
+        return 1
+
+    # then: only instructionFiles changes
+    [[ "$(jq -r --arg id "$AGENTS_PLUGIN" '.pluginConfigs[$id].options.instructionFiles' <<<"$out")" = \
+        "claude-md-and-agents-md" ]] &&
+        [[ "$(jq -c --arg id "$AGENTS_PLUGIN" '.pluginConfigs[$id].options.extra, .pluginConfigs[$id].enabled' \
+            <<<"$out" | paste -sd' ')" = "true true" ]] &&
+        [[ "$(jq -c '.pluginConfigs["other@market"]' <<<"$out")" = '{"options":{"level":2}}' ]]
 }
 
 # --- WSL's .wslconfig ----------------------------------------------------------
@@ -562,6 +609,9 @@ else
     run_case "settings.json: takes out the retired GitHub MCP rule" settings_retires_the_github_mcp_rule
     run_case "settings.json: passes a complete file through byte for byte" settings_passes_a_complete_file_through
     run_case "settings.json: gives Linux the look and none of the rules" settings_gives_linux_the_look_only
+    run_case "settings.json: has Claude Code read AGENTS.md beside CLAUDE.md on Linux and Android" \
+        settings_reads_agents_md_on_both_platforms
+    run_case "settings.json: sets that one option and keeps every other plugin entry" settings_keeps_other_plugin_configs
     run_case "settings.json: passes a Linux file that has the look through byte for byte" \
         settings_passes_a_linux_file_with_the_look_through
     run_case "claude.json: fails on invalid JSON instead of replacing the file" invalid_json_fails_instead_of_replacing

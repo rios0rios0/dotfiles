@@ -1,0 +1,3 @@
+kind: 'Removed'
+body: 'removed aisync''s global instruction files, `~/.claude/CLAUDE.md` and `~/.config/opencode/AGENTS.md`, which `.chezmoiremove` now deletes on every platform: the home guide is the only home-level instruction file, and it carries what they held beyond the machine facts -- the git rules, the credential loader, Claude Code''s and OpenCode''s own directories, and OpenCode''s pointer to its standards; aisync keeps the deletions as outgoing changes, which the next `aisync sync` removes from aifiles'
+time: '2026-10-30T01:16:48.248964421Z'

@@ -1,7 +1,9 @@
 # aisync's exclusions on this device (aisync 1.7.0 and later): a path matching a line here is
 # neither pulled nor pushed. aifiles keeps one copy of each of these for every device, written for
 # Linux/WSL -- the settings start a status line and two hooks by Linux paths, and the instructions
-# describe WSL -- so the phone keeps its own. See "AI Rules Sync" in CLAUDE.md.
+# describe WSL -- so the phone keeps its own settings, and gets its instructions from the home guide
+# chezmoi renders for Termux, which also deletes both instruction files. See "AI Rules Sync" in
+# CLAUDE.md.
 claude/settings.json
 claude/CLAUDE.md
 opencode/AGENTS.md

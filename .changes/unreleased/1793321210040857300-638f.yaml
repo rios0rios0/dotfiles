@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'stopped deploying the repository''s `AGENTS.md`, 161 KB written for agents working on the dotfiles, to `~/AGENTS.md` on every platform, where OpenCode V2, which reads every `AGENTS.md` up to the home folder, loaded it into every session started under `~`'
+time: '2026-10-30T00:46:50.040812776Z'

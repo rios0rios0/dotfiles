@@ -1,10 +1,11 @@
 #!/bin/bash
 
 # Fills ~/.claude and ~/.config/opencode from aifiles through aisync after every apply: Claude's
-# CLAUDE.md, settings, rules, agents, commands, hooks, scripts and skills, OpenCode's AGENTS.md,
-# rules, agents, commands, skills and plugins, and Claude's project memories and recent
-# conversations. The body is .chezmoitemplates/lib-aifiles-sync.sh, which Android shares; "AI Rules
-# Sync" in CLAUDE.md lists the rules it keeps.
+# settings, rules, agents, commands, hooks, scripts and skills, OpenCode's rules, agents, commands,
+# skills and plugins, and Claude's project memories and recent conversations. Their global
+# instruction files are not among them: chezmoi deletes those and writes the home guide instead
+# ("The Home AGENTS.md"). The body is .chezmoitemplates/lib-aifiles-sync.sh, which Android shares;
+# "AI Rules Sync" in CLAUDE.md lists the rules it keeps.
 #
 # `run_after_`, not `run_onchange_`: aifiles changes without this repository changing, and an apply
 # that finds aifiles unchanged costs one `git ls-remote`. After the files, because a first apply has

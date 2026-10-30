@@ -8,8 +8,10 @@ set -euo pipefail
 # directory a `curl` stub serves, and `install_bun` is sourced from the shared dependency
 # library against a `curl` stub that fabricates the upstream installer. Covers the checkout the
 # builder obtains itself (the clone onto the fork's branch with the fork/upstream remote layout,
-# the branch switch, the branch created from the fork's remote-tracking one, the checkout
-# holding no fork branch, a directory that is not a checkout, a failed clone), the skip without
+# the branch switch, the branch created from the fork's remote-tracking one under whichever
+# remote's URL is the fork's -- `origin` in a plain clone, through an SSH host alias -- and fetched
+# over the fork's HTTPS URL first when that remote never fetched it, a failed fetch, a checkout
+# with no remote for the fork, a directory that is not a checkout, a failed clone), the skip without
 # bun, the first build (including the fork channel and the version it must carry -- the release
 # the checkout is built on, marked as the fork's build, or 2.0.0 when its CLI package names no
 # release -- and the dependency install that must precede it), the no-op rebuild, the rebuild on
@@ -35,6 +37,8 @@ ANDROID_INSTALLER="$REPO_ROOT/.chezmoiscripts/run_once_before_android-002-instal
 EXIT_CODE=0
 # What the fake ocode the builds install says, so a check can tell it from the one it replaced.
 FAKE_OCODE="fake ocode"
+# The fork's branch, which every checkout the builder touches must end on.
+FORK_BRANCH="reworked"
 
 TMP="$(mktemp -d)"
 trap 'rm -rf "$TMP"' EXIT
@@ -81,9 +85,10 @@ write_cli_manifest() {
 # git stub: a fake checkout under .git -- HEAD holds the sha, HEAD_REF the branch, refs/ the
 # branches and the remote-tracking ones, remotes/ the remote URLs -- so the clone, the branch
 # switch and the remote layout are all assertable. The clone also brings the package.json a real
-# one would, pinning bun $CLONE_PIN, and the CLI package's, naming release $CLONE_RELEASE. Every
-# invocation is recorded in $GIT_CALLS. CLONE_FAIL makes the clone fail the way a machine without
-# the network does.
+# one would, pinning bun $CLONE_PIN, and the CLI package's, naming release $CLONE_RELEASE. A fetch
+# writes the destination of its refspec, and records the GIT_TERMINAL_PROMPT it ran with. Every
+# invocation is recorded in $GIT_CALLS. CLONE_FAIL and FETCH_FAIL make the clone and the fetch fail
+# the way a machine without the network does.
 cat >"$STUB/git" <<'STUB'
 #!/bin/bash
 echo "$*" >>"${GIT_CALLS:?}"
@@ -110,12 +115,12 @@ case "$sub" in
     log) echo "fake0123 chore: fake fork commit" ;;
     clone)
         [[ -z "${CLONE_FAIL:-}" ]] || exit 128
-        remote=""; branch=""
+        remote=""; branch=""; url=""; target=""
         while [ $# -gt 0 ]; do
             case "$1" in
                 --origin) remote="$2"; shift 2 ;;
                 --branch) branch="$2"; shift 2 ;;
-                *) url="$1"; target="$1"; shift ;;
+                *) if [ -z "$url" ]; then url="$1"; else target="$1"; fi; shift ;;
             esac
         done
         mkdir -p "$target/.git" "$target/.git/remotes"
@@ -129,8 +134,17 @@ case "$sub" in
         mkdir -p "$target/packages/cli"
         printf '{\n  "name": "@opencode/cli",\n  "version": "%s"\n}\n' "${CLONE_RELEASE:?}" >"$target/packages/cli/package.json"
         ;;
+    fetch)
+        echo "fetch-env GIT_TERMINAL_PROMPT=${GIT_TERMINAL_PROMPT-unset}" >>"${GIT_CALLS:?}"
+        [[ -z "${FETCH_FAIL:-}" ]] || exit 128
+        for arg in "$@"; do refspec="$arg"; done
+        dst="${refspec#*:}"
+        mkdir -p "$(dirname "$dir/.git/$dst")"
+        : >"$dir/.git/$dst"
+        ;;
     remote)
-        case "$1" in
+        case "${1:-}" in
+            "") [ ! -d "$dir/.git/remotes" ] || ls "$dir/.git/remotes" ;;
             get-url)
                 [ -f "$dir/.git/remotes/$2" ] || exit 2
                 cat "$dir/.git/remotes/$2"
@@ -276,9 +290,8 @@ ran_with() {
     done
 }
 
-# 1) No checkout: the fork is cloned onto its branch, the remotes are named the way the
-#    hand-made checkouts on this machine have them (`fork` for rios0rios0, `origin` for sst
-#    upstream), and the build then runs -- a fresh machine ends the apply with ocode installed
+# 1) No checkout: the fork is cloned onto its branch, with the fork as `fork` and sst upstream
+#    as `origin`, and the build then runs -- a fresh machine ends the apply with ocode installed
 #    *and* the checkout ready to edit. The build carries a release-grade version on the fork's
 #    channel, because the Console's free tier refuses client versions below 1.18.0 and a bare
 #    branch build's preview version falls below it.
@@ -287,7 +300,9 @@ run_script
 [[ "$(rc)" -eq 0 ]] || fail "the clone must exit 0"
 grep -qF "clone --origin fork --branch reworked https://github.com/rios0rios0/opencode.git $CHECKOUT" "$GIT_CALLS" ||
     fail "a missing checkout must be cloned from the fork on its branch"
-[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the clone must land on the fork's branch"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "the clone must land on the fork's branch"
+[[ "$(cat "$CHECKOUT/.git/remotes/fork")" = "https://github.com/rios0rios0/opencode.git" ]] ||
+    fail "the clone must keep the fork as fork"
 [[ "$(cat "$CHECKOUT/.git/remotes/origin")" = "https://github.com/sst/opencode.git" ]] ||
     fail "the clone must get sst upstream as origin"
 [[ -x "$HOME/.local/bin/ocode" ]] || fail "the build after the clone must install an executable ocode"
@@ -329,7 +344,7 @@ before="$(calls)"
 run_script
 [[ "$(rc)" -eq 0 ]] || fail "a branch switch must exit 0"
 grep -q "checkout is on main, switching to reworked" "$TMP/out" || fail "the switch must say which branch it came from"
-[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the checkout must end on the fork's branch"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "the checkout must end on the fork's branch"
 [[ "$(calls)" -eq "$before" ]] || fail "an unchanged head must not rebuild after a branch switch"
 pass "a checkout on another branch is switched to the fork's without rebuilding"
 
@@ -342,21 +357,95 @@ run_script
 [[ "$(rc)" -eq 0 ]] || fail "tracking the fork's branch must exit 0"
 grep -qF "checkout -b reworked --track fork/reworked" "$GIT_CALLS" ||
     fail "a missing local branch must be created from fork/<branch>"
-[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "reworked" ]] || fail "the tracked branch must be checked out"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "the tracked branch must be checked out"
 pass "a missing local branch is created from the fork's remote-tracking one"
 
-# 4) Neither the branch nor the fork's remote one exists: the checkout is left alone and
-#    nothing is built, rather than building whatever branch it happens to be on.
-rm -rf "$CHECKOUT/.git/refs/heads/reworked" "$CHECKOUT/.git/refs/remotes"
-printf 'main\n' >"$CHECKOUT/.git/HEAD_REF"
+# Points the fake checkout at the given remotes, `<name>=<url>` each, with no local fork branch
+# and no remote-tracking refs, on another branch: the state the switch above starts from.
+set_remotes() {
+    local spec
+    rm -rf "$CHECKOUT/.git/refs/heads/reworked" "$CHECKOUT/.git/refs/remotes" "$CHECKOUT/.git/remotes"
+    mkdir -p "$CHECKOUT/.git/remotes"
+    for spec in "$@"; do
+        printf '%s\n' "${spec#*=}" >"$CHECKOUT/.git/remotes/${spec%%=*}"
+    done
+    printf 'dev\n' >"$CHECKOUT/.git/HEAD_REF"
+    : >"$GIT_CALLS"
+}
+# Gives remote $1 a remote-tracking reworked, as a fetch of the fork would.
+fetched() {
+    local remote="$1"
+    mkdir -p "$CHECKOUT/.git/refs/remotes/$remote"
+    : >"$CHECKOUT/.git/refs/remotes/$remote/$FORK_BRANCH"
+}
+fetches() { grep -c ' fetch --no-tags ' "$GIT_CALLS" || true; }
+
+# 3b) A plain `git clone` of the fork, made by hand, calls the fork `origin`, here through the
+#     github.com-mine SSH alias, and has no `fork` remote at all: the checkout behind this case,
+#     whose apply warned that it had no reworked branch while origin/reworked was right there.
+#     The branch is created from origin/reworked, and nothing is fetched.
+set_remotes "origin=git@github.com-mine:rios0rios0/opencode.git"
+fetched origin
+run_script
+[[ "$(rc)" -eq 0 ]] || fail "a plain clone of the fork must switch: $(cat "$TMP/out")"
+grep -qF "checkout -b reworked --track origin/reworked" "$GIT_CALLS" ||
+    fail "a plain clone's branch must be created from origin/reworked: $(cat "$GIT_CALLS")"
+[[ "$(fetches)" -eq 0 ]] || fail "a fetched branch must not be fetched again"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "a plain clone must end on the fork's branch"
+pass "a plain clone, whose fork is origin, gets the branch from origin/reworked"
+
+# 3c) The fork's other URL forms count too, under a remote of any name.
+for url in "https://github.com/rios0rios0/opencode" "ssh://git@github.com/rios0rios0/opencode.git" "github.com-mine:rios0rios0/opencode"; do
+    set_remotes "mirror=$url"
+    fetched mirror
+    run_script
+    grep -qF "checkout -b reworked --track mirror/reworked" "$GIT_CALLS" ||
+        fail "$url: must be recognized as the fork: $(cat "$TMP/out")"
+done
+pass "the fork is recognized by any of its URL forms, under any remote name"
+
+# 3d) The fork's remote has never fetched the branch: it is fetched first, from the fork's HTTPS
+#     URL rather than the remote's SSH one, whose 1Password approval nobody gives an unattended
+#     apply, with git's prompts off, into that remote's namespace; then it is tracked.
+set_remotes "origin=git@github.com-mine:rios0rios0/opencode.git"
+run_script
+[[ "$(rc)" -eq 0 ]] || fail "fetching the fork's branch must exit 0: $(cat "$TMP/out")"
+grep -qF "fetch --no-tags https://github.com/rios0rios0/opencode.git +refs/heads/reworked:refs/remotes/origin/reworked" "$GIT_CALLS" ||
+    fail "the branch must be fetched over the fork's HTTPS URL into origin's namespace: $(cat "$GIT_CALLS")"
+grep -qxF "fetch-env GIT_TERMINAL_PROMPT=0" "$GIT_CALLS" || fail "the fetch must run with git's prompts off"
+grep -qF "checkout -b reworked --track origin/reworked" "$GIT_CALLS" || fail "the fetched branch must be tracked"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "$FORK_BRANCH" ]] || fail "the checkout must end on the fetched branch"
+pass "a branch the fork's remote never fetched is fetched over HTTPS, then tracked"
+
+# 4) The fetch fails -- no network, or the branch is gone: the checkout is left alone and nothing
+#    is built, rather than building whatever branch it happens to be on.
+set_remotes "origin=git@github.com-mine:rios0rios0/opencode.git"
 rm -f "$HOME/.local/bin/ocode"
 before="$(calls)"
+export FETCH_FAIL=1
 run_script
-[[ "$(rc)" -eq 0 ]] || fail "a checkout without the fork's branch must skip"
-grep -q "has no reworked branch" "$TMP/out" || fail "the missing branch must be reported"
-[[ "$(calls)" -eq "$before" ]] || fail "a checkout without the fork's branch must not build"
-[[ ! -e "$HOME/.local/bin/ocode" ]] || fail "a checkout without the fork's branch must not install a binary"
-pass "a checkout with no fork branch warns and builds nothing"
+unset FETCH_FAIL
+[[ "$(rc)" -eq 0 ]] || fail "a failed fetch must not fail the apply"
+grep -qF "WARN: failed to fetch reworked from https://github.com/rios0rios0/opencode.git" "$TMP/out" ||
+    fail "a failed fetch must say what failed: $(cat "$TMP/out")"
+[[ "$(cat "$CHECKOUT/.git/HEAD_REF")" = "dev" ]] || fail "a failed fetch must leave the checkout on its branch"
+[[ "$(calls)" -eq "$before" ]] || fail "a failed fetch must not build"
+[[ ! -e "$HOME/.local/bin/ocode" ]] || fail "a failed fetch must not install a binary"
+pass "a failed fetch warns and builds nothing"
+
+# 4b) No remote points at the fork -- upstream alone, or a repository whose name only starts the
+#     same: nothing is fetched or built, and the warning says how to add the remote.
+set_remotes "origin=https://github.com/sst/opencode.git" "other=git@github.com-mine:rios0rios0/opencode-fork.git"
+before="$(calls)"
+run_script
+[[ "$(rc)" -eq 0 ]] || fail "a checkout with no remote for the fork must skip"
+grep -qF "has no reworked branch and no remote for https://github.com/rios0rios0/opencode.git" "$TMP/out" ||
+    fail "a checkout with no remote for the fork must be reported: $(cat "$TMP/out")"
+grep -qF "remote add fork https://github.com/rios0rios0/opencode.git" "$TMP/out" || fail "the warning must say how to add the remote"
+[[ "$(fetches)" -eq 0 ]] || fail "a checkout with no remote for the fork must fetch nothing"
+[[ "$(calls)" -eq "$before" ]] || fail "a checkout with no remote for the fork must not build"
+[[ ! -e "$HOME/.local/bin/ocode" ]] || fail "a checkout with no remote for the fork must not install a binary"
+pass "a checkout with no remote for the fork warns and builds nothing"
 
 # 5) A directory that is not a checkout is not cloned into: it may hold somebody's work, and a
 #    clone would either fail on it or, worse, be mistaken for done.

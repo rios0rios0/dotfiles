@@ -56,3 +56,13 @@ local-services/omniroute/compose.yaml
 # process that runs op, so each item asked for an approval of its own; chezmoi runs `op.exe`
 # itself again. It only ever existed on Windows.
 .local/bin/op-retry.cmd
+
+# aisync's global instruction files -- their job moved to the home guide in #283 (2026-10-29),
+# which chezmoi writes as `~/AGENTS.md` and Claude Code and OpenCode both read, so these would only
+# repeat it; the guide carries what they held beyond it. aisync leaves a file it synced
+# and that was deleted here deleted: the deletion is an outgoing change, which the next
+# `aisync sync` removes from aifiles for every device. On the phone they were its own copies, kept
+# out of aisync by its exclude file. Anything Claude Code's `/memory` later writes to user memory
+# is deleted with it: durable instructions belong in `.chezmoitemplates/home-agents.md`.
+.claude/CLAUDE.md
+.config/opencode/AGENTS.md

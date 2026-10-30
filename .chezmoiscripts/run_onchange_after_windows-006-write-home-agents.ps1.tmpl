@@ -1,0 +1,26 @@
+# Writes ~\AGENTS.md, the agent guide for this machine, from .chezmoitemplates/home-agents.md: the
+# Windows counterpart of .chezmoitemplates/lib-home-agents.sh, which Linux and Android share. It is
+# not the repository's AGENTS.md, which .chezmoiignore keeps out of the home folder: see "The Home
+# AGENTS.md" there. `run_onchange_`: the guide below is part of this script, so the script runs
+# again exactly when the guide changes.
+#
+# Windows PowerShell 5.1 may run it as well as pwsh, so the file is written through .NET: UTF-8
+# without a BOM, with LF line endings whatever the checkout's are, staged beside the target and
+# moved over it. A guide already in place is left untouched.
+
+$ErrorActionPreference = 'Stop'
+
+$guide = @'
+{{ includeTemplate "home-agents.md" . | trim }}
+'@
+$content = ($guide -replace "`r`n", "`n") + "`n"
+$target = Join-Path $HOME 'AGENTS.md'
+
+if ((Test-Path -LiteralPath $target -PathType Leaf) -and ([System.IO.File]::ReadAllText($target) -ceq $content)) {
+    return
+}
+
+$staged = "$target.new"
+[System.IO.File]::WriteAllText($staged, $content, (New-Object System.Text.UTF8Encoding $false))
+Move-Item -LiteralPath $staged -Destination $target -Force
+Write-Host "[home-agents] wrote the agent guide for this machine to $target"

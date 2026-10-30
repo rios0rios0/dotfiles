@@ -1,0 +1,3 @@
+kind: 'Fixed'
+body: 'fixed the `ocode` build skipping a checkout whose fork remote is `origin`, as a plain `git clone` of the fork names it: `run_after_linux-006-build-ocode.sh` looked for the `reworked` branch only under a remote named `fork` and warned `has no reworked branch` on every apply; it now finds the fork''s remote by its URL and, when that remote has never fetched `reworked`, fetches it over the fork''s HTTPS URL first, so an SSH remote''s 1Password approval never holds up an apply'
+time: '2026-10-30T00:46:50.038345133Z'

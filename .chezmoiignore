@@ -3,6 +3,12 @@
 .editorconfig
 .github
 .shellcheckrc
+# AGENTS.md (and CLAUDE.md below) are the repository's, for agents working on the dotfiles.
+# ~/AGENTS.md is another file, the agent guide for each machine, which the write-home-agents
+# scripts render from .chezmoitemplates/home-agents.md: this list matches targets, so ignoring the
+# repository's AGENTS.md ignores any other source of ~/AGENTS.md too (see "The Home AGENTS.md" in
+# AGENTS.md). No ~/CLAUDE.md is written at all.
+AGENTS.md
 CHANGELOG.md
 CLAUDE.md
 CONTRIBUTING.md
