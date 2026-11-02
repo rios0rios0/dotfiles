@@ -1602,8 +1602,12 @@ database the repository carried as encrypted files that nothing ever committed a
     warned about if it has no session); every other device logs in on its next apply.
 13. **Neither script fails the apply.** No `op`, a locked 1Password, an unreachable server, a failed
     import: each is an `[atuin] WARN:` line and exit 0, and the next apply tries again. A failure
-    of Atuin's own carries the `Error:` line of its report, never the last line: that is the
-    `Location:` naming a line of Atuin's source, all a failed login on Termux used to show.
+    of Atuin's own carries its report on one line: the `Error:` line and each cause under
+    `Caused by:` that it does not already contain, joined by colons as eyre's one-line form joins
+    them (`error sending request for url (…): client error (Connect): dns error: failed to lookup
+    address information: …`). Never the last line, which is the `Location:` naming a line of
+    Atuin's source, all a failed login on Termux once showed; never the error alone, which said
+    only that the request failed when the phone's Tailscale was off.
 14. **The import is once per Atuin database, by two markers, and only once logged in.** `atuin
     import` does not deduplicate, so `~/.atuin/data/.dotfiles-histdb-imported` -- not chezmoi's
     state, which `chezmoi state reset` and an edit of the script would undo -- records it. Only the

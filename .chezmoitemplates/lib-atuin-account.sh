@@ -33,21 +33,44 @@ _atuin_not_logged_in() {
     [[ "$output" == *"You are not logged in to a sync server"* ]]
 }
 
-# _atuin_reason <output>: why an Atuin command failed, for a WARN line. Atuin's error report starts
-# with an `Error:` line and ends with a `Location:` block naming a line of its own source, so the
-# last line says nothing: a failed login on Termux showed only
-# `crates/atuin/src/command/client/account/login.rs:271:9`. Output without an `Error:` line gives
-# its last line that is not blank.
+# _atuin_reason <output>: why an Atuin command failed, on one line for a WARN. Atuin's error report
+# is an `Error:` line, a `Caused by:` list from the outermost cause in to the innermost (numbered
+# when there is more than one), and a `Location:` naming a line of Atuin's own source. The reason is
+# the error and then each cause it does not already contain, joined by colons as eyre's one-line
+# form joins them. A login that cannot reach the server then says how, as in `error sending request
+# for url (…): client error (Connect): dns error: failed to lookup address information: …`, where
+# the error line alone said only that the request failed, and the last line only where: a failed
+# login on Termux showed nothing but `crates/atuin/src/command/client/account/login.rs:271:9`.
+# Output without an `Error:` line gives its last line that is not blank, before any `Location:`.
 _atuin_reason() {
-    local line last=""
+    local line reason="" last="" causes=false numbered='^[0-9]+: (.*)$'
     while IFS= read -r line; do
-        if [[ "$line" == "Error: "* ]]; then
-            printf '%s' "${line#Error: }"
-            return 0
+        [[ "$line" != "Location:" ]] || break
+        if [[ -z "$reason" ]]; then
+            if [[ "$line" == "Error: "* ]]; then
+                reason="${line#Error: }"
+            elif [[ "$line" == *[![:space:]]* ]]; then
+                last="$line"
+            fi
+        elif [[ "$line" == "Caused by:" ]]; then
+            causes=true
+        elif [[ "$causes" == "true" ]]; then
+            if [[ "$line" != *[![:space:]]* ]]; then
+                causes=false
+                continue
+            fi
+            line="${line#"${line%%[![:space:]]*}"}"
+            if [[ "$line" =~ $numbered ]]; then
+                line="${BASH_REMATCH[1]}"
+            fi
+            [[ "$reason" == *"$line"* ]] || reason+=": $line"
         fi
-        [[ "$line" != *[![:space:]]* ]] || last="$line"
     done <<<"$1"
-    printf '%s' "${last#"${last%%[![:space:]]*}"}"
+    if [[ -n "$reason" ]]; then
+        printf '%s' "$reason"
+    else
+        printf '%s' "${last#"${last%%[![:space:]]*}"}"
+    fi
 }
 
 # _atuin_write_key_file <key>: on Termux, writes the account's key into Atuin's key file when there

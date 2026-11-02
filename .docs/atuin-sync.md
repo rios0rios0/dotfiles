@@ -90,8 +90,9 @@ Termux, where no script can call `op`, chezmoi renders them into the script from
 session, and only on an apply whose render finds no session. Either way the password reaches
 `atuin login` in its environment and the key on its stdin. On Termux the key file is written first
 (see "Termux and the key file"). Anything that stops it -- no network, 1Password locked, the
-server down -- is an `[atuin] WARN:` line carrying Atuin's own error, and the next apply tries
-again. The server's own device is only warned about: it registered in step 2.
+server down -- is an `[atuin] WARN:` line carrying Atuin's own error and its causes, innermost
+last, and the next apply tries again. The server's own device is only warned about: it registered
+in step 2.
 
 By hand, on a device where the apply cannot reach 1Password:
 
@@ -230,6 +231,8 @@ To an always-on machine, once there is one:
 | Symptom | Check |
 |---------|-------|
 | `atuin sync` cannot connect from another device | The laptop is on and Docker Desktop runs there, which starts the container by itself (`restart: always`): `docker compose -f local-services/atuin/compose.yaml ps`. Then `tailscale serve status` on the laptop |
+| `atuin login failed (error sending request for url (http://alien-a51:8888/login): … dns error: failed to lookup address information: …)` | The device cannot resolve the server's name. Check that its Tailscale is connected: `tailscale status` on the laptop lists the device as `offline, last seen …` while it is not, as the phone was when its app had dropped off the tailnet. On Termux, also check that the app uses Tailscale DNS |
+| `atuin login failed (… tcp connect error: Connection refused …)` or `… timed out …` | The name resolved, so the server or its share is down: the row above about `atuin sync` |
 | The name `alien-a51` does not resolve on a device | Give that device the laptop's tailnet address: `tailscale ip -4 alien-a51`, as `devices.<deviceName>.serverHost` in `.chezmoidata/atuin.yaml` |
 | `atuin register` fails with registration closed | Start the container with `ATUIN_OPEN_REGISTRATION=true`, as in step 1 |
 | A device is still not logged in after an apply | The apply's `[atuin] WARN:` line says why; `atuin status` says whether a session exists, and step 3 has the login by hand |
