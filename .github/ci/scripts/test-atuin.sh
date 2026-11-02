@@ -13,7 +13,8 @@ set -euo pipefail
 # `op`, which record their arguments, environment and stdin, so the suite proves where the password
 # and the key travel, and against a small zsh-histdb database built with sqlite3. The atuin stub can
 # refuse to create its key file as Atuin does on Termux (atuinsh/atuin#4329), which is what Termux's
-# login has to write first, and fails with Atuin's own report, whose last line names a source line.
+# login has to write first, and fails with Atuin's own report: an error, the causes a warning must
+# keep, and a last line that names only a line of Atuin's source.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -349,7 +350,8 @@ done
 # account's two fields. The stub keeps its key file where Atuin would with ATUIN_HOME set, and
 # reports that path to `config get --resolved key_path`, creating the data directory as Atuin does.
 # With STUB_NO_HARDLINKS it is Atuin on Termux: a login that finds no key file fails to create one,
-# with the report the phone printed.
+# with the report the phone printed. With STUB_LOGIN_UNREACHABLE the login cannot resolve the
+# server's name, as on a phone whose Tailscale is off.
 ACCT_BIN="$TMP/acct-bin"
 mkdir -p "$ACCT_BIN"
 cat >"$ACCT_BIN/atuin" <<'STUB'
@@ -357,9 +359,23 @@ cat >"$ACCT_BIN/atuin" <<'STUB'
 state="${ATUIN_STATE:?}"
 key_file="${ATUIN_HOME:?}/data/key"
 printf '%s\n' "$*" >>"$state/argv"
-# report <message> <source line>: Atuin's error report, which ends with where it was raised
+# report <message> <source line> [<cause>...]: Atuin's error report as the real one prints it: the
+# error, its causes from the outermost in (numbered when there is more than one), and where it was
+# raised
 report() {
-    printf 'Error: %s\n\nLocation:\n    crates/atuin/src/%s\n' "$1" "$2" >&2
+    local message="$1" location="$2" cause i=0
+    shift 2
+    printf 'Error: %s\n' "$message" >&2
+    if (($# == 1)); then
+        printf '\nCaused by:\n    %s\n' "$1" >&2
+    elif (($# > 1)); then
+        printf '\nCaused by:\n' >&2
+        for cause in "$@"; do
+            printf '%4d: %s\n' "$i" "$cause" >&2
+            i=$((i + 1))
+        done
+    fi
+    printf '\nLocation:\n    crates/%s\n' "$location" >&2
 }
 case "$1" in
     status)
@@ -382,11 +398,18 @@ case "$1" in
         if [[ -e "$key_file" ]]; then
             cp "$key_file" "$state/login-key-file"
         elif [[ -n "${STUB_NO_HARDLINKS:-}" ]]; then
-            printf 'Error: unexpected io error: Permission denied (os error 13)\n\nCaused by:\n    Permission denied (os error 13)\n\nLocation:\n    crates/atuin/src/command/client/account/login.rs:271:9\n' >&2
+            report "unexpected io error: Permission denied (os error 13)" \
+                "atuin/src/command/client/account/login.rs:271:9" "Permission denied (os error 13)"
+            exit 1
+        fi
+        if [[ -n "${STUB_LOGIN_UNREACHABLE:-}" ]]; then
+            report "error sending request for url (http://alien-a51:8888/login)" \
+                "atuin-client/src/api_client.rs:188:16" "client error (Connect)" "dns error" \
+                "failed to lookup address information: No address associated with hostname"
             exit 1
         fi
         if [[ -n "${STUB_LOGIN_FAIL:-}" ]]; then
-            report "invalid login details" "command/client/account/login.rs:162:24"
+            report "invalid login details" "atuin/src/command/client/account/login.rs:162:24"
             exit 1
         fi
         : >"$state/logged-in"
@@ -397,7 +420,8 @@ case "$1" in
         printf '%s' "${HISTDB_FILE:-}" >"$state/histdb-path"
         cp "${HISTDB_FILE:?}" "$state/imported.db"
         if [[ -n "${STUB_IMPORT_FAIL:-}" ]]; then
-            report "the database is locked" "command/client/import.rs:88:13"
+            report "the database is locked" "atuin/src/command/client/import.rs:88:13" \
+                "error returned from database: (code: 5) database is locked" "(code: 5) database is locked"
             exit 1
         fi
         echo "Import complete!"
@@ -515,6 +539,20 @@ if [[ "$(state_rc)" -eq 0 && "$(leaks)" -eq 0 ]] &&
     pass "a refused login is a warning that gives Atuin's reason"
 else
     fail "a refused login: rc=$(state_rc), leaks: $(leaks), $(state_out)"
+fi
+
+# given a server whose name does not resolve, as on a phone whose Tailscale is off
+new_state
+# when the login runs
+run_rendered "$TMP/login-linux.sh" STUB_LOGIN_UNREACHABLE=1
+# then the warning keeps every cause, from the request in to the lookup, on one line, which the error
+# line alone did not: it said only that the request failed
+if [[ "$(state_rc)" -eq 0 ]] &&
+    grep -qF "WARN: atuin login failed (error sending request for url (http://alien-a51:8888/login): client error (Connect): dns error: failed to lookup address information: No address associated with hostname); the next apply tries again" "$ATUIN_STATE/out" &&
+    ! grep -q 'api_client\.rs' "$ATUIN_STATE/out"; then
+    pass "a server that cannot be reached is a warning that names the cause, the failed lookup"
+else
+    fail "an unreachable server's warning: rc=$(state_rc), $(state_out)"
 fi
 
 # given Atuin as Termux has it, which cannot create its key file, and a login that does not write it
@@ -780,7 +818,7 @@ SQL
     run_rendered "$TMP/import-laptop.sh" STUB_IMPORT_FAIL=1
     # then it warns and writes no marker, so the next apply tries again
     if [[ "$(state_rc)" -eq 0 && ! -e "$(marker)" && "$(calls sync)" -eq 0 ]] &&
-        grep -qF "WARN: atuin import failed (the database is locked); the next apply tries again" "$ATUIN_STATE/out"; then
+        grep -qF "WARN: atuin import failed (the database is locked: error returned from database: (code: 5) database is locked); the next apply tries again" "$ATUIN_STATE/out"; then
         pass "a failed import is a warning that leaves no marker"
     else
         fail "a failed import: rc=$(state_rc), marker: $(ls "$(marker)" 2>&1), $(state_out)"
