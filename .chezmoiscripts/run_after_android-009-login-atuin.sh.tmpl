@@ -7,6 +7,11 @@
 # key -- and only when the render finds Atuin reporting no session, so that a phone already logged
 # in reads nothing from 1Password. A login that fails is retried by the next apply, which renders
 # the secrets again.
+#
+# Unlike Linux, it writes Atuin's key file before `atuin login`. Atuin cannot create that file on
+# Android: it hard-links the file into place, which Android's app storage refuses
+# (atuinsh/atuin#4329), so the login would fail before it reached the server. The key is therefore
+# the base64 form `atuin key --base64` prints, the only form the file takes.
 
 set -euo pipefail
 {{ $atuin := includeTemplate "lib-atuin.tmpl" . | fromJson -}}
@@ -35,4 +40,4 @@ atuin_secret() {
     printf '%s' "${value%$'\n'}"
 }
 
-atuin_ensure_login {{ $atuin.account.username | squote }} {{ $atuin.isServer }}
+atuin_ensure_login {{ $atuin.account.username | squote }} {{ $atuin.isServer }} true

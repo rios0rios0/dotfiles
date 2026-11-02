@@ -20,9 +20,10 @@ atuin:
   # The port the server listens on, and the tailnet port tailscale-up shares it on.
   port: 8888
   # The account every device logs in with, and the 1Password item that holds its secrets in two
-  # fields, `password` and `key` (the encryption key `atuin key` prints). It is registered once, by
-  # hand, on the server's device (.docs/atuin-sync.md); after that, an apply logs in any other
-  # device that is not logged in yet.
+  # fields, `password` and `key` (the encryption key in the base64 form `atuin key --base64`
+  # prints: Termux writes it into Atuin's key file, which takes no other form). It is registered
+  # once, by hand, on the server's device (.docs/atuin-sync.md); after that, an apply logs in any
+  # other device that is not logged in yet.
   account:
     username: 'rios0rios0'
     onePasswordAccount: 'my'

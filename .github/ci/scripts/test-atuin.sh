@@ -11,7 +11,9 @@ set -euo pipefail
 # file against the client's pin and port, and the wiring of the removal of zsh-histdb. The login and
 # the one-time history import that every apply runs are rendered and run against stubbed `atuin` and
 # `op`, which record their arguments, environment and stdin, so the suite proves where the password
-# and the key travel, and against a small zsh-histdb database built with sqlite3.
+# and the key travel, and against a small zsh-histdb database built with sqlite3. The atuin stub can
+# refuse to create its key file as Atuin does on Termux (atuinsh/atuin#4329), which is what Termux's
+# login has to write first, and fails with Atuin's own report, whose last line names a source line.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 CI_DIR="$REPO_ROOT/.github/ci"
@@ -202,10 +204,20 @@ if ! command -v chezmoi >/dev/null 2>&1; then
     exit 1
 fi
 chmod +x "$CI_DIR/fixtures/mock-op.sh"
+# chezmoi's 1Password command: the shared mock, except that the Atuin key, which Termux's login
+# renders into itself, is $RENDER_KEY when that is set, so each render can carry a key in either form.
+cat >"$TMP/op-render" <<EOF
+#!/bin/sh
+case "\$*" in
+    *op://Private/Atuin/key*) [ -n "\${RENDER_KEY:-}" ] && { printf '%s\n' "\$RENDER_KEY"; exit 0; } ;;
+esac
+exec "$CI_DIR/fixtures/mock-op.sh" "\$@"
+EOF
+chmod +x "$TMP/op-render"
 cat >"$TMP/chezmoi.yaml" <<EOF
 sourceDir: "$REPO_ROOT"
 onePassword:
-  command: "$CI_DIR/fixtures/mock-op.sh"
+  command: "$TMP/op-render"
 data:
   deviceName: "testdevice"
 EOF
@@ -333,13 +345,22 @@ done
 # The account on apply: the login, and the one-time import of zsh-histdb's history. The rendered
 # scripts run against stubs that stand in for `atuin` and `op`: each records its arguments in
 # $ATUIN_STATE, the atuin stub keeps a login in a file there and records the password it found in
-# its environment and the key it read on stdin, and the op stub answers the account's two fields.
+# its environment, the key it read on stdin and the key file it found, and the op stub answers the
+# account's two fields. The stub keeps its key file where Atuin would with ATUIN_HOME set, and
+# reports that path to `config get --resolved key_path`, creating the data directory as Atuin does.
+# With STUB_NO_HARDLINKS it is Atuin on Termux: a login that finds no key file fails to create one,
+# with the report the phone printed.
 ACCT_BIN="$TMP/acct-bin"
 mkdir -p "$ACCT_BIN"
 cat >"$ACCT_BIN/atuin" <<'STUB'
 #!/bin/bash
 state="${ATUIN_STATE:?}"
+key_file="${ATUIN_HOME:?}/data/key"
 printf '%s\n' "$*" >>"$state/argv"
+# report <message> <source line>: Atuin's error report, which ends with where it was raised
+report() {
+    printf 'Error: %s\n\nLocation:\n    crates/atuin/src/%s\n' "$1" "$2" >&2
+}
 case "$1" in
     status)
         if [[ -e "$state/logged-in" ]]; then
@@ -349,11 +370,23 @@ case "$1" in
         echo "Error: You are not logged in to a sync server - cannot show sync status" >&2
         exit 1
         ;;
+    config)
+        [[ "$*" == "config get --resolved key_path" && -z "${STUB_CONFIG_FAIL:-}" ]] || exit 1
+        mkdir -p "${key_file%/*}"
+        echo "$key_file"
+        ;;
     login)
         printf '%s' "${ATUIN_PASSWORD:-}" >"$state/login-password"
         cat >"$state/login-stdin"
+        echo "IMPORTANT"
+        if [[ -e "$key_file" ]]; then
+            cp "$key_file" "$state/login-key-file"
+        elif [[ -n "${STUB_NO_HARDLINKS:-}" ]]; then
+            printf 'Error: unexpected io error: Permission denied (os error 13)\n\nCaused by:\n    Permission denied (os error 13)\n\nLocation:\n    crates/atuin/src/command/client/account/login.rs:271:9\n' >&2
+            exit 1
+        fi
         if [[ -n "${STUB_LOGIN_FAIL:-}" ]]; then
-            echo "Error: invalid login details" >&2
+            report "invalid login details" "command/client/account/login.rs:162:24"
             exit 1
         fi
         : >"$state/logged-in"
@@ -364,7 +397,7 @@ case "$1" in
         printf '%s' "${HISTDB_FILE:-}" >"$state/histdb-path"
         cp "${HISTDB_FILE:?}" "$state/imported.db"
         if [[ -n "${STUB_IMPORT_FAIL:-}" ]]; then
-            echo "Error: the database is locked" >&2
+            report "the database is locked" "command/client/import.rs:88:13"
             exit 1
         fi
         echo "Import complete!"
@@ -410,8 +443,12 @@ calls() {
 }
 # What .github/ci/fixtures/mock-op.sh answers for every 1Password read, which Termux's render embeds.
 MOCK_SECRET='stub-value'
+# Atuin's key in the base64 form its key file takes (`atuin key --base64`), as Termux renders it: a
+# placeholder's bytes, encoded here, so that nothing key-shaped sits in the repository.
+FIXTURE_KEY="$(printf '%s' 'fixture-atuin-key-placeholder-32' | base64)"
 # leaks: every place a secret must never reach -- the stubs' arguments and the script's output
-leaks() { cat "$ATUIN_STATE/argv" "$ATUIN_STATE/op-argv" "$ATUIN_STATE/out" 2>/dev/null | grep -c "fixture-\\|$MOCK_SECRET" || true; }
+leaks() { cat "$ATUIN_STATE/argv" "$ATUIN_STATE/op-argv" "$ATUIN_STATE/out" 2>/dev/null | grep -cF -e "fixture-" -e "$MOCK_SECRET" -e "$FIXTURE_KEY" || true; }
+key_file() { echo "$ATUIN_HOME/data/key"; }
 
 render linux "$LOGIN_LINUX" >"$TMP/login-linux.sh"
 render linux "$LOGIN_LINUX" "{\"deviceName\":\"$SERVER\"}" >"$TMP/login-server.sh"
@@ -447,8 +484,9 @@ if [[ "$(state_rc)" -eq 0 ]] &&
     grep -qx "login -u rios0rios0" "$ATUIN_STATE/argv" &&
     [[ "$(cat "$ATUIN_STATE/login-password")" == "fixture-password-placeholder" ]] &&
     [[ "$(cat "$ATUIN_STATE/login-stdin")" == "fixture-key-placeholder words" ]] &&
+    [[ "$(calls '^config ')" -eq 0 && ! -e "$(key_file)" ]] &&
     [[ "$(leaks)" -eq 0 ]] && grep -q "logged in to the sync server as rios0rios0" "$ATUIN_STATE/out"; then
-    pass "a device with no session logs in with the password in its environment and the key on stdin"
+    pass "a device with no session logs in with the password in its environment and the key on stdin, leaving the key file to Atuin"
 else
     fail "the login: rc=$(state_rc), op: $(cat "$ATUIN_STATE/op-argv" 2>/dev/null), atuin: $(cat "$ATUIN_STATE/argv"), leaks: $(leaks), $(state_out)"
 fi
@@ -469,12 +507,28 @@ fi
 new_state
 # when the login runs
 run_rendered "$TMP/login-linux.sh" STUB_LOGIN_FAIL=1
-# then it warns with Atuin's own reason, and still keeps the secrets out of its output
+# then it warns with Atuin's own reason, not the source line its report ends with, and still keeps
+# the secrets out of its output
 if [[ "$(state_rc)" -eq 0 && "$(leaks)" -eq 0 ]] &&
-    grep -q "WARN: atuin login failed (Error: invalid login details)" "$ATUIN_STATE/out"; then
+    grep -qF "WARN: atuin login failed (invalid login details); the next apply tries again" "$ATUIN_STATE/out" &&
+    ! grep -q 'login\.rs' "$ATUIN_STATE/out"; then
     pass "a refused login is a warning that gives Atuin's reason"
 else
     fail "a refused login: rc=$(state_rc), leaks: $(leaks), $(state_out)"
+fi
+
+# given Atuin as Termux has it, which cannot create its key file, and a login that does not write it
+# first -- what every apply on the phone did before
+new_state
+# when the login runs
+run_rendered "$TMP/login-linux.sh" STUB_NO_HARDLINKS=1
+# then the warning names Atuin's error, where the phone's showed only
+# `crates/atuin/src/command/client/account/login.rs:271:9`
+if [[ "$(state_rc)" -eq 0 ]] &&
+    grep -qF "WARN: atuin login failed (unexpected io error: Permission denied (os error 13)); the next apply tries again" "$ATUIN_STATE/out"; then
+    pass "a login that fails as it did on Termux warns with Atuin's error, not the source line"
+else
+    fail "the Termux failure's warning: rc=$(state_rc), $(state_out)"
 fi
 
 # given the server's own device, not logged in
@@ -508,25 +562,96 @@ fi
 # On Termux no op is signed in for a script to call, so the secrets are rendered into the script, and
 # only by a render that finds no session.
 new_state
-PATH="$ACCT_BIN:$PATH" render android "$LOGIN_ANDROID" >"$TMP/login-android-out.sh" 2>"$TMP/render.err" ||
+RENDER_KEY="$FIXTURE_KEY" PATH="$ACCT_BIN:$PATH" render android "$LOGIN_ANDROID" >"$TMP/login-android-out.sh" 2>"$TMP/render.err" ||
     fail "Termux's login does not render: $(cat "$TMP/render.err")"
 : >"$ATUIN_STATE/logged-in"
-PATH="$ACCT_BIN:$PATH" render android "$LOGIN_ANDROID" >"$TMP/login-android-in.sh" 2>"$TMP/render.err" ||
+RENDER_KEY="$FIXTURE_KEY" PATH="$ACCT_BIN:$PATH" render android "$LOGIN_ANDROID" >"$TMP/login-android-in.sh" 2>"$TMP/render.err" ||
     fail "Termux's login does not render with a session: $(cat "$TMP/render.err")"
-if grep -qx "$MOCK_SECRET" "$TMP/login-android-out.sh" && grep -qx 'END_OF_ATUIN_KEY' "$TMP/login-android-out.sh" &&
-    ! grep -q "$MOCK_SECRET\\|END_OF_ATUIN" "$TMP/login-android-in.sh"; then
+if grep -qx "$MOCK_SECRET" "$TMP/login-android-out.sh" && grep -qxF "$FIXTURE_KEY" "$TMP/login-android-out.sh" &&
+    grep -qx 'END_OF_ATUIN_KEY' "$TMP/login-android-out.sh" &&
+    ! grep -qF -e "$MOCK_SECRET" -e "$FIXTURE_KEY" -e "END_OF_ATUIN" "$TMP/login-android-in.sh"; then
     pass "Termux's login renders the secrets only when the render finds no session"
 else
-    fail "Termux's render: $(grep -c "$MOCK_SECRET" "$TMP/login-android-out.sh") values without a session, $(grep -c "$MOCK_SECRET" "$TMP/login-android-in.sh") with one"
+    fail "Termux's render: $(grep -cF -e "$MOCK_SECRET" -e "$FIXTURE_KEY" "$TMP/login-android-out.sh") values without a session, $(grep -cF -e "$MOCK_SECRET" -e "$FIXTURE_KEY" "$TMP/login-android-in.sh") with one"
 fi
-new_state
-run_rendered "$TMP/login-android-out.sh"
-if [[ "$(state_rc)" -eq 0 && ! -e "$ATUIN_STATE/op-argv" ]] && grep -qx "login -u rios0rios0" "$ATUIN_STATE/argv" &&
-    [[ "$(cat "$ATUIN_STATE/login-password")" == "$MOCK_SECRET" && "$(cat "$ATUIN_STATE/login-stdin")" == "$MOCK_SECRET" ]] &&
-    [[ "$(leaks)" -eq 0 ]]; then
-    pass "Termux logs in with the rendered secrets, the password in the environment and the key on stdin"
+if grep -qx "atuin_ensure_login 'rios0rios0' false true" "$TMP/login-android-out.sh"; then
+    pass "Termux's login asks for the key file to be written first"
 else
-    fail "Termux's login: rc=$(state_rc), atuin: $(cat "$ATUIN_STATE/argv"), leaks: $(leaks), $(state_out)"
+    fail "Termux's login call: $(grep -n 'atuin_ensure_login' "$TMP/login-android-out.sh")"
+fi
+
+# given Termux's Atuin, which cannot create its key file, with none yet
+new_state
+# when the login runs
+run_rendered "$TMP/login-android-out.sh" STUB_NO_HARDLINKS=1
+# then the key file is written first, where Atuin says it goes, readable by this user alone, holding
+# the key exactly as `atuin key --base64` prints it, and the login that finds it goes through
+if [[ "$(state_rc)" -eq 0 && ! -e "$ATUIN_STATE/op-argv" ]] && grep -qx "login -u rios0rios0" "$ATUIN_STATE/argv" &&
+    grep -qx "config get --resolved key_path" "$ATUIN_STATE/argv" &&
+    [[ "$(cat "$ATUIN_STATE/login-password")" == "$MOCK_SECRET" && "$(cat "$ATUIN_STATE/login-stdin")" == "$FIXTURE_KEY" ]] &&
+    [[ "$(cat "$ATUIN_STATE/login-key-file" 2>/dev/null)" == "$FIXTURE_KEY" && "$(wc -c <"$(key_file)")" -eq "${#FIXTURE_KEY}" ]] &&
+    [[ "$(stat -c %a "$(key_file)")" == "600" && -z "$(find "$ATUIN_HOME/data" -name '.key.dotfiles.*')" ]] &&
+    grep -q "wrote Atuin's key file from 1Password" "$ATUIN_STATE/out" &&
+    grep -q "logged in to the sync server as rios0rios0" "$ATUIN_STATE/out" && [[ "$(leaks)" -eq 0 ]]; then
+    pass "Termux writes the key file before logging in, and the login goes through"
+else
+    fail "Termux's login: rc=$(state_rc), atuin: $(cat "$ATUIN_STATE/argv"), key file: $(ls -l "$(key_file)" 2>&1), leaks: $(leaks), $(state_out)"
+fi
+
+# given Termux with a key file already in place
+new_state
+mkdir -p "$ATUIN_HOME/data"
+printf 'kept' >"$(key_file)"
+# when the login runs
+run_rendered "$TMP/login-android-out.sh" STUB_NO_HARDLINKS=1
+# then the file is left as it is, and Atuin compares the key it is handed with it
+if [[ "$(state_rc)" -eq 0 && "$(cat "$(key_file)")" == "kept" && "$(cat "$ATUIN_STATE/login-key-file" 2>/dev/null)" == "kept" ]] &&
+    ! grep -q "wrote Atuin's key file" "$ATUIN_STATE/out" && grep -q "logged in to the sync server" "$ATUIN_STATE/out"; then
+    pass "Termux keeps a key file that is already there"
+else
+    fail "Termux with a key file: rc=$(state_rc), key file: $(cat "$(key_file)"), $(state_out)"
+fi
+
+# given 1Password holding the key as its 24-word phrase, which the key file cannot hold
+new_state
+phrase="$(printf 'word%.0s ' {1..24})"
+RENDER_KEY="${phrase% }" PATH="$ACCT_BIN:$PATH" render android "$LOGIN_ANDROID" >"$TMP/login-android-phrase.sh" 2>"$TMP/render.err" ||
+    fail "Termux's login does not render with a phrase: $(cat "$TMP/render.err")"
+# when the login runs
+run_rendered "$TMP/login-android-phrase.sh" STUB_NO_HARDLINKS=1
+# then it says what to put in 1Password instead, and neither writes a file nor tries a login that
+# cannot succeed
+if [[ "$(state_rc)" -eq 0 && "$(calls login)" -eq 0 && ! -e "$(key_file)" ]] &&
+    grep -q "WARN: the Atuin key in 1Password is the 24-word phrase.*atuin key --base64" "$ATUIN_STATE/out"; then
+    pass "Termux with the phrase in 1Password says to store the base64 form, and logs nothing in"
+else
+    fail "Termux with the phrase: rc=$(state_rc), logins: $(calls login), $(state_out)"
+fi
+
+# given 1Password holding something that is not a key in base64
+new_state
+PATH="$ACCT_BIN:$PATH" render android "$LOGIN_ANDROID" >"$TMP/login-android-mock.sh" 2>"$TMP/render.err" ||
+    fail "Termux's login does not render: $(cat "$TMP/render.err")"
+# when the login runs
+run_rendered "$TMP/login-android-mock.sh" STUB_NO_HARDLINKS=1
+# then it writes nothing and says what the field should hold
+if [[ "$(state_rc)" -eq 0 && "$(calls login)" -eq 0 && ! -e "$(key_file)" ]] &&
+    grep -q "WARN: the Atuin key in 1Password is not the base64 form" "$ATUIN_STATE/out"; then
+    pass "Termux refuses to write a key file from a value that is not a base64 key"
+else
+    fail "Termux with a value that is not a key: rc=$(state_rc), logins: $(calls login), $(state_out)"
+fi
+
+# given Termux's Atuin failing to say where its key file goes
+new_state
+# when the login runs
+run_rendered "$TMP/login-android-out.sh" STUB_NO_HARDLINKS=1 STUB_CONFIG_FAIL=1
+# then it guesses no path, and the next apply tries again
+if [[ "$(state_rc)" -eq 0 && "$(calls login)" -eq 0 && -z "$(find "$ATUIN_HOME" -type f 2>/dev/null)" ]] &&
+    grep -q "WARN: could not ask Atuin where its key file goes" "$ATUIN_STATE/out"; then
+    pass "Termux writes no key file where Atuin did not say it goes"
+else
+    fail "Termux without the key path: rc=$(state_rc), $(state_out)"
 fi
 
 # The import: a zsh-histdb database with commands recorded under four hosts -- the laptop, the
@@ -655,7 +780,7 @@ SQL
     run_rendered "$TMP/import-laptop.sh" STUB_IMPORT_FAIL=1
     # then it warns and writes no marker, so the next apply tries again
     if [[ "$(state_rc)" -eq 0 && ! -e "$(marker)" && "$(calls sync)" -eq 0 ]] &&
-        grep -q "WARN: atuin import failed (Error: the database is locked)" "$ATUIN_STATE/out"; then
+        grep -qF "WARN: atuin import failed (the database is locked); the next apply tries again" "$ATUIN_STATE/out"; then
         pass "a failed import is a warning that leaves no marker"
     else
         fail "a failed import: rc=$(state_rc), marker: $(ls "$(marker)" 2>&1), $(state_out)"

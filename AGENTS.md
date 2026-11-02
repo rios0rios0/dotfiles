@@ -43,7 +43,7 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `local-llm` | the local model server: its settings, the window its unit allocates, the installer's gate |
 | `opencode` | OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference |
 | `tailscale` | tailscale-up on bare metal and on WSL (Windows' client): the quiet pass, the login, sharing the model's server, the ocode web UI and the Atuin server |
-| `atuin` | Atuin: the pinned install, the client config per device, zsh after Oh My Zsh, the server's pin and port, zsh-histdb's removal, the login and the one-time history import on apply |
+| `atuin` | Atuin: the pinned install, the client config per device, zsh after Oh My Zsh, the server's pin and port, zsh-histdb's removal, the login (Termux's key file first) and the one-time history import on apply |
 | `wsl-systemd` | systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it |
 | `statusline` | Claude Code status line: with and without a login, no refresh without one, the token off argv |
 | `claude-lsp` | language servers and their plugins: pins, order, the regular profile, the first apply |
@@ -1555,7 +1555,7 @@ database the repository carried as encrypted files that nothing ever committed a
 | Shell | `dot_zshrc.tmpl`, after Oh My Zsh |
 | Server | `local-services/atuin/compose.yaml`, run by hand on the server's device, as OmniRoute is |
 | Tailnet share | `tailscale-up`, on the server's device alone |
-| The account's secrets | the 1Password item `account:` names (`Atuin` in `Private`), fields `password` and `key` |
+| The account's secrets | the 1Password item `account:` names (`Atuin` in `Private`), fields `password` and `key`, the key in the base64 form `atuin key --base64` prints |
 | Login, on every apply | `run_after_linux-016-login-atuin.sh.tmpl`, `run_after_android-009-login-atuin.sh.tmpl` |
 | zsh-histdb's history, once | `run_after_linux-017-import-atuin-history.sh.tmpl`, `run_after_android-010-import-atuin-history.sh.tmpl` |
 | What the four share | `.chezmoitemplates/lib-atuin-account.sh` (`[atuin]` prefix) |
@@ -1601,7 +1601,9 @@ database the repository carried as encrypted files that nothing ever committed a
 12. **Registration stays by hand.** The server's own device registers the account once (and is only
     warned about if it has no session); every other device logs in on its next apply.
 13. **Neither script fails the apply.** No `op`, a locked 1Password, an unreachable server, a failed
-    import: each is an `[atuin] WARN:` line and exit 0, and the next apply tries again.
+    import: each is an `[atuin] WARN:` line and exit 0, and the next apply tries again. A failure
+    of Atuin's own carries the `Error:` line of its report, never the last line: that is the
+    `Location:` naming a line of Atuin's source, all a failed login on Termux used to show.
 14. **The import is once per Atuin database, by two markers, and only once logged in.** `atuin
     import` does not deduplicate, so `~/.atuin/data/.dotfiles-histdb-imported` -- not chezmoi's
     state, which `chezmoi state reset` and an edit of the script would undo -- records it. Only the
@@ -1616,8 +1618,20 @@ database the repository carried as encrypted files that nothing ever committed a
     environment`, so the import syncs as `ATUIN_SESSION="$(atuin uuid)" atuin sync`.
 16. **Atuin 18.24.2 keeps its data in `~/.atuin/data/`** (`history.db`, `key`, `meta.db`), not in
     `~/.local/share/atuin` as older releases did.
+17. **Termux writes Atuin's key file before `atuin login`.** Atuin creates that file by writing a
+    temporary one and hard-linking it into place; Android refuses hard links in app storage with
+    `EACCES`, and Atuin falls back to a plain write only when a file system reports them
+    unsupported ([atuinsh/atuin#4329](https://github.com/atuinsh/atuin/issues/4329), open; still so
+    in 18.24.4, Termux's package on 2026-11-01). Without the file the login fails before it reaches
+    the server (`login.rs:271`), and so do search and `history end`, which load or create the key
+    the same way. With it, Atuin only compares the key it is handed. The file takes the base64 form
+    alone, so the item's `key` field holds `atuin key --base64`, which `atuin login` accepts as
+    readily as the 24-word phrase; a phrase there gets a warning on Termux and no login. The path
+    is Atuin's own (`atuin config get --resolved key_path`), and a rename puts the file there,
+    which Android allows. Linux leaves the file to Atuin. Drop it once Termux's package carries a
+    fix.
 
-`make test ONLY=atuin` covers 2 and 4 to 16, and the pinned install against a stubbed `curl`, with
+`make test ONLY=atuin` covers 2 and 4 to 17, and the pinned install against a stubbed `curl`, with
 the login and the import run against stubbed `atuin` and `op` and a zsh-histdb database built with
 `sqlite3`; `make test ONLY=tailscale` covers the share on the server's device alone;
 `make test ONLY=chezmoiignore` the platforms; `make test ONLY=script-order` that the login comes before the
