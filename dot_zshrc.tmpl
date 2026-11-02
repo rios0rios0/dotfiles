@@ -64,6 +64,22 @@ zinit light zsh-users/zsh-autosuggestions
 ######################################################
 ######################################################
 zinit light zdharma-continuum/fast-syntax-highlighting
+{{- if ne .chezmoi.os "android" }}
+######################################################
+######################################################
+# Docker's completion: installed as a completion, never sourced, before Oh My Zsh runs compinit below,
+# and whether or not docker answers. Docker Desktop's WSL integration links its own `_docker` into
+# /usr/share/zsh/vendor-completions, pointing at a mount that exists only while Docker Desktop runs,
+# and compinit opens every completion file when it builds its dump, so a new machine's first shell
+# printed `compinit:533: no such file or directory: .../vendor-completions/_docker` whenever Docker
+# Desktop was not up yet. compinit keeps the first file of each name in fpath and never opens the
+# rest, and zinit puts its completions directory ahead of the system ones, so this copy keeps the
+# link closed. A bare `zinit snippet` sourced the file, which ends by calling `_docker`, and defined
+# it over the completion Oh My Zsh's docker plugin generates for the installed CLI; that one comes
+# first in fpath once it exists, and this copy only stands in until then.
+zinit ice as"completion"
+zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
+{{- end }}
 {{- if eq .chezmoi.os "android" }}
 ######################################################
 ######################################################
@@ -362,10 +378,7 @@ source "$HOME/.scripts/linux-engineering-detect-kube-config-files.sh"
 
 {{- if ne .chezmoi.os "android" }}
 ###### Docker ######################################################################
-# only load docker completions if docker is available (avoids errors when Docker Desktop is not running)
-if command -v docker &>/dev/null; then
-  zinit snippet "https://github.com/docker/cli/blob/master/contrib/completion/zsh/_docker"
-fi
+# the completion is installed with the zinit plugins at the top, before Oh My Zsh runs compinit
 # docker aliases (dip, dreset) migrated to dev-toolkit: `dev docker ips`, `dev docker reset`
 {{- end }}
 

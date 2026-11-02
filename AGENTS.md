@@ -40,6 +40,7 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `claude-install` | Claude Code's native build: the launcher check, both failures, the verify and the npm tombstone |
 | `aisync-install` | install_aisync: the install when missing, the self-update on every run (as terra's), its failure only warning, none on Android |
 | `zshrc-functions` | top-size, sentry-ds and rebuild-ocode in dot_zshrc: arguments, sudo, the work store, completion, the resolved build script |
+| `docker-completion` | Docker's zsh completion in dot_zshrc: a zinit completion, never sourced, before Oh My Zsh's compinit with no docker guard, none on Termux; compinit against a dangling `_docker` |
 | `sentry-setup` | the Sentry CLI setup scripts: the version floor sentry-ds needs, the upgrade, failing until it holds |
 | `local-llm` | the local model server: its settings, the window its unit allocates, the installer's gate |
 | `opencode` | OpenCode V2: the render on both platforms, the provider, the MCP shape, the reference |
@@ -1065,6 +1066,37 @@ These ship to every platform, not only Android: both blocks sit outside the chez
 
 - `dot_zshenv.tmpl` relaxes `nomatch` for non-interactive shells (`[[ -o interactive ]] || setopt NO_NOMATCH`), so a glob that matches nothing is passed through to the command instead of aborting the whole line. Interactive shells keep the prompt-time error.
 - `dot_zshrc.tmpl` replaces the `common-aliases` `rm`/`cp`/`mv -i` aliases with functions, defined right after oh-my-zsh loads, that keep `-i` only when stdin is a terminal. Against a closed stdin `-i` reads EOF and skips the operation with exit 0 — a `cp` that never happened, reported as success.
+
+## Docker's Zsh Completion (Before compinit)
+
+Docker Desktop's WSL integration links `docker` and its completions into the distribution, among them
+`/usr/share/zsh/vendor-completions/_docker`, which points into `/mnt/wsl/docker-desktop/cli-tools`, a
+mount that exists only while Docker Desktop runs. compinit opens every completion file in `fpath`
+when it builds its dump, and a link to nothing fails that read, so a new machine's first shell
+printed `compinit:533: no such file or directory: /usr/share/zsh/vendor-completions/_docker` whenever
+Docker Desktop was not up yet (alien-a51's did, in October 2026). The message was all it did: compinit
+carries on, leaving docker out of that one dump, and later shells load the dump instead.
+
+compinit keeps the first file of each name in `fpath` and never opens the others, and zinit puts its
+completions directory ahead of the system ones, so `dot_zshrc.tmpl` installs docker/cli's `_docker`
+there before Oh My Zsh runs compinit.
+
+**Keep these:**
+
+1. **A completion, never sourced.** `zinit ice as"completion"` sits right before the snippet. A bare
+   `zinit snippet` sources the file, which ends by calling `_docker` -- outside the completion system
+   that is `command not found: _call_function` -- and its definition replaced the completion Oh My
+   Zsh's docker plugin generates for the installed CLI.
+2. **Before Oh My Zsh, with no `command -v docker` guard.** The file needs no docker to install. The
+   guard, and the snippet's place after Oh My Zsh, are what left the first shell without it. Oh My
+   Zsh's docker plugin keeps its guard: it runs docker when it loads.
+3. **Oh My Zsh's copy wins once it exists.** The plugin writes it to `$ZSH_CACHE_DIR/completions`,
+   which is `~/.cache/zinit/completions` because zinit sets `ZSH_CACHE_DIR`, and Oh My Zsh puts that
+   directory ahead of zinit's; docker/cli's copy only stands in until then.
+
+`make test ONLY=docker-completion` covers 1 and 2 on the rendered `.zshrc`, and Termux getting none,
+plus compinit itself against a dangling `_docker`: the failure when nothing comes before it, and no
+read when a copy does.
 
 ## Claude Account Rotation (ccswitch)
 
