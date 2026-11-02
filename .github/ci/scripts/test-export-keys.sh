@@ -8,8 +8,9 @@ set -euo pipefail
 # anywhere. Covers the silent pass while every key matches, the first fetch, replacing an older
 # key (the SSH key the repository encrypted to before), a failed or wrong chezmoi key failing the
 # apply without touching the file, a failed backup key only warning, the backup key staying off
-# bare metal, ~/.ssh never being emptied, and the aisync key: fetched only when missing, never
-# replaced, recognised without age-keygen's comment, and only warning when it cannot be fetched.
+# bare metal, ~/.ssh never being emptied, and the aisync key: fetched when missing, another key in
+# its file renamed and kept rather than overwritten (and left alone when 1Password fails), recognised
+# without age-keygen's comment, and only warning when it cannot be fetched.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 TEMPLATE="$REPO_ROOT/.chezmoiscripts/run_before_linux-005-export-private-key.sh.tmpl"
@@ -224,13 +225,44 @@ reset metal no-aisync
 cp "$CHEZMOI_ID" "$TMP/home/.ssh/chezmoi"
 mkdir -p "$TMP/home/.config/aisync"
 cp "$TMP/other.id" "$TMP/home/.config/aisync/key.txt"
-# when / then: it is kept, nothing is fetched, and the apply goes on with a warning
+chmod 600 "$TMP/home/.config/aisync/key.txt"
+# when / then: aifiles' key is fetched into its place, and the other one is renamed beside it, kept
+# whole and still private, since something may be encrypted to it
 rc="$(run)"
-if [[ "$rc" == 0 && ! -s "$OP_LOG" ]] && same "$TMP/home/.config/aisync/key.txt" "$TMP/other.id" &&
-    grep -q 'WARN: .*key.txt holds another key' "$TMP/out"; then
-    pass "another aisync key is kept and warned about, never replaced"
+kept="$(find "$TMP/home/.config/aisync" -name 'key.txt.old-*')"
+if [[ "$rc" == 0 && "$(reads)" == 1 && -n "$kept" && "$(wc -l <<<"$kept")" == 1 ]] &&
+    same "$TMP/home/.config/aisync/key.txt" "$AISYNC_ID" && same "$kept" "$TMP/other.id" &&
+    [[ "${kept##*/}" =~ ^key\.txt\.old-[0-9]{8}T[0-9]{6}Z$ && "$(stat -c '%a' "$kept")" == 600 ]] &&
+    grep -q "moved .*key.txt, which held another key, to $kept: kept" "$TMP/out" &&
+    [[ "$(find "$TMP/home/.config/aisync" -name 'key.txt.??????' | wc -l)" == 0 ]]; then
+    pass "another aisync key is renamed to key.txt.old-<UTC time> and kept, and aifiles' key takes its place"
 else
-    fail "other aisync key: rc=$rc, op calls: $(cat "$OP_LOG"), $(cat "$TMP/out")"
+    fail "other aisync key: rc=$rc, op calls: $(cat "$OP_LOG"), files: $(ls -A "$TMP/home/.config/aisync"), $(cat "$TMP/out")"
+fi
+# when the next apply runs
+rc="$(run)"
+# then aifiles' key is in place, and nothing more is fetched or moved
+if [[ "$rc" == 0 && "$(reads)" == 1 && "$(find "$TMP/home/.config/aisync" -name 'key.txt.old-*' | wc -l)" == 1 ]] &&
+    grep -q 'the aisync age key at .* is already in place' "$TMP/out"; then
+    pass "a replaced aisync key stays in place on the next apply"
+else
+    fail "after the replacement: rc=$rc, reads=$(reads), $(cat "$TMP/out")"
+fi
+
+# given another key where aisync's should be, and 1Password failing to return aifiles' key
+reset metal no-aisync
+cp "$CHEZMOI_ID" "$TMP/home/.ssh/chezmoi"
+mkdir -p "$TMP/home/.config/aisync"
+cp "$TMP/other.id" "$TMP/home/.config/aisync/key.txt"
+# when / then: the other key stays where it was, nothing is renamed, and the apply goes on with a
+# warning
+rc="$(OP_READ_FAIL="$AISYNC_REF" run)"
+if [[ "$rc" == 0 ]] && same "$TMP/home/.config/aisync/key.txt" "$TMP/other.id" &&
+    [[ -z "$(find "$TMP/home/.config/aisync" -name 'key.txt.*')" ]] &&
+    grep -q 'WARN: 1Password did not return the aisync age key' "$TMP/out"; then
+    pass "another aisync key stays in place when aifiles' key cannot be fetched"
+else
+    fail "other aisync key, failed read: rc=$rc, files: $(ls -A "$TMP/home/.config/aisync"), $(cat "$TMP/out")"
 fi
 
 # given aisync's key without the comment age-keygen writes, as aisync can import one

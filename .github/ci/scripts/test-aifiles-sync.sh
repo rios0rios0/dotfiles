@@ -8,7 +8,9 @@ set -euo pipefail
 # remote is a local bare repository, so the clone, its checks and `git ls-remote` run for real while
 # nothing reaches GitHub or 1Password. Covers the first sync (the backup, aifiles winning, the
 # replaced files named), the steady state, the unchanged no-op, every failure only warning, the
-# version floor on both platforms, the key on both platforms, the SSH command, and that nothing
+# version floor on both platforms -- Termux building a missing or older aisync from source, which
+# git fetches from a local repository in place of GitHub's, with `make` and `go` stubbed -- the key
+# on both platforms, another key renamed and kept on Android, the SSH command, and that nothing
 # ever pushes.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
@@ -112,6 +114,46 @@ case "${args[0]}" in
 esac
 STUB
 chmod +x "$TMP/bin/aisync"
+cp "$TMP/bin/aisync" "$TMP/aisync.stub"
+
+# The aisync source Termux builds from: a bare repository holding a tagged release, which the
+# sandbox's git reaches in place of GitHub's HTTPS URL. `make install` is a stub that records its
+# call and installs the aisync stub into ~/.local/bin, reporting the newest tag the checkout holds,
+# as the real Makefile stamps it (MAKE_FAIL=1 fails the build); `go` only has to exist.
+SOURCE_REMOTE="$TMP/aisync-source.git"
+git init -q --bare "$SOURCE_REMOTE"
+git -C "$SOURCE_REMOTE" symbolic-ref HEAD refs/heads/main
+git init -q -b main "$TMP/aisync-work"
+echo "package main" >"$TMP/aisync-work/main.go"
+git -C "$TMP/aisync-work" add main.go
+# release_source <tag>: a new commit on the source's main, tagged and pushed
+release_source() {
+    echo "// $1" >>"$TMP/aisync-work/main.go"
+    git -C "$TMP/aisync-work" add main.go
+    git -C "$TMP/aisync-work" -c user.name=t -c user.email=t@t commit -q -m "$1"
+    git -C "$TMP/aisync-work" tag "$1"
+    git -C "$TMP/aisync-work" push -q "$SOURCE_REMOTE" HEAD:refs/heads/main "refs/tags/$1"
+}
+release_source v1.7.2
+printf '[url "%s"]\n\tinsteadOf = https://github.com/rios0rios0/aisync.git\n' "$SOURCE_REMOTE" >>"$TMP/gitconfig"
+printf '[core]\n\tsshCommand = ssh.exe\n[url "%s"]\n\tinsteadOf = https://github.com/rios0rios0/aisync.git\n' \
+    "$TMP/gone/aisync.git" >"$TMP/gitconfig-offline"
+cat >"$TMP/bin/make" <<'STUB'
+#!/bin/bash
+echo "$*" >>"$MAKE_LOG"
+[[ "$1" == -C && "${3:-}" == install ]] || exit 64
+if [[ "${MAKE_FAIL:-}" == 1 ]]; then
+    echo "go build: compile error" >&2
+    exit 2
+fi
+version="$(git -C "$2" describe --tags --abbrev=0 2>/dev/null || echo dev)"
+echo "${version#v}" >"$AISYNC_VERSION_FILE"
+mkdir -p "$HOME/.local/bin"
+cp "$AISYNC_STUB" "$HOME/.local/bin/aisync"
+STUB
+printf '#!/bin/sh\nexit 0\n' >"$TMP/bin/go"
+chmod +x "$TMP/bin/make" "$TMP/bin/go"
+export MAKE_LOG="$TMP/make.log" AISYNC_STUB="$TMP/aisync.stub"
 
 # op stub for chezmoi's own 1Password calls while rendering the Android script; `read` serves
 # $OP_SERVE, aifiles' identity unless a case says otherwise.
@@ -161,6 +203,7 @@ reset() {
     echo "1.6.0" >"$AISYNC_VERSION_FILE"
     : >"$AISYNC_LOG"
     : >"$AISYNC_SSH_LOG"
+    : >"$MAKE_LOG"
 }
 
 # run <script>: the rendered hook against the sandbox. PATH is the stubs and the system's own
@@ -375,8 +418,8 @@ reset
 cp "$TMP/other.id" "$TMP/home/.config/aisync/key.txt"
 rc="$(run "$TMP/linux.sh")"
 if [[ "$rc" == 0 && ! -e "$repo" ]] && cmp -s "$TMP/other.id" "$TMP/home/.config/aisync/key.txt" &&
-    grep -q 'WARN: .* holds another key' "$TMP/out"; then
-    pass "another key is reported and kept"
+    grep -q 'WARN: .* holds another key than the .* aifiles is encrypted to, so nothing was synced; the next apply moves it aside, keeping it' "$TMP/out"; then
+    pass "another key is reported and kept on Linux, whose key export replaces it before the next sync"
 else
     fail "other key: rc=$rc, $(cat "$TMP/out")"
 fi
@@ -464,14 +507,114 @@ if [[ "$rc" == 0 && ! -e "$TMP/home/.config/aisync/key.txt" && ! -e "$repo" ]] &
 else
     fail "Android wrong identity: rc=$rc, $(cat "$TMP/out")"
 fi
+# given Android holding another key, one aisync's own init may have generated
 reset
-echo "1.6.0" >"$AISYNC_VERSION_FILE"
-rc="$(run "$TMP/android-with-key.sh")"
-if [[ "$rc" == 0 && ! -e "$repo" ]] && ! grep -q 'self-update' "$AISYNC_LOG" &&
-    grep -q "WARN: aisync 1.6.0 is older than the 1.7.0 .* rebuild it: (cd ~/Development/github.com/rios0rios0/aisync" "$TMP/out"; then
-    pass "Android reports an older aisync with the rebuild command, and never self-updates"
+cp "$TMP/other.id" "$TMP/home/.config/aisync/key.txt"
+chmod 600 "$TMP/home/.config/aisync/key.txt"
+render android "$TMP/android-stray.sh"
+echo "1.7.0" >"$AISYNC_VERSION_FILE"
+# when the hook runs
+rc="$(run "$TMP/android-stray.sh")"
+# then the render carried aifiles' identity, the other key is renamed beside it, kept whole and
+# private, and aifiles' key takes its place
+kept="$(find "$TMP/home/.config/aisync" -name 'key.txt.old-*')"
+if grep -qxF "$SECRET_LINE" "$TMP/android-stray.sh" && [[ "$rc" == 0 && -n "$kept" ]] &&
+    cmp -s "$TMP/aifiles.id" "$TMP/home/.config/aisync/key.txt" && cmp -s "$TMP/other.id" "$kept" &&
+    [[ "${kept##*/}" =~ ^key\.txt\.old-[0-9]{8}T[0-9]{6}Z$ && "$(stat -c '%a' "$kept")" == 600 ]] &&
+    grep -q "moved .*key.txt, which held another key than aifiles', to $kept: kept" "$TMP/out" &&
+    grep -q 'in sync with aifiles' "$TMP/out"; then
+    pass "Android renames another key to key.txt.old-<UTC time>, keeps it, and syncs with aifiles' key"
 else
-    fail "Android floor: rc=$rc, $(cat "$TMP/out")"
+    fail "Android with another key: rc=$rc, files: $(ls -A "$TMP/home/.config/aisync"), $(cat "$TMP/out")"
+fi
+# given the same, with 1Password returning an identity for another recipient
+reset
+cp "$TMP/other.id" "$TMP/home/.config/aisync/key.txt"
+OP_SERVE="$TMP/other.id" render android "$TMP/android-stray-wrong.sh"
+echo "1.7.0" >"$AISYNC_VERSION_FILE"
+rc="$(run "$TMP/android-stray-wrong.sh")"
+# then the key there is left where it was, and nothing is synced
+if [[ "$rc" == 0 && ! -e "$repo" && -z "$(find "$TMP/home/.config/aisync" -name 'key.txt.*')" ]] &&
+    cmp -s "$TMP/other.id" "$TMP/home/.config/aisync/key.txt" && grep -q 'WARN: 1Password returned no age identity' "$TMP/out"; then
+    pass "Android leaves another key in place when 1Password returns no identity for aifiles"
+else
+    fail "Android with another key and a wrong identity: rc=$rc, $(cat "$TMP/out")"
+fi
+
+# given Android with an aisync older than its minimum, and no checkout of its source yet
+reset
+src="$TMP/home/Development/github.com/rios0rios0/aisync"
+# when the hook runs
+rc="$(run "$TMP/android-with-key.sh")"
+# then the source is cloned (from the local repository git reaches in place of GitHub's HTTPS URL),
+# built into ~/.local/bin, and the sync goes on with the new build, never self-updating
+if [[ "$rc" == 0 && -d "$src/.git" && -x "$TMP/home/.local/bin/aisync" ]] &&
+    grep -qxF -e "-C $src install" "$MAKE_LOG" && [[ "$(cat "$AISYNC_VERSION_FILE")" == 1.7.2 ]] &&
+    ! grep -q 'self-update' "$AISYNC_LOG" && grep -q "aisync 1.6.0 is older than the 1.7.0 aifiles needs; rebuilding it" "$TMP/out" &&
+    grep -q "built aisync 1.7.2 into $TMP/home/.local/bin/aisync" "$TMP/out" && grep -q 'in sync with aifiles' "$TMP/out"; then
+    pass "Android builds an older aisync from source, and syncs with it"
+else
+    fail "Android rebuild: rc=$rc, make: $(cat "$MAKE_LOG"), $(cat "$TMP/out")"
+fi
+# given that checkout, behind a newer release, and an aisync older than the minimum again
+release_source v1.7.3
+echo "1.6.0" >"$AISYNC_VERSION_FILE"
+: >"$MAKE_LOG"
+rc="$(run "$TMP/android-with-key.sh")"
+# then the checkout is brought up to the source's main, and the newer release is built
+if [[ "$rc" == 0 && "$(git -C "$src" describe --tags --abbrev=0)" == v1.7.3 && "$(cat "$AISYNC_VERSION_FILE")" == 1.7.3 ]] &&
+    grep -qxF -e "-C $src install" "$MAKE_LOG" && grep -q 'built aisync 1.7.3' "$TMP/out"; then
+    pass "Android brings an existing checkout up to its default branch before building"
+else
+    fail "Android rebuild of a checkout: rc=$rc, $(cat "$TMP/out")"
+fi
+# given that checkout with local changes
+if [[ ! -d "$src/.git" ]]; then
+    fail "Android rebuild with local changes: the cases above left no checkout to change"
+else
+    echo "// mine" >>"$src/main.go"
+    echo "1.6.0" >"$AISYNC_VERSION_FILE"
+    : >"$MAKE_LOG"
+    pulls_before="$(pulls)"
+    rc="$(run "$TMP/android-with-key.sh")"
+    # then it is left alone, nothing is built or synced, and the warning says why and what to run
+    if [[ "$rc" == 0 && ! -s "$MAKE_LOG" && "$(pulls)" == "$pulls_before" ]] && [[ "$(tail -1 "$src/main.go")" == '// mine' ]] &&
+        grep -q "WARN: could not build aisync ($src has work of its own: a branch other than main, or local changes), so nothing was synced; .* or by hand: (cd ~/Development/github.com/rios0rios0/aisync" "$TMP/out"; then
+        pass "Android never touches a checkout with work of its own"
+    else
+        fail "Android rebuild with local changes: rc=$rc, make: $(cat "$MAKE_LOG"), $(cat "$TMP/out")"
+    fi
+fi
+# given a build that fails
+reset
+rc="$(MAKE_FAIL=1 run "$TMP/android-with-key.sh")"
+if [[ "$rc" == 0 && ! -e "$repo" ]] &&
+    grep -q "WARN: could not build aisync (its build failed), so nothing was synced; the next apply tries again ($TMP/home/.cache/aifiles-sync/aisync-build.log)" "$TMP/out" &&
+    grep -q 'compile error' "$TMP/home/.cache/aifiles-sync/aisync-build.log"; then
+    pass "a failed build only warns, pointing at its log"
+else
+    fail "Android failed build: rc=$rc, $(cat "$TMP/out")"
+fi
+# given aisync's source out of reach
+reset
+rc="$(GIT_CONFIG_GLOBAL="$TMP/gitconfig-offline" run "$TMP/android-with-key.sh")"
+if [[ "$rc" == 0 && ! -e "$repo" && ! -e "$src" && ! -s "$MAKE_LOG" ]] &&
+    grep -q 'WARN: could not build aisync (the clone of https://github.com/rios0rios0/aisync.git failed: offline?)' "$TMP/out"; then
+    pass "an aisync source out of reach only warns, and leaves no checkout behind"
+else
+    fail "Android offline rebuild: rc=$rc, $(ls -A "$TMP/home/Development/github.com/rios0rios0" 2>&1), $(cat "$TMP/out")"
+fi
+# given Android without aisync at all
+reset
+mv "$TMP/bin/aisync" "$TMP/aisync"
+rc="$(run "$TMP/android-with-key.sh")"
+mv "$TMP/aisync" "$TMP/bin/aisync"
+# then it is built from source too, and the sync goes on with it
+if [[ "$rc" == 0 && -x "$TMP/home/.local/bin/aisync" ]] && grep -q 'aisync is not installed; building it from source' "$TMP/out" &&
+    grep -q 'in sync with aifiles' "$TMP/out"; then
+    pass "Android builds a missing aisync from source, and syncs with it"
+else
+    fail "Android without aisync: rc=$rc, $(cat "$TMP/out")"
 fi
 
 # across every run above: the hook only ever ran version, self-update, init and pull

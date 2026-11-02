@@ -58,8 +58,8 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `terra-update` | terra update in both installers carries TERRA_ASSUME_YES=true |
 | `yq` | mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring |
 | `chlog` | chlog from upstream's pinned tag: the go install, the skip, the replacement, the failures, the wiring |
-| `aifiles-sync` | the aisync hook: the first sync's backup, pull only, the unchanged no-op, failures only warning, both platforms |
-| `export-keys` | the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key, aisync's |
+| `aifiles-sync` | the aisync hook: the first sync's backup, pull only, the unchanged no-op, failures only warning, both platforms, Termux building aisync, another key kept |
+| `export-keys` | the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key, aisync's, another one kept |
 | `export-key-windows` | the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh) |
 | `op-wrapper` | how chezmoi reaches op: the WSL wrapper's retry, a terminal's op untouched, each platform's config, no account list on Windows |
 | `install-fonts-windows` | the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh) |
@@ -894,20 +894,31 @@ content.
    `main` and `transcripts` and aisync's version, and an apply that finds them unchanged runs no
    pull: a pull only brings changes in, so local edits never need one.
 7. **Never fail the apply.** Every expected failure -- offline, no approval, no key, no aisync, a pull
-   that fails or times out -- is a WARN, and the body runs with errexit in a subshell of its own, so
-   an unexpected one stops the sync and is a WARN as well. The next apply tries again.
-8. **The key is fetched only when missing, never replaced.** aisync's own `init` and `key generate`
-   write `~/.config/aisync/key.txt`, so another key there may be one aisync generated, with something
-   already encrypted to it; the export warns and keeps it.
+   that fails or times out, a build of aisync that fails -- is a WARN, and the body runs with errexit
+   in a subshell of its own, so an unexpected one stops the sync and is a WARN as well. The next apply
+   tries again.
+8. **Another key is kept, never overwritten.** aisync's own `init` and `key generate` write
+   `~/.config/aisync/key.txt`, so another key there may be one aisync generated, with something
+   already encrypted to it. Once 1Password has returned aifiles' key -- the Linux export, Termux's
+   hook -- that one is renamed to `key.txt.old-<UTC time>` (a suffix when the name is taken) and
+   aifiles' key takes its place; a read that fails or returns another identity leaves it where it
+   was, and the sync waits. A phone holding a key from an earlier manual `aisync init` stopped every
+   sync until it was moved by hand, which is why the apply does it now. Termux's render reads
+   1Password whenever the file lacks aifiles' `# public key:` line, so a bare copy of the right key
+   costs one read per apply.
 9. **The installer keeps aisync current, and the hook holds the version floor.** On Linux,
    `install_aisync` runs `aisync self-update --force` after the install, as `install_terra` does with
    terra, so every run of the dependency installer moves aisync to its latest release; a failed
    update only warns. The hook's floor covers a machine whose installer has not run since a release
    aifiles needs: 1.6.0 on Linux (conversations, `--prefer` and the `sync.use_system_git` aifiles
    sets), where an older aisync runs `self-update`; 1.7.0 on Android (the exclusions in 10), where
-   aisync is built from source and releases carry no binary, so an older one is reported with the
-   command that rebuilds it. The floor lives in the hook because raising one in `install_aisync` would
-   re-run the whole 45-120 minute installer.
+   releases carry no binary, so the hook builds a missing or older aisync from source itself, as
+   `install_aisync` does: the checkout at `~/Development/github.com/rios0rios0/aisync`, cloned or
+   brought up to its default branch over HTTPS (no SSH key, no approval), then `make install` into
+   `~/.local/bin`, its output in `~/.cache/aifiles-sync/aisync-build.log`. A checkout with work of
+   its own -- another branch, local changes -- is never touched, and only a failure names the command
+   to run by hand. The floor lives in the hook because raising one in `install_aisync` would re-run
+   the whole 45-120 minute installer.
 10. **Android keeps its own `settings.json`.** aifiles holds one copy for every device, written for
     Linux/WSL: it starts a status line (a bash fork on every redraw, against Android's phantom-process
     budget) and two hooks by Linux paths. `~/.config/aisync/exclude` keeps it out of the phone's sync
@@ -928,7 +939,8 @@ content.
 
 The first sync on a new machine needs nothing by hand: the apply fetches the key, clones aifiles and
 pulls. To leave aifiles alone for one apply, set `SKIP_AIFILES_SYNC=1`. `make test ONLY=aifiles-sync`
-covers the hook on both platforms against a stubbed aisync and a local bare remote,
+covers the hook on both platforms against a stubbed aisync and a local bare remote -- Termux's build
+against a local source repository git reaches in place of GitHub's, with `make` and `go` stubbed --
 `make test ONLY=export-keys` the key, and `make test ONLY=script-order` that the hook runs after the Sentry
 CLI's skill and the LSP plugins.
 
@@ -1966,10 +1978,10 @@ versions in the repository's history.
    `run_before_windows-004-export-private-key.ps1.tmpl` compare each file with the `# public key:`
    comment `age-keygen` writes into it -- no age binary needed, which a first Windows apply has
    only just installed -- and fetch the item when it is missing or holds another key; a key
-   already in place gets a line saying so. The aisync key is the exception: fetched only when
-   missing, and another key there is kept with a warning (see "AI Rules Sync", 8). Android has no
-   export script: its hook carries the aisync key, rendered from chezmoi's own 1Password session only
-   on an apply that finds none. As `run_once_` scripts they could not recover: the
+   already in place gets a line saying so. The aisync key differs in one way: another key there is
+   renamed to `key.txt.old-<UTC time>` and kept, never overwritten (see "AI Rules Sync", 8). Android
+   has no export script: its hook carries the aisync key, rendered from chezmoi's own 1Password
+   session only on an apply that finds none, or another one. As `run_once_` scripts they could not recover: the
    Windows one called `op read` without `--account my`, which fails with two accounts in the CLI,
    and reported that as success, because a native command's failure does not fail a PowerShell
    script; chezmoi recorded it as done, and every apply after that died at `.aws/config` with

@@ -4,17 +4,25 @@
 # run_after_linux-014 does on Linux and with the same body (.chezmoitemplates/lib-aifiles-sync.sh),
 # except for three things:
 #   - The key comes from chezmoi's own 1Password session, rendered into this script the way
-#     run_after_android-001 brings the SSH keys, and only on an apply that finds no key at all: no
-#     `op` is signed in for a script to call on Termux.
+#     run_after_android-001 brings the SSH keys, and only on an apply that finds no key, or a key
+#     whose `# public key:` line is not aifiles': no `op` is signed in for a script to call on
+#     Termux. The hook renames such a key to key.txt.old-<UTC time>, keeping it, before writing
+#     aifiles' key in its place.
 #   - ~/.config/aisync/exclude keeps aifiles' settings.json off the phone in both directions, since
 #     it is written for Linux/WSL; aisync reads that file from 1.7.0 on, hence the higher minimum.
-#   - An older aisync is reported with the command that rebuilds it: releases carry no Android
-#     binary, so `aisync self-update` has nothing to install.
+#   - A missing or older aisync is built from source, as the Android installer builds it: releases
+#     carry no Android binary, so `aisync self-update` has nothing to install.
 
 set -euo pipefail
 
 {{ template "lib-aifiles-sync.sh" }}
-{{ if stat (joinPath .chezmoi.homeDir ".config/aisync/key.txt") }}
+{{- $keyFile := joinPath .chezmoi.homeDir ".config/aisync/key.txt" }}
+{{- $keyInPlace := false }}
+{{- $keyStat := stat $keyFile }}
+{{- if and $keyStat (not $keyStat.isDir) }}
+{{-   $keyInPlace = contains (printf "# public key: %s" .ageKeys.aisync.recipient) (include $keyFile) }}
+{{- end }}
+{{ if $keyInPlace }}
 aifiles_sync {{ .ageKeys.aisync.recipient | squote }} '1.7.0' rebuild
 {{- else }}
 IFS= read -r -d '' identity <<'AISYNC_IDENTITY' || true

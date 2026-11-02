@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added Termux''s aisync hook building aisync from source when it is missing or older than the `1.7.0` aifiles needs, as the Android installer''s `install_aisync` does: it clones or fast-forwards `~/Development/github.com/rios0rios0/aisync` over HTTPS and runs `make install` into `~/.local/bin`, leaving a checkout with local work alone and warning, with the command to run by hand, only when the build fails, where it used to stop at that command every time'
+time: '2026-11-02T17:53:32.296033311Z'

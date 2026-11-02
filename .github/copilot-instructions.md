@@ -149,7 +149,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Shared font library: `.chezmoitemplates/lib-install-fonts.sh`
 
 #### Private Key Export
-- Linux: `run_before_linux-005-export-private-key.sh.tmpl` — before every apply, writes each key `.chezmoidata/age-keys.yaml` names when its file is missing or holds another key: the chezmoi key to `~/.ssh/chezmoi`, the aisync key to `~/.config/aisync/key.txt` (only when missing), and on WSL the OmniRoute and home-secrets backup keys to `~/.ssh/omniroute-backup-key` and `~/.ssh/secrets-backup-key` (see "Age Keys" in `AGENTS.md`)
+- Linux: `run_before_linux-005-export-private-key.sh.tmpl` — before every apply, writes each key `.chezmoidata/age-keys.yaml` names when its file is missing or holds another key: the chezmoi key to `~/.ssh/chezmoi`, the aisync key to `~/.config/aisync/key.txt` (another key there is renamed to `key.txt.old-<UTC time>` and kept, never overwritten), and on WSL the OmniRoute and home-secrets backup keys to `~/.ssh/omniroute-backup-key` and `~/.ssh/secrets-backup-key` (see "Age Keys" in `AGENTS.md`)
 - Windows: `run_before_windows-004-export-private-key.ps1.tmpl` — the same for the chezmoi key, to `~\.ssh\chezmoi`, with `--account my`; a failed read stops the apply
 - Android: Key is retrieved by the `op` wrapper during chezmoi template rendering
 

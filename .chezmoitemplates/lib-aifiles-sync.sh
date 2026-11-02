@@ -13,9 +13,10 @@
 # recipient   the public key aifiles is encrypted to (.chezmoidata/age-keys.yaml)
 # minimum     the oldest aisync that reads aifiles' config.yaml as it is
 # self-update an older aisync upgrades itself (Linux: releases carry its binaries);
-# rebuild     an older aisync is only reported, with the command that rebuilds it (Termux: built
-#             from source, and releases carry no Android binary)
-# identity    an age identity to put at ~/.config/aisync/key.txt when no key is there yet
+# rebuild     a missing or older aisync is built from source (Termux: releases carry no Android
+#             binary), the way the Android installer's install_aisync builds it
+# identity    aifiles' age identity, for ~/.config/aisync/key.txt when no key is there yet, or when
+#             another key is: that one is renamed to key.txt.old-<UTC time> and kept
 
 _aifiles_prefix="aifiles"
 
@@ -68,20 +69,78 @@ _aifiles_key_matches() {
 }
 
 # _aifiles_write_key <file> <recipient> <identity>: stages the identity beside the target and
-# renames it into place only once it is the key aifiles is encrypted to.
+# renames it into place only once it is the key aifiles is encrypted to. Another key already there
+# -- one aisync's own `init` or `key generate` wrote, which something may be encrypted to -- is
+# renamed to <file>.old-<UTC time> first, never deleted, and its new name is left in
+# _aifiles_kept. A wrong or empty identity leaves that key where it was.
 _aifiles_write_key() {
-    local target="$1" recipient="$2" identity="$3" staged
+    local target="$1" recipient="$2" identity="$3" staged stamp n=0
+    _aifiles_kept=""
     mkdir -p "${target%/*}"
     chmod 700 "${target%/*}"
     staged="$(mktemp "$target.XXXXXX")"
     printf '%s\n' "$identity" >"$staged"
     if grep -q '^AGE-SECRET-KEY-1' "$staged" && _aifiles_key_matches "$staged" "$recipient"; then
         chmod 600 "$staged"
+        if [[ -e "$target" || -L "$target" ]]; then
+            stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+            _aifiles_kept="$target.old-$stamp"
+            while [[ -e "$_aifiles_kept" || -L "$_aifiles_kept" ]]; do
+                n=$((n + 1))
+                _aifiles_kept="$target.old-$stamp.$n"
+            done
+            mv "$target" "$_aifiles_kept"
+        fi
         mv -f "$staged" "$target"
         return 0
     fi
     rm -f "$staged"
     return 1
+}
+
+# _aifiles_rebuild <log>: Termux only. Builds aisync from source into ~/.local/bin, as the Android
+# installer's install_aisync does, since its releases carry no Android binary: the checkout at
+# ~/Development/github.com/rios0rios0/aisync, cloned when it is missing and otherwise brought up to
+# its default branch, then its `make install`, which stamps the release from the newest tag. The
+# source comes over HTTPS, which asks for no SSH key and no approval, and a checkout with work of
+# its own -- another branch checked out, or local changes -- is never touched. Why it failed is left
+# in _aifiles_rebuild_reason.
+_aifiles_rebuild() {
+    local log="$1" source="$HOME/Development/github.com/rios0rios0/aisync"
+    local url="https://github.com/rios0rios0/aisync.git" branch
+    _aifiles_rebuild_reason=""
+    (umask 077 && : >"$log")
+    if ! command -v go >/dev/null 2>&1 || ! command -v make >/dev/null 2>&1; then
+        _aifiles_rebuild_reason="it needs go and make, Termux's golang and make packages"
+        return 1
+    fi
+    if [[ ! -e "$source" ]]; then
+        mkdir -p "${source%/*}"
+        if ! timeout -k 10 600 git clone --quiet "$url" "$source" </dev/null >>"$log" 2>&1; then
+            _aifiles_rebuild_reason="the clone of $url failed: offline?"
+            return 1
+        fi
+    elif ! git -C "$source" rev-parse --is-inside-work-tree >/dev/null 2>&1; then
+        _aifiles_rebuild_reason="$source is no checkout"
+        return 1
+    else
+        branch="$(git -C "$source" symbolic-ref --quiet --short refs/remotes/origin/HEAD 2>/dev/null || true)"
+        branch="${branch#origin/}"
+        branch="${branch:-main}"
+        if [[ "$(git -C "$source" branch --show-current)" != "$branch" || -n "$(git -C "$source" status --porcelain)" ]]; then
+            _aifiles_rebuild_reason="$source has work of its own: a branch other than $branch, or local changes"
+            return 1
+        fi
+        if ! timeout -k 10 600 git -C "$source" fetch --quiet --tags "$url" "$branch" </dev/null >>"$log" 2>&1 ||
+            ! git -C "$source" merge --quiet --ff-only FETCH_HEAD </dev/null >>"$log" 2>&1; then
+            _aifiles_rebuild_reason="$source could not be brought up to $url's $branch: offline, or diverged?"
+            return 1
+        fi
+    fi
+    if ! timeout -k 30 1200 make -C "$source" install </dev/null >>"$log" 2>&1; then
+        _aifiles_rebuild_reason="its build failed"
+        return 1
+    fi
 }
 
 # aifiles_sync runs the sync with errexit in a subshell of its own, so the first failure nothing
@@ -111,6 +170,7 @@ _aifiles_sync() {
     local repo="$config_dir/repo" key="$config_dir/key.txt"
     local state_dir="$HOME/.cache/aifiles-sync"
     local marker="$state_dir/synced-refs" pending="$state_dir/first-sync" log="$state_dir/last-pull.log"
+    local build_log="$state_dir/aisync-build.log"
     local rebuild="(cd ~/Development/github.com/rios0rios0/aisync && git pull --ff-only && make install)"
 
     if [[ "${SKIP_AIFILES_SYNC:-}" == 1 ]]; then
@@ -123,7 +183,7 @@ _aifiles_sync() {
     if [[ -z "$aisync" && -x "$HOME/.local/bin/aisync" ]]; then
         aisync="$HOME/.local/bin/aisync"
     fi
-    if [[ -z "$aisync" ]]; then
+    if [[ -z "$aisync" && "$upgrade" != rebuild ]]; then
         _aifiles_warn "aisync is not installed, so nothing was synced; the dependency installer's install_aisync installs it"
         return 0
     fi
@@ -133,26 +193,44 @@ _aifiles_sync() {
     (umask 077 && : >"$log")
 
     # A development build reports no release, and is left to whoever built it.
-    local version
-    version="$(_aifiles_version "$aisync")"
-    if [[ -n "$version" ]] && ! _aifiles_at_least "$version" "$min_version"; then
+    local version=""
+    if [[ -n "$aisync" ]]; then
+        version="$(_aifiles_version "$aisync")"
+    fi
+    if [[ -z "$aisync" ]] || { [[ -n "$version" ]] && ! _aifiles_at_least "$version" "$min_version"; }; then
         if [[ "$upgrade" == self-update ]]; then
             _aifiles_info "aisync $version is older than $min_version, which aifiles needs; upgrading it..."
             timeout -k 30 300 "$aisync" self-update --force </dev/null >>"$log" 2>&1 || true
             version="$(_aifiles_version "$aisync")"
-        fi
-        if [[ -z "$version" ]] || ! _aifiles_at_least "$version" "$min_version"; then
-            if [[ "$upgrade" == self-update ]]; then
+            if [[ -z "$version" ]] || ! _aifiles_at_least "$version" "$min_version"; then
                 _aifiles_warn "aisync is still ${version:-unknown}, older than the $min_version aifiles needs, so nothing was synced ($log)"
-            else
-                _aifiles_warn "aisync $version is older than the $min_version aifiles needs, so nothing was synced; rebuild it: $rebuild"
+                return 0
             fi
-            return 0
+        else
+            if [[ -z "$aisync" ]]; then
+                _aifiles_info "aisync is not installed; building it from source, as its releases carry no Android binary..."
+            else
+                _aifiles_info "aisync $version is older than the $min_version aifiles needs; rebuilding it from source, as its releases carry no Android binary..."
+            fi
+            if ! _aifiles_rebuild "$build_log"; then
+                _aifiles_warn "could not build aisync ($_aifiles_rebuild_reason), so nothing was synced; the next apply tries again ($build_log), or by hand: $rebuild"
+                return 0
+            fi
+            aisync="$HOME/.local/bin/aisync"
+            version="$(_aifiles_version "$aisync")"
+            if [[ -n "$version" ]] && ! _aifiles_at_least "$version" "$min_version"; then
+                _aifiles_warn "the aisync built from source is $version, still older than the $min_version aifiles needs, so nothing was synced ($build_log)"
+                return 0
+            fi
+            _aifiles_info "built aisync ${version:-from its default branch} into $aisync"
         fi
     fi
 
-    if [[ -n "$identity" && ! -e "$key" ]]; then
+    if [[ -n "$identity" ]] && ! _aifiles_key_matches "$key" "$recipient"; then
         if _aifiles_write_key "$key" "$recipient" "$identity"; then
+            if [[ -n "$_aifiles_kept" ]]; then
+                _aifiles_info "moved $key, which held another key than aifiles', to $_aifiles_kept: kept, since something may be encrypted to it"
+            fi
             _aifiles_info "wrote $key from 1Password"
         else
             _aifiles_warn "1Password returned no age identity for $recipient, so nothing was synced; the next apply tries again"
@@ -161,7 +239,7 @@ _aifiles_sync() {
     fi
     if ! _aifiles_key_matches "$key" "$recipient"; then
         if [[ -e "$key" ]]; then
-            _aifiles_warn "$key holds another key, and aifiles is encrypted to $recipient; nothing was synced until it is moved aside (it may decrypt something) and the next apply fetches the right one"
+            _aifiles_warn "$key holds another key than the $recipient aifiles is encrypted to, so nothing was synced; the next apply moves it aside, keeping it, and fetches aifiles' key from 1Password"
         else
             _aifiles_warn "there is no aisync age key at $key yet, so nothing was synced; the next apply fetches it from 1Password"
         fi

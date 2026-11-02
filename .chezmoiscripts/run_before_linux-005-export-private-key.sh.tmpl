@@ -13,9 +13,10 @@
 # A chezmoi key that cannot be fetched fails the apply, which could decrypt nothing without it; the
 # other two only warn, because the apply needs neither.
 #
-# The aisync key is never replaced, only fetched when missing: aisync's own `init` and
-# `key generate` write that file, so another key there may be one aisync generated, and something
-# may already be encrypted to it. Moving it aside is a person's decision, never an apply's.
+# Another key in aisync's file is kept, never overwritten: aisync's own `init` and `key generate`
+# write that file, so it may be a key aisync generated, and something may already be encrypted to
+# it. Once 1Password has returned aifiles' key, that one is renamed to key.txt.old-<UTC time> and
+# aifiles' key takes its place; a failed read leaves it where it was.
 #
 # Nothing here deletes ~/.ssh, which on WSL also holds the SSH agent bridge's socket.
 
@@ -51,15 +52,26 @@ key_matches() {
     command -v age-keygen >/dev/null 2>&1 && [[ "$(age-keygen -y "$1" 2>/dev/null)" == "$2" ]]
 }
 
-# fetch_key <file> <recipient> <reference>: stages the identity beside the target and renames it
-# over the target only once it is the key the recipient names, so a failed or wrong read never
-# leaves a partial key behind, nor replaces a working one.
+# fetch_key <file> <recipient> <reference> [keep]: stages the identity beside the target and renames
+# it over the target only once it is the key the recipient names, so a failed or wrong read never
+# leaves a partial key behind, nor replaces a working one. With `keep`, a key already at the target
+# is first renamed to <file>.old-<UTC time>, never overwritten.
 fetch_key() {
-    local target="$1" recipient="$2" reference="$3" staged
+    local target="$1" recipient="$2" reference="$3" keep="${4:-}" staged kept stamp n=0
     staged="$(mktemp "$target.XXXXXX")"
     if op read --no-newline "$reference" --account my >"$staged" &&
         grep -q '^AGE-SECRET-KEY-1' "$staged" && key_matches "$staged" "$recipient"; then
         chmod 600 "$staged"
+        if [[ "$keep" == keep && ( -e "$target" || -L "$target" ) ]]; then
+            stamp="$(date -u +%Y%m%dT%H%M%SZ)"
+            kept="$target.old-$stamp"
+            while [[ -e "$kept" || -L "$kept" ]]; do
+                n=$((n + 1))
+                kept="$target.old-$stamp.$n"
+            done
+            mv "$target" "$kept"
+            echo "[$prefix] moved $target, which held another key, to $kept: kept, since something may be encrypted to it" >&2
+        fi
         mv -f "$staged" "$target"
         echo "[$prefix] wrote $target from 1Password" >&2
         return 0
@@ -91,9 +103,10 @@ if grep -qiE "(microsoft|wsl)" /proc/version 2>/dev/null; then
 fi
 if key_matches "$aisync_key" "$aisync_recipient"; then
     echo "[$prefix] the aisync age key at $aisync_key is already in place" >&2
-elif [[ -e "$aisync_key" ]]; then
-    echo "[$prefix] WARN: $aisync_key holds another key, and aifiles is encrypted to $aisync_recipient; nothing is synced until it is moved aside (it may decrypt something) and the next apply fetches the right one" >&2
 else
+    if [[ -e "$aisync_key" || -L "$aisync_key" ]]; then
+        echo "[$prefix] $aisync_key holds another key than the $aisync_recipient aifiles is encrypted to; it is kept beside aifiles' key once 1Password returns that one" >&2
+    fi
     need_aisync=true
 fi
 if ! $need_chezmoi && ! $need_backup && ! $need_secrets_backup && ! $need_aisync; then
@@ -144,6 +157,6 @@ fi
 if $need_secrets_backup && ! fetch_key "$secrets_backup_key" "$secrets_backup_recipient" "$secrets_backup_reference"; then
     echo "[$prefix] WARN: 1Password did not return the home-secrets backup key, so those backups fail until it arrives; the next apply tries again ('op read \"$secrets_backup_reference\" --account my')" >&2
 fi
-if $need_aisync && ! fetch_key "$aisync_key" "$aisync_recipient" "$aisync_reference"; then
+if $need_aisync && ! fetch_key "$aisync_key" "$aisync_recipient" "$aisync_reference" keep; then
     echo "[$prefix] WARN: 1Password did not return the aisync age key, so aifiles is not synced until it arrives; the next apply tries again ('op read \"$aisync_reference\" --account my')" >&2
 fi
