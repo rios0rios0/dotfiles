@@ -140,6 +140,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 
 #### Windows Configuration (`.chezmoiscripts/run_once_before_windows-002-configure-dependencies.ps1`)
 - Installs/updates Kali Linux WSL distro and sets it as default
+- Asks whether to move `kali-linux` and Docker Desktop's disks off the system drive to `<drive>:\wsl` on the roomiest other internal NTFS/ReFS drive (never a USB one), and moves them on a yes: Kali with `wsl --manage --move`, Docker's data disk by copying it and pointing `CustomWslDistroDir` at it, Docker Desktop stopped and WSL shut down meanwhile; a Docker Desktop that never started only gets the location. `make test ONLY=configure-dependencies-windows` covers it (see "WSL Disks Off the System Drive" in `AGENTS.md`)
 
 #### Font Installation
 - All platforms install MesloLGS NF (for Powerlevel10k) and Nerd Fonts (FiraCode, Meslo)

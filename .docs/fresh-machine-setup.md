@@ -79,13 +79,17 @@ succeeds.
 | `wsl --set-default-version 2`                            | `[manual]`    | Not run anywhere. Windows 11 defaults new distros to WSL 2, so it only matters on an image that was ever switched to 1.                                                                                                                    |
 | Kali as the default distro                               | `[automated]` | `wsl.exe --setdefault kali-linux`, same script.                                                                                                                                                                                            |
 | First Kali login (UNIX user and password)                | `[manual]`    | WSL prompts for it the first time the distro starts.                                                                                                                                                                                       |
+| WSL's disks off the system drive                         | `[automated]` | Same script, after the Kali step: when `kali-linux` or Docker Desktop's disks are on `C:` and another internal NTFS or ReFS drive has room, it asks whether to move them to `<drive>:\wsl`, and moves them on a yes. A Docker Desktop that never started only gets its disk location, so its first start creates them there. Apply from a terminal: without one it only prints the commands. See "WSL Disks Off the System Drive" in `AGENTS.md`. |
 
 Because `windows-002` runs during the Windows bootstrap, you do not run these commands yourself on a
 fresh machine; Phase 3 triggers them. Run them by hand only when adding WSL to a machine that already
 went through Phase 3.
 
 **Verify:** after the reboot, `wsl --status` reports `kali-linux` as the default distribution with
-version 2, and `wsl -l -v` lists it as `Stopped` or `Running`, not `Installing`.
+version 2, and `wsl -l -v` lists it as `Stopped` or `Running`, not `Installing`. After a yes to the
+move, `(Get-ChildItem HKCU:\Software\Microsoft\Windows\CurrentVersion\Lxss | Get-ItemProperty).BasePath`
+lists `<drive>:\wsl\kali-linux`. If WSL asked for a reboot before Kali existed, the script printed
+the `wsl --manage kali-linux --move` command to run once it does.
 
 ## Phase 3: Windows bootstrap
 
@@ -140,7 +144,7 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 | Step | Script                                                                                       | Marker        | What it does                                                                                                                                                                        |
 |------|----------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
 | 1    | `run_once_before_windows-001-install-dependencies.ps1`                                       | `[automated]` | 36 packages (Spotify from the Microsoft Store, the rest from winget), skipping any that `winget list` finds under its exact ID, plus RustDesk from its GitHub release (section 3.3). |
-| 2    | `run_once_before_windows-002-configure-dependencies.ps1`                                     | `[partial]`   | Phase 2: installs Kali and makes it the default distro, or runs `wsl --update` where Kali already exists. The reboot after the install is on you.                                   |
+| 2    | `run_once_before_windows-002-configure-dependencies.ps1`                                     | `[partial]`   | Phase 2: installs Kali and makes it the default distro, or runs `wsl --update` where Kali already exists; then asks whether to move `kali-linux` and Docker Desktop's disks off `C:`. The reboot after the install is on you. |
 | 3    | `run_before_windows-003-install-fonts.ps1`                                                   | `[automated]` | MesloLGS NF, Meslo Nerd Font and FiraCode Nerd Font for the current user, into `%LOCALAPPDATA%\Microsoft\Windows\Fonts` with `HKCU` font entries, whenever a family is missing; no elevation needed. |
 | 4    | `run_before_windows-004-export-private-key.ps1.tmpl`                                         | `[automated]` | Writes the age identity from `op://Private/chezmoi.age/private key` to `~\.ssh\chezmoi`, on every apply where that file is missing or holds another key; a failed read stops the apply. |
 | 5    | Managed files                                                                                | `[automated]` | `.gitconfig`, `.ssh\config`, `.ssh\allowed_signers`, `.ssh\authorized_keys`, `.age_recipients`, `.oh-my-posh.json`, `.config\powershell\profile.ps1`, `.wslconfig` (merged), `.wakatime.cfg`, `.aws` and `.azure` (decrypted). |
@@ -477,6 +481,7 @@ under `.chezmoiscripts/`; winget IDs refer to `run_once_before_windows-001-insta
 | `wsl --update`                             | `[automated]` `windows-002`                                            |
 | `wsl --set-default-version 2`              | `[manual]`, not run anywhere                                           |
 | `wsl --install kali-linux`                 | `[automated]` `windows-002` (`--install -d kali-linux`, then `--setdefault`) |
+| WSL and Docker Desktop disks off `C:`      | `[automated]` `windows-002`, after a yes: `<drive>:\wsl\kali-linux` and `<drive>:\wsl\docker-desktop` |
 
 ### Microsoft Store
 

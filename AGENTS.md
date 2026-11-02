@@ -31,6 +31,7 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `remove-dependencies` | dependency removal library (tombstones, $HOME safety rail) |
 | `remove-dependencies-windows` | Windows removal script, failed removals reported (needs pwsh) |
 | `install-dependencies-windows` | Windows installer: detection by exact ID, failed installs reported (needs pwsh) |
+| `configure-dependencies-windows` | moving WSL's disks off the system drive: the drive chosen, the question, Docker's data disk copied before its setting and deleted after, each failure (needs pwsh) |
 | `prune-tmp-modcache` | $TMPDIR Go module cache pruning ($TMPDIR safety rail) |
 | `shell-credentials` | 1Password credential/workspace loading and removal |
 | `clipboard-shim` | Claude Code clipboard shim (Ctrl+V image paste) |
@@ -303,7 +304,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `secrets-sync`, `home-agents`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `secrets-sync`, `home-agents`, `wsl-move`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -1931,6 +1932,61 @@ reinstall in October 2026.
 `make test ONLY=modify-scripts` covers the merge (a new file, a file passing through byte for byte, the
 other keys and distributions kept, invalid JSON failing); `make test ONLY=chezmoiignore` resolves the
 whole source state per platform with `chezmoi managed` and finds the file on Windows alone.
+
+## WSL Disks Off the System Drive (Windows)
+
+After installing Kali or updating WSL, `run_once_before_windows-002-configure-dependencies.ps1`
+asks whether to move what WSL keeps on the system drive to another internal drive, and moves it on
+a yes:
+
+| What | From | To | How |
+|------|------|----|-----|
+| `kali-linux` | where `wsl --install` put it | `<drive>:\wsl\kali-linux` | `wsl --manage kali-linux --move`, then `wsl --set-default kali-linux` |
+| Docker Desktop's data disk, `docker_data.vhdx`: every image, container and volume | `%LOCALAPPDATA%\Docker\wsl\disk` | `<drive>:\wsl\docker-desktop\disk` | copied, `CustomWslDistroDir` in `%APPDATA%\Docker\settings-store.json` pointed at it, the original deleted |
+| The `docker-desktop` distribution, about 100 MB | `%LOCALAPPDATA%\Docker\wsl\main` | `<drive>:\wsl\docker-desktop\main` | `wsl --manage docker-desktop --move` |
+
+A Docker Desktop that never started has no disks yet and gets only `CustomWslDistroDir`, so that its
+first start creates them on that drive. The drive is a lettered NTFS or ReFS volume other than the
+system drive, on a disk that cannot be unplugged, with room for what moves plus 10 GB; of those, the
+one with the most free space.
+
+**Keep these:**
+
+1. **Docker's data moves through Docker's setting, never through `wsl --manage` alone.**
+   `docker_data.vhdx` is no WSL distribution, so no `wsl` command moves it, and the `docker-desktop`
+   distribution beside it is a 100 MB disk (the data disk was 28 GB on alien-a51): moving only the
+   distribution frees nothing. Docker Desktop attaches the data disk from `<CustomWslDistroDir>\disk`
+   at every start (its log: `WSL2 disk exists`, then `setting up data disk`), and the distribution
+   goes into `main\` beside it, as in Docker Desktop's own folder.
+2. **Copied, pointed at, then deleted.** The copy is flushed to its drive before the setting is
+   written, and the original goes only after it: whatever step fails, Docker Desktop has a whole disk
+   where its setting points, and a failed copy or setting deletes the copy. The copy is refused while
+   anything writes to the disk (its guard handle shares it with readers only), and its owner is set to
+   the user, as WSL does for every disk it writes: a file an elevated apply writes belongs to
+   `BUILTIN\Administrators`, and WSL grants its VM access to a disk while impersonating the user.
+3. **Docker Desktop and WSL stop first.** `docker desktop stop`, then `wsl --shutdown`, which releases
+   the data disk however Docker attached it, and `docker desktop start` after when it was running.
+   `wsl --manage --move` refuses a running distribution, so only `kali-linux` is stopped when only it
+   moves. A Docker Desktop that does not stop keeps its disks; a WSL that does not shut down moves
+   nothing.
+4. **Never over a disk already there.** After Windows is reinstalled, `<drive>:\wsl` may hold the
+   previous install's disks; a part whose target already holds one stays, with a WARN.
+5. **The drive need not have more free space than the system drive.** Getting WSL off it is the
+   point: alien-a51's `D:`, which holds `kali-linux` by choice, had less free space than `C:` (650 GB
+   against 664 GB), so the question shows both. A USB disk's volume reports its drive type as fixed
+   (alien-a51's external disk does), so the disk's bus is checked instead.
+6. **Asked once, never failing the apply.** A `run_once_` script asks on a fresh machine's first
+   apply, and again only when it changes. Without a terminal (chezmoi hands its scripts its own
+   stdin) it asks nothing, and a "no" moves nothing; both print the commands to run later. Every
+   failure is a WARN.
+7. **`CustomWslDistroDir` stays out of `.chezmoidata/docker-desktop.yaml`.** It is per machine and
+   written once: managed, every apply would set it back, away from a disk moved later through Docker
+   Desktop's own settings.
+
+`make test ONLY=configure-dependencies-windows` covers the drive chosen (alien-a51's drives, an
+unpluggable one with more room, FAT and exFAT, the headroom), a disk already in a target folder, the
+question and its absence, and the move with every step failing in turn, against stubbed `wsl` and
+`docker`, with the copy made in a scratch folder.
 
 ## RustDesk on Windows (GitHub Release, Not winget)
 
