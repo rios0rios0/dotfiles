@@ -69,10 +69,13 @@ the password in its `password` field and the encryption key in a concealed field
 
 ```sh
 ATUIN_PASSWORD="$(op read --account my 'op://Private/Atuin/password')" atuin register -u <username> -e <email>
-atuin key                                 # the encryption key, for the item's `key` field
+atuin key --base64                        # the encryption key, for the item's `key` field
 ```
 
-The key cannot be recovered, and every other device needs it. Then close registration:
+Store the base64 form, not the 24-word phrase a plain `atuin key` prints: Termux writes it into
+Atuin's key file, which takes no other form (see "Termux and the key file"), and `atuin login`
+accepts either. The key cannot be recovered, and every other device needs it. Then close
+registration:
 
 ```sh
 docker compose -f local-services/atuin/compose.yaml up -d
@@ -85,9 +88,10 @@ costs one `atuin status`, which reports the missing session from the local datab
 reaches the network. On Linux the login reads the item's two fields at run time through `op`; on
 Termux, where no script can call `op`, chezmoi renders them into the script from its own 1Password
 session, and only on an apply whose render finds no session. Either way the password reaches
-`atuin login` in its environment and the key on its stdin. Anything that stops it -- no network,
-1Password locked, the server down -- is an `[atuin] WARN:` line, and the next apply tries again.
-The server's own device is only warned about: it registered in step 2.
+`atuin login` in its environment and the key on its stdin. On Termux the key file is written first
+(see "Termux and the key file"). Anything that stops it -- no network, 1Password locked, the
+server down -- is an `[atuin] WARN:` line carrying Atuin's own error, and the next apply tries
+again. The server's own device is only warned about: it registered in step 2.
 
 By hand, on a device where the apply cannot reach 1Password:
 
@@ -95,6 +99,41 @@ By hand, on a device where the apply cannot reach 1Password:
 op read --account my 'op://Private/Atuin/key' |
     ATUIN_PASSWORD="$(op read --account my 'op://Private/Atuin/password')" atuin login -u <username>
 ```
+
+On Termux, write the key file before that login, once the field holds the base64 form (see
+"Termux and the key file"), and only from a key that was read in full:
+
+```sh
+key="$(op read --account my 'op://Private/Atuin/key')" &&
+    (umask 077 && printf '%s' "$key" >"$(atuin config get --resolved key_path)")
+unset key
+```
+
+### Termux and the key file
+
+Atuin cannot create its key file on Android. It writes a temporary file and hard-links it into
+place, Android refuses hard links in an app's storage, and Atuin falls back to a plain write only
+for file systems that report hard links unsupported, which Android does not
+([atuinsh/atuin#4329](https://github.com/atuinsh/atuin/issues/4329), still open in 18.24.4). On a
+phone without the file, `atuin login` fails before it reaches the server, with
+`unexpected io error: Permission denied (os error 13)` (at `login.rs:271` in 18.24.0 to 18.24.2),
+and Ctrl-R and the `history end` hook fail with `could not load or generate encryption key`.
+
+So Termux's login writes the file itself, from the item's `key` field, before `atuin login`. Given
+a key file, Atuin only compares the key it is handed with it. The file holds the base64 form, which
+is why the field does. When the field still holds the 24-word phrase, the apply on Termux warns and
+logs nothing in. Replace the phrase with the base64 form from a device that is logged in, keeping the
+key off every command line:
+
+```sh
+op item get Atuin --vault Private --account my --format json |
+    ATUIN_KEY_B64="$(atuin key --base64)" jq '(.fields[] | select(.label == "key")).value = env.ATUIN_KEY_B64' |
+    op item edit Atuin --vault Private --account my
+```
+
+The phrase stays recoverable: `atuin key` prints it on any device that holds the key, and the
+item's history keeps the old value. Once Termux's package carries a fix for #4329, the phone needs
+none of this.
 
 ### 4. The old history, once per device
 
@@ -194,6 +233,9 @@ To an always-on machine, once there is one:
 | The name `alien-a51` does not resolve on a device | Give that device the laptop's tailnet address: `tailscale ip -4 alien-a51`, as `devices.<deviceName>.serverHost` in `.chezmoidata/atuin.yaml` |
 | `atuin register` fails with registration closed | Start the container with `ATUIN_OPEN_REGISTRATION=true`, as in step 1 |
 | A device is still not logged in after an apply | The apply's `[atuin] WARN:` line says why; `atuin status` says whether a session exists, and step 3 has the login by hand |
+| `atuin login failed (unexpected io error: Permission denied (os error 13))` on Termux | Atuin cannot create its key file there, so the apply writes it first ("Termux and the key file"); by hand, step 3 |
+| Termux warns that the Atuin key in 1Password is the 24-word phrase | Put the base64 form in the item's `key` field ("Termux and the key file"), then apply again |
+| Ctrl-R on Termux fails with `could not load or generate encryption key` | No key file yet, for the same reason; the next apply writes it before its login |
 | `atuin sync` fails with `Failed to find $ATUIN_SESSION in the environment` | It ran outside an interactive zsh: `ATUIN_SESSION="$(atuin uuid)" atuin sync` |
 | Ctrl-R opens Oh My Zsh's search, not Atuin's | `atuin` is not on `PATH` in that shell: `command -v atuin`; on Linux the dependency installer installs it into `~/.local/bin` |
 | Anything else | `atuin doctor` |

@@ -9,9 +9,10 @@
 # again. Neither puts a secret on a command line or the terminal: the password reaches `atuin login`
 # in its environment (ATUIN_PASSWORD) and the key on its stdin.
 #
-#   atuin_ensure_login <username> <server device: true|false>
+#   atuin_ensure_login <username> <server device: true|false> [<write the key file first: true|false>]
 #       logs in when Atuin reports no session; the caller defines `atuin_secret <password|key>`,
-#       which prints that field of the account's 1Password item, or fails
+#       which prints that field of the account's 1Password item, or fails. Termux passes true for
+#       the third argument, since Atuin cannot create its key file there (_atuin_write_key_file)
 #   atuin_import_histdb <name for localhost, or ''> <host>...
 #       imports the rows zsh-histdb recorded under those hosts, once per Atuin database and only
 #       once logged in, then syncs them, on every apply until a sync succeeds
@@ -32,8 +33,70 @@ _atuin_not_logged_in() {
     [[ "$output" == *"You are not logged in to a sync server"* ]]
 }
 
+# _atuin_reason <output>: why an Atuin command failed, for a WARN line. Atuin's error report starts
+# with an `Error:` line and ends with a `Location:` block naming a line of its own source, so the
+# last line says nothing: a failed login on Termux showed only
+# `crates/atuin/src/command/client/account/login.rs:271:9`. Output without an `Error:` line gives
+# its last line that is not blank.
+_atuin_reason() {
+    local line last=""
+    while IFS= read -r line; do
+        if [[ "$line" == "Error: "* ]]; then
+            printf '%s' "${line#Error: }"
+            return 0
+        fi
+        [[ "$line" != *[![:space:]]* ]] || last="$line"
+    done <<<"$1"
+    printf '%s' "${last#"${last%%[![:space:]]*}"}"
+}
+
+# _atuin_write_key_file <key>: on Termux, writes the account's key into Atuin's key file when there
+# is none, because Atuin cannot. It writes a temporary file and hard-links it into place, Android
+# refuses every hard link in app storage with EACCES, and Atuin falls back to a plain write only when
+# a file system reports hard links unsupported (atuinsh/atuin#4329). Without the file `atuin login`
+# fails before it reaches the server, and so do search and `history end`, which load or create the
+# key the same way. With it, Atuin only compares the key it is handed with the file. The path is
+# Atuin's own (`config get --resolved`), and a rename puts the file there, which Android allows.
+#
+# The file holds the base64 form `atuin key --base64` prints, so the 1Password item's `key` field
+# holds that form; `atuin login` takes it as readily as the 24-word phrase, which the file cannot
+# hold. Drop this once Termux's package carries a fix for #4329.
+_atuin_write_key_file() {
+    local key="$1" key_file dir tmp
+    key_file="$(atuin config get --resolved key_path </dev/null 2>/dev/null)" || key_file=""
+    key_file="${key_file##*$'\n'}"
+    if [[ "$key_file" != /* ]]; then
+        _atuin_warn "could not ask Atuin where its key file goes; the next apply tries again"
+        return 1
+    fi
+    [[ ! -e "$key_file" && ! -L "$key_file" ]] || return 0
+    if [[ "$key" == *[[:space:]]* ]]; then
+        _atuin_warn "the Atuin key in 1Password is the 24-word phrase, which Atuin's key file cannot hold, and Atuin cannot write that file on Termux (atuinsh/atuin#4329): replace the item's key field with the base64 form, \`atuin key --base64\` on a device that is logged in"
+        return 1
+    fi
+    if [[ ! "$key" =~ ^[A-Za-z0-9+/]+={0,2}$ ]] || ((${#key} % 4 != 0 || ${#key} < 44)); then
+        _atuin_warn "the Atuin key in 1Password is not the base64 form \`atuin key --base64\` prints, which Atuin's key file takes; the next apply tries again"
+        return 1
+    fi
+    # Atuin creates its data directory as it reads its settings; a missing one is not for this to guess.
+    dir="${key_file%/*}"
+    if [[ ! -d "$dir" ]]; then
+        _atuin_warn "Atuin's data directory $dir does not exist; the next apply tries again"
+        return 1
+    fi
+    # mktemp creates the file readable by this user alone, as Atuin keeps its key file, and `mv -T`
+    # never moves it into a directory of that name.
+    if ! tmp="$(mktemp "$dir/.key.dotfiles.XXXXXX")" ||
+        ! printf '%s' "$key" >"$tmp" || ! mv -T "$tmp" "$key_file"; then
+        [[ -z "${tmp:-}" ]] || rm -f -- "$tmp"
+        _atuin_warn "could not write Atuin's key file $key_file; the next apply tries again"
+        return 1
+    fi
+    _atuin_info "wrote Atuin's key file from 1Password, since Atuin cannot create it on Termux (atuinsh/atuin#4329)"
+}
+
 atuin_ensure_login() {
-    local username="$1" is_server="$2" password key output
+    local username="$1" is_server="$2" key_file_first="${3:-false}" password key output
     command -v atuin >/dev/null 2>&1 || return 0
     _atuin_not_logged_in || return 0
     if [[ "$is_server" == "true" ]]; then
@@ -48,12 +111,15 @@ atuin_ensure_login() {
         _atuin_warn "could not read the Atuin key from 1Password; the next apply tries again"
         return 0
     fi
+    if [[ "$key_file_first" == "true" ]] && ! _atuin_write_key_file "$key"; then
+        return 0
+    fi
     # `atuin login` reads ATUIN_PASSWORD when no --password is given, then the key as one line from
     # stdin: a pipe makes it non-interactive, so a wrong key fails instead of asking again.
     if output="$(printf '%s\n' "$key" | ATUIN_PASSWORD="$password" atuin login -u "$username" 2>&1)"; then
         _atuin_info "logged in to the sync server as $username"
     else
-        _atuin_warn "atuin login failed ($(tail -n 1 <<<"$output")); the next apply tries again"
+        _atuin_warn "atuin login failed ($(_atuin_reason "$output")); the next apply tries again"
     fi
 }
 
@@ -122,7 +188,7 @@ atuin_import_histdb() (
         count="$(sqlite3 "$copy" "SELECT COUNT(*) FROM history;" 2>/dev/null)" || count="the"
 
         if ! output="$(HISTDB_FILE="$copy" atuin import zsh-hist-db </dev/null 2>&1)"; then
-            _atuin_warn "atuin import failed ($(tail -n 1 <<<"$output")); the next apply tries again"
+            _atuin_warn "atuin import failed ($(_atuin_reason "$output")); the next apply tries again"
             exit 0
         fi
         if ! { mkdir -p "$data" &&
