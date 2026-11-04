@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'changed every `[atuin] WARN:` line to carry the causes Atuin''s report lists under `Caused by:`, joined after its error on one line as eyre''s one-line form joins them: a login that cannot reach the server now ends in `dns error: failed to lookup address information: …` or `tcp connect error: Connection refused …`, where it said only `error sending request for url (http://alien-a51:8888/login)` when the phone''s Tailscale was off'
-time: '2026-11-02T17:18:50.43569324Z'

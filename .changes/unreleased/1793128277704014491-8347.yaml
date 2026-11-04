@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed Windows Terminal opening with `MesloLGS NF` not found: the font installer copied into `$env:WINDIR\Fonts`, which needs an elevated shell, and without one it warned and exited 0, so chezmoi recorded the `run_once_` script as done and never ran it again; `run_before_windows-003-install-fonts.ps1` installs MesloLGS NF and the FiraCode and Meslo Nerd Fonts for the current user instead (`%LOCALAPPDATA%\Microsoft\Windows\Fonts` and `HKCU`, no elevation), runs before every apply, returns at once while every family is installed, and only warns on a failed download; `make test-install-fonts-windows` covers it'
-time: '2026-10-27T19:11:17.704014491Z'

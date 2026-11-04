@@ -1,4 +1,0 @@
-kind: 'Removed'
-body: 'removed the GitHub Copilot and Codex CLIs from every platform: `install_copilot_cli` and `install_codex_cli` left the Linux and Android installers, `GitHub.Copilot` and `OpenAI.Codex` the winget list, and with Codex went its Termux wrapper (`run_once_before_android-001f`), the `codexx` shortcut, the `~/.codex/config.toml` look in `dot_codex/` and the shell environment policy that handed `LD_PRELOAD` to its tool shells; the next apply uninstalls both packages, deletes `~/.local/bin/copilot` on Linux and the wrapper, its builds under `~/.local/share/codex` and its update stamp on Android, and leaves `~/.codex` and `~/.copilot` in place'
-breaking: true
-time: '2026-10-27T17:47:24.673195346Z'

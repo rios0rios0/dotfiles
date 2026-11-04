@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the PowerShell CI jobs failing at setup with `Unable to locate package powershell` once `ubuntu-latest` moved to 26.04, for which Microsoft publishes no PowerShell package yet, by pinning them to `ubuntu-24.04`; added `make test-export-keys` and `make test-export-key-windows` for the two key exports'
-time: '2026-10-27T18:36:07.313696615Z'

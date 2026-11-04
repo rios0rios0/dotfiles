@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed `chezmoi init --apply` on Windows dying at `.aws/config` with `age: error: reading ".../.ssh/chezmoi": ... cannot find the file`: the key export called `op read` without `--account my`, which fails with two accounts in the 1Password CLI, and as a `run_once_` PowerShell script it was recorded as done anyway, because a native command''s failure does not fail the script; it is now `run_before_windows-004-export-private-key.ps1.tmpl`, which runs before every apply, returns at once while `~/.ssh/chezmoi` holds the right key, stages and verifies a fetched key before replacing the file, and stops the apply with a message when 1Password returns nothing usable'
-time: '2026-10-27T18:36:07.282690189Z'

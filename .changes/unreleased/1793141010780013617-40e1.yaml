@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'upgraded `npm` to its latest release with `nvm install-latest-npm` after every Node.js LTS install, and on an LTS that was already installed, so `npm install -g` no longer opens with `New major version of npm available!` (Node.js `24.22.1` ships `npm` `11.19.1`); `npm` `12` blocks the install scripts of global packages, which no CLI installed here needs, covered by `make test-install-nvm`'
-time: '2026-10-27T22:43:30.780013617Z'

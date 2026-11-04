@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'corrected the OmniRoute guide: `API_KEY_SECRET` signs the check digits of the `sk-` keys the dashboard creates rather than encrypting provider keys, `STORAGE_ENCRYPTION_KEY` encrypts the stored provider credentials rather than the whole database, the backups now cover a lost machine as the guide claimed, and the manual restore steps, which failed on a fresh machine (no container to stop, a volume created outside Compose, a world-readable plaintext database in `/tmp`, no word on `.env`), gave way to `omniroute-restore`'
-time: '2026-10-27T23:32:21.20237177Z'

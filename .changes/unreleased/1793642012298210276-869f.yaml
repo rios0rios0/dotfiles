@@ -1,3 +1,0 @@
-kind: 'Changed'
-body: 'changed a `~/.config/aisync/key.txt` holding another key than aifiles'' from stopping every sync until it was moved by hand to being renamed to `key.txt.old-<UTC time>`, kept whole, and replaced with aifiles'' key once 1Password returns it: by the key export on Linux, and by the hook on Termux, whose render now reads 1Password for such a key too'
-time: '2026-11-02T17:53:32.298166409Z'
