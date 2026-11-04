@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added the OmniRoute backup key to the keys `chezmoi apply` fetches on WSL: `run_before_linux-005-export-private-key.sh.tmpl` writes `op://Private/omniroute-backup.age/private key` to `~/.ssh/omniroute-backup-key` whenever that file is missing or holds another key, only warning when it cannot, so a first apply no longer leaves the daily backup failing until the key is copied by hand; the Linux export also runs before every apply now, signs in only when a key differs, and no longer deletes `~/.ssh`, which held the SSH agent bridge''s socket'
-time: '2026-10-27T18:36:07.292974597Z'

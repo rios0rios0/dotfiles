@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the Atuin login on Termux, which failed on every apply before it reached the server because Atuin creates its key file through a hard link, which Android refuses ([atuinsh/atuin#4329](https://github.com/atuinsh/atuin/issues/4329)): Termux''s login now writes the key file first, from the 1Password item''s `key` field, which holds the base64 form `atuin key --base64` prints, and warns instead when that field still holds the 24-word phrase; every `[atuin] WARN:` line now carries Atuin''s own error rather than the `Location:` line its report ends with, which was all the phone showed'
-time: '2026-11-01T19:13:11.463439505Z'

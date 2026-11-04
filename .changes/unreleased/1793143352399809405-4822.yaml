@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'pulled the private aifiles repository into `~/.claude` and `~/.config/opencode` through aisync after every apply on Linux/WSL and Android, so a fresh machine gets its instructions, rules, skills and memories with no manual step; the pull never prompts, never pushes and never fails the apply, a device''s first sync lets aifiles'' copy win after backing up every local file it may replace to `$TMPDIR`, and the phone keeps its own `settings.json`, `CLAUDE.md` and `AGENTS.md`'
-time: '2026-10-27T23:22:32.399715607Z'

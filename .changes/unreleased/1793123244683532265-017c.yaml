@@ -1,4 +1,0 @@
-kind: 'Removed'
-body: 'removed the official OpenCode CLI from Linux/WSL, where `ocode`, the fork build, replaces it and reads the same `~/.config/opencode/` configuration: `install_opencode` left the shared install library, the `~/.opencode/bin` PATH block left `dot_zshenv.tmpl`, `make test-opencode-cli` went with them, and the next apply deletes `~/.opencode`'
-breaking: true
-time: '2026-10-27T17:47:24.683532265Z'
