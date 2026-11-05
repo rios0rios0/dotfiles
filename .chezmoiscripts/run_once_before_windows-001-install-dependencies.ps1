@@ -158,7 +158,6 @@ $utilities = @(
     "CharlesMilette.TranslucentTB",
     "EaseUS.PartitionMaster",
     "GIMP.GIMP",
-    "Grammarly.Grammarly",
     "Microsoft.OneDrive",
     "Notepad++.Notepad++",
     "PDFLabs.PDFtk.Free",

@@ -134,7 +134,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Uses winget with exact package IDs: `winget list --id <id> --exact` decides what is already installed, `msstore:<id>` entries come from the Microsoft Store source (Spotify), and a failed install is reported as a WARN and listed at the end
 - Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
 - Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, PassMark PerformanceTest
-- Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify (Microsoft Store edition), Grammarly, etc.
+- Installs utilities: SumatraPDF, GIMP, Notepad++, Spotify (Microsoft Store edition), etc.
 - Installs RustDesk outside winget (its publisher had it removed from winget): `Install-RustDesk` downloads the pinned MSI from the GitHub release, installs it only after its SHA-256 and its `PURSLANE` Authenticode signer check out, and skips machines where RustDesk is already installed
 - Installs development: Docker Desktop, ExpressVPN, Azure Storage Explorer, Lens, OpenVPN Connect, ripgrep
 - Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy
