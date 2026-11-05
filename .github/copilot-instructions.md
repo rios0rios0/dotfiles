@@ -99,6 +99,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **Neon CLI** (`neon` npm package from `neondatabase/neon-pkgs`, through the shared `install_neon_cli`; fresh installs take `neon`, not the legacy `neonctl` compatibility shim, and the plain JavaScript bundle needs no wrapper on Termux — its `--keyring` native addon has no android-arm64 build and the CLI falls back to file-based credentials)
   - **GitHub CLI** (gh, via apt repository)
   - **Azure CLI** and **OCI CLI** (via pipx through `install_pipx_app`, one venv each; see "One Interpreter Per Python CLI" in `AGENTS.md`)
+  - **doctl** (DigitalOcean's CLI) — a pinned release tarball, checked against its SHA-256, into `~/.local/bin`. `doctl version` also asks GitHub for the latest release with no timeout of its own, so `install_doctl` bounds each version check with `timeout`; Oh My Zsh's `doctl` plugin writes the zsh completion
   - **ggshield** (GitGuardian CLI, via pipx) — installs a global pre-commit hook script at `~/.local/share/ggshield/git-hooks/pre-commit`; `core.hooksPath` in `~/.gitconfig` points all repos there
   - **ruff** (Python linter, via Astral install script) — `make lint ONLY=python` runs it over any `PYEOF` heredoc in a `modify_*` file (none at present: the JSON merges are modify-templates)
   - **yq** (mikefarah's, the one `make lint ONLY=syntax` and CI call as `yq eval`) — a pinned release binary, checked against its SHA-256, into `~/.local/bin`. Kali's apt `yq` is a different tool (kislyuk's Python wrapper around jq, with no `eval`) and is tombstoned; `install_yq` checks `~/.local/bin/yq`'s version rather than `command -v yq`, which would find the apt one and skip the install
@@ -133,7 +134,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Uses winget with exact package IDs: `winget list --id <id> --exact` decides what is already installed, `msstore:<id>` entries come from the Microsoft Store source (Spotify), and a failed install is reported as a WARN and listed at the end
 - Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
 - Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, PassMark PerformanceTest
-- Installs utilities: Adobe Reader, GIMP, Notepad++, Spotify (Microsoft Store edition), Grammarly, etc.
+- Installs utilities: SumatraPDF, GIMP, Notepad++, Spotify (Microsoft Store edition), etc.
 - Installs RustDesk outside winget (its publisher had it removed from winget): `Install-RustDesk` downloads the pinned MSI from the GitHub release, installs it only after its SHA-256 and its `PURSLANE` Authenticode signer check out, and skips machines where RustDesk is already installed
 - Installs development: Docker Desktop, ExpressVPN, Azure Storage Explorer, Lens, OpenVPN Connect, ripgrep
 - Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy

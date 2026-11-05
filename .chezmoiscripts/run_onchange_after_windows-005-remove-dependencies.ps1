@@ -150,6 +150,9 @@ function Invoke-TombstoneList {
 # can be retired once every machine has converged (a commit hash from the feature
 # branch changes when the branch is rebased before merge).
 $tombstones = @(
+    # Grammarly -- removed in #293 (2026-11-05)
+    "winget:Grammarly.Grammarly",
+
     # Adobe Acrobat Reader and CCleaner -- replaced by SumatraPDF and BleachBit in #269 (2026-10-27)
     "winget:Adobe.Acrobat.Reader.64-bit",
     "winget:Piriform.CCleaner",

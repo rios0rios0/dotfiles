@@ -158,7 +158,7 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 
 - `$requirements`: `AgileBits.1Password`, `AgileBits.1Password.CLI`, `FiloSottile.age`, `Git.Git`, `JanDeDobbeleer.OhMyPosh`, `Microsoft.PowerShell`, `Microsoft.WSL`, `Microsoft.WindowsTerminal`, `Tailscale.Tailscale`
 - `$hardware`: `CPUID.CPU-Z.ROG`, `FinalWire.AIDA64.Extreme`, `Logitech.GHUB`, `PassMark.PerformanceTest`
-- `$utilities`: `BleachBit.BleachBit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Grammarly.Grammarly`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `SumatraPDF.SumatraPDF`, `msstore:9NCBCSZSJRSB` (Spotify, Microsoft Store edition)
+- `$utilities`: `BleachBit.BleachBit`, `CharlesMilette.TranslucentTB`, `EaseUS.PartitionMaster`, `GIMP.GIMP`, `Microsoft.OneDrive`, `Notepad++.Notepad++`, `PDFLabs.PDFtk.Free`, `Piriform.Recuva`, `RevoUninstaller.RevoUninstallerPro`, `SumatraPDF.SumatraPDF`, `msstore:9NCBCSZSJRSB` (Spotify, Microsoft Store edition)
 - `$communication`: `Zoom.Zoom.EXE`
 - `$development`: `Docker.DockerDesktop`, `ExpressVPN.ExpressVPN`, `Microsoft.Azure.StorageExplorer`, `Mirantis.Lens`, `OpenVPNTechnologies.OpenVPNConnect`, `BurntSushi.ripgrep.MSVC`
 - `$gaming`: `ElectronicArts.EADesktop`, `EpicGames.EpicGamesLauncher`, `GOG.Galaxy`, `Valve.Steam`
@@ -256,6 +256,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | Azure CLI                                        | `install_azure_cli`                  | `[automated]` | pip, inside the pyenv Python.                                                                                                   |
 | Fly.io CLI                                        | `install_fly_cli`                     | `[automated]`  | Upstream installer into `~/.fly/bin`; `dot_zshenv.tmpl` adds it to PATH.                                                         |
 | OCI CLI                                           | `install_oci_cli`                     | `[automated]`  | pip, inside the pyenv Python.                                                                                                    |
+| DigitalOcean CLI                                 | `install_doctl`                      | `[automated]` | The release tarball, pinned and SHA-256 checked, into `~/.local/bin`; Oh My Zsh's `doctl` plugin writes the completion.          |
 | ggshield                                         | `install_ggshield`                   | `[automated]` | pipx; its auth config is rendered from 1Password by `dot_config/ggshield/private_auth_config.yaml.tmpl`.                         |
 | ruff                                             | `install_ruff`                       | `[automated]` | Astral install script.                                                                                                          |
 | yq                                               | `install_yq`                         | `[automated]` | mikefarah's release, pinned and SHA-256 checked, into `~/.local/bin`; Kali's apt `yq` is a different tool.                      |
@@ -276,6 +277,7 @@ exec zsh                                   # first zsh: ZINIT clones Powerlevel1
 claude                                     # /login, then: ccswitch enroll
 sentry auth login                          # device code entered at a URL; `--token <API token>` skips OAuth
 neon login                                 # browser flow; `NEON_API_KEY` or `neon profile create <name> --api-key -` (stdin) skips it
+doctl auth login                           # browser flow (`--no-browser` prints the link); `doctl auth init` takes an API token, `DIGITALOCEAN_ACCESS_TOKEN` skips both
 atuin login -u <username>                  # the password and key from the `Atuin` item in 1Password
 ```
 
@@ -302,7 +304,7 @@ gvm list && go version
 node --version && corepack --version
 pyenv version
 kubectl version --client && kubectl krew list
-command -v terra terraform terragrunt aws az gh sentry neon acli ruff ggshield aisync ccswitch flyctl oci bun atuin
+command -v terra terraform terragrunt aws az gh sentry neon acli ruff ggshield aisync ccswitch flyctl oci doctl bun atuin
 atuin status                               # logged in, and the last sync
 ls ~/.local/share/zsh/site-functions/_sentry
 fc-list | grep -i meslo
@@ -420,7 +422,7 @@ Everything left is a download, a login or a license. The order does not matter w
 | Docker Desktop first start                                                   | `[manual]` | Accept the terms, sign in, enable WSL integration for `kali-linux` if wanted.                                                                             |
 | Microsoft Store apps: WhatsApp, Telegram, CineBench, draw.io, JW Library     | `[manual]` | 1Password, Spotify, TranslucentTB and Oh My Posh from the same list already came from winget in Phase 3.                                                  |
 | Office 365, Notion                                                           | `[manual]` | account.microsoft.com and notion.so downloads.                                                                                                            |
-| Licenses: AIDA64 Extreme, Revo Uninstaller Pro, EaseUS Partition Master, PerformanceTest, ExpressVPN, Grammarly | `[manual]` | The apps are installed; the keys and accounts are not.                                                                        |
+| Licenses: AIDA64 Extreme, Revo Uninstaller Pro, EaseUS Partition Master, PerformanceTest, ExpressVPN | `[manual]` | The apps are installed; the keys and accounts are not.                                                                        |
 | Battle.net, Ubisoft Connect, Mavis HUB                                       | `[manual]` | The first two have broken winget manifests (Phase 3); Mavis HUB has none.                                                                                 |
 | Watchtower                                                                   | `[manual]` | A container that updates other containers; run it on Docker Desktop yourself.                                                                             |
 | Authy Desktop, NiceHash Miner                                                | `[manual]` | Twilio discontinued the Authy desktop app in 2024; NiceHash is still a question mark on the original checklist.                                           |
@@ -448,8 +450,9 @@ Candidates for future issues, in rough order of payoff:
 
 The checklist from issue [#30](https://github.com/rios0rios0/dotfiles/issues/30), mapped to what the
 repository does today. Items the Windows setup has since dropped are left out: the JetBrains Toolbox
-with the IDEs and ReSharper installed through it, Visual Studio, Postman, Go and jq. Script paths are
-under `.chezmoiscripts/`; winget IDs refer to `run_once_before_windows-001-install-dependencies.ps1`.
+with the IDEs and ReSharper installed through it, Visual Studio, Postman, Go, jq and Grammarly.
+Script paths are under `.chezmoiscripts/`; winget IDs refer to
+`run_once_before_windows-001-install-dependencies.ps1`.
 
 ### Drivers
 
@@ -502,7 +505,6 @@ under `.chezmoiscripts/`; winget IDs refer to `run_once_before_windows-001-insta
 | Item                                | Status                                                                                       |
 |-------------------------------------|----------------------------------------------------------------------------------------------|
 | Notion                              | `[manual]`                                                                                   |
-| Grammarly                           | `[automated]` `Grammarly.Grammarly`                                                          |
 | PassMark PerformanceTest            | `[automated]` `PassMark.PerformanceTest`                                                     |
 | EaseUS Partition Master Professional | `[automated]` `EaseUS.PartitionMaster`; the license is `[manual]`                            |
 | Revo Uninstaller Pro                | `[automated]` `RevoUninstaller.RevoUninstallerPro`; the license is `[manual]`                |

@@ -849,6 +849,68 @@ install_atuin() {
     fi
 }
 
+# https://github.com/digitalocean/doctl
+# doctl, DigitalOcean's CLI. The release tarball, which holds the static `doctl` binary alone:
+# Kali packages no doctl, and the snap DigitalOcean documents needs a snapd Kali does not install.
+#
+# Pinned like yq. doctl's releases are immutable on GitHub, so an asset is never replaced under
+# its tag and a pin stays valid until it is bumped. To bump it, take both builds' SHA-256 from the
+# new release's `doctl-<version>-checksums.sha256`, which match the digests GitHub lists for the
+# assets; the version check below then replaces the installed binary.
+install_doctl() {
+    local version="2.3.0"
+    local arch sha256
+    case "$(uname -m)" in
+        x86_64) arch="amd64" sha256="782f720843364bfe5e7eaffa561af7685987ec3658510faa64ec330c5ea87a3c" ;;
+        aarch64) arch="arm64" sha256="5d90101beb19022f04d47af786f9de4019c17da3ffbb6eb1bd251b3e50aa42c9" ;;
+        *)
+            echo "[configure-deps] ERROR: no doctl build is pinned for $(uname -m)" >&2
+            return 1
+            ;;
+    esac
+
+    # `doctl version` prints "doctl version <version>-release" on its first line. It also asks
+    # GitHub for the latest release, through an HTTP client with no timeout (doctl's own doit.go
+    # says so), so each call is bounded: a lookup that stalls must not hold up this installer.
+    local target="$HOME/.local/bin/doctl"
+    if [[ -x "$target" && "$(timeout 30 "$target" version 2>/dev/null | head -n 1)" == "doctl version $version-release" ]]; then
+        echo "[configure-deps] doctl $version is already installed, skipping" >&2
+        return
+    fi
+
+    local workdir
+    workdir="$(mktemp -d)"
+    if ! curl --proto '=https' --proto-redir '=https' -fsSL -o "$workdir/doctl.tar.gz" \
+        "https://github.com/digitalocean/doctl/releases/download/v$version/doctl-$version-linux-$arch.tar.gz"; then
+        echo "[configure-deps] ERROR: failed to download doctl $version" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    if ! echo "$sha256  $workdir/doctl.tar.gz" | sha256sum --check --status; then
+        echo "[configure-deps] ERROR: the doctl $version download does not match its pinned SHA-256" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    if ! tar -xzf "$workdir/doctl.tar.gz" -C "$workdir" doctl; then
+        echo "[configure-deps] ERROR: the doctl $version archive holds no doctl" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+
+    mkdir -p "$HOME/.local/bin"
+    if ! install -m 0755 "$workdir/doctl" "$target"; then
+        echo "[configure-deps] ERROR: could not install doctl into $target" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    rm -rf "$workdir"
+
+    if [[ "$(timeout 30 "$target" version 2>/dev/null | head -n 1)" != "doctl version $version-release" ]]; then
+        echo "[configure-deps] ERROR: $target does not report doctl $version after the install" >&2
+        return 1
+    fi
+}
+
 # https://github.com/rios0rios0/aisync
 # `aisync` syncs AI assistant rules/agents/skills across AI assistant home
 # directories such as `~/.claude/`.
@@ -1018,6 +1080,8 @@ install_fly_cli
 # The ocode fork build (`run_after_linux-006-build-ocode.sh`) runs on bun.
 verify install_bun
 verify install_oci_cli
+# DigitalOcean's CLI, a pinned release download like yq's (see the function).
+verify install_doctl
 
 install_ggshield
 install_ruff
