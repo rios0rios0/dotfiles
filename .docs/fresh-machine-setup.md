@@ -256,6 +256,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | Azure CLI                                        | `install_azure_cli`                  | `[automated]` | pip, inside the pyenv Python.                                                                                                   |
 | Fly.io CLI                                        | `install_fly_cli`                     | `[automated]`  | Upstream installer into `~/.fly/bin`; `dot_zshenv.tmpl` adds it to PATH.                                                         |
 | OCI CLI                                           | `install_oci_cli`                     | `[automated]`  | pip, inside the pyenv Python.                                                                                                    |
+| DigitalOcean CLI                                 | `install_doctl`                      | `[automated]` | The release tarball, pinned and SHA-256 checked, into `~/.local/bin`; Oh My Zsh's `doctl` plugin writes the completion.          |
 | ggshield                                         | `install_ggshield`                   | `[automated]` | pipx; its auth config is rendered from 1Password by `dot_config/ggshield/private_auth_config.yaml.tmpl`.                         |
 | ruff                                             | `install_ruff`                       | `[automated]` | Astral install script.                                                                                                          |
 | yq                                               | `install_yq`                         | `[automated]` | mikefarah's release, pinned and SHA-256 checked, into `~/.local/bin`; Kali's apt `yq` is a different tool.                      |
@@ -276,6 +277,7 @@ exec zsh                                   # first zsh: ZINIT clones Powerlevel1
 claude                                     # /login, then: ccswitch enroll
 sentry auth login                          # device code entered at a URL; `--token <API token>` skips OAuth
 neon login                                 # browser flow; `NEON_API_KEY` or `neon profile create <name> --api-key -` (stdin) skips it
+doctl auth login                           # browser flow (`--no-browser` prints the link); `doctl auth init` takes an API token, `DIGITALOCEAN_ACCESS_TOKEN` skips both
 atuin login -u <username>                  # the password and key from the `Atuin` item in 1Password
 ```
 
@@ -302,7 +304,7 @@ gvm list && go version
 node --version && corepack --version
 pyenv version
 kubectl version --client && kubectl krew list
-command -v terra terraform terragrunt aws az gh sentry neon acli ruff ggshield aisync ccswitch flyctl oci bun atuin
+command -v terra terraform terragrunt aws az gh sentry neon acli ruff ggshield aisync ccswitch flyctl oci doctl bun atuin
 atuin status                               # logged in, and the last sync
 ls ~/.local/share/zsh/site-functions/_sentry
 fc-list | grep -i meslo

@@ -60,6 +60,7 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `terra-update` | terra update in both installers carries TERRA_ASSUME_YES=true |
 | `yq` | mikefarah's yq: the pin, the Python yq it replaces, the skip, the failures, the wiring |
 | `chlog` | chlog from upstream's pinned tag: the go install, the skip, the replacement, the failures, the wiring |
+| `doctl` | DigitalOcean's CLI: the pin, the skip, the replacement, the failures, a `doctl version` that never returns (its GitHub lookup has no timeout), the completion plugin, the wiring |
 | `aifiles-sync` | the aisync hook: the first sync's backup, pull only, the unchanged no-op, failures only warning, both platforms, Termux building aisync, another key kept |
 | `export-keys` | the age keys fetched before every apply on Linux: the match, the fetch, failures, the WSL-only backup key, aisync's, another one kept |
 | `export-key-windows` | the Windows chezmoi key export: the match, the fetch, a failed or wrong read (needs pwsh) |
