@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added Armoury Crate to every Windows device, last in the installer: `Install-ArmouryCrate` skips a machine that has the `B9ECED6F.ArmouryCrate` package and otherwise runs `Asus.ArmouryCrate` with `--override "-silent"`, because `winget list` never finds what the tool installs and the tool reads the `/SILENT` of the winget manifest as a request for its interactive installer, which is why it stayed commented out as never found and always asking to install; `make test ONLY=install-dependencies-windows` covers it and `AGENTS.md` records why'
+time: '2026-11-06T20:17:07.548840191Z'

@@ -68,7 +68,7 @@ Scripts execute in this order per platform (numbers = execution priority):
 
 | Order | Linux (WSL)                                            | Windows                          | Android (Termux)                       |
 |-------|--------------------------------------------------------|----------------------------------|----------------------------------------|
-| 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1`       | `create-wrapper.sh` → `001a-e` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`) |
+| 001   | `create-op-wrapper.sh`                                 | `install-dependencies.ps1.tmpl`  | `create-wrapper.sh` → `001a-e` tool wrappers (`op`, `gh`, `golangci-lint`, `acli`, `claude`) |
 | 002   | `install-dependencies.sh.tmpl` *(also baremetal variant)* | `configure-dependencies.ps1`     | `install-dependencies.sh.tmpl`         |
 | 003   | `configure-dependencies.sh`                            | `install-fonts.ps1` *(run_before, every apply)* | `install-fonts.sh.tmpl` |
 | 004   | `install-fonts.sh.tmpl`                                | `export-private-key.ps1.tmpl` *(run_before, every apply)* | —             |
@@ -129,13 +129,15 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 - Configures NeoVim with AstroVim template (`~/.config/nvim`)
 - Configures Termux DNS (8.8.8.8, 8.8.4.4, 1.1.1.1)
 
-#### Windows Dependencies (`.chezmoiscripts/run_once_before_windows-001-install-dependencies.ps1`)
+#### Windows Dependencies (`.chezmoiscripts/run_once_before_windows-001-install-dependencies.ps1.tmpl`)
 - **TIMING**: Takes 30-60 minutes to complete. NEVER CANCEL - Set timeout to 90+ minutes.
 - Uses winget with exact package IDs: `winget list --id <id> --exact` decides what is already installed, `msstore:<id>` entries come from the Microsoft Store source (Spotify), and a failed install is reported as a WARN and listed at the end
 - Installs: 1Password + CLI, age, Git, Oh My Posh, PowerShell 7, WSL, Windows Terminal
 - Installs hardware tools: CPU-Z ROG, AIDA64 Extreme, Logitech G HUB, PassMark PerformanceTest
 - Installs utilities: SumatraPDF, GIMP, Notepad++, Spotify (Microsoft Store edition), etc.
 - Installs RustDesk outside winget (its publisher had it removed from winget): `Install-RustDesk` downloads the pinned MSI from the GitHub release, installs it only after its SHA-256 and its `PURSLANE` Authenticode signer check out, and skips machines where RustDesk is already installed
+- Installs PowerPanel Business (Local) on the one device `.chezmoidata/ups.yaml` names, the only reason this script is a template: `Install-PowerPanelBusiness` downloads the pinned installer, checks its SHA-256 and its `Cyber Power Systems, Inc.` Authenticode signer, runs it silently and elevated with `installModule=local`, and goes by `PowerPanel Business Service`, which also skips a machine that has it
+- Installs Armoury Crate on every device, last: `Install-ArmouryCrate` skips a machine with the `B9ECED6F.ArmouryCrate` MSIX and otherwise runs `Asus.ArmouryCrate` with `--override "-silent"`, since `winget list` never finds it and ASUS's tool reads the manifest's `/SILENT` as "ask interactively"; its service finishes the install in the background
 - Installs development: Docker Desktop, ExpressVPN, Azure Storage Explorer, Lens, OpenVPN Connect, ripgrep
 - Installs gaming: Steam, Epic Games, EA Desktop, GOG Galaxy
 

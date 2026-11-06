@@ -1,5 +1,5 @@
 # Removes dependencies that this repository used to install on Windows but no
-# longer declares in run_once_before_windows-001-install-dependencies.ps1.
+# longer declares in run_once_before_windows-001-install-dependencies.ps1.tmpl.
 #
 # Deleting a package from the installer only stops NEW machines from getting the
 # tool -- machines that already ran it keep the tool forever. chezmoi has no

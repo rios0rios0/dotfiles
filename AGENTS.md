@@ -24,13 +24,13 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 
 | Test (`make test ONLY=<name>`) | What it covers |
 |---|---|
-| `template-render` | template rendering with mock 1Password |
+| `template-render` | template rendering with mock 1Password, and the Windows installer on the UPS's device and any other |
 | `chezmoiignore` | platform file inclusion logic |
 | `script-order` | script dependency ordering |
 | `modify-scripts` | modify script (merge) behavior |
 | `remove-dependencies` | dependency removal library (tombstones, $HOME safety rail) |
 | `remove-dependencies-windows` | Windows removal script, failed removals reported (needs pwsh) |
-| `install-dependencies-windows` | Windows installer: detection by exact ID, failed installs reported (needs pwsh) |
+| `install-dependencies-windows` | Windows installer: detection by exact ID, failed installs reported, Armoury Crate's package check and switch, PowerPanel Business's pinned silent install and its service (needs pwsh) |
 | `configure-dependencies-windows` | moving WSL's disks off the system drive: the drive chosen, the question, Docker's data disk copied before its setting and deleted after, each failure (needs pwsh) |
 | `prune-tmp-modcache` | $TMPDIR Go module cache pruning ($TMPDIR safety rail) |
 | `shell-credentials` | 1Password credential/workspace loading and removal |
@@ -307,7 +307,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `secrets-sync`, `home-agents`, `wsl-move`, `git-identities`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `secrets-sync`, `home-agents`, `wsl-move`, `git-identities`, `armoury-crate`, `powerpanel`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -1503,7 +1503,7 @@ installer render one way or the other from the kernel, as `.chezmoiignore` does.
 
 | Part | WSL | Bare metal |
 |------|-----|------------|
-| Client | Windows', `Tailscale.Tailscale` in `run_once_before_windows-001-install-dependencies.ps1` | `tailscaled`, from Tailscale's apt repository |
+| Client | Windows', `Tailscale.Tailscale` in `run_once_before_windows-001-install-dependencies.ps1.tmpl` | `tailscaled`, from Tailscale's apt repository |
 | `tailscale` in a shell | `dot_local/bin/executable_tailscale`, a wrapper for `tailscale.exe` | the package's |
 | Login | the Tailscale app on Windows | `tailscale-up`, which waits for the browser |
 | Sharing the model's server | `tailscale-up`, through Windows' `tailscale serve` | `tailscale-up`, through `tailscale serve` |
@@ -1892,7 +1892,7 @@ workspaces, in a worktree placed elsewhere and in a repository with an email of 
 
 ## Windows Package Detection (winget list, Not export)
 
-`Install-PackageList` in `run_once_before_windows-001-install-dependencies.ps1` decides what is
+`Install-PackageList` in `run_once_before_windows-001-install-dependencies.ps1.tmpl` decides what is
 already installed with `winget list --id <id> --exact --source <source>`, one call per entry
 (about 1.3 s each). It used to read `winget export` once, which looked cheaper and was wrong:
 export leaves out packages that are installed -- on the machine this was found on it omitted
@@ -1905,6 +1905,8 @@ GIMP, Codex, yq, ShellCheck, the Copilot CLI and the EA app -- so every run inst
 | A failed install is a `WARN`, never "installed successfully" | The script prints winget's exit code and ends with the list of everything that failed, RustDesk included. It still exits 0, because a failing `run_once_before_` script aborts the apply before any file is written; the cost is that a failed package is retried only when the script changes |
 
 `make test ONLY=install-dependencies-windows` runs `Install-PackageList` against a stubbed `winget`.
+A package winget can install but never find stays out of these lists: see "Armoury Crate on
+Windows".
 
 ## Windows Fonts (Per User, Before Every Apply)
 
@@ -2082,7 +2084,7 @@ after Microsoft's scan falsely flagged it as malware and it could not be allowli
 ([microsoft/winget-pkgs#352094](https://github.com/microsoft/winget-pkgs/issues/352094)).
 `winget install RustDesk.RustDesk` now fails with `No package found`.
 
-`Install-RustDesk` in `run_once_before_windows-001-install-dependencies.ps1` installs the
+`Install-RustDesk` in `run_once_before_windows-001-install-dependencies.ps1.tmpl` installs the
 release MSI instead, through `Save-VerifiedDownload`:
 
 | Check | Why |
@@ -2095,6 +2097,69 @@ The MSI is per-machine (`ALLUSERS=1`) and registers the `RustDesk` service, so i
 `/passive`, not `/qn`: a non-elevated apply then raises a UAC prompt instead of failing
 silently. To bump the pin, take the new MSI's `digest` from the release API; the signer check
 needs no change unless RustDesk changes certificates.
+
+## Armoury Crate on Windows (winget Runs It, Never Finds It)
+
+Every Windows device here has ROG gear, so `Install-ArmouryCrate`, in
+`run_once_before_windows-001-install-dependencies.ps1.tmpl`, runs on all of them. A PC that is not
+ASUS's still gets the peripherals' settings ([ASUS's FAQ](https://www.asus.com/support/faq/1041654/),
+1-1-4). It is a function and not an entry in `$hardware` because `Asus.ArmouryCrate` is not an
+installer winget can manage: it is ASUS's install tool in a ZIP, and both halves of `Install-PackageList`
+fail on it.
+
+| Fact | Consequence |
+|------|-------------|
+| The manifest names no product code or package family, so nothing ties what the tool installs to the package | `winget list --id Asus.ArmouryCrate` never finds it, and the list would start the tool on every run, which is what `TODO: it's never found. Always asking to install` was. The app's MSIX decides instead: `B9ECED6F.ArmouryCrate`, what the tool itself looks for with `Get-AppxPackage`, and the package of Store product `9PM9DFQRDH3F` |
+| The tool parses its argument only when the first character is `-` (read out of `ArmouryCrateInstaller.exe` 3.3.6.0); anything else lands on `Parameter = default, Default Manually Download & Install Mode` | The manifest's `/SILENT` opens the interactive installer, which stops the script until someone clicks through it. `--override "-silent"` replaces it. The dash is what matters: the comparison itself ignores case |
+| `-silent` hands over to ASUS's `AsusROGLSLService`, which runs the installer's window hidden | `winget` can return before the app is registered, so exit code 0 is reported as a hand-over, never as installed. The next run of the script is what checks. It runs last in the script, because an installer that starts beside a running one can fail on it |
+| ASUS documents the install tool, and names the Store only for updates | The tool also installs the services the app needs, so the Store product is not the route here, however easily `msstore:` could find it |
+| `ArmouryCrateInstallTool.zip` sits behind an unversioned URL that the manifest pins by SHA-256 | When ASUS replaces the file, `winget install` fails on the hash until the manifest follows: a `WARN` in the final list, retried when the script next changes |
+
+**Not yet run end to end on a device.** Everything above comes from the manifest and the tool's own
+code, and the script is tested against stubs. Whether `-silent` finishes the install unattended on a
+machine that is not ASUS's is what the first apply shows: `Get-AppxPackage B9ECED6F.ArmouryCrate`
+lists the app when it did. If it never appears, run `ArmouryCrateInstaller.exe` by hand; the check
+above then sees that install too.
+
+`make test ONLY=install-dependencies-windows` covers the check, the switch and the failures, and
+`make test ONLY=template-render` that every device installs it, last.
+
+## PowerPanel Business on the UPS's Device
+
+The UPS, a CyberPower OL1500RTXL2U, reaches one machine over USB, and `.chezmoidata/ups.yaml` names
+it: `ups.device`, read the way `atuin.serverDevice` is. That key is the only reason the Windows
+installer is a template, and on that device alone the script calls `Install-PowerPanelBusiness`.
+
+| Fact | Consequence |
+|------|-------------|
+| CyberPower's [page for this UPS](https://www.cyberpowersystems.com/product/ups/smart-app-online/ol1500rtxl2u/) lists PowerPanel Business, and its [software selector](https://www.cyberpower.com/global/en/tools/selector/software) maps all 44 OL and OLS models it knows to Business, `OL1500ERTXL2U`, this model's 230 V twin, among them | Not `CyberPowerSystems.PowerPanel.Personal`, which the script carried commented out: Personal is the selector's answer for the home range. Its page does say "any CyberPower UPS", so it may well run here, but it is not what the vendor recommends for this series |
+| Business has three modules: Local reads a UPS over USB or serial, Remote a network card, and Management watches other machines. Local and Remote cannot share a computer | Local is the one needed, and it ships with Remote in `PPB_Windows_v<version>.exe`. `CyberPowerSystems.PowerPanel.Business.Management`, the only Business package in winget, is the wrong module |
+| The installer comes from CyberPower's CDN through `Save-VerifiedDownload` | SHA-256 pinned to one file, signer `Cyber Power Systems, Inc.`. To bump it, take the version from the UPS's page and hash that file |
+| It is install4j, and its launcher runs as its invoker. CyberPower's [silent install guide](https://wiki.cyberpowersystems.de/WIKI%20Stuff/Guides_BestPractise_PDF/Quick%20Guides%20Software/PPBAllgemein/Silent%20installation/PowerPanel%20Business%20Silent%20Installation-Windows.pdf) runs it with `-q`, as Administrator, beside a file of the same name ending in `.varfile` that holds `installModule=local` | The script writes that file and elevates. The file is a Java properties file, so it is written in ASCII: a byte order mark would hide the key |
+| The guide's window closes after about three seconds, and it checks the install by the service | `PowerPanel Business Service` decides, for up to five minutes after the launcher returns; the same check skips a machine that has it. A service that never appears is a `WARN` in the final list |
+| `Start-Process -Wait` also waits for the process's descendants when it can put them in a job, which an elevated apply can | `Invoke-ElevatedInstaller` waits for the installer's own process instead, within five minutes, so nothing the installer leaves running can hold up the apply |
+| [CVE-2023-25131](https://nvd.nist.gov/vuln/detail/cve-2023-25131): through 4.8.6, nothing ever asked anyone to replace the default `admin` password. The remedy is 4.9.0 or later and logging in once to change it | An unattended install leaves that login to a person, so the success line points at `http://localhost:3052/local`. Do it right after the apply |
+
+**Keep these:**
+
+1. **The device comes from `.chezmoidata/ups.yaml`, read with `get`.** `.deviceName` would abort the
+   render on a config that predates it, before `run_before_000-verify-chezmoi-config` could report
+   it (see "Config Data Comes From `chezmoi init`").
+2. **The pin lives in the function, like RustDesk's, and only a new install follows it.** A machine
+   with the service is skipped whatever its version, so bumping the pin upgrades nothing: PowerPanel
+   updates itself, or by hand. `ups.device` changes only the rendered copies of the two devices
+   involved.
+3. **Moving the UPS leaves the old device alone.** It keeps PowerPanel until someone removes it: no
+   tombstone can name a device.
+
+**Not yet run on a device.** The download and its signature were checked on the 4.12.4 file without
+running it, and the script is tested against stubs. `-q` and `installModule` are taken from
+CyberPower's guide for 4.11.0, because install4j keeps its settings where they cannot be read without
+running it. After the first apply, `http://localhost:3052/local` showing `LOCAL` in its header proves
+the module.
+
+`make test ONLY=install-dependencies-windows` covers the install, its wait and each failure, and
+`make test ONLY=template-render` that only the UPS's device renders the call.
 
 ## Age Keys (One Per Purpose)
 

@@ -1,0 +1,11 @@
+# The UPS, a CyberPower OL1500RTXL2U. Its USB cable reaches one machine, which runs the software
+# that reads it: PowerPanel Business, from Install-PowerPanelBusiness in
+# .chezmoiscripts/run_once_before_windows-001-install-dependencies.ps1.tmpl. See AGENTS.md,
+# "PowerPanel Business on the UPS's Device".
+#
+# chezmoi reads this file on every apply -- unlike `data:` in .chezmoi.yaml.tmpl, which only
+# `chezmoi init` regenerates -- so an edit reaches the installer on the next apply.
+ups:
+  # The chezmoi `deviceName` of that machine, a Windows one. Moving the cable to another device
+  # means editing this: the installer then runs there, and nothing leaves the old device.
+  device: 'alien-a51'
