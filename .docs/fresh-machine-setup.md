@@ -52,12 +52,12 @@ on Android, so Termux never needs `~/.ssh/chezmoi`.
 
 Nothing here is automated, and most of it cannot be: the installers are vendor downloads without a
 winget manifest, or with a manifest that is broken (the `#TODO` comments in
-`run_once_before_windows-001-install-dependencies.ps1` say which and why).
+`run_once_before_windows-001-install-dependencies.ps1.tmpl` say which and why).
 
 | Item                                                            | Marker            | Notes                                                                                                                        |
 |-----------------------------------------------------------------|-------------------|------------------------------------------------------------------------------------------------------------------------------|
 | Wireless driver for the ASUS ROG USB adapter                    | `[manual]`        | Vendor download. Needed before anything else can reach the network.                                                          |
-| ASUS Armoury Crate and the board drivers it pulls               | `[manual]`        | `Asus.ArmouryCrate` is commented out: winget never sees it as installed and keeps reinstalling it. Install from asus.com.    |
+| ASUS Armoury Crate and the board drivers it pulls               | `[automated]`     | `Install-ArmouryCrate`, on every Windows device, last in Phase 3. Its service finishes in the background.                    |
 | AIDA64 Extreme, CPU-Z ROG                                       | `[automated]`     | `FinalWire.AIDA64.Extreme` and `CPUID.CPU-Z.ROG` in the `$hardware` array. Phase 3 installs them; do not install them by hand. |
 | AIDA64 OSD label order                                          | `[manual]`        | Configured in the AIDA64 UI after Phase 3.                                                                                   |
 | ASUS GPU Tweak III                                              | `[manual]`        | `Asus.GPUTweak` sits in the commented-out `$hardwareDesktop` array (RTX 4090 desktop only).                                  |
@@ -65,7 +65,8 @@ winget manifest, or with a manifest that is broken (the `#TODO` comments in
 | Logitech G HUB, PassMark PerformanceTest                        | `[automated]`     | `Logitech.GHUB` and `PassMark.PerformanceTest` in `$hardware`. Phase 3 installs them.                                        |
 | Brother full driver                                             | `[manual]`        | Not in the winget source, so `Brother.FullDriver` is commented out; download the model's package from support.brother.com.   |
 | Lian Li L-Connect 3, Samsung Magician                           | `[manual]`        | Vendor downloads.                                                                                                            |
-| CyberPower PowerPanel Personal, APC PowerChute                  | `[manual]`        | `CyberPowerSystems.PowerPanel.Personal` is in the commented-out `$utilitiesDesktop` array; PowerChute is a vendor download.  |
+| CyberPower PowerPanel Business (Local)                          | `[automated]`     | `Install-PowerPanelBusiness`, on the device `.chezmoidata/ups.yaml` names. Log in once afterwards to set its password.       |
+| APC PowerChute                                                  | `[manual]`        | Vendor download.                                                                                                             |
 
 **Verify:** Device Manager shows no unknown devices, and `Test-NetConnection github.com -Port 443`
 succeeds.
@@ -143,7 +144,7 @@ What runs, in order (all paths under `.chezmoiscripts/`):
 
 | Step | Script                                                                                       | Marker        | What it does                                                                                                                                                                        |
 |------|----------------------------------------------------------------------------------------------|---------------|-------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| 1    | `run_once_before_windows-001-install-dependencies.ps1`                                       | `[automated]` | 36 packages (Spotify from the Microsoft Store, the rest from winget), skipping any that `winget list` finds under its exact ID, plus RustDesk from its GitHub release (section 3.3). |
+| 1    | `run_once_before_windows-001-install-dependencies.ps1.tmpl`                                  | `[automated]` | 36 packages (Spotify from the Microsoft Store, the rest from winget), skipping any that `winget list` finds under its exact ID, plus RustDesk from its GitHub release, PowerPanel Business on the UPS's device, and Armoury Crate last (section 3.3). |
 | 2    | `run_once_before_windows-002-configure-dependencies.ps1`                                     | `[partial]`   | Phase 2: installs Kali and makes it the default distro, or runs `wsl --update` where Kali already exists; then asks whether to move `kali-linux` and Docker Desktop's disks off `C:`. The reboot after the install is on you. |
 | 3    | `run_before_windows-003-install-fonts.ps1`                                                   | `[automated]` | MesloLGS NF, Meslo Nerd Font and FiraCode Nerd Font for the current user, into `%LOCALAPPDATA%\Microsoft\Windows\Fonts` with `HKCU` font entries, whenever a family is missing; no elevation needed. |
 | 4    | `run_before_windows-004-export-private-key.ps1.tmpl`                                         | `[automated]` | Writes the age identity from `op://Private/chezmoi.age/private key` to `~\.ssh\chezmoi`, on every apply where that file is missing or holds another key; a failed read stops the apply. |
@@ -176,10 +177,23 @@ and installs it only if its SHA-256 matches and its Authenticode signature is va
 RustDesk's publisher. It skips machines where RustDesk is already installed, whether from the `.exe`
 or the MSI. The MSI installs per machine, so a non-elevated apply shows a UAC prompt for it.
 
-Commented out in the script with the reason, so `[manual]`: `Asus.ArmouryCrate` (never detected as
-installed), `Brother.FullDriver` (not in the winget source), `Blizzard.BattleNet` (asks for a path
-and never installs), `Ubisoft.Connect` (hash mismatch, Windows blocks the installer), and the
-desktop-only `Asus.GPUTweak` and `CyberPowerSystems.PowerPanel.Personal`.
+PowerPanel Business, CyberPower's software for the OL-series UPS, is installed right after
+`$hardware` on the one device `.chezmoidata/ups.yaml` names, the machine the UPS's USB cable
+reaches. `Install-PowerPanelBusiness` downloads the pinned installer from CyberPower, checks its
+SHA-256 and its `Cyber Power Systems, Inc.` signature, and installs the Local module silently, with
+a UAC prompt on a non-elevated apply. **Log in once at `http://localhost:3052/local` right after the
+apply**: that first login is what replaces the default password.
+
+Armoury Crate is installed last, on every device, by `Install-ArmouryCrate`. winget runs ASUS's
+install tool but cannot find what it installs, so the app's package decides whether it is there, and
+the tool is started with the `-silent` it parses rather than the manifest's `/SILENT`, which opens
+its interactive installer. ASUS's service finishes the install in the background, so the app may
+take a while to show up after the apply has moved on. Neither has been run end to end on a device
+yet: if `Get-AppxPackage` below stays empty, run `ArmouryCrateInstaller.exe` by hand.
+
+Commented out in the script with the reason, so `[manual]`: `Brother.FullDriver` (not in the winget
+source), `Blizzard.BattleNet` (asks for a path and never installs), `Ubisoft.Connect` (hash mismatch,
+Windows blocks the installer), and the desktop-only `Asus.GPUTweak`.
 
 **Verify:**
 
@@ -191,6 +205,8 @@ Get-ChildItem "$env:LOCALAPPDATA\Microsoft\Windows\Fonts" -Filter 'MesloLGS*'
 Test-Path ~\.ssh\chezmoi
 docker run --rm hello-world          # after starting Docker Desktop once and accepting its terms
 Get-Service RustDesk                 # Running once Install-RustDesk has installed it
+Get-AppxPackage B9ECED6F.ArmouryCrate  # listed once ASUS's service has finished in the background
+Get-Service 'PowerPanel Business Service'  # on the UPS's device only
 ```
 
 ## Phase 4: Kali on WSL bootstrap
@@ -437,8 +453,8 @@ signed in.
 Candidates for future issues, in rough order of payoff:
 
 1. **Microsoft Store apps.** winget can install from the Store through its `msstore` source; the IDs for WhatsApp, Telegram, CineBench, draw.io and JW Library need to be looked up with `winget search --source msstore` and added to the Windows installer.
-2. **Hardware profiles.** `$hardwareDesktop` and `$utilitiesDesktop` are commented out; a chezmoi data flag keyed on the hostname could enable them on the desktop only.
-3. **Broken winget manifests**: `Asus.ArmouryCrate`, `Blizzard.BattleNet`, `Ubisoft.Connect`. Re-test them periodically, or install from the vendor URL with a checksum.
+2. **Hardware profiles.** `$hardwareDesktop` is commented out; a chezmoi data key naming the device, as `.chezmoidata/ups.yaml` does for PowerPanel Business, could enable it on the desktop only.
+3. **Broken winget manifests**: `Blizzard.BattleNet`, `Ubisoft.Connect`. Re-test them periodically, or install from the vendor URL with a checksum.
 4. **Windows features up front.** A small elevated pre-step could enable Virtual Machine Platform and WSL and run `wsl --set-default-version 2` before winget, instead of relying on `wsl --install` inside `windows-002`.
 5. **Baremetal Linux 1Password.** `linux-001` and `linux-005` assume `op.exe`.
 6. **Post-install steps that need a token**: `ccswitch enroll`, the Claude Code bootstrap on Android. The `cred:` fields on the device note could feed them.
@@ -452,14 +468,14 @@ The checklist from issue [#30](https://github.com/rios0rios0/dotfiles/issues/30)
 repository does today. Items the Windows setup has since dropped are left out: the JetBrains Toolbox
 with the IDEs and ReSharper installed through it, Visual Studio, Postman, Go, jq and Grammarly.
 Script paths are under `.chezmoiscripts/`; winget IDs refer to
-`run_once_before_windows-001-install-dependencies.ps1`.
+`run_once_before_windows-001-install-dependencies.ps1.tmpl`.
 
 ### Drivers
 
 | Item                                     | Status                                                    |
 |------------------------------------------|-----------------------------------------------------------|
 | Wireless driver with ASUS ROG USB        | `[manual]`                                                |
-| Armoury Crate, all drivers               | `[manual]`, `Asus.ArmouryCrate` commented out             |
+| Armoury Crate, all drivers               | `[automated]` `Install-ArmouryCrate`, each Windows device |
 | Tools: AIDA64                            | `[automated]` `FinalWire.AIDA64.Extreme`                  |
 | AIDA64 OSD label order                   | `[manual]`                                                |
 | Tools: CPUID CPU-Z                       | `[automated]` `CPUID.CPU-Z.ROG`                           |
@@ -520,7 +536,7 @@ Script paths are under `.chezmoiscripts/`; winget IDs refer to
 | GIMP                                | `[automated]` `GIMP.GIMP`                                                                    |
 | Brother Full Setup                  | `[manual]` not in the winget source                                                          |
 | `sudo apt install pdftk imagemagick` | `[manual]` on WSL: neither is installed there; `pdftk` is on Windows (`PDFLabs.PDFtk.Free`) and baremetal Linux |
-| CyberPower Personal                 | `[manual]`, `CyberPowerSystems.PowerPanel.Personal` commented out (desktop only)             |
+| CyberPower PowerPanel Business      | `[automated]` `Install-PowerPanelBusiness`, on the device in `.chezmoidata/ups.yaml`         |
 
 ### Development
 

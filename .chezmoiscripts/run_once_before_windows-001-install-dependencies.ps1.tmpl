@@ -117,8 +117,110 @@ function Install-RustDesk {
     }
 }
 
-# Dot-sourcing the script, as `make test-install-dependencies-windows` does, stops
-# here with the functions defined; running it installs the lists below.
+# The Windows-only commands below sit in functions of their own, as those of
+# windows-002-configure-dependencies do, so that the tests can stand in for them.
+function Test-AppxPackage {
+    param([string]$Name)
+
+    return [bool](Get-AppxPackage -Name $Name -ErrorAction SilentlyContinue)
+}
+
+function Test-Service {
+    param([string]$Name)
+
+    return [bool](Get-Service -Name $Name -ErrorAction SilentlyContinue)
+}
+
+# RunAs for an installer that starts as its invoker and needs an administrator. Not -Wait,
+# which in an elevated apply also waits for anything the installer leaves running: this
+# waits for the installer's own process, within a limit.
+function Invoke-ElevatedInstaller {
+    param([string]$Path, [string]$Arguments)
+
+    $process = Start-Process -FilePath $Path -ArgumentList $Arguments -Verb RunAs -PassThru -ErrorAction Stop
+    $null = $process.WaitForExit(300000)
+}
+
+# Armoury Crate comes from ASUS's install tool, the package `Asus.ArmouryCrate`, but
+# winget can neither find what the tool installs nor run it quietly. Its manifest names
+# no product code or package family, so `winget list` never finds the package, and
+# Install-PackageList would start the tool on every run: the app's MSIX below decides
+# instead, which is what the tool checks for itself, through Get-AppxPackage. And the
+# tool reads an argument only when it starts with `-`, so the manifest's `/SILENT` opens
+# the interactive installer: `--override` hands it `-silent` in its place.
+function Install-ArmouryCrate {
+    if (Test-AppxPackage -Name "B9ECED6F.ArmouryCrate") {
+        Write-Host "[armoury-crate] already installed..."
+        return
+    }
+
+    winget install --id Asus.ArmouryCrate --exact --source winget --override "-silent" --accept-package-agreements --accept-source-agreements
+    $exitCode = $LASTEXITCODE
+    if ($exitCode -eq 0) {
+        # The tool hands over to a service of ASUS's, so this proves nothing about the app
+        # yet: the next run of this script tells, by starting the tool again if it is missing.
+        Write-Host "[armoury-crate] install tool finished, ASUS's service may still be installing the app in the background"
+    }
+    else {
+        Write-Host "[armoury-crate] WARN: not installed (winget exit code $exitCode)"
+        $script:failed += "Armoury Crate"
+    }
+}
+
+# The UPS is an OL series, and the software CyberPower lists for that series is PowerPanel
+# Business, not PowerPanel Personal, its software for the home range. Business's Local
+# module is the one that reads a UPS over USB. It ships with Remote in one installer that
+# winget does not have: `CyberPowerSystems.PowerPanel.Business.Management` is the third
+# module, which watches other machines over the network. So it comes from CyberPower's
+# download, pinned to one installer. To bump it, take the version from
+# https://www.cyberpowersystems.com/product/ups/smart-app-online/ol1500rtxl2u/ and the
+# SHA-256 of that file -- the signer check still refuses anything CyberPower did not sign.
+function Install-PowerPanelBusiness {
+    param([int]$PollSeconds = 5)
+
+    $version = "4.12.4"
+    $sha256 = "2924ef115f5acce5a65a0623c09a1112965d29cf8a5bbe4b9b6213a72312254d"
+    $service = "PowerPanel Business Service"
+
+    if (Test-Service -Name $service) {
+        Write-Host "[powerpanel] already installed..."
+        return
+    }
+
+    $installer = $null
+    try {
+        $installer = Save-VerifiedDownload -Signer "Cyber Power Systems, Inc." -Sha256 $sha256 `
+            -Uri "https://dl4jz3rbrsfum.cloudfront.net/software/PPB_Windows_v$version.exe"
+
+        # A silent run takes its answers from a file named after the installer, and
+        # `installModule` is the Local or Remote choice its dialog would ask for.
+        $answers = [System.IO.Path]::ChangeExtension($installer, ".varfile")
+        Set-Content -LiteralPath $answers -Value "installModule=local" -Encoding Ascii
+        Invoke-ElevatedInstaller -Path $installer -Arguments "-q"
+
+        # The launcher can return before the install is done, so the service decides, which
+        # is also how CyberPower's guide says to check a silent install.
+        $attempts = 60
+        while (-not (Test-Service -Name $service)) {
+            if ($attempts-- -eq 0) { throw "the service '$service' did not appear" }
+            Start-Sleep -Seconds $PollSeconds
+        }
+        Write-Host "[powerpanel] installed $version, log in once at http://localhost:3052/local to replace its default password"
+    }
+    catch {
+        Write-Host "[powerpanel] WARN: not installed: $_"
+        $script:failed += "PowerPanel Business"
+    }
+    finally {
+        if ($installer) {
+            Remove-Item -LiteralPath $installer, $answers -Force -ErrorAction SilentlyContinue
+        }
+    }
+}
+
+# Dot-sourcing the script, as `make test ONLY=install-dependencies-windows` does with its
+# template actions stripped, stops here with the functions defined; running it installs
+# the lists below.
 if ($MyInvocation.InvocationName -eq ".") { return }
 
 # =========================================================================================================
@@ -138,7 +240,6 @@ Install-PackageList $requirements
 # =========================================================================================================
 # Hardware
 $hardware = @(
-    #"Asus.ArmouryCrate",            # TODO: it's never found. Always asking to install
     #"Brother.FullDriver",           # TODO: not in the winget source (Brother has only BRAdmin and iPrint&Scan there)
     "CPUID.CPU-Z.ROG",
     "FinalWire.AIDA64.Extreme",
@@ -146,6 +247,9 @@ $hardware = @(
     "PassMark.PerformanceTest"
 )
 Install-PackageList $hardware
+{{- if eq (get . "deviceName") .ups.device }}
+Install-PowerPanelBusiness          # the device the UPS is cabled to (.chezmoidata/ups.yaml); not in winget, see the function
+{{- end }}
 # Hardware for Desktop
 #$hardwareDesktop = @(
 #    "Asus.GPUTweak"               # (just for RTX 4090)
@@ -168,11 +272,6 @@ $utilities = @(
 )
 Install-PackageList $utilities
 Install-RustDesk                    # not in winget, see the function
-# Utilities for Desktop
-#$utilitiesDesktop = @(
-#    "CyberPowerSystems.PowerPanel.Personal" # (just for Desktop)
-#)
-#Install-PackageList $utilitiesDesktop
 # =========================================================================================================
 # Communication
 $communication = @(
@@ -201,6 +300,10 @@ $gaming = @(
     "Valve.Steam"
 )
 Install-PackageList $gaming
+# =========================================================================================================
+# Armoury Crate goes last: ASUS's service carries on installing after the tool exits,
+# and an installer that starts beside it can fail on the one already running.
+Install-ArmouryCrate
 # =========================================================================================================
 if ($script:failed) {
     Write-Host "[$prefix] WARN: $($script:failed.Count) packages were not installed: $($script:failed -join ', ')"

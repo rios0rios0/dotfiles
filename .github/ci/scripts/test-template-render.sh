@@ -149,6 +149,48 @@ for script in run_after_windows-001-create-ssh-public-keys.ps1.tmpl run_after_wi
     fi
 done
 
+# The Windows installer differs by one line between the device the UPS is cabled to and any
+# other: only that device installs PowerPanel Business, and every device ends on Armoury Crate,
+# whose service goes on installing after the script's other installers have finished.
+installer="$REPO_ROOT/.chezmoiscripts/run_once_before_windows-001-install-dependencies.ps1.tmpl"
+render_installer() {
+    chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" \
+        --override-data "{\"chezmoi\": {\"os\": \"windows\"}, \"deviceName\": \"$1\"}" < "$installer"
+}
+
+# given
+ups_device="$(chezmoi execute-template --config="$TMPDIR/chezmoi.yaml" '{{ .ups.device }}')"
+
+# when
+if ups_output="$(render_installer "$ups_device" 2>&1)" && other_output="$(render_installer "testdevice" 2>&1)"; then
+    # then
+    only_on_ups="$(diff <(printf '%s\n' "$other_output") <(printf '%s\n' "$ups_output") | grep -c '^[<>]' || true)"
+    if [[ -z "$ups_device" ]]; then
+        echo "[test-template-render] FAIL: .ups.device names no device" >&2
+        EXIT_CODE=1
+    elif [[ "$only_on_ups" = "1" ]] && grep -q '^Install-PowerPanelBusiness ' <<<"$ups_output" &&
+        ! grep -q '^Install-PowerPanelBusiness' <<<"$other_output"; then
+        echo "[test-template-render] PASS: only the UPS's device ($ups_device) installs PowerPanel Business" >&2
+    else
+        echo "[test-template-render] FAIL: the installer differs by $only_on_ups lines between $ups_device and another device" >&2
+        EXIT_CODE=1
+    fi
+    if [[ "$(grep '^Install-' <<<"$ups_output" | tail -1)" = "Install-ArmouryCrate" ]] &&
+        [[ "$(grep '^Install-' <<<"$other_output" | tail -1)" = "Install-ArmouryCrate" ]]; then
+        echo "[test-template-render] PASS: every Windows device installs Armoury Crate, last" >&2
+    else
+        echo "[test-template-render] FAIL: Armoury Crate is not the last install on every Windows device" >&2
+        EXIT_CODE=1
+    fi
+    if grep -q '{{' <<<"$ups_output$other_output"; then
+        echo "[test-template-render] FAIL: the installer renders with template syntax left in it" >&2
+        EXIT_CODE=1
+    fi
+else
+    echo "[test-template-render] FAIL: the Windows installer does not render: $ups_output" >&2
+    EXIT_CODE=1
+fi
+
 # The config guard must render to nothing for a current config -- chezmoi then
 # never runs it -- and stop a config generated before a data key existed, pointing
 # at `chezmoi init`.
