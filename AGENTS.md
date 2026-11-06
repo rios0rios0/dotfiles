@@ -68,6 +68,7 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `install-fonts-windows` | the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh) |
 | `powershell-profile-windows` | PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh) |
 | `home-agents` | the home guide (~/AGENTS.md): each platform's guide, its own writer, the writers in a sandbox home (Windows' under pwsh, skipped without it), no ~/CLAUDE.md |
+| `git-identities` | each workspace's git identity: the identities and workspaces read from the device note, the unusable ones skipped, the includes per platform (none on Windows), the writers in a sandbox home, and real commits inside, between and outside nested workspaces |
 
 ## The CI Pipeline (Linear Stages)
 
@@ -169,7 +170,7 @@ Templates fetch this note (cached by chezmoi across all template files) and filt
 | `pem`    | `notesPlain` entry referencing Secure Note in `Private` vault | Chezmoi templates |
 | `docker` | `notesPlain` entry referencing Docker registry item in `Private` vault | Chezmoi templates |
 | `cred`   | Field on device note (`cred:NAME` label, concealed value) | Runtime `op-loader` |
-| `ws`     | Field on device note (`ws:NAME` label, text value) | Runtime `op-loader` |
+| `ws`     | Field on device note (`ws:NAME` label, text value) | Runtime `op-loader`; chezmoi templates, for each workspace's git identity (see "Git Identities per Workspace") |
 
 **Device-note pattern with type filtering** (every call takes its account from
 `lib-onepassword.tmpl`, never `"my"`: see "1Password CLI Retry"):
@@ -306,7 +307,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `secrets-sync`, `home-agents`, `wsl-move`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `secrets-sync`, `home-agents`, `wsl-move`, `git-identities`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -1836,6 +1837,58 @@ fails with `Couldn't get agent socket`. Windows' own Git keeps 1Password's `op-s
 found with `lookPath` -- the Store build's alias is on `PATH` -- and otherwise under Program Files
 or in the per-user install, whichever exists. `make test ONLY=template-render` covers each
 platform's signer and allowed-signers file.
+
+## Git Identities per Workspace
+
+Every repository in a workspace commits and signs as the identity the workspace is named after. The
+device note holds both halves: a `ws:<name>` field is a workspace, the directory the shell's
+`<name>` alias cds into, and each `ssh:` entry names an SSH Key item whose `ssh alias`,
+`ssh username`, `ssh email` and `public key` are an identity. A workspace whose name is an
+identity's alias -- `ws:work` beside an item whose alias is `work` -- commits as that identity, and a
+repository outside every workspace as `[user]`, the first `ssh:` entry's. Before, `[user]` applied
+everywhere: every commit in a work repository carried the personal name and email and the personal
+key's signature, unless someone had run `git ssh<alias>` in that repository first. Pushing was never
+affected, since the remotes go through the `<host>-<alias>` hosts of the SSH config, which pick the
+key.
+
+| Part | Where |
+|------|-------|
+| The identities and workspaces, read from the note | `.chezmoitemplates/lib-git-identities.tmpl` |
+| An `[includeIf "gitdir:<workspace>/"]` per workspace, shallowest first | `dot_gitconfig.tmpl`, Linux and Android |
+| `~/.config/git/identities/<alias>`: `user.name`, `user.email`, `user.signingkey`, `gpg.format` | `run_after_linux-003-write-git-identities.sh.tmpl` and `run_after_android-002-write-git-identities.sh.tmpl`, through `.chezmoitemplates/lib-git-identities.sh` |
+
+**Keep these:**
+
+1. **The note is the only source.** The repository is public, so no alias, name, email or path is
+   written in it: a new identity or workspace is an entry or a field on the note, which the next
+   apply picks up. The `ws:` name has to equal the `ssh alias` exactly; a workspace named after no
+   identity only gets its shell alias.
+2. **The condition is the directory, not the remote.** A `gitdir:` include covers every repository
+   below the workspace however it was cloned, a worktree wherever it is placed (its git directory
+   sits inside the main repository's) and a submodule. A workspace inside another wins over it,
+   because its include comes later. A repository outside every workspace keeps `[user]`; a
+   `git config include.path ~/.config/git/identities/<alias>` in it, or an `includeIf` in
+   `~/.gitconfig.local`, gives it an identity that follows 1Password, where `git ssh<alias>` copies
+   the values once.
+3. **The includes come after `[user]` and before `~/.gitconfig.local`.** A workspace wins over the
+   default and the machine's own file over both; a repository's own config wins over everything.
+4. **A script writes the identities, because chezmoi cannot.** A target's name cannot come from
+   1Password, and the aliases must stay out of the repository. Each file is staged beside its
+   target and renamed over it, a file already in place is left alone, so an apply with nothing to
+   change says nothing, and only files that start with the writer's marker line and whose alias
+   left the note are deleted: a file without the marker is somebody's own. The script is
+   `run_after_`, so an identity deleted by hand comes back on the next apply instead of its
+   workspace committing as the default identity without a word.
+5. **An unusable entry is skipped with a warning, never rendered.** An alias that is not a plain file
+   name (it would become a path), a second item with an alias already taken, an item missing one of
+   the three fields, a line break in one of them, and a workspace that is neither under `~` nor
+   absolute. Names, emails and keys are escaped for git's quoted values.
+6. **Not on Windows.** Its projects live in WSL, so `dot_gitconfig.tmpl` renders no include there
+   and no writer runs.
+
+`make test ONLY=git-identities` covers 1 to 6 against a mock 1Password: the library, the includes on
+each platform, the writers in a sandbox home, and real commits inside, between and outside nested
+workspaces, in a worktree placed elsewhere and in a repository with an email of its own.
 
 ## Windows Package Detection (winget list, Not export)
 

@@ -1,0 +1,22 @@
+#!/bin/bash
+
+# Writes ~/.config/git/identities/<alias>, the git identity of each SSH key on this device's
+# 1Password note, which dot_gitconfig.tmpl includes for every workspace named after it, and deletes
+# the ones taken off the note: a repository in the workspace commits and signs as that key's owner
+# instead of as the default identity. Android runs the same body (run_after_android-002). See "Git
+# Identities per Workspace" in AGENTS.md.
+#
+# `run_after_`, not `run_onchange_`: an identity deleted by hand would otherwise stay deleted until
+# the note changed, and every repository in its workspace would commit as the default identity in
+# the meantime, without a word. An apply whose files already match writes nothing and says nothing.
+
+set -euo pipefail
+
+{{ template "lib-git-identities.sh" }}
+{{- $git := includeTemplate "lib-git-identities.tmpl" . | fromJson }}
+{{- range $git.identities }}
+write_git_identity '{{ .alias }}' <<'GIT_IDENTITY'
+{{ .config }}
+GIT_IDENTITY
+{{- end }}
+prune_git_identities{{ range $git.identities }} '{{ .alias }}'{{ end }}

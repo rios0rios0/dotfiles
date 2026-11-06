@@ -1,0 +1,101 @@
+{{- /*
+  The git identities on this device's 1Password note, and the workspaces that commit as each, as JSON:
+
+      {"identities": [{"alias": "work", "config": "[user]\n    name = ..."}, ...],
+       "workspaces": [{"dir": "~/Development/dev.azure.com/SomeOrg/", "alias": "work"}, ...]}
+
+  An identity is an ssh: entry of the note -- the entries dot_gitconfig.tmpl takes its [user]
+  defaults and its ssh<alias> aliases from -- and its config is the git config that makes a
+  repository commit as it: the item's `ssh username` and `ssh email`, and its `public key` to sign
+  with. Its alias names the file the write-git-identities scripts write that config to,
+  ~/.config/git/identities/<alias>, so an alias that is not a plain file name is skipped, as are a
+  second item with the same alias and an item missing any of the three fields.
+
+  A workspace is a `ws:<name>` field of the note -- the directory the shell's workspace alias of
+  that name cds into (dot_scripts/linux-engineering-workspace-aliases.sh) -- whose <name> is an
+  identity's alias. Its dir is written for an includeIf "gitdir:" condition: $HOME, ${HOME} or ~ at
+  its start as ~, which git expands itself, and one trailing slash, which makes the condition cover
+  every repository below it. The workspaces are sorted shallowest first, so that when one sits inside
+  another, the deeper one is included last and wins. A workspace named after no identity, or whose
+  directory is neither under ~ nor absolute, gets nothing.
+
+  dot_gitconfig.tmpl includes ~/.config/git/identities/<alias> for each workspace, and
+  run_after_linux-003 and run_after_android-002 write those files, so the two read one list:
+      includeTemplate "lib-git-identities.tmpl" . | fromJson
+  See "Git Identities per Workspace" in AGENTS.md.
+*/ -}}
+{{- $op := includeTemplate "lib-onepassword.tmpl" . | fromJson -}}
+
+{{- $deviceNotes := "" -}}
+{{- $workspaceFields := list -}}
+{{- range (onepassword (printf "Device: %s" .deviceName) "personal" $op.account).fields -}}
+{{-   if and (hasKey . "label") (hasKey . "value") -}}
+{{-     if eq .label "notesPlain" -}}
+{{-       $deviceNotes = .value -}}
+{{-     else if hasPrefix "ws:" .label -}}
+{{-       $workspaceFields = append $workspaceFields (list (trimPrefix "ws:" .label | trim) (.value | toString | trim)) -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
+{{- $identities := list -}}
+{{- $itemByAlias := dict -}}
+{{- range splitList "\n" $deviceNotes -}}
+{{-   $entry := . | trim -}}
+{{-   if hasPrefix "ssh:" $entry -}}
+{{-     $name := trimPrefix "ssh:" $entry | trim -}}
+{{-     $f := dict -}}
+{{-     range (onepassword $name "Private" $op.account).fields -}}
+{{-       if and (hasKey . "label") (hasKey . "value") -}}
+{{-         $_ := set $f .label (.value | toString | trim) -}}
+{{-       end -}}
+{{-     end -}}
+{{-     $alias := get $f "ssh alias" -}}
+{{-     $userName := get $f "ssh username" -}}
+{{-     $email := get $f "ssh email" -}}
+{{-     $key := get $f "public key" -}}
+{{-     if not (regexMatch `^[A-Za-z0-9][A-Za-z0-9._-]*$` $alias) -}}
+{{-       warnf "[git-identities] WARN: skipped \"%s\": its ssh alias \"%s\" is not a plain file name" $name $alias -}}
+{{-     else if hasKey $itemByAlias $alias -}}
+{{-       warnf "[git-identities] WARN: skipped \"%s\": \"%s\" already has the ssh alias \"%s\"" $name (get $itemByAlias $alias) $alias -}}
+{{-     else if or (eq $userName "") (eq $email "") (eq $key "") -}}
+{{-       warnf "[git-identities] WARN: skipped \"%s\": it needs an ssh username, an ssh email and a public key" $name -}}
+{{-     else if regexMatch `[\r\n]` (cat $name $userName $email $key) -}}
+{{-       warnf "[git-identities] WARN: skipped \"%s\": a line break in its name or fields" $name -}}
+{{-     else -}}
+{{-       $_ := set $itemByAlias $alias $name -}}
+{{- /* Inside a git config double-quoted value, only a backslash and a quote need escaping. */ -}}
+{{-       $quoted := list -}}
+{{-       range list $userName $email $key -}}
+{{-         $quoted = append $quoted (. | replace "\\" "\\\\" | replace "\"" "\\\"") -}}
+{{-       end -}}
+{{-       $config := printf "# the identity \"%s\", from the 1Password item \"%s\"\n[user]\n    name = \"%s\"\n    email = \"%s\"\n    signingkey = \"%s\"\n[gpg]\n    format = ssh" $alias $name (index $quoted 0) (index $quoted 1) (index $quoted 2) -}}
+{{-       $identities = append $identities (dict "alias" $alias "config" $config) -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+
+{{- /* Each workspace as "<length of dir>\t<dir>\t<alias>", the length zero-padded, so that sortAlpha
+       puts a directory before every directory inside it. */ -}}
+{{- $sortable := list -}}
+{{- range $workspaceFields -}}
+{{-   $alias := index . 0 -}}
+{{-   if hasKey $itemByAlias $alias -}}
+{{-     $dir := regexReplaceAll `^(\$HOME|\$\{HOME\}|~)(/|$)` (index . 1) "~/" -}}
+{{-     if not (or (hasPrefix "~/" $dir) (hasPrefix "/" $dir)) -}}
+{{-       warnf "[git-identities] WARN: skipped the workspace \"%s\": \"%s\" is neither under ~ nor absolute" $alias $dir -}}
+{{-     else if regexMatch `["\\\t\r\n]` $dir -}}
+{{-       warnf "[git-identities] WARN: skipped the workspace \"%s\": its directory holds a quote, a backslash or a control character" $alias -}}
+{{-     else -}}
+{{-       $dir = printf "%s/" (regexReplaceAll `/+$` $dir "") -}}
+{{-       $sortable = append $sortable (printf "%06d\t%s\t%s" (len $dir) $dir $alias) -}}
+{{-     end -}}
+{{-   end -}}
+{{- end -}}
+{{- $workspaces := list -}}
+{{- range sortAlpha $sortable -}}
+{{-   $parts := splitList "\t" . -}}
+{{-   $workspaces = append $workspaces (dict "dir" (index $parts 1) "alias" (index $parts 2)) -}}
+{{- end -}}
+
+{{- dict "identities" $identities "workspaces" $workspaces | toJson -}}
