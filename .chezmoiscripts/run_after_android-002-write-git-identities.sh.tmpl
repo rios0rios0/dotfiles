@@ -1,0 +1,16 @@
+#!/data/data/com.termux/files/usr/bin/bash
+
+# Writes ~/.config/git/identities/<alias>, the git identity of each SSH key on this phone's
+# 1Password note, as run_after_linux-003 does on Linux and with the same body
+# (.chezmoitemplates/lib-git-identities.sh). See "Git Identities per Workspace" in AGENTS.md.
+
+set -euo pipefail
+
+{{ template "lib-git-identities.sh" }}
+{{- $git := includeTemplate "lib-git-identities.tmpl" . | fromJson }}
+{{- range $git.identities }}
+write_git_identity '{{ .alias }}' <<'GIT_IDENTITY'
+{{ .config }}
+GIT_IDENTITY
+{{- end }}
+prune_git_identities{{ range $git.identities }} '{{ .alias }}'{{ end }}

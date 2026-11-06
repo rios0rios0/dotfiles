@@ -169,8 +169,27 @@
     ff = yes
 [push]
     autoSetupRemote = true
+{{- /* Every workspace this device's 1Password note names after one of its SSH keys -- a
+       `ws:<alias>` field, the directory the shell's <alias> workspace alias cds into -- commits and
+       signs as that key's identity, which the write-git-identities scripts write to
+       ~/.config/git/identities/<alias>. [user] above is the first ssh: entry's identity, for every
+       repository outside them. The includes come after it so that they win, shallowest first so
+       that a workspace inside another wins over it, and before ~/.gitconfig.local so that the
+       machine keeps the last word. Linux and Android only, where those scripts run: Windows'
+       projects live in WSL. See "Git Identities per Workspace" in AGENTS.md. */ -}}
+{{- if or (eq .chezmoi.os "linux") (eq .chezmoi.os "android") }}
+{{- $workspaces := (includeTemplate "lib-git-identities.tmpl" . | fromJson).workspaces }}
+{{- if $workspaces }}
 
-# machine-local config kept out of this public repo (e.g. work identities through includeIf);
-# git skips the include silently when the file does not exist
+# each workspace commits and signs as the identity it is named after, from 1Password
+{{- range $workspaces }}
+[includeIf "gitdir:{{ .dir }}"]
+    path = ~/.config/git/identities/{{ .alias }}
+{{- end }}
+{{- end }}
+{{- end }}
+
+# machine-local config kept out of this public repo, read last so that it wins; git skips the
+# include silently when the file does not exist
 [include]
     path = ~/.gitconfig.local

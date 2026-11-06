@@ -196,7 +196,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
 ### Key Managed Files
 - `dot_zshrc.tmpl` → `~/.zshrc`: Zsh configuration with ZINIT plugins, version managers, aliases; on Linux/WSL also keeps the [`ccswitch`](https://github.com/rios0rios0/ccswitch) monitor daemon alive and wraps `claude` to rotate between backup Claude accounts when usage limits are exhausted
 - `dot_zshenv.tmpl` → `~/.zshenv`: PATH setup for all Zsh invocations (critical for IDE integration)
-- `dot_gitconfig.tmpl` → `~/.gitconfig`: Git config with 1Password SSH/GPG signing, per-device keys
+- `dot_gitconfig.tmpl` → `~/.gitconfig`: Git config with 1Password SSH/GPG signing, per-device keys, and each workspace's identity: an `includeIf "gitdir:..."` of `~/.config/git/identities/<alias>` for every `ws:<alias>` named after an `ssh:` entry's alias, written by `run_after_linux-003`/`run_after_android-002-write-git-identities` (see "Git Identities per Workspace" in `AGENTS.md`; `make test ONLY=git-identities`)
 - `dot_p10k.zsh` → `~/.p10k.zsh`: Powerlevel10k theme configuration
 - `dot_oh-my-posh.json` → `~/.oh-my-posh.json`: Oh My Posh theme (Windows only), loaded by `~/.config/powershell/profile.ps1`
 - `dot_config/powershell/profile.ps1` → `~/.config/powershell/profile.ps1`: PowerShell 7's profile (Windows only), kept in the user folder because PowerShell's own profile path is in Documents, which OneDrive moves; Windows Terminal's PowerShell profile dot-sources it (`pwsh.exe -NoExit -Command`)
@@ -472,7 +472,7 @@ Each device has a single **"Device: \<deviceName\>"** Secure Note in the `person
 - **`notesPlain`**: references to external items (`ssh:`, `gpg:`, `pem:`, `docker:`) fetched from the `Private` vault
 - **Custom fields**: credential (`cred:NAME`, concealed) and workspace (`ws:NAME`, text) values stored directly on the note
 
-Templates fetch this note (cached by chezmoi) and filter by type prefix. Runtime shell scripts use the `op-loader` to read `cred:` and `ws:` field values directly from the device note — no separate items in the `Private` vault are fetched for these types.
+Templates fetch this note (cached by chezmoi) and filter by type prefix. Runtime shell scripts use the `op-loader` to read `cred:` and `ws:` field values directly from the device note — no separate items in the `Private` vault are fetched for these types. Templates read the `ws:` fields too: a workspace named after an `ssh:` entry's `ssh alias` commits and signs as that identity (`.chezmoitemplates/lib-git-identities.tmpl`).
 
 **Device-note pattern with type filtering:**
 ```go
