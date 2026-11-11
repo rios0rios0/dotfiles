@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added the DigitalOcean CLI (`doctl`) to the Linux/WSL dependency installer: `install_doctl` downloads the release pinned to `v2.3.0` into `~/.local/bin/doctl`, checked against a SHA-256 per architecture, and bounds each `doctl version` check with `timeout`, because that command also asks GitHub for the latest release through an HTTP client with no timeout; Oh My Zsh''s `doctl` plugin writes its zsh completion, `make test ONLY=doctl` covers the install, and the README, the Copilot instructions and the fresh-machine runbook list the tool and its login'
-time: '2026-11-05T20:59:39.402900327Z'

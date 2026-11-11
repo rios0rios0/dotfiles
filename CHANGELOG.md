@@ -22,6 +22,22 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [2.1.0] - 2026-11-11
+
+### Added
+
+- added Armoury Crate to every Windows device, last in the installer: `Install-ArmouryCrate` skips a machine that has the `B9ECED6F.ArmouryCrate` package and otherwise runs `Asus.ArmouryCrate` with `--override "-silent"`, because `winget list` never finds what the tool installs and the tool reads the `/SILENT` of the winget manifest as a request for its interactive installer, which is why it stayed commented out as never found and always asking to install; `make test ONLY=install-dependencies-windows` covers it and `AGENTS.md` records why
+- added PowerPanel Business (Local) `4.12.4` on the device `.chezmoidata/ups.yaml` names, `alien-a51`, for its CyberPower `OL1500RTXL2U` UPS: CyberPower recommends Business for the OL series and winget only carries its Management module, so `Install-PowerPanelBusiness` downloads the pinned installer, checks its SHA-256 and its `Cyber Power Systems, Inc.` signature, installs it silently and goes by `PowerPanel Business Service`; `CyberPowerSystems.PowerPanel.Personal` left the commented-out list, the Windows installer became `run_once_before_windows-001-install-dependencies.ps1.tmpl`, and the first login at `http://localhost:3052/local` replaces the default password
+- added the DigitalOcean CLI (`doctl`) to the Linux/WSL dependency installer: `install_doctl` downloads the release pinned to `v2.3.0` into `~/.local/bin/doctl`, checked against a SHA-256 per architecture, and bounds each `doctl version` check with `timeout`, because that command also asks GitHub for the latest release through an HTTP client with no timeout; Oh My Zsh's `doctl` plugin writes its zsh completion, `make test ONLY=doctl` covers the install, and the README, the Copilot instructions and the fresh-machine runbook list the tool and its login
+
+### Fixed
+
+- fixed commits in a work repository using the default (personal) Git identity and signing key: a workspace on the device note (`ws:<alias>`) named after the `ssh alias` of an SSH key now commits and signs as the identity of that key, through an `includeIf "gitdir:..."` in `~/.gitconfig` and a `~/.config/git/identities/<alias>` file that the new `run_after_linux-003` and `run_after_android-002` scripts write from 1Password, so no work name, email or path is written in this public repository; repositories outside every workspace keep the first SSH key as before, Windows gets no includes because its projects live in WSL, `make test ONLY=git-identities` covers it with real commits, and the README, `AGENTS.md` and the Copilot instructions describe it
+
+### Removed
+
+- removed Grammarly (`Grammarly.Grammarly`) from the Windows dependency installer and tombstoned it, so the next apply uninstalls it with winget where it is installed
+
 ## [2.0.0] - 2026-11-04
 
 ### Added
