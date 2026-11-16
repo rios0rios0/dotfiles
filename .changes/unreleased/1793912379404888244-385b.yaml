@@ -1,3 +1,0 @@
-kind: 'Removed'
-body: 'removed Grammarly (`Grammarly.Grammarly`) from the Windows dependency installer and tombstoned it, so the next apply uninstalls it with winget where it is installed'
-time: '2026-11-05T20:59:39.404846538Z'
