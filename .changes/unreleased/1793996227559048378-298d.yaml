@@ -1,3 +1,0 @@
-kind: 'Added'
-body: 'added PowerPanel Business (Local) `4.12.4` on the device `.chezmoidata/ups.yaml` names, `alien-a51`, for its CyberPower `OL1500RTXL2U` UPS: CyberPower recommends Business for the OL series and winget only carries its Management module, so `Install-PowerPanelBusiness` downloads the pinned installer, checks its SHA-256 and its `Cyber Power Systems, Inc.` signature, installs it silently and goes by `PowerPanel Business Service`; `CyberPowerSystems.PowerPanel.Personal` left the commented-out list, the Windows installer became `run_once_before_windows-001-install-dependencies.ps1.tmpl`, and the first login at `http://localhost:3052/local` replaces the default password'
-time: '2026-11-06T20:17:07.558987041Z'
