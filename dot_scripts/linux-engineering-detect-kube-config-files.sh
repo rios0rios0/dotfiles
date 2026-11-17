@@ -1,5 +1,12 @@
 #!/bin/bash
 
+# Builds KUBECONFIG from the machine's own ~/.kube/config and every *.yml/*.yaml file under
+# ~/.kube/config-files. The order is the point: kubectl takes the default context from the first
+# file that sets one, and `kubectl config use-context` writes into that same file. So
+# ~/.kube/config, the machine-local file the secrets sync never copies, comes first, and the extra
+# files follow sorted by name. They used to follow the order `find` happened to return, which
+# changes whenever a tool rewrites one of them, so a new shell's default context could move to
+# another cluster without anyone choosing it.
 export KUBECONFIG=""
 _kube_count=0
 
@@ -10,15 +17,13 @@ if [[ -f "${DEFAULT_KUBECONFIG_FILE}" ]]; then
   _kube_count=$((_kube_count + 1))
 fi
 
-# your additional kubeconfig files should be inside ~/.kube/config-files
+# your additional kubeconfig files should be inside ~/.kube/config-files, merged in name order
 ADD_KUBECONFIG_FILES="$HOME/.kube/config-files"
 if [[ -d "${ADD_KUBECONFIG_FILES}" ]]; then
-  # shellcheck disable=SC2044
-  for kubeconfigFile in $(find "${ADD_KUBECONFIG_FILES}" -type f -name "*.yml" -o -name "*.yaml")
-  do
-    export KUBECONFIG="$kubeconfigFile:$KUBECONFIG"
+  while IFS= read -r kubeconfigFile; do
+    export KUBECONFIG="${KUBECONFIG:+$KUBECONFIG:}$kubeconfigFile"
     _kube_count=$((_kube_count + 1))
-  done
+  done < <(find "${ADD_KUBECONFIG_FILES}" -type f \( -name "*.yml" -o -name "*.yaml" \) | LC_ALL=C sort)
 fi
 
 if [[ $_kube_count -gt 0 ]]; then

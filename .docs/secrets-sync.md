@@ -23,10 +23,12 @@ never ran John never gets a `~/.john`.
 
 **Why the `current-context` stays behind.** With several kubeconfigs in `KUBECONFIG`,
 `kubectl config use-context` writes the new context into the first file that already has one. The
-shell's loader (`linux-engineering-detect-kube-config-files.sh`) lists `~/.kube/config-files` first,
-so that file is one of the synced ones. If those lines synced, switching to production on the laptop
-would switch the desktop's next `kubectl apply` to production too. The sync leaves them out of every
-comparison and every snapshot, and keeps a device's own line when a newer copy of the file arrives.
+shell's loader (`linux-engineering-detect-kube-config-files.sh`) lists `~/.kube/config` first and
+then `~/.kube/config-files` sorted by name, so on a machine with its own `~/.kube/config` the
+choice lands in that local file, which never syncs. On a machine without one it lands in the first
+synced file. If those lines synced, switching to production on the laptop would switch the desktop's
+next `kubectl apply` to production too. The sync leaves them out of every comparison and every
+snapshot, and keeps a device's own line when a newer copy of the file arrives.
 
 **Why `~/.kube/config` stays behind.** Its contexts (Docker Desktop, kind) point at the machine's own
 loopback and mean nothing on another one. The backups keep it.

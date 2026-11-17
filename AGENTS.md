@@ -27,6 +27,7 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `template-render` | template rendering with mock 1Password, and the Windows installer on the UPS's device and any other |
 | `chezmoiignore` | platform file inclusion logic |
 | `script-order` | script dependency ordering |
+| `kube-config-order` | the `KUBECONFIG` merge order: `~/.kube/config` first, then `~/.kube/config-files` sorted by name, in bash and zsh |
 | `modify-scripts` | modify script (merge) behavior |
 | `remove-dependencies` | dependency removal library (tombstones, $HOME safety rail) |
 | `remove-dependencies-windows` | Windows removal script, failed removals reported (needs pwsh) |
