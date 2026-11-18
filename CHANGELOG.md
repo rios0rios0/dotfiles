@@ -22,6 +22,12 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [2.1.1] - 2026-11-18
+
+### Fixed
+
+- fixed the default kubectl context of a new shell moving on its own: the kubeconfig loader merged `~/.kube/config-files` in the order `find` returned, which changes whenever a tool rewrites a file; it now lists `~/.kube/config` first and the other files sorted by name
+
 ## [2.1.0] - 2026-11-16
 
 ### Added
