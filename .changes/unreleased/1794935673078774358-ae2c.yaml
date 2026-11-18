@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed the default kubectl context of a new shell moving on its own: the kubeconfig loader merged `~/.kube/config-files` in the order `find` returned, which changes whenever a tool rewrites a file; it now lists `~/.kube/config` first and the other files sorted by name'
-time: '2026-11-17T17:14:33.078725408Z'
