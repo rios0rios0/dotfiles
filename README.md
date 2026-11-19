@@ -40,7 +40,7 @@ Cross-platform dotfiles managed with [chezmoi](https://www.chezmoi.io/), [1Passw
 ### Cloud and Infrastructure
 
 - **Kubernetes**: kubectl, krew (ctx/ns plugins), kubeconfig auto-detection
-- **Terraform** + Terragrunt
+- **Terraform** + Terragrunt, and **TFLint** (Linux/WSL), pinned to the version the pipelines run for `make lint`
 - **AWS CLI**, **Azure CLI**, **DigitalOcean CLI** (`doctl`; Linux/WSL), **Fly.io CLI**, **OCI CLI** (Oracle Cloud), **GitHub CLI**, **Atlassian CLI**
 - **Docker** + Docker Compose
 

@@ -89,6 +89,7 @@ On Android the tool wrappers **must** be `run_once_before` scripts (not chezmoi-
   - **GVM** — Go version manager (resolves and installs the latest stable Go version)
   - **kubectl** (v1.32 channel) + **krew** (with `ctx` and `ns` plugins)
   - **terra** (Terraform + Terragrunt version manager via upstream install script, same as Android)
+  - **TFLint** — the linter `make lint` runs in the Terraform repositories, which terra does not fetch: a pinned release zip, checked against its SHA-256, into `~/.local/bin`, at the version and digests the pipelines repository's `pinned-versions.sh` gives CI. `tflint --version` also asks GitHub for the latest release, so `install_tflint` runs its version checks with `TFLINT_DISABLE_VERSION_CHECK=1`
   - **SDKMAN** — Java/Gradle ecosystem (installs latest Java and Gradle)
   - **NVM** (v0.40.2) — Node.js version manager (installs LTS, upgrades npm to its latest with `nvm install-latest-npm`, + corepack)
   - **Pyenv** — Python version manager (installs Python 3.13.2)
