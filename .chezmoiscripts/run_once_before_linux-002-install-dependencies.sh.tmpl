@@ -911,6 +911,74 @@ install_doctl() {
     fi
 }
 
+# https://github.com/terraform-linters/tflint
+# TFLint, which `make lint` runs as a bare `tflint` in the Terraform repositories (the pipelines
+# repository's makefiles/terra.mk). terra fetches Terraform and Terragrunt but not it, and Kali
+# packages none. The release zip, which holds the `tflint` binary alone: upstream's documented
+# install is its install_linux.sh, fetched from the `master` branch and piped into bash.
+#
+# Pinned to what CI installs, so a workstation lints with the TFLint the pipelines run: the version
+# and both digests are the pipelines repository's global/scripts/shared/pinned-versions.sh
+# (`TFLINT_PINNED_VERSION`, `TFLINT_SHA256_AMD64`, `TFLINT_SHA256_ARM64`), taken from the release's
+# checksums.txt, which match the digests GitHub lists for the assets. TFLint's releases are
+# immutable on GitHub, so an asset is never replaced under its tag. To bump it, move the three
+# values to what that file pins; the version check below then replaces the installed binary.
+install_tflint() {
+    local version="0.66.0"
+    local arch sha256
+    case "$(uname -m)" in
+        x86_64) arch="amd64" sha256="22be11cadc25cd02401e94c0ccc91aa63467debb8485c2a755d98f4c0a9d1e2e" ;;
+        aarch64) arch="arm64" sha256="1105a0a5ddee7cdac7957a3475571a946b839192ea1bc0c722c6c4686001067e" ;;
+        *)
+            echo "[configure-deps] ERROR: no TFLint build is pinned for $(uname -m)" >&2
+            return 1
+            ;;
+    esac
+
+    # `--version` prints "TFLint version <version>" on its first line, before it reads any config.
+    # It also asks GitHub for the latest release (bounded at 3 s, cached for 48 h), which a check of
+    # the installed binary has no use for, so TFLINT_DISABLE_VERSION_CHECK turns that lookup off.
+    # Not `command -v tflint`: a TFLint elsewhere on PATH, at another version, would skip the pin.
+    local target="$HOME/.local/bin/tflint"
+    if [[ -x "$target" && "$(TFLINT_DISABLE_VERSION_CHECK=1 "$target" --version 2>/dev/null | head -n 1)" == "TFLint version $version" ]]; then
+        echo "[configure-deps] TFLint $version is already installed, skipping" >&2
+        return
+    fi
+
+    local workdir
+    workdir="$(mktemp -d)"
+    if ! curl --proto '=https' --proto-redir '=https' -fsSL -o "$workdir/tflint.zip" \
+        "https://github.com/terraform-linters/tflint/releases/download/v$version/tflint_linux_$arch.zip"; then
+        echo "[configure-deps] ERROR: failed to download TFLint $version" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    if ! echo "$sha256  $workdir/tflint.zip" | sha256sum --check --status; then
+        echo "[configure-deps] ERROR: the TFLint $version download does not match its pinned SHA-256" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    # unzip is in the requirements at the top of this script.
+    if ! unzip -q "$workdir/tflint.zip" tflint -d "$workdir"; then
+        echo "[configure-deps] ERROR: could not unpack tflint from the TFLint $version archive" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+
+    mkdir -p "$HOME/.local/bin"
+    if ! install -m 0755 "$workdir/tflint" "$target"; then
+        echo "[configure-deps] ERROR: could not install TFLint into $target" >&2
+        rm -rf "$workdir"
+        return 1
+    fi
+    rm -rf "$workdir"
+
+    if [[ "$(TFLINT_DISABLE_VERSION_CHECK=1 "$target" --version 2>/dev/null | head -n 1)" != "TFLint version $version" ]]; then
+        echo "[configure-deps] ERROR: $target does not report TFLint $version after the install" >&2
+        return 1
+    fi
+}
+
 # https://github.com/rios0rios0/aisync
 # `aisync` syncs AI assistant rules/agents/skills across AI assistant home
 # directories such as `~/.claude/`.
@@ -1082,6 +1150,8 @@ verify install_bun
 verify install_oci_cli
 # DigitalOcean's CLI, a pinned release download like yq's (see the function).
 verify install_doctl
+# TFLint, which `make lint` runs in the Terraform repositories, pinned to CI's (see the function).
+verify install_tflint
 
 install_ggshield
 install_ruff

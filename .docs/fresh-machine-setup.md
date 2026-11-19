@@ -257,6 +257,7 @@ apt, from the `requirements`, `hardware` and `utilities` arrays: `git`, `curl`, 
 | Go, via GVM                                      | `install_gvm`                        | `[automated]` | Resolves the latest stable release from go.dev on every run.                                                                    |
 | kubectl (`v1.32` apt channel), krew with `ctx` and `ns` | `install_kubectl`, `install_krew` | `[automated]` |                                                                                                                                 |
 | terra (Terraform and Terragrunt manager)         | `install_terra`                      | `[automated]` | Upstream install script, then `terra self-update` and `terra update` with `TERRA_ASSUME_YES=true`, so an unattended run updates instead of reporting "Non-interactive session - skipping update". |
+| TFLint                                           | `install_tflint`                     | `[automated]` | The release zip, pinned and SHA-256 checked, into `~/.local/bin`, at the version CI installs (the pipelines repository's `pinned-versions.sh`); `make lint` in the Terraform repositories runs it. |
 | Java and Gradle, via SDKMAN                      | `install_sdkman`                     | `[automated]` | Latest candidates, refreshed on every run.                                                                                      |
 | Node.js LTS, via NVM `v0.40.2`, plus corepack    | `install_nvm`                        | `[automated]` | npm is upgraded to its latest release with `nvm install-latest-npm` on every pass.                                              |
 | Python `3.13.2`, via pyenv                       | `install_pyenv`                      | `[automated]` | Also installs the apt build dependencies pyenv needs, and upgrades that Python's pip to the latest release.                     |
@@ -320,7 +321,7 @@ gvm list && go version
 node --version && corepack --version
 pyenv version
 kubectl version --client && kubectl krew list
-command -v terra terraform terragrunt aws az gh sentry neon acli ruff ggshield aisync ccswitch flyctl oci doctl bun atuin
+command -v terra terraform terragrunt tflint aws az gh sentry neon acli ruff ggshield aisync ccswitch flyctl oci doctl bun atuin
 atuin status                               # logged in, and the last sync
 ls ~/.local/share/zsh/site-functions/_sentry
 fc-list | grep -i meslo

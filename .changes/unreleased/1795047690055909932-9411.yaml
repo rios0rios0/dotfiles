@@ -1,0 +1,3 @@
+kind: 'Added'
+body: 'added TFLint to the Linux/WSL dependency installer, so `make lint` in the Terraform repositories finds it on a fresh machine instead of failing: `install_tflint` downloads the release zip pinned to `v0.66.0`, the version and digests the pipelines repository installs on CI, into `~/.local/bin/tflint`, checked against a SHA-256 per architecture, and runs its version checks with `TFLINT_DISABLE_VERSION_CHECK=1`, because `tflint --version` otherwise asks GitHub for the latest release; `make test ONLY=tflint` covers the install, and the README, the Copilot instructions and the fresh-machine runbook list the tool'
+time: '2026-11-19T00:21:30.055835767Z'
