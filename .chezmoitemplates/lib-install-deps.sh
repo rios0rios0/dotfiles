@@ -95,6 +95,93 @@ install_sdkman() {
     sdk install gradle
 }
 
+# carry_npm_globals <version>: installs into the active Node.js's global tree every package that
+# Node.js <version>'s tree holds and the active one lacks, at the version installed there, one at a
+# time and with `--ignore-scripts`. It replaces nvm's `--reinstall-packages-from`, which puts every
+# package into ONE `npm install -g`, install scripts included, so that a single failure carries none
+# of them, in a failure `nvm install` reported to a log nobody read: when NVM's default moved from
+# v24 to v26 on alien-a51 (2026-11-02), v26's tree received none of v24's packages. Never carried:
+# npm and corepack, which each Node ships, and, named with the reason, a package linked with
+# `npm link`, which points at a checkout, or one whose command is already in ~/.local/bin: this
+# repository put that command there (Claude Code's native build, the language servers' links), and
+# `.zshenv` puts NVM's bin ahead of ~/.local/bin, so a carried copy would shadow it. Returns
+# non-zero, naming each package and the command that installs it, when any did not come across.
+carry_npm_globals() {
+    local from="$1"
+    local source_root="$NVM_DIR/versions/node/$from/lib/node_modules"
+    if [[ ! -d "$source_root" ]]; then
+        echo "[install-deps] Node.js $from is no longer installed, so there are no global packages to carry over" >&2
+        return 0
+    fi
+    local target_root
+    target_root="$(npm root -g 2>/dev/null)"
+    if [[ -z "$target_root" || "$target_root" -ef "$source_root" ]]; then
+        echo "[install-deps] ERROR: cannot tell the active Node.js's global packages from $from's" >&2
+        return 1
+    fi
+
+    local dir name version bins bin shadowed
+    local -a bin_names=() carried=() failed=()
+    for dir in "$source_root"/* "$source_root"/@*/*; do
+        [[ -f "$dir/package.json" ]] || continue
+        name="" version="" bins=""
+        IFS=$'\t' read -r name version bins < <(jq -r '[.name // "", .version // "",
+            (if (.bin | type) == "string" then (.name | split("/") | last)
+             elif (.bin | type) == "object" then (.bin | keys | join(","))
+             else "" end)] | @tsv' "$dir/package.json" 2>/dev/null)
+        if [[ -z "$name" || -z "$version" || "$name" == npm || "$name" == corepack ||
+            -e "$target_root/$name/package.json" ]]; then
+            continue
+        fi
+        if [[ -L "$dir" ]]; then
+            echo "[install-deps] WARN: not carrying $name from Node.js $from: it is linked from $(readlink -f "$dir"); run \`npm link\` there to link it again" >&2
+            continue
+        fi
+        shadowed=""
+        IFS=, read -r -a bin_names <<<"$bins"
+        for bin in "${bin_names[@]}"; do
+            if [[ -e "$HOME/.local/bin/$bin" ]]; then
+                shadowed="$bin"
+                break
+            fi
+        done
+        if [[ -n "$shadowed" ]]; then
+            echo "[install-deps] WARN: not carrying $name from Node.js $from: ~/.local/bin/$shadowed already answers for it" >&2
+            continue
+        fi
+        if npm install -g --ignore-scripts "$name@$version" >&2; then
+            carried+=("$name@$version")
+        else
+            failed+=("$name@$version")
+        fi
+    done
+
+    if (( ${#carried[@]} > 0 )); then
+        echo "[install-deps] carried from Node.js $from: ${carried[*]}" >&2
+    fi
+    if (( ${#failed[@]} > 0 )); then
+        echo "[install-deps] WARN: could not carry from Node.js $from: ${failed[*]}; to install them by hand: npm install -g --ignore-scripts ${failed[*]}" >&2
+        return 1
+    fi
+}
+
+# lts_switch_failed <marker> <carry from> <failed before> <message>: the first time a switch to a
+# new LTS goes wrong -- the LTS does not install, or a global package does not come across -- it
+# records that in the marker and returns non-zero, so that the run fails and the next apply retries
+# the switch. When the retry goes wrong too, it only warns and clears the marker: the installer
+# takes 45-120 minutes, and a package that can never install, such as a version since unpublished,
+# would otherwise re-run it on every apply.
+lts_switch_failed() {
+    local marker="$1" from="$2" failed_before="$3" message="$4"
+    if [[ "$failed_before" != 1 ]]; then
+        printf 'from=%s\nfailed=1\n' "$from" >"$marker"
+        echo "[install-deps] ERROR: $message; the next apply retries once" >&2
+        return 1
+    fi
+    rm -f "$marker"
+    echo "[install-deps] WARN: $message, on the retry too; giving up, so that the next apply does not run this installer again for it" >&2
+}
+
 # https://github.com/nvm-sh/nvm?tab=readme-ov-file#install--update-script
 install_nvm() {
     # Termux ships Node.js as a native package (`nodejs` in the Android
@@ -129,21 +216,44 @@ install_nvm() {
     local current_version
     current_version="$(nvm current 2>/dev/null)" || true
 
+    # Globally installed npm packages live inside the active version's tree, so a new LTS major
+    # starts empty, and every CLI an `npm install -g` placed silently disappears from PATH -- the
+    # old tree still holds it, which is why nothing downstream reports an error. They are carried
+    # over below, after npm's upgrade. Until a switch to a new LTS is done, this marker keeps the
+    # version to carry them from (none on a first install, where `nvm current` prints
+    # `none`/`system`) and whether a run already failed the switch: the run after a failure finds
+    # the new LTS already current, and would otherwise carry nothing.
+    local marker="$NVM_DIR/.dotfiles-lts-switch"
+    local carry_from="" failed_before=0 key value
+    if [[ -f "$marker" ]]; then
+        while IFS='=' read -r key value || [[ -n "$key" ]]; do
+            if [[ "$key" == from ]]; then
+                carry_from="$value"
+            elif [[ "$key" == failed && "$value" == 1 ]]; then
+                failed_before=1
+            fi
+        done <"$marker"
+    fi
     if [[ -n "$lts_version" && "$current_version" == "$lts_version" ]]; then
         echo "[install-deps] Node.js LTS $lts_version is already installed, skipping" >&2
     else
-        # Globally installed npm packages live inside the active version's tree, so a
-        # new LTS major starts empty and every `npm install -g` CLI this installer
-        # placed (`sentry`, `neon`) silently disappears from PATH -- the
-        # old tree still holds them, which is why nothing downstream reports an error.
-        # `--reinstall-packages-from` rebuilds them in the new tree. It is only passed
-        # when there is a version to copy from: on a first install `nvm current` prints
-        # `none`/`system`, and nvm aborts the whole install on such a source.
-        local -a reinstall_from=()
-        if [[ "$current_version" =~ ^v[0-9] ]]; then
-            reinstall_from=(--reinstall-packages-from="$current_version")
+        # A switch carries from the version it leaves. A marker naming another one is a carry-over
+        # that never finished, overtaken by this newer LTS: that version's packages are named
+        # rather than carried, and this switch starts with its own retry.
+        if [[ "$current_version" =~ ^v[0-9] && "$current_version" != "$carry_from" ]]; then
+            if [[ -n "$carry_from" ]]; then
+                echo "[install-deps] WARN: the global npm packages of Node.js $carry_from never all came across; carrying from $current_version instead" >&2
+            fi
+            carry_from="$current_version"
+            failed_before=0
         fi
-        nvm install --lts "${reinstall_from[@]}"
+        printf 'from=%s\nfailed=%s\n' "$carry_from" "$failed_before" >"$marker"
+        # Given up on the retry, the marker is gone, so the current Node.js stays and nothing is
+        # carried below.
+        if ! nvm install --lts; then
+            lts_switch_failed "$marker" "$carry_from" "$failed_before" \
+                "could not install the Node.js LTS${lts_version:+ $lts_version}" || return 1
+        fi
     fi
 
     # Node ships the npm that was current at its release, which npm's own releases overtake:
@@ -160,6 +270,21 @@ install_nvm() {
     # keeps a compromised registry response from running code at install time.
     npm install -g --ignore-scripts corepack
     corepack enable
+
+    [[ -f "$marker" ]] || return 0
+    if [[ -n "$carry_from" && "$carry_from" != "$(nvm current 2>/dev/null)" ]]; then
+        if ! carry_npm_globals "$carry_from"; then
+            lts_switch_failed "$marker" "$carry_from" "$failed_before" \
+                "the global npm packages did not all come across from Node.js $carry_from"
+            return
+        fi
+        # The old version stays installed: a project may pin it, so removing it is a person's call.
+        # Never suggested while NVM's default still resolves to it.
+        if [[ -d "$NVM_DIR/versions/node/$carry_from" && "$(nvm version default 2>/dev/null)" != "$carry_from" ]]; then
+            echo "[install-deps] Node.js $carry_from is still installed beside $(nvm current 2>/dev/null); once no project needs it, \`nvm uninstall $carry_from\` removes it" >&2
+        fi
+    fi
+    rm -f "$marker"
 }
 # =========================================================================================================
 
