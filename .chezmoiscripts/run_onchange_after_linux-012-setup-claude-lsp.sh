@@ -60,24 +60,44 @@ if [[ -s "$nvm_script" ]]; then
     fi
 fi
 
-# gopls goes to ~/.local/bin, not GVM's per-version pkgset: ~/.zshenv puts only the newest Go's
-# pkgset on PATH, so a binary installed there would vanish at the next Go upgrade.
+# No server lives in a per-version toolchain tree, because ~/.zshenv puts only one version on PATH:
+# gopls goes to ~/.local/bin rather than GVM's newest pkgset, and the npm servers to a prefix of
+# their own rather than NVM's default Node, reached through links in ~/.local/bin. A plain
+# `npm install -g` left both in v24's tree when NVM's default moved to v26 on alien-a51
+# (2026-11-02), and nothing ran this script again. Both packages are plain JavaScript, so
+# whichever Node is on PATH runs them, and typescript-language-server falls back to the
+# `typescript` installed beside it here, which it finds with `require.resolve` from its own path.
+npm_prefix="$HOME/.local/share/claude-lsp"
+
 install_gopls() {
     GOBIN="$HOME/.local/bin" go install "golang.org/x/tools/gopls@$gopls_version" || return 1
     [[ -x "$HOME/.local/bin/gopls" ]]
 }
 
-# npm installs into the active Node version's tree, so verify each server resolves after selecting
-# NVM's default. None of these packages has an install script to run.
+# link_server <name>: points ~/.local/bin/<name> at the prefix's copy, with a line when it pointed
+# anywhere else, and succeeds only when the link reaches an executable server. Only the servers
+# are linked, so the prefix's `tsc` and `pyright` never shadow a Node's own on PATH.
+link_server() {
+    local target="$npm_prefix/bin/$1" link="$HOME/.local/bin/$1"
+    [[ -x "$target" ]] || return 1
+    if [[ -e "$link" || -L "$link" ]] && [[ "$(readlink -f "$link" 2>/dev/null)" != "$(readlink -f "$target")" ]]; then
+        echo "[$prefix] $link pointed at $(readlink -f "$link" 2>/dev/null || echo '<dangling>'); repointing it at $target" >&2
+    fi
+    ln -sfn "$target" "$link"
+    [[ -x "$link" ]]
+}
+
+# NVM's default npm runs the installs, selected above. None of these packages has an install
+# script to run.
 install_typescript_language_server() {
-    npm install -g --ignore-scripts \
+    npm install -g --prefix "$npm_prefix" --ignore-scripts \
         "typescript-language-server@$typescript_language_server_version" "typescript@$typescript_version" || return 1
-    command -v typescript-language-server >/dev/null 2>&1
+    link_server typescript-language-server
 }
 
 install_pyright() {
-    npm install -g --ignore-scripts "pyright@$pyright_version" || return 1
-    command -v pyright-langserver >/dev/null 2>&1
+    npm install -g --prefix "$npm_prefix" --ignore-scripts "pyright@$pyright_version" || return 1
+    link_server pyright-langserver
 }
 
 mkdir -p "$HOME/.local/bin"

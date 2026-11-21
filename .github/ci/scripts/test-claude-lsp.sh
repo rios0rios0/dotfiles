@@ -3,9 +3,10 @@ set -euo pipefail
 
 # Tests run_onchange_after_linux-012-setup-claude-lsp.sh against stubbed go, npm and claude, in an
 # environment with nothing else of the developer's: that each plugin comes after an available
-# server, that the servers are pinned, that failed or missing binaries keep their plugins out and
-# fail the run, that NVM's default wins over another npm on PATH, and that go and npm are found on
-# the first apply from a bash that never loaded GVM or NVM.
+# server, that the servers are pinned, that the npm servers land in a prefix of their own behind
+# links in ~/.local/bin, so a new NVM default keeps them, that failed or missing binaries keep their
+# plugins out and fail the run, that NVM's default wins over another npm on PATH, and that go and
+# npm are found on the first apply from a bash that never loaded GVM or NVM.
 
 REPO_ROOT="$(cd "$(dirname "$0")/../../.." && pwd)"
 SCRIPT="$REPO_ROOT/.chezmoiscripts/run_onchange_after_linux-012-setup-claude-lsp.sh"
@@ -45,14 +46,22 @@ fi
 if [[ "${SKIP_NPM_BINARIES:-}" == 1 ]]; then
     exit 0
 fi
-mkdir -p "$NPM_GLOBAL_BIN"
+# Like npm's own, a global install lands in the selected Node's tree unless --prefix names another.
+bin="$NPM_GLOBAL_BIN"
+args=("$@")
+for ((i = 0; i < ${#args[@]} - 1; i++)); do
+    if [[ "${args[i]}" == --prefix ]]; then
+        bin="${args[i + 1]}/bin"
+    fi
+done
+mkdir -p "$bin"
 if [[ "$*" == *typescript-language-server@* ]]; then
-    : > "$NPM_GLOBAL_BIN/typescript-language-server"
-    chmod +x "$NPM_GLOBAL_BIN/typescript-language-server"
+    : > "$bin/typescript-language-server"
+    chmod +x "$bin/typescript-language-server"
 fi
 if [[ "$*" == *pyright@* ]]; then
-    : > "$NPM_GLOBAL_BIN/pyright-langserver"
-    chmod +x "$NPM_GLOBAL_BIN/pyright-langserver"
+    : > "$bin/pyright-langserver"
+    chmod +x "$bin/pyright-langserver"
 fi
 EOF
     cat > "$dir/claude" <<'EOF'
@@ -66,7 +75,7 @@ EOF
 # otherwise answer for a stub that a case removed, and download for real.
 TOOLS="$TMP/tools"
 mkdir -p "$TOOLS"
-for tool in bash sort tail mkdir chmod; do
+for tool in bash sort tail mkdir chmod ln readlink; do
     ln -s "$(command -v "$tool")" "$TOOLS/$tool"
 done
 
@@ -111,11 +120,23 @@ if grep -q -F "go install golang.org/x/tools/gopls@v0.23.0 GOBIN=$TMP/all/home/.
 else
     fail "gopls was not installed pinned into ~/.local/bin: $(grep '^go ' "$calls")"
 fi
-if grep -q -F "npm install -g --ignore-scripts typescript-language-server@6.0.2 typescript@6.0.3" "$calls" &&
-    grep -q -F "npm install -g --ignore-scripts pyright@1.1.414" "$calls"; then
-    pass "the npm servers are pinned, TypeScript on 6.x, with no install scripts run"
+lsp_prefix="$TMP/all/home/.local/share/claude-lsp"
+if grep -q -F "npm install -g --prefix $lsp_prefix --ignore-scripts typescript-language-server@6.0.2 typescript@6.0.3" "$calls" &&
+    grep -q -F "npm install -g --prefix $lsp_prefix --ignore-scripts pyright@1.1.414" "$calls"; then
+    pass "the npm servers are pinned into ~/.local/share/claude-lsp, TypeScript on 6.x, with no install scripts run"
 else
-    fail "the npm servers were not installed as pinned: $(grep '^npm ' "$calls")"
+    fail "the npm servers were not installed as pinned into their prefix: $(grep '^npm ' "$calls")"
+fi
+linked=true
+for server in typescript-language-server pyright-langserver; do
+    if [[ "$(readlink "$TMP/all/home/.local/bin/$server")" != "$lsp_prefix/bin/$server" ]]; then
+        linked=false
+    fi
+done
+if $linked && [[ -z "$(ls -A "$TMP/all/npm-global-bin")" ]]; then
+    pass "each npm server is reached through a link in ~/.local/bin, and nothing lands in npm's own tree"
+else
+    fail "the npm servers were not linked from ~/.local/bin into their prefix: $(ls -l "$TMP/all/home/.local/bin" "$TMP/all/npm-global-bin")"
 fi
 marketplace=$(line_of all "claude plugin marketplace add anthropics/claude-plugins-official")
 ordered=true
@@ -149,10 +170,29 @@ if [[ "$STATUS" -ne 0 ]] &&
     grep -q -F "claude plugin install gopls-lsp@claude-plugins-official" "$calls" &&
     ! grep -q -F "claude plugin install typescript-lsp" "$calls" &&
     ! grep -q -F "claude plugin install pyright-lsp" "$calls" &&
-    grep -q -F "not set up: typescript-lsp pyright-lsp" "$TMP/npm-unresolved/stderr"; then
-    pass "npm success without reachable servers keeps both plugins out and fails the run"
+    grep -q -F "not set up: typescript-lsp pyright-lsp" "$TMP/npm-unresolved/stderr" &&
+    [[ ! -L "$TMP/npm-unresolved/home/.local/bin/typescript-language-server" ]] &&
+    [[ ! -L "$TMP/npm-unresolved/home/.local/bin/pyright-langserver" ]]; then
+    pass "npm success without the servers keeps both plugins out, links nothing, and fails the run"
 else
     fail "missing npm server binaries did not keep their plugins out or fail the run (status $STATUS): $(cat "$calls")"
+fi
+
+# given ~/.local/bin/pyright-langserver left pointing somewhere else, such as a Node tree NVM dropped
+mkdir -p "$TMP/stale-link/home/.local/bin"
+ln -s "$TMP/stale-link/home/.nvm/versions/node/v24.0.0/bin/pyright-langserver" \
+    "$TMP/stale-link/home/.local/bin/pyright-langserver"
+
+# when
+run_case stale-link
+
+# then
+if [[ "$STATUS" -eq 0 ]] &&
+    [[ "$(readlink "$TMP/stale-link/home/.local/bin/pyright-langserver")" == "$TMP/stale-link/home/.local/share/claude-lsp/bin/pyright-langserver" ]] &&
+    grep -q -F "repointing it at $TMP/stale-link/home/.local/share/claude-lsp/bin/pyright-langserver" "$TMP/stale-link/stderr"; then
+    pass "a link left pointing elsewhere is repointed at the prefix, with a line saying so"
+else
+    fail "a stale ~/.local/bin/pyright-langserver was not repointed with a line (status $STATUS): $(cat "$TMP/stale-link/stderr")"
 fi
 
 # given go install exits successfully without exposing gopls
@@ -204,6 +244,26 @@ if [[ "$STATUS" -eq 0 ]] && grep -q '^nvm use default$' "$calls" &&
     pass "NVM's default wins when an unrelated npm already resolves on PATH"
 else
     fail "the unrelated npm was used instead of NVM's default (status $STATUS): $(cat "$calls")"
+fi
+
+# given the servers installed through that NVM default, and the default then moving to a Node whose
+# global tree is empty, as v24 to v26 did on alien-a51, with nothing running the script again
+nvm_old_bin="$TMP/nvm-selected/home/.nvm/versions/node/v24.21.0/bin"
+nvm_new_bin="$TMP/nvm-selected/home/.nvm/versions/node/v26.13.0/bin"
+mkdir -p "$nvm_new_bin"
+
+# when
+resolved=""
+for server in typescript-language-server pyright-langserver; do
+    resolved+="$(PATH="$nvm_new_bin:$TMP/nvm-selected/home/.local/bin"; command -v "$server" || true) "
+done
+
+# then
+if [[ "$resolved" == "$TMP/nvm-selected/home/.local/bin/typescript-language-server $TMP/nvm-selected/home/.local/bin/pyright-langserver " ]] &&
+    [[ ! -e "$nvm_old_bin/typescript-language-server" && ! -e "$nvm_old_bin/pyright-langserver" ]]; then
+    pass "a new NVM default keeps both npm servers on PATH, since neither went into the old Node's tree"
+else
+    fail "the npm servers did not survive a new NVM default: '$resolved' $(ls "$nvm_old_bin")"
 fi
 
 # given NVM cannot select its default while another npm is available

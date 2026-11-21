@@ -229,7 +229,7 @@ Linux and Android get the same user-scope MCP servers in `~/.claude.json`, less 
 
 ### Code Intelligence (LSP)
 
-On Linux, `chezmoi apply` installs pinned `gopls`, `typescript-language-server` and `pyright`, and the official `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins that start them, so Claude Code's LSP tool can jump to definitions, find references and report type errors after each edit in Go, TypeScript/JavaScript and Python. Restart Claude Code after the first apply to load them. "Claude Code Language Servers" in `AGENTS.md` explains the pins and why Termux, Windows and Java are left out.
+On Linux, `chezmoi apply` installs pinned `gopls`, `typescript-language-server` and `pyright` (outside GVM's and NVM's per-version folders, where a Go or Node upgrade would strand them) and the official `gopls-lsp`, `typescript-lsp` and `pyright-lsp` plugins that start them, so Claude Code's LSP tool can jump to definitions, find references and report type errors after each edit in Go, TypeScript/JavaScript and Python. Restart Claude Code after the first apply to load them. "Claude Code Language Servers" in `AGENTS.md` explains the pins and why Termux, Windows and Java are left out.
 
 ### Gitignore Design
 

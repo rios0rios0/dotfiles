@@ -18,6 +18,15 @@ set -euo pipefail
 # converged (a commit hash from the feature branch changes when the branch is
 # rebased before merge).
 TOMBSTONES=(
+    # pyright and typescript-language-server in NVM's tree -- moved in #301 (2026-11-21) to
+    # ~/.local/share/claude-lsp, linked from ~/.local/bin, after NVM's switch from v24 to v26 left
+    # them in v24's tree. `.zshenv` puts NVM's bin ahead of ~/.local/bin, so a copy left in the
+    # current Node's tree would shadow the pinned link in a shell that reads no `.zshrc`; older
+    # trees are off PATH. `typescript` is deliberately NOT listed: its `tsc` may be in use, and the
+    # server now reads the one in its own prefix.
+    "npm_global:pyright"
+    "npm_global:typescript-language-server"
+
     # zsh-histdb -- replaced in #273 (2026-10-27) by Atuin, which syncs the shell history through
     # the tailnet server in .chezmoidata/atuin.yaml. zinit's checkout of the plugin, and the link into
     # Oh My Zsh's custom plugins that .zshrc made. ~/.histdb is deliberately NOT listed: it is the

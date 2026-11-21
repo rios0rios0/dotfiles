@@ -49,7 +49,7 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `atuin` | Atuin: the pinned install, the client config per device, zsh after Oh My Zsh, the server's pin and port, zsh-histdb's removal, the login (Termux's key file first) and the one-time history import on apply |
 | `wsl-systemd` | systemd on WSL: the /etc/wsl.conf merge, the restart messages, installers that wait for it |
 | `statusline` | Claude Code status line: with and without a login, no refresh without one, the token off argv |
-| `claude-lsp` | language servers and their plugins: pins, order, the regular profile, the first apply |
+| `claude-lsp` | language servers and their plugins: pins, the npm servers' prefix and links, a new NVM default, order, the regular profile, the first apply |
 | `omniroute-backup` | the OmniRoute stack's encrypted backups: the self-contained archive, retention, the personal OneDrive mirror, the empty-gateway guard, the installer's gate |
 | `omniroute-restore` | omniroute-restore: the archive allowlist, integrity and schema checks, .env from the archive or 1Password, the key check, the volume |
 | `omniroute-stack` | the OmniRoute start on apply: every state it finds, never creating the database, the render gate |
@@ -450,8 +450,8 @@ installs both halves:
 | Plugin (`claude-plugins-official`) | Server it starts | Installed as |
 |------------------------------------|------------------|--------------|
 | `gopls-lsp` | `gopls` | `go install` into `~/.local/bin` |
-| `typescript-lsp` | `typescript-language-server --stdio`, with `typescript` 6.x | `npm install -g` into NVM's default Node |
-| `pyright-lsp` | `pyright-langserver --stdio` | `npm install -g` into NVM's default Node |
+| `typescript-lsp` | `typescript-language-server --stdio`, with `typescript` 6.x | `npm install -g` into `~/.local/share/claude-lsp`, linked from `~/.local/bin` |
+| `pyright-lsp` | `pyright-langserver --stdio` | `npm install -g` into `~/.local/share/claude-lsp`, linked from `~/.local/bin` |
 
 **Keep these:**
 
@@ -461,11 +461,23 @@ installs both halves:
    the built-in directory, so the script adds the `claude-plugins-official` marketplace first. The
    ids are that marketplace's because aifiles' `settings.json` and earlier project-scope installs
    use them, and two ids for one plugin would start two copies of its server.
-2. **`gopls` lives in `~/.local/bin`.** `dot_zshenv.tmpl` puts only the newest Go's GVM pkgset on
-   `PATH`, so a plain `go install` would vanish at the next Go upgrade.
+2. **No server lives in a toolchain's per-version tree.** `dot_zshenv.tmpl` puts only the newest
+   Go's GVM pkgset and NVM's default Node on `PATH`, so a plain `go install` would vanish at the next
+   Go upgrade and a plain `npm install -g` at the next Node one. That is how both npm servers went
+   missing on alien-a51: NVM's default moved from v24 to v26 on 2026-11-02, v26's tree received
+   none of v24's packages, and this script, unchanged, never ran again, so Claude Code reported
+   `pyright-langserver` not found. `gopls` goes into `~/.local/bin`, and the npm servers into
+   `~/.local/share/claude-lsp`, reached through links in `~/.local/bin` -- the two servers only, so
+   the prefix's `tsc` and `pyright` never shadow a Node's own. Both are plain JavaScript, run by
+   whichever Node is on `PATH`; NVM's default npm still installs them, because another `npm` may be
+   Windows' through WSL interop. The removal script tombstones the copies an earlier revision put
+   into the current Node's tree: `.zshenv` puts NVM's bin ahead of `~/.local/bin`, so one left there
+   would shadow the link in a shell that reads no `.zshrc`.
 3. **TypeScript stays on 6.x.** typescript-language-server drives tsserver, and TypeScript 7 --
    the native port, npm's `latest` since July 2026 -- ships none. A project's own
-   `node_modules/typescript` still wins; the global one is the fallback.
+   `node_modules/typescript` still wins; the fallback is the one in the servers' prefix, which
+   typescript-language-server finds with `require.resolve` from its own path, so a TypeScript 7
+   installed into NVM's tree cannot replace it.
 4. **Every server is pinned** at the top of the script, so bumping one is an edit there, which is
    also what reruns the script on the next apply. npm runs with `--ignore-scripts`: none of these
    packages has an install script.
@@ -486,7 +498,8 @@ are `#!/usr/bin/env node` scripts would hit the `bad interpreter` failure descri
 unverified on a device, which is why it is not attempted. Java's `jdtls-lsp` is left out: Eclipse
 JDT LS needs a Java 21 runtime and starts a JVM in every session that opens a `.java` file.
 
-`make test ONLY=claude-lsp` covers 1 and 3 to 7 against stubbed `go`, `npm` and `claude`, and the first
+`make test ONLY=claude-lsp` covers 1 to 7 against stubbed `go`, `npm` and `claude` -- 2 including NVM's
+default moving to a Node whose tree is empty, and a link left pointing elsewhere -- and the first
 apply's bash, which has to find GVM's newest Go and NVM's default Node on its own.
 
 ## Shared Install Library
