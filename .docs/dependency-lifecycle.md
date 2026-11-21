@@ -68,7 +68,7 @@ removed.
 |----------|-----------|---------|
 | `apt` | Linux, Android | A dpkg/apt package |
 | `gh_extension` | Linux, Android | A `gh` CLI extension |
-| `npm_global` | all | A globally installed npm package |
+| `npm_global` | all | A globally installed npm package, in the active npm's tree and in every Node.js NVM installed |
 | `path` | all | A file, symlink, or directory (constrained to `$HOME`) |
 | `pipx` | Linux, Android | A pipx-managed application |
 | `winget` | Windows | A winget package by exact ID |

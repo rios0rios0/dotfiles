@@ -37,7 +37,7 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `shell-credentials` | 1Password credential/workspace loading and removal |
 | `clipboard-shim` | Claude Code clipboard shim (Ctrl+V image paste) |
 | `nvm-resolution` | NVM default-alias resolution in dot_zshenv |
-| `install-nvm` | install_nvm: npm upgraded after the LTS, before the first global install; --reinstall-packages-from |
+| `install-nvm` | install_nvm: npm upgraded after the LTS, before the first global install; a new LTS's global packages carried one at a time, what is never carried, a failure retried once and then only warned about, the old version named |
 | `claude-install` | Claude Code's native build: the launcher check, both failures, the verify and the npm tombstone |
 | `aisync-install` | install_aisync: the install when missing, the self-update on every run (as terra's), its failure only warning, none on Android |
 | `zshrc-functions` | top-size, sentry-ds and rebuild-ocode in dot_zshrc: arguments, sudo, the work store, completion, the resolved build script |
@@ -328,9 +328,11 @@ This repository is a **sync**, not a bootstrapper. Deleting an `install_*()` fun
 
 Strategies live in `.chezmoitemplates/lib-remove-dependencies.sh` (shared by Linux and Android; Windows has its own inline set): `apt`, `gh_extension`, `npm_global`, `path`, `pipx`, `winget`. Every handler is idempotent and silent when the target is already absent.
 
+`npm_global` removes the package from the active npm's tree and from the tree of every Node.js NVM installed, each with that Node's own `node` and npm. A package sits in whichever Node was NVM's default when this repository installed it, and an older Node stays installed for the projects that pin it, where `nvm use` puts its copy back on PATH: alien-a51 keeps Node v24 for the projects that pin it, and its tree still held the `pyright` and `typescript-language-server` copies that #301 moved out while the active tree was v26's.
+
 A removal that leaves its target behind is reported (`WARN: failed to remove ...`), never counted as removed. The Windows handlers decide that by checking whether the package or path is still there, not by the uninstaller's exit code, which can be 0 when nothing was removed. The scripts still exit 0, so a failed removal is not retried until the tombstone list changes.
 
-`remove_path` refuses any target outside `$HOME` — these scripts run unattended, so never widen that guard. `make test ONLY=remove-dependencies` covers it, and `make test ONLY=remove-dependencies-windows` covers the Windows script (it needs `pwsh`, which CI installs).
+`remove_path` refuses any target outside `$HOME` — these scripts run unattended, so never widen that guard. `make test ONLY=remove-dependencies` covers it and `npm_global` across NVM's Node versions, and `make test ONLY=remove-dependencies-windows` covers the Windows script (it needs `pwsh`, which CI installs).
 
 See `.docs/dependency-lifecycle.md` for the rationale, including why Nix/home-manager was evaluated and rejected (it cannot cover Windows-native or Termux).
 
@@ -638,10 +640,35 @@ Two halves keep it fixed, and both are needed:
 | Half | Mechanism |
 |------|-----------|
 | The shell picks what NVM picks | `dot_zshenv.tmpl` follows the alias chain to a concrete version (with a hop budget, since `nvm alias` permits cycles), honours `system` by leaving PATH alone, and falls back to the newest installed version only when resolution genuinely fails |
-| An LTS bump carries the CLIs with it | `install_nvm` passes `--reinstall-packages-from` the current version, since a new major otherwise starts with an empty global tree. It is omitted on a first install, where `nvm current` prints `none`/`system` and nvm aborts on such a source |
+| An LTS bump carries the CLIs with it | `carry_npm_globals` installs every global package of the version `install_nvm` leaves into the new LTS, one `npm install -g --ignore-scripts` per package at the version it had, since a new major otherwise starts with an empty global tree. A first install has nothing to carry: `nvm current` prints `none`/`system` |
+
+**The switch fails loudly, once, and is retried once.** nvm's own `--reinstall-packages-from` put
+every package into one `npm install -g`, install scripts included, so one failure carried none of
+them, and `nvm install` ignored the outcome: when alien-a51's default moved from v24 to v26 on
+2026-11-02, v26's tree received none of v24's packages, and nothing said so. Now:
+
+- Every package that does not come across is named, with the command that installs it.
+- A switch that goes wrong -- the LTS that does not install, or a package that does not come
+  across -- fails the run once: `install_nvm` returns non-zero and the installer calls it through
+  `verify`, so the next apply retries it. When the retry goes wrong too, it only warns, and the run
+  goes on. The installer takes 45-120 minutes, and a package that can never install, such as a
+  version since unpublished, would otherwise re-run it on every apply.
+- `$NVM_DIR/.dotfiles-lts-switch` holds the switch until it is done: `from=` the version to carry
+  from, and `failed=1` once a run failed it. It is written before the LTS installs and removed when
+  the switch is done or given up, because the retry finds the new LTS already current and would
+  otherwise carry nothing. A package the new tree already has is skipped, so a retry installs only
+  what is missing. Deleting the file gives a switch up by hand.
+- npm and corepack are never carried (each Node ships its own), and neither is a package linked
+  with `npm link` or one whose command is already in `~/.local/bin`; both are named. That
+  directory holds this repository's builds (Claude Code's native `claude`, the language servers'
+  links), and `.zshenv` puts NVM's bin ahead of it, so a carried copy, such as the npm package
+  Claude Code replaced, would shadow them in every shell that reads no `.zshrc`.
+- Once the carry-over is done, the old version is named with the `nvm uninstall` that removes it,
+  unless NVM's default still resolves to it. It is never removed unattended: a project may pin it.
 
 `make test ONLY=nvm-resolution` covers the resolver, including the exact shape that
-produced the bug: an LTS and a newer Current release installed side by side.
+produced the bug: an LTS and a newer Current release installed side by side;
+`make test ONLY=install-nvm` covers the carry-over.
 
 ## npm Is the Latest, So Claude Code Is the Native Build (Linux)
 
@@ -675,7 +702,8 @@ the npm package. The package's postinstall is what copies the native binary over
 Android is unaffected: its Claude Code is the musl build behind the `claude` wrapper (see "Android
 Wrapper Timing"), and its Node is Termux's `nodejs`, whose npm `install_nvm` leaves alone.
 
-`make test ONLY=install-nvm` covers the npm upgrade on both branches and its order;
+`make test ONLY=install-nvm` covers the npm upgrade on both branches and its order, before the
+carry-over's first install;
 `make test ONLY=claude-install` covers 2 and 3 against a stubbed installer.
 
 ## Important Timing Constraints

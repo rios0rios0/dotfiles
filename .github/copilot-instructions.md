@@ -400,7 +400,10 @@ Python CLI" in `AGENTS.md`.
 ### Installing a CLI from npm
 Global npm packages live inside the *active* Node version's tree, so anything `npm install -g` places
 disappears from PATH when NVM moves to a new LTS major, with no error anywhere. Two rules follow:
-`install_nvm` passes `--reinstall-packages-from` the current version on an upgrade, and
+`install_nvm` carries every global package of the version it leaves into a new LTS, one
+`npm install -g --ignore-scripts` per package, naming each one that does not come across; that fails
+the run once, a marker in `$NVM_DIR` makes the next run retry it, and a retry that fails too only
+warns, and
 `dot_zshenv.tmpl` must resolve NVM's `default` alias chain to the same version the real `nvm` would —
 "newest installed" is wrong on any machine that also has a non-LTS Current release. Verify the binary
 is on PATH after installing rather than trusting the exit status. `make test ONLY=nvm-resolution` covers the

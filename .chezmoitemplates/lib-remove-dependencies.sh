@@ -22,15 +22,34 @@ removed=0
 # errexit for the whole call, so without the explicit guard a failing command
 # would fall through, still bump `removed`, and return success.
 
-# Uninstall a globally installed npm package.
+# Uninstall a globally installed npm package: from the active npm's tree, and from the tree of every
+# Node.js NVM installed. A package this repository installed sits in whichever Node was NVM's
+# default at the time, and an older Node stays installed for the projects that pin it, where
+# `nvm use` puts its copy back on PATH, so the active tree alone would leave it behind. Each NVM
+# tree is cleaned by its own node and npm, so neither needs to be on PATH (a first apply runs from
+# bash, before NVM is), and is checked afterwards rather than trusted. A failure is recorded
+# instead of returned at once, so that every tree is still tried.
 remove_npm_global() {
-    local package="$1"
-    command -v npm &>/dev/null || return 0
-    npm ls -g --depth=0 "$package" &>/dev/null || return 0
-
-    echo "[$prefix] removing npm global package: $package" >&2
-    npm uninstall -g "$package" >&2 || return 1
-    removed=$((removed + 1))
+    local package="$1" tree status=0
+    if command -v npm &>/dev/null && npm ls -g --depth=0 "$package" &>/dev/null; then
+        echo "[$prefix] removing npm global package: $package" >&2
+        if npm uninstall -g "$package" >&2; then
+            removed=$((removed + 1))
+        else
+            status=1
+        fi
+    fi
+    for tree in "${NVM_DIR:-$HOME/.nvm}"/versions/node/*; do
+        [[ -e "$tree/lib/node_modules/$package" || -L "$tree/lib/node_modules/$package" ]] || continue
+        echo "[$prefix] removing npm global package: $package from Node.js ${tree##*/}" >&2
+        "$tree/bin/node" "$tree/lib/node_modules/npm/bin/npm-cli.js" uninstall -g --prefix "$tree" "$package" >&2
+        if [[ -e "$tree/lib/node_modules/$package" || -L "$tree/lib/node_modules/$package" ]]; then
+            status=1
+        else
+            removed=$((removed + 1))
+        fi
+    done
+    return "$status"
 }
 
 # Delete a file, symlink, or directory left behind by an upstream installer.

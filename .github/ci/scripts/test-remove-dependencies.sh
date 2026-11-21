@@ -37,8 +37,9 @@ run_case() {
         echo "$body"
     } > "$case_script"
 
+    # NVM_DIR too: `npm_global` reads every Node.js under it, and the developer's own is exported.
     local output
-    if output=$(HOME="$case_home" bash "$case_script" 2>&1); then
+    if output=$(HOME="$case_home" NVM_DIR="$case_home/.nvm" bash "$case_script" 2>&1); then
         echo "[test-remove-dependencies] PASS: $description" >&2
     else
         echo "[test-remove-dependencies] FAIL: $description" >&2
@@ -126,6 +127,52 @@ output=$(apply_tombstones "npm_global:@example/stuck" 2>&1)
 # then
 grep -q 'failed to remove' <<<"$output"
 ! grep -q 'leftover dependency entries' <<<"$output"
+CASE
+)"
+
+run_case "removes an npm package from every Node.js NVM installed, each with its own npm" "$(cat <<'CASE'
+# given: an active npm that does not see the package, and two Node versions whose trees hold it,
+# each with a node that runs its npm by deleting the package from --prefix
+npm() { return 1; }
+for version in v24.0.0 v26.0.0; do
+    tree="$NVM_DIR/versions/node/$version"
+    mkdir -p "$tree/bin" "$tree/lib/node_modules/@example/tool" "$tree/lib/node_modules/npm/bin"
+    : > "$tree/lib/node_modules/npm/bin/npm-cli.js"
+    cat > "$tree/bin/node" <<'NODE'
+#!/bin/bash
+# node <npm-cli.js> uninstall -g --prefix <tree> <package>
+[[ "$2" == uninstall ]] && rm -rf "$5/lib/node_modules/$6"
+NODE
+    chmod +x "$tree/bin/node"
+done
+
+# when
+output=$(apply_tombstones "npm_global:@example/tool" 2>&1)
+
+# then
+[[ ! -e "$NVM_DIR/versions/node/v24.0.0/lib/node_modules/@example/tool" ]]
+[[ ! -e "$NVM_DIR/versions/node/v26.0.0/lib/node_modules/@example/tool" ]]
+grep -q 'removing npm global package: @example/tool from Node.js v24.0.0' <<<"$output"
+grep -q 'removing npm global package: @example/tool from Node.js v26.0.0' <<<"$output"
+! grep -q 'failed to remove' <<<"$output"
+CASE
+)"
+
+run_case "reports an npm package a Node.js tree still holds after its uninstall" "$(cat <<'CASE'
+# given: a Node version whose npm exits 0 without removing anything
+npm() { return 1; }
+tree="$NVM_DIR/versions/node/v24.0.0"
+mkdir -p "$tree/bin" "$tree/lib/node_modules/@example/stuck" "$tree/lib/node_modules/npm/bin"
+: > "$tree/lib/node_modules/npm/bin/npm-cli.js"
+printf '#!/bin/bash\nexit 0\n' > "$tree/bin/node"
+chmod +x "$tree/bin/node"
+
+# when
+output=$(apply_tombstones "npm_global:@example/stuck" 2>&1)
+
+# then
+[[ -e "$tree/lib/node_modules/@example/stuck" ]]
+grep -q 'failed to remove' <<<"$output"
 CASE
 )"
 

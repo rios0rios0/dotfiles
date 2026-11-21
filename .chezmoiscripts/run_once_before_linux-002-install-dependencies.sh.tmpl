@@ -1106,7 +1106,6 @@ install_kubectl
 install_krew
 install_terra
 install_sdkman
-install_nvm
 install_pyenv
 
 # Installers whose outcome this script verifies rather than assumes. A `return 1`
@@ -1123,6 +1122,13 @@ verified_failures=()
 verify() {
     "$@" || verified_failures+=("$1")
 }
+
+# Verified, and first, because every npm installer below needs its Node.js: a new LTS that did
+# not install, or a global package that did not come across from the version before it, fails
+# the run once, and a marker in $NVM_DIR makes the retry carry the packages over again. A retry
+# that fails too only warns, so that one package that can never install does not re-run this
+# installer on every apply (see `lts_switch_failed` in the install library).
+verify install_nvm
 
 # Flutter is resolved and downloaded here rather than by a version manager, so it is verified
 # like the other downloaders: a manifest that could not be read, an archive whose digest does
