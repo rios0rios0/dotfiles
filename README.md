@@ -113,6 +113,8 @@ Set-ExecutionPolicy RemoteSigned -Scope Process
 chezmoi init --apply rios0rios0
 ```
 
+Windows Terminal's PowerShell profile starts `pwsh.exe` by name, so every apply also adds PowerShell 7's folder to your user `Path` when no folder on `Path` holds `pwsh.exe`, which a PowerShell installer or update can leave off. Restart Windows Terminal after the apply that adds it.
+
 Windows Terminal forwards **Ctrl+V** to the running application as `\u0016` instead of pasting, so an application that reads the clipboard itself (to attach an image, for instance) receives the key. Use **Ctrl+Shift+V** for normal terminal paste. These bindings apply to all Windows Terminal profiles and are deployed by the Windows chezmoi configuration; run `chezmoi update` from PowerShell to sync them on an existing computer.
 
 ### Termux on Android
