@@ -69,6 +69,7 @@ would pass a job that checked nothing. A new test is a new script; nothing else 
 | `op-wrapper` | how chezmoi reaches op: the WSL wrapper's retry, a terminal's op untouched, each platform's config, no account list on Windows |
 | `install-fonts-windows` | the Windows fonts, per user: what is missing, what is installed, a failed download (needs pwsh) |
 | `powershell-profile-windows` | PowerShell 7's profile from Windows Terminal: its command line, Oh My Posh's init and scope, no Oh My Posh (needs pwsh) |
+| `powershell-path-windows` | PowerShell 7's folder on the user's PATH: nothing written while a PATH folder holds `pwsh.exe` (the Store build's alias too), the installer's folder (stable before preview, newest first) or Program Files', the user's entries, variables and kind kept, a `REG_SZ` PATH left unexpanded, each failure only warning (needs pwsh) |
 | `home-agents` | the home guide (~/AGENTS.md): each platform's guide, its own writer, the writers in a sandbox home (Windows' under pwsh, skipped without it), no ~/CLAUDE.md |
 | `git-identities` | each workspace's git identity: the identities and workspaces read from the device note, the unusable ones skipped, the includes per platform (none on Windows), the writers in a sandbox home, and real commits inside, between and outside nested workspaces |
 
@@ -309,7 +310,7 @@ All scripts and templates use a standardized `[prefix]` logging format to stderr
 | PowerShell (`.ps1`) | `Write-Host "[prefix] message"` |
 | Modify-templates (JSON `modify_*`) | `warnf "[prefix] message"`, only when the file actually changes |
 
-Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `secrets-sync`, `home-agents`, `wsl-move`, `git-identities`, `armoury-crate`, `powerpanel`
+Existing prefixes: `gitconfig`, `ssh-config`, `allowed-signers`, `authorized-keys`, `docker-config`, `wakatime`, `age-recipients`, `android-ssh-keys`, `linux-gpg-keys`, `windows-ssh-keys`, `windows-pem-keys`, `wrapper`, `op-wrapper`, `gh-wrapper`, `acli-wrapper`, `golangci-lint-wrapper`, `claude-wrapper`, `export-key`, `clone-tools`, `configure-deps`, `ssh-known-hosts`, `copy-appdata`, `termux-config`, `fonts`, `kube-config`, `mcp-servers`, `claude-trust`, `claude-settings`, `claude-code-patch`, `ggshield-auth`, `ggshield-hook`, `jetbrains-themes`, `acli`, `send`, `credentials`, `workspaces`, `dev-toolkit`, `aws-cli`, `azure-cli`, `golangci-lint`, `sync-repo`, `install-deps`, `remove-deps`, `tmp-modcache`, `sentry-setup`, `claude-exec-shim`, `clipshot`, `ssh-agent-bridge`, `rustdesk`, `chezmoi-config`, `ollama`, `tailscale`, `chrome`, `claude-lsp`, `wsl-systemd`, `omniroute-backup`, `omniroute-restore`, `omniroute-stack`, `top-size`, `ocode`, `rebuild-ocode`, `wslconfig`, `aifiles`, `atuin`, `docker-settings`, `secrets-backup`, `secrets-restore`, `secrets-sync`, `home-agents`, `wsl-move`, `git-identities`, `armoury-crate`, `powerpanel`, `pwsh-path`
 
 ## Dependency Lifecycle (Removal Is Explicit)
 
@@ -1985,7 +1986,7 @@ PowerShell profile in Windows Terminal's
 |------|-----|
 | The profile lives in the user folder, never in Documents | PowerShell reads its own profile only from the Documents folder Windows reports, which OneDrive moves -- on alien-a51 to `OneDrive - <organization>\Documents`, with no `C:\Users\<user>\Documents` left at all -- and which Controlled Folder Access guards. Defender blocked the script that used to write the profile there (event 1123), and because `Set-Content` failed without stopping, that script reported success |
 | Dot-sourced with `.`, after `-NoExit` | `-Command` runs at the session's global scope, so the prompt Oh My Posh sets up, and anything else the profile defines, stays in the session; `-File` would run it in a script scope whose definitions are gone when the prompt appears |
-| `pwsh.exe`, by name | Setting `commandline` replaces the one Windows Terminal generates for the profile, so it has to name PowerShell itself; `pwsh.exe` resolves through `PATH` -- for the Store build, its app execution alias in `%LOCALAPPDATA%\Microsoft\WindowsApps` -- whichever version is installed |
+| `pwsh.exe`, by name | Setting `commandline` replaces the one Windows Terminal generates for the profile, so it has to name PowerShell itself; `pwsh.exe` resolves through `PATH` -- for the Store build, its app execution alias in `%LOCALAPPDATA%\Microsoft\WindowsApps` -- whichever version is installed, and every apply makes sure a folder on `PATH` holds it (see "PowerShell 7 on PATH") |
 | PowerShell 7 only | Windows PowerShell 5.1 runs no profile under its default execution policy (`Restricted`) -- `oh-my-posh init` failed there with `UnauthorizedAccess` -- and loosening that policy is the user's decision, not an apply's |
 
 A PowerShell 7 started outside Windows Terminal -- VS Code's terminal, `pwsh` typed in another
@@ -1995,6 +1996,32 @@ same arguments.
 `make test ONLY=powershell-profile-windows` runs the command line from `settings.json` in a child pwsh
 against a scratch home: Oh My Posh's init gets the theme's path and its output lands in the session,
 and a machine without Oh My Posh starts with no error.
+
+## PowerShell 7 on PATH (Every Apply)
+
+`run_after_windows-004-add-powershell-to-path.ps1` adds PowerShell 7's folder to the end of the
+user's `PATH` when no folder on the machine's or the user's `PATH` holds `pwsh.exe`. Windows
+Terminal's PowerShell profile starts `pwsh.exe` by name (see "PowerShell Profile"), and with the
+folder on neither `PATH` it does not open, failing with `[error 2147942402 (0x80070002) when
+launching ...] The system cannot find the file specified` while PowerShell 7 is installed. The
+profile Windows Terminal generates by itself names the full path it finds, which is why nothing
+showed this until the profile named `pwsh.exe`: in November 2026 a machine had PowerShell 7.6.10 in
+`C:\Program Files\PowerShell\7`, installed through its EXE bundle, with that folder on neither
+`PATH`.
+
+| Rule | Why |
+|------|-----|
+| The user's `PATH`, under `HKCU`, never the machine's | It needs no administrator rights, as the fonts' `HKCU` entries need none (see "Windows Fonts") |
+| Any folder on either `PATH` that holds `pwsh.exe` counts | The installer's folder on the machine's `PATH`, or the Store build's alias in `%LOCALAPPDATA%\Microsoft\WindowsApps` on the user's, already lets Windows Terminal start it; nothing is written then |
+| Variables expanded only in a `REG_EXPAND_SZ` value | Windows expands no other kind, so a `%VAR%` in a `REG_SZ` `PATH` leads nowhere and must not count |
+| The folder the installer recorded, a stable version's before a preview's, the newest first, then `%ProgramFiles%\PowerShell\7` | `HKLM\SOFTWARE\Microsoft\PowerShellCore\InstalledVersions` names each version's folder, so a preview never takes `pwsh.exe` away from the stable build the profile is for; only a folder that holds `pwsh.exe` is taken |
+| Appended, with every other entry, its variables and the value's kind kept | `[Environment]::SetEnvironmentVariable` would write `REG_SZ` with `%USERPROFILE%` and the like expanded for good, so the value is read with `DoNotExpandEnvironmentNames` and written back as the kind it was |
+| `WM_SETTINGCHANGE` after the write | Explorer, which starts Windows Terminal, takes the new `PATH` without a sign-out; a Windows Terminal already open keeps the `PATH` it started with until it restarts |
+| `run_after_`, every apply | An installer or an update that rewrites `PATH` without the folder is put right by the next apply |
+| No PowerShell 7, a failed write and a failed broadcast only warn | The Windows installer installs `Microsoft.PowerShell`, and the next apply tries again; an apply never stops over it |
+
+`make test ONLY=powershell-path-windows` covers it under pwsh, with the registry and the broadcast
+stubbed.
 
 ## WSL Settings (.wslconfig)
 
