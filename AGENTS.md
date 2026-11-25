@@ -1076,7 +1076,11 @@ deploys the repository's `AGENTS.md` or `CLAUDE.md`; and `make test ONLY=aifiles
 Claude Code's look is declared here and merged into its settings file by a modify-template, which
 sets a managed key whose value differs and leaves every other key alone. The same template also
 sets, on Linux and Termux, the Project instructions setting that has Claude Code read `AGENTS.md`
-beside `CLAUDE.md` (`pluginConfigs`, see "The Home AGENTS.md"):
+beside `CLAUDE.md` (`pluginConfigs`, see "The Home AGENTS.md"), and, on Linux only,
+`env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` at `32`, raised from Claude Code's default of 20 so that a
+session leading many parallel agents is not refused its next one. It is merged into `env` key by key,
+so variables of your own stay. Termux does not get it, because every agent there counts against
+Android's phantom-process budget:
 
 | Look | Declared in | Merged into |
 |------|-------------|-------------|
