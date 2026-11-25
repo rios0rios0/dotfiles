@@ -1,3 +1,0 @@
-kind: 'Fixed'
-body: 'fixed `npm_global` tombstones reaching only the active npm''s tree: `remove_npm_global` now also removes the package from the tree of every Node.js NVM installed, with that Node''s own `node` and npm, and checks that it is gone, so an older Node kept for the projects that pin it no longer keeps what the repository retired (Node `v24` on alien-a51 still held the `pyright` and `typescript-language-server` copies that the language-server move left behind, out of reach of tombstones that only saw `v26`)'
-time: '2026-11-21T22:33:52.329005907Z'

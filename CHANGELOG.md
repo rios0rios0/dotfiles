@@ -22,6 +22,18 @@ Exceptions are acceptable depending on the circumstances (critical bug fixes tha
 
 ## [Unreleased]
 
+## [2.2.0] - 2026-11-25
+
+### Added
+
+- added TFLint to the Linux/WSL dependency installer, so `make lint` in the Terraform repositories finds it on a fresh machine instead of failing: `install_tflint` downloads the release zip pinned to `v0.66.0`, the version and digests the pipelines repository installs on CI, into `~/.local/bin/tflint`, checked against a SHA-256 per architecture, and runs its version checks with `TFLINT_DISABLE_VERSION_CHECK=1`, because `tflint --version` otherwise asks GitHub for the latest release; `make test ONLY=tflint` covers the install, and the README, the Copilot instructions and the fresh-machine runbook list the tool
+
+### Fixed
+
+- fixed `npm_global` tombstones reaching only the active npm's tree: `remove_npm_global` now also removes the package from the tree of every Node.js NVM installed, with that Node's own `node` and npm, and checks that it is gone, so an older Node kept for the projects that pin it no longer keeps what the repository retired (Node `v24` on alien-a51 still held the `pyright` and `typescript-language-server` copies that the language-server move left behind, out of reach of tombstones that only saw `v26`)
+- fixed a new Node.js LTS silently starting without the global npm packages of the version before it, as Node `v26` did on alien-a51, which received none of `v24`'s: `install_nvm` now carries them over itself with `carry_npm_globals`, one `npm install -g --ignore-scripts` per package at the version it had, in place of nvm's `--reinstall-packages-from`, which put them all into one install with their scripts so that a single failure carried none, and whose failure nothing reported; it names every package that does not come across with the command that installs it, and a switch that goes wrong (a package that does not come across, or an LTS that does not install) fails the run once, through `verify`, with a marker in `$NVM_DIR` so that the next run retries it, while a retry that goes wrong too only warns, so that a package which can never install does not re-run the 45-120 minute installer on every apply; it never carries `npm`, `corepack`, linked packages or a package whose command is already in `~/.local/bin`, which a copy in NVM's bin would shadow, and once it is done it names the old version with the `nvm uninstall` that removes it
+- fixed Claude Code reporting `pyright-langserver` (and, for TypeScript files, `typescript-language-server`) not found after NVM's default Node changes: `run_onchange_after_linux-012-setup-claude-lsp.sh` now installs `pyright` and `typescript-language-server`, with `typescript` `6.0.3`, into `~/.local/share/claude-lsp` and links the two servers from `~/.local/bin`, where `gopls` already lives, instead of into NVM's per-version tree, where the switch from Node `v24` to `v26` left them behind; the Linux removal script drops the copies an earlier apply left in the current Node's tree, which `.zshenv` would put ahead of the links, and `make test ONLY=claude-lsp` covers the prefix, the links, a repointed link and a new NVM default
+
 ## [2.1.1] - 2026-11-18
 
 ### Fixed
