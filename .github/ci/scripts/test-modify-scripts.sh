@@ -369,7 +369,7 @@ settings_passes_a_linux_file_with_the_look_through() {
     mkdir -p "$home"
     CASE_HOME="$home" apply_modify_template dot_claude/modify_settings.json .claude/settings.json "" "${LINUX[@]}" \
         | jq --indent 2 '{model: "opus", statusLine: .statusLine, tui: .tui, theme: .theme, voiceEnabled: true,
-            pluginConfigs: .pluginConfigs}' \
+            pluginConfigs: .pluginConfigs, env: .env}' \
         > "$SANDBOX/look.json"
 
     # when
@@ -378,6 +378,25 @@ settings_passes_a_linux_file_with_the_look_through() {
 
     # then
     cmp -s "$SANDBOX/look.json" "$SANDBOX/look.out"
+}
+
+settings_raises_the_subagent_limit_on_linux_only() {
+    # given a Linux file with an env variable of the user's own and the limit set by hand
+    local home="$SANDBOX/env-home"
+    mkdir -p "$home"
+    local input='{"env": {"MY_VARIABLE": "kept", "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS": "8"}}'
+
+    # when
+    local linux android
+    linux=$(CASE_HOME="$home" apply_modify_template dot_claude/modify_settings.json .claude/settings.json "$input" \
+        "${LINUX[@]}") || return 1
+    android=$(apply_modify_template dot_claude/modify_settings.json .claude/settings.json "" "${ANDROID[@]}") ||
+        return 1
+
+    # then: Linux gets 32 and keeps the user's variable; Android gets no env at all
+    [[ "$(jq -r '.env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS' <<<"$linux")" = "32" ]] &&
+        [[ "$(jq -r '.env.MY_VARIABLE' <<<"$linux")" = "kept" ]] &&
+        [[ "$(jq -r 'has("env")' <<<"$android")" = "false" ]]
 }
 
 # Claude Code reads AGENTS.md itself, but by default not where a CLAUDE.md sits in the working
@@ -609,6 +628,8 @@ else
     run_case "settings.json: takes out the retired GitHub MCP rule" settings_retires_the_github_mcp_rule
     run_case "settings.json: passes a complete file through byte for byte" settings_passes_a_complete_file_through
     run_case "settings.json: gives Linux the look and none of the rules" settings_gives_linux_the_look_only
+    run_case "settings.json: raises the concurrent subagent limit to 32 on Linux only" \
+        settings_raises_the_subagent_limit_on_linux_only
     run_case "settings.json: has Claude Code read AGENTS.md beside CLAUDE.md on Linux and Android" \
         settings_reads_agents_md_on_both_platforms
     run_case "settings.json: sets that one option and keeps every other plugin entry" settings_keeps_other_plugin_configs

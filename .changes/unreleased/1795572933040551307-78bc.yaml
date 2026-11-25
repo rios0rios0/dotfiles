@@ -1,0 +1,3 @@
+kind: 'Changed'
+body: 'raised Claude Code''s concurrent subagent limit on Linux from its default of 20 to 32: `dot_claude/modify_settings.json` now merges `env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` into `~/.claude/settings.json` key by key, keeping any variable of your own, so that a session leading many parallel agents is not refused its next one; Android does not get it, since every agent there counts against the phantom-process budget'
+time: '2026-11-25T02:15:33.040491072Z'

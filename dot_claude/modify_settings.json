@@ -4,7 +4,11 @@
 
   - Linux gets Claude Code's look -- theme, renderer and status line -- from
     lib-claude-look.tmpl. A key whose value differs is set back, so change the look in
-    that library, not with /theme.
+    that library, not with /theme. Linux also gets the env variables below, merged key by key
+    into settings.json's "env", so a variable of the user's own stays: today only
+    CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS, raised from Claude Code's default of 20 to 32 so that a
+    lead session running a fleet of parallel agents is not refused its next one. Android does not
+    get it: every agent there counts against the phantom-process budget.
   - Android gets this repository's permission rules, and effortLevel when it is missing.
     Rules already present, including ones added by hand, keep their place; missing ones
     are appended in the order below, and retired ones are taken out.
@@ -38,6 +42,23 @@
 {{-   end -}}
 {{-   if $updated -}}
 {{-     warnf "[claude-settings] set %s in ~/.claude/settings.json" (join ", " $updated) -}}
+{{-     $changed = true -}}
+{{-   end -}}
+{{-   $claudeEnv := dict "CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS" "32" -}}
+{{-   $env := dict -}}
+{{-   if kindIs "map" (get $settings "env") -}}
+{{-     $env = get $settings "env" -}}
+{{-   end -}}
+{{-   $envUpdated := list -}}
+{{-   range $key, $value := $claudeEnv -}}
+{{-     if ne (toJson (get $env $key)) (toJson $value) -}}
+{{-       $_ := set $env $key $value -}}
+{{-       $envUpdated = append $envUpdated $key -}}
+{{-     end -}}
+{{-   end -}}
+{{-   if $envUpdated -}}
+{{-     $_ := set $settings "env" $env -}}
+{{-     warnf "[claude-settings] set env.%s in ~/.claude/settings.json" (join ", env." $envUpdated) -}}
 {{-     $changed = true -}}
 {{-   end -}}
 {{- else -}}

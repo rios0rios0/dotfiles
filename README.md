@@ -197,7 +197,7 @@ This repository manages four Claude Code configuration files. Each targets a dif
 
 | Repository Path | Deployed To | Purpose |
 |-----------------|-------------|---------|
-| `dot_claude/modify_settings.json` | `~/.claude/settings.json` | Linux: the look (theme, renderer, status line). Android: default permission rules (`allow` list) and effort level |
+| `dot_claude/modify_settings.json` | `~/.claude/settings.json` | Linux: the look (theme, renderer, status line) and `env.CLAUDE_CODE_MAX_CONCURRENT_SUBAGENTS` (32). Android: default permission rules (`allow` list) and effort level |
 | `dot_claude/executable_statusline-command.sh` | `~/.claude/statusline-command.sh` | The status line Claude Code runs (Linux) |
 | `dot_claude/modify_dot_claude.json` | `~/.claude/.claude.json` | Auto-trusts project directories to skip the trust dialog |
 | `modify_dot_claude.json` (root) | `~/.claude.json` | User-scoped MCP servers (see [MCP Servers](#mcp-servers)) |
